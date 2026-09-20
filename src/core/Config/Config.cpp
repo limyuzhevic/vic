@@ -1,16 +1,21 @@
 #include "Config.hpp"
+#include "ConfigParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unique_ptr<ConfigParserManager> parserManager;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->parserManager = std::make_unique<ConfigParserManager>();
+}
 
 Config::~Config() = default;
 
@@ -19,40 +24,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::vector<std::pair<std::string, ConfigValue>> entries;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Try to parse using the parser manager
+    if (pImpl->parserManager->parseFromFile(filepath, entries)) {
+        // Convert entries to ConfigEntry format
+        for (const auto& entry : entries) {
+            set(entry.first, entry.second, ConfigSource::File);
+        }
+        return true;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +67,44 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // For backward compatibility, save in simple key=value format
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -171,18 +189,61 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
+    // Group entries by source for better organization
+    std::unordered_map<ConfigSource, std::vector<const ConfigEntry*>> grouped;
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        grouped[entry.source].push_back(&entry);
     }
+    
+    // Print summary by source
+    oss << "Sources:\n";
+    oss << "  Default (" << grouped[ConfigSource::Default].size() << ")\n";
+    oss << "  File (" << grouped[ConfigSource::File].size() << ")\n";
+    oss << "  CommandLine (" << grouped[ConfigSource::CommandLine].size() << ")\n";
+    oss << "  Runtime (" << grouped[ConfigSource::Runtime].size() << ")\n\n";
+    
+    // Show detailed entries
+    oss << "Entries by source:\n";
+    for (const auto& [source, entries] : grouped) {
+        oss << "  " << static_cast<int>(source) << ":\n";
+        for (const auto* entry : entries) {
+            oss << "    " << entry->key << " = [";
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << "\"" << arg[i] << "\"";
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    oss << (arg ? "true" : "false");
+                } else {
+                    oss << arg;
+                }
+            }, entry->value);
+            oss << "]\n";
+        }
+    }
+    
     return oss.str();
 }
 

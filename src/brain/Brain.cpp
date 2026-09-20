@@ -439,11 +439,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) - WITH NEUROMODULATION ==========
+    // Calculate neuromodulation factor for plasticity (FIXED - TODO addressed)
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply neuromodulation to plasticity (FIXED - TODO addressed)
+    // Neuromodulators like dopamine modulate synaptic plasticity strength
+    float neuromodulationStrength = 1.0f;
+    if (pImpl->predictionError) {
+        neuromodulationStrength = pImpl->predictionError->getStrength() * 0.5f + 1.0f;
     }
     
     for (auto& region : pImpl->regions) {
@@ -454,27 +461,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Modify weight change based on neuromodulation
                     pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f * neuromodulationStrength;
                     syn->setWeight(weight);
                 }
             }
             
-            // Apply Hebbian learning
+            // Apply Hebbian learning with neuromodulation
             if (syn->getPlasticityFlags().hebbian) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    // Hebbian learning strength is also modulated by neuromodulators
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 0.5f : -0.5f) * neuromodulationStrength * 0.0005f;
+                    syn->setWeight(weight);
                 }
             }
             
             // Update synapse state
             syn->step(currentTime);
         }
+    }
+    
+    // Apply neuromodulation to working memory strength
+    if (pImpl->workingMemory && pImpl->dopamine) {
+        float memoryStrength = pImpl->dopamine->getLevel() * 0.5f + 0.5f;
+        pImpl->workingMemory->setMemoryStrength(memoryStrength);
+    }
+    
+    // Apply neuromodulation to attention
+    if (pImpl->attention && pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        pImpl->attention->setInhibitionStrength(0.5f + noveltyLevel * 0.3f);
     }
     
     // ========== STEP 7: Update episodic memory ==========
@@ -511,8 +534,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory input and use prediction errors
+        // Get current sensory activity from neural activity
+        float totalSensoryActivity = 0.0f;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            const auto& state = neuron->getState();
+            totalSensoryActivity += std::abs(state.membranePotential - state.restingPotential);
+        }
+        
+        // Create a prediction based on current neural patterns
+        PredictionInput predictionInput;
+        predictionInput.sensoryActivity = totalSensoryActivity;
+        predictionInput.currentNeurons = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->isFiring()) {
+                    predictionInput.currentNeurons++;
+                }
+            }
+        }
+        
+        // Process prediction
+        pImpl->predictionSystem->update(predictionInput);
+        
+        // Get prediction error and feed it to neuromodulation
+        if (pImpl->predictionError) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->update(error);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +577,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
+        // Update concept formation with current neural patterns
         // This requires sensory state encoding
+        
+        // Prepare neural pattern for concept formation
+        ConceptInput conceptInput;
+        conceptInput.timestamp = currentTime;
+        conceptInput.step = currentStep;
+        
+        // Collect current neural activity patterns
+        // Focus on regions with significant activity
+        std::vector<NeuralPattern> currentPatterns;
+        for (auto& region : pImpl->regions) {
+            NeuralPattern pattern;
+            pattern.regionId = region->getId();
+            
+            // Collect firing neuron activations
+            for (auto* neuron : region->getAllNeurons()) {
+                const auto& state = neuron->getState();
+                if (neuron->isFiring() || 
+                    std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                    pattern.neuronActivations.push_back({
+                        neuron->getId(),
+                        std::abs(state.membranePotential - state.restingPotential)
+                    });
+                }
+            }
+            
+            if (!pattern.neuronActivations.empty()) {
+                currentPatterns.push_back(pattern);
+            }
+        }
+        
+        // Update concept formation with patterns
+        if (!currentPatterns.empty()) {
+            conceptInput.patterns = currentPatterns;
+            pImpl->conceptFormation->update(conceptInput);
+        }
+        
+        // Apply formed concepts to brain state
+        auto formedConcepts = pImpl->conceptFormation->getActiveConcepts();
+        for (const auto& concept : formedConcepts) {
+            // Apply concept to influence neural activity
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float conceptInfluence = concept.influence * pImpl->curiosity->getLevel() * 0.1f;
+                neuron->injectCurrent(conceptInfluence);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -787,6 +881,8 @@ bool Brain::save(const std::string& filepath) const {
         neuronData.threshold.reserve(getTotalNeuronCount());
         neuronData.resetPotential.reserve(getTotalNeuronCount());
         neuronData.leakConductance.reserve(getTotalNeuronCount());
+        neuronData.excitatoryConductance.reserve(getTotalNeuronCount());
+        neuronData.inhibitoryConductance.reserve(getTotalNeuronCount());
         
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
@@ -797,10 +893,26 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.threshold.push_back(state.threshold);
                     neuronData.resetPotential.push_back(state.resetPotential);
                     neuronData.leakConductance.push_back(state.leakConductance);
+                    neuronData.excitatoryConductance.push_back(state.excitatoryConductance);
+                    neuronData.inhibitoryConductance.push_back(state.inhibitoryConductance);
                     neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.lastLastSpikeTime.push_back(state.lastLastSpikeTime);
+                    neuronData.adaptationVariable.push_back(state.adaptationVariable);
+                    neuronData.adaptationVariable2.push_back(state.adaptationVariable2);
+                    neuronData.predictionError.push_back(state.predictionError);
+                    neuronData.metaplasticThreshold.push_back(state.metaplasticThreshold);
+                    neuronData.neuromodulationLevel.push_back(state.neuromodulationLevel);
+                    neuronData.gainFactor.push_back(state.gainFactor);
+                    neuronData.noiseAmplitude.push_back(state.noiseAmplitude);
+                    neuronData.timeConstant.push_back(state.timeConstant);
+                    neuronData.totalInput.push_back(state.totalInput);
+                    neuronData.adaptiveExcitability.push_back(state.adaptiveExcitability ? 1 : 0);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    neuronData.regionId.push_back(state.regionId.index());
+                    neuronData.populationId.push_back(state.populationId.index());
                 }
             }
         }
@@ -882,6 +994,8 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.refractoryRemaining.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
+                        // Note: The NeuronState has additional fields that would need to be set
+                        // through additional accessors or a bulk setState method
                     }
                     idx++;
                 }

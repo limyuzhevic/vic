@@ -202,39 +202,89 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // LIF dynamics: Leaky Integrate-and-Fire with conductance-based synapses
+    // dV/dt = (V_rest - V + I_syn * g_syn)/tau_m + I_noise + I_adaptive
+    // Where g_syn = excitatory_conductance - inhibitory_conductance
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Apply neuromodulation effects
+    // Dopamine lowers threshold for excitability
+    if (pImpl->state.adaptiveExcitability) {
+        float dopamineEffect = pImpl->state.neuromodulationLevel * 0.5f;  // Up to 50% threshold reduction
+        threshold -= dopamineEffect;
+    }
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Acetylcholine increases gain (noise amplitude) and boosts excitatory conductance
+    float acetylcholineEffect = pImpl->state.gainFactor * 1.5f;  // Boost gain
+    pImpl->state.noiseAmplitude = 0.1f * acetylcholineEffect;  // Higher noise for exploration
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Add Gaussian noise for stochasticity (biologically realistic)
+    float noise = pImpl->state.noiseAmplitude * (static_cast<float>(rand()) / RAND_MAX - 0.5f);
+    noise *= 2.0f;  // Scale noise appropriately
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Calculate effective total conductance
+    float totalConductance = pImpl->state.excitatoryConductance - pImpl->state.inhibitoryConductance;
+    float effectiveConductance = totalConductance * acetylcholineEffect;  // ACh boosts all synaptic efficacy
+    
+    // Convert conductance to current: I_syn = g_syn * (V - E_syn)
+    // For simplicity, use reversal potentials:
+    // Excitatory (AMPA): ~0mV, Inhibitory (GABA): ~-70mV
+    float excitatoryCurrent = pImpl->state.excitatoryConductance * (0.0f - V);
+    float inhibitoryCurrent = pImpl->state.inhibitoryConductance * (-70.0f - V);
+    float synapticCurrent = excitatoryCurrent + inhibitoryCurrent;
+    
+    // Add external input (current injection)
+    synapticCurrent += pImpl->synapticInput;
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
+    // Apply metaplasticity: prediction error adjusts future learning rates
+    if (pImpl->state.predictionError != 0.0f) {
+        // Positive prediction error (better than expected) increases plasticity threshold
+        if (pImpl->state.predictionError > 0.0f) {
+            pImpl->state.metaplasticThreshold += pImpl->state.predictionError * 0.001f;
+        } else {
+            // Negative prediction error (worse than expected) decreases plasticity
+            pImpl->state.metaplasticThreshold += pImpl->state.predictionError * 0.002f;
+        }
+        // Clamp metaplastic threshold to reasonable range
+        pImpl->state.metaplasticThreshold = std::clamp(pImpl->state.metaplasticThreshold, 0.1f, 1.0f);
+        
+        // Clear prediction error after applying metaplastic changes
+        pImpl->state.predictionError = 0.0f;
+    }
+    
+    // Update adaptive membrane time constant based on recent activity
+    if (pImpl->state.lastSpikeTime > 0.0f && currentTime - pImpl->state.lastSpikeTime < 100.0f) {
+        // Recent high activity reduces time constant (faster response)
+        pImpl->state.timeConstant = std::max(5.0f, pImpl->state.timeConstant * 0.98f);
+    } else {
+        // Baseline time constant recovers
+        pImpl->state.timeConstant = std::min(50.0f, pImpl->state.timeConstant * 1.02f);
+    }
+    
+    // Clamp membrane potential to prevent instability (input saturation)
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
-    if (V >= threshold) {
+    // Check for spike with noise-modulated threshold
+    float thresholdMod = threshold;
+    if (pImpl->state.noiseAmplitude > 0.0f) {
+        // Noise can cause premature firing or delay spike
+        thresholdMod += noise * 0.5f;
+    }
+    
+    if (V >= thresholdMod) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastLastSpikeTime = pImpl->state.lastSpikeTime;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike
@@ -248,10 +298,32 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptationVariable += 1.0f + pImpl->state.predictionError * 0.1f;
+        
+        // Update adaptation variable 2 for slower dynamics
+        pImpl->state.adaptationVariable2 += 0.5f;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
+    
+    // Calculate derivatives for membrane potential update
+    float leakTerm = (V_rest - V) / pImpl->state.timeConstant;
+    float synapticTerm = synapticCurrent / Impl::MEMBRANE_CAPACITANCE;
+    
+    // Apply noise to membrane dynamics
+    float noiseTerm = noise / Impl::MEMBRANE_CAPACITANCE;
+    
+    // Update membrane potential using exponential Euler integration
+    V += static_cast<float>(dt) * 1000.0f * (leakTerm + synapticTerm + noiseTerm);
+    
+    // Apply adaptation effects to membrane potential
+    if (pImpl->state.adaptationVariable2 > 0.0f) {
+        V -= pImpl->state.adaptationVariable2 * 0.001f;  // Slower adaptation
+        pImpl->state.adaptationVariable2 *= 0.99f;
+    }
+    
+    // Clamp again after integration
+    V = std::clamp(V, -100.0f, 50.0f);
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
@@ -288,11 +360,40 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
+    // Excitation/inhibition conductance balance (typically 3:1 ratio)
+    float balance = rng.uniformReal(0.8f, 1.2f);
+    pImpl->state.excitatoryConductance = 3.0f * balance;  // More excitation
+    pImpl->state.inhibitoryConductance = 1.0f * balance;
+    
+    // Neuromodulation levels (initially low)
+    pImpl->state.neuromodulationLevel = rng.uniformReal(0.0f, 0.2f);  // Low initial neuromodulation
+    pImpl->state.gainFactor = rng.uniformReal(1.0f, 1.5f);  // Slightly increased gain
+    
+    // Noise amplitude for stochastic dynamics
+    pImpl->state.noiseAmplitude = rng.uniformReal(0.01f, 0.05f);  // Low noise initially
+    
+    // Adaptive membrane time constant
+    pImpl->state.timeConstant = rng.uniformReal(15.0f, 25.0f);  // Typical 20ms
+    
+    // Prediction error for metaplasticity (initialized near 0)
+    pImpl->state.predictionError = rng.uniformReal(-0.1f, 0.1f);
+    
+    // Metaplastic threshold
+    pImpl->state.metaplasticThreshold = rng.uniformReal(0.3f, 0.7f);
+    
+    // Input clamping settings
+    pImpl->state.totalInput = 0.0f;  // Will be updated dynamically
+    
+    // Adaptive excitability flag
+    pImpl->state.adaptiveExcitability = false;  // Will be set by neuromodulators
+    
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.adaptationVariable2 = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.lastLastSpikeTime = -1.0f;
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;

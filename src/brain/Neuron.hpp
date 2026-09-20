@@ -18,12 +18,24 @@ struct NeuronState {
     MembranePotential resetPotential;       // Post-spike reset value (mV)
     MembranePotential leakConductance;      // Leak conductance (nS)
     MembranePotential synapseConductance;   // Synaptic conductance (nS)
+    MembranePotential excitatoryConductance; // Total excitatory conductance (nS)
+    MembranePotential inhibitoryConductance;  // Total inhibitory conductance (nS)
     FiringRate firingRate;                 // Current firing rate (Hz)
     FiringState firingState;               // Current firing state
     uint32_t refractoryRemaining;          // Steps remaining in refractory period
     uint32_t refractoryPeriod;             // Total refractory period (steps)
     float adaptationVariable;              // For spike-frequency adaptation
+    float adaptationVariable2;             // Second adaptation variable for slow dynamics
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+    float lastLastSpikeTime;               // Previous spike time for interval calculations
+    float predictionError;                 // Reward prediction error for metaplasticity
+    float metaplasticThreshold;            // Threshold for metaplastic changes
+    float neuromodulationLevel;            // Current neuromodulation level (0-1)
+    float gainFactor;                      // Neural gain factor (acetylcholine effect)
+    float noiseAmplitude;                  // Noise amplitude for stochasticity
+    float timeConstant;                    // Adaptive membrane time constant
+    float totalInput;                      // Total synaptic input (mV/ms)
+    bool adaptiveExcitability;             // Whether to apply dopamine effects
     
     NeuronState()
         : membranePotential(-70.0f)
@@ -32,12 +44,24 @@ struct NeuronState {
         , resetPotential(-70.0f)
         , leakConductance(10.0f)
         , synapseConductance(0.0f)
+        , excitatoryConductance(0.0f)
+        , inhibitoryConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
         , refractoryPeriod(5)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , adaptationVariable2(0.0f)
+        , lastSpikeTime(-1.0f)
+        , lastLastSpikeTime(-1.0f)
+        , predictionError(0.0f)
+        , metaplasticThreshold(0.5f)
+        , neuromodulationLevel(0.0f)
+        , gainFactor(1.0f)
+        , noiseAmplitude(0.0f)
+        , timeConstant(20.0f)
+        , totalInput(0.0f)
+        , adaptiveExcitability(false) {}
 };
 
 // Neuron class representing a single neuron

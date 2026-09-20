@@ -1,7 +1,9 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "core/Config/ConfigParser.hpp"
 #include <cassert>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 namespace test_config {
 
@@ -78,12 +80,139 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigLoadFromFile() {
+    nlm::Config config;
+    
+    // Test loading from JSON file
+    // Create a temporary JSON file
+    std::string jsonContent = R"({
+        "learning_rate": 0.01,
+        "plasticity": true,
+        "synapses": [10, 20, 30],
+        "neuron": {
+            "count": 500,
+            "region": {
+                "count": 1,
+                "type": "cortex"
+            }
+        }
+    })";
+    
+    // Write to a temporary file
+    const std::string testFile = "test_config.json";
+    std::ofstream file(testFile);
+    file << jsonContent;
+    file.close();
+    
+    bool loaded = config.loadFromFile(testFile);
+    assert(loaded);
+    
+    // Check that values were loaded
+    auto lr = config.get<double>("learning_rate");
+    assert(lr.has_value());
+    assert(abs(*lr - 0.01) < 0.001);
+    
+    auto plasticity = config.get<bool>("plasticity");
+    assert(plasticity.has_value());
+    assert(*plasticity == true);
+    
+    auto synapses = config.get<std::vector<int>>("synapses");
+    assert(synapses.has_value());
+    assert(synapses->size() == 3);
+    assert((*synapses)[0] == 10);
+    
+    auto neuronCount = config.get<int>("neuron.count");
+    assert(neuronCount.has_value());
+    assert(*neuronCount == 500);
+    
+    // Clean up
+    std::remove(testFile.c_str());
+    
+    std::cout << "    testConfigLoadFromFile passed" << std::endl;
+}
+
+void testConfigLoadFromArgs() {
+    nlm::Config config;
+    
+    // Test command line argument parsing
+    const char* argv[] = {
+        "program_name",
+        "--learning_rate", "0.05",
+        "--plasticity", "true",
+        "-synapses", "1,2,3"
+    };
+    
+    int argc = 6;
+    config.loadFromArgs(argc, const_cast<char**>(argv));
+    
+    auto lr = config.get<double>("learning_rate");
+    assert(lr.has_value());
+    assert(abs(*lr - 0.05) < 0.001);
+    
+    auto plasticity = config.get<bool>("plasticity");
+    assert(plasticity.has_value());
+    assert(*plasticity == true);
+    
+    auto synapses = config.get<std::string>("synapses");
+    assert(synapses.has_value());
+    assert(*synapses == "1,2,3");
+    
+    std::cout << "    testConfigLoadFromArgs passed" << std::endl;
+}
+
+void testConfigFileFormatDetection() {
+    std::string jsonContent = "{\"key\": \"value\"}";
+    std::string yamlContent = "key: value\n  nested: true";
+    std::string simpleContent = "key = value\nnumber = 42";
+    
+    nlm::FileFormatDetector::Format jsonFormat = nlm::FileFormatDetector::detectFromContent(jsonContent);
+    assert(jsonFormat == nlm::FileFormatDetector::Format::JSON);
+    
+    nlm::FileFormatDetector::Format yamlFormat = nlm::FileFormatDetector::detectFromContent(yamlContent);
+    assert(yamlFormat == nlm::FileFormatDetector::Format::YAML);
+    
+    nlm::FileFormatDetector::Format simpleFormat = nlm::FileFormatDetector::detectFromContent(simpleContent);
+    assert(simpleFormat == nlm::FileFormatDetector::Format::SimpleKeyValue);
+    
+    std::cout << "    testConfigFileFormatDetection passed" << std::endl;
+}
+
+void testConfigParserManager() {
+    nlm::ConfigParserManager manager;
+    
+    // Get parser names
+    auto parserNames = manager.getParserNames();
+    assert(!parserNames.empty());
+    
+    // Test JSON parsing
+    std::string jsonContent = "{\"test\": \"value\"}";
+    std::vector<std::pair<std::string, nlm::ConfigValue>> entries;
+    
+    bool parsed = manager.parseFromContent(jsonContent, entries);
+    assert(parsed);
+    assert(entries.size() > 0);
+    
+    // Test backward compatibility with simple key=value
+    std::string simpleContent = "test = value\nnumber = 42";
+    entries.clear();
+    
+    parsed = manager.parseFromContent(simpleContent, entries);
+    assert(parsed);
+    assert(entries.size() >= 2);
+    
+    std::cout << "    testConfigParserManager passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigLoadFromFile();
+    testConfigLoadFromArgs();
+    testConfigFileFormatDetection();
+    testConfigParserManager();
 }
 
 } // namespace test_config

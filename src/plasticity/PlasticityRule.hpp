@@ -36,8 +36,6 @@ private:
     bool enabled_;
 };
 
-// Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -53,6 +51,15 @@ public:
     // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
+    void setTimeConstant(float tau);    // Time window for correlation (ms)
+    float getTimeConstant() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    // Configure all parameters
+    void configure(float learningRate, float timeConstant, float maxWeight);
     
 private:
     struct Impl;

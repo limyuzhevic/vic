@@ -8,10 +8,11 @@ struct Hebbian::Impl {
     float learningRate;
     float maxWeight;
     float minWeight;
+    float timeConstant;       // Time window for correlation (ms)
     float covarianceThreshold;  // For covariance rule
     
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             timeConstant(20.0f), covarianceThreshold(0.0f) {}
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -42,7 +43,7 @@ void Hebbian::update(Synapse* synapse,
      *   - Reflects AMPA receptor trafficking
      *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
      *   - Correlation-based learning in visual cortex
-     *   
+     *  
      * Limitations:
      *   - Doesn't account for STDP timing details
      *   - Single learning rate (no separate potentiation/depression rates)
@@ -57,9 +58,9 @@ void Hebbian::update(Synapse* synapse,
     size_t correlationCount = 0;
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
+            float dt_val = static_cast<float>(postTime - preTime);
             // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+            if (std::abs(dt_val) < pImpl->timeConstant) {  // Use configurable time window
                 ++correlationCount;
             }
         }
@@ -99,8 +100,26 @@ void Hebbian::setMaxWeight(float maxWeight) {
     pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
 }
 
-float Hebbian::getMaxWeight() const {
-    return pImpl->maxWeight;
+void Hebbian::setTimeConstant(float tau) {
+    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+}
+
+float Hebbian::getTimeConstant() const {
+    return pImpl->timeConstant;
+}
+
+void Hebbian::setMinWeight(float minWeight) {
+    pImpl->minWeight = std::clamp(minWeight, -10.0f, 0.0f);
+}
+
+float Hebbian::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
+void Hebbian::configure(float learningRate, float timeConstant, float maxWeight) {
+    setLearningRate(learningRate);
+    setTimeConstant(timeConstant);
+    setMaxWeight(maxWeight);
 }
 
 } // namespace nlm
