@@ -18,22 +18,22 @@ void testConfigSetAndGet() {
     config.set("int_value", 42, nlm::ConfigSource::Runtime);
     assert(config.has("int_value"));
     
-    auto intVal = config.get<int>("int_value");
+    const auto intVal = config.get<int>("int_value");
     assert(intVal.has_value());
     assert(*intVal == 42);
     
     config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
-    auto doubleVal = config.get<double>("double_value");
+    const auto doubleVal = config.get<double>("double_value");
     assert(doubleVal.has_value());
     assert(*doubleVal > 3.13 && *doubleVal < 3.15);
     
     config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
-    auto stringVal = config.get<std::string>("string_value");
+    const auto stringVal = config.get<std::string>("string_value");
     assert(stringVal.has_value());
     assert(*stringVal == "hello");
     
     config.set("bool_value", true, nlm::ConfigSource::Runtime);
-    auto boolVal = config.get<bool>("bool_value");
+    const auto boolVal = config.get<bool>("bool_value");
     assert(boolVal.has_value());
     assert(*boolVal == true);
     
@@ -43,12 +43,12 @@ void testConfigSetAndGet() {
 void testConfigGetOr() {
     nlm::Config config;
     
-    int val = config.getOr<int>("missing", 100);
+    const int val = config.getOr<int>("missing", 100);
     assert(val == 100);
     
     config.set("existing", 50, nlm::ConfigSource::Runtime);
-    val = config.getOr<int>("existing", 100);
-    assert(val == 50);
+    const int val2 = config.getOr<int>("existing", 100);
+    assert(val2 == 50);
     
     std::cout << "    testConfigGetOr passed" << std::endl;
 }
@@ -72,7 +72,7 @@ void testConfigKeys() {
     config.set("key2", 2, nlm::ConfigSource::Runtime);
     config.set("key3", 3, nlm::ConfigSource::Runtime);
     
-    auto keys = config.getKeys();
+    const auto keys = config.getKeys();
     assert(keys.size() == 3);
     
     std::cout << "    testConfigKeys passed" << std::endl;

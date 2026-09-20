@@ -1,0 +1,14 @@
+{
+  "neuron": {
+    "count": 500,
+    "region": {
+      "count": 1,
+      "type": "cortex"
+    }
+  },
+  "brain": {
+    "synapses": [10, 20, 30],
+    "plasticity": true,
+    "learning_rate": 0.01
+  }
+}

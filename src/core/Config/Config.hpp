@@ -3,13 +3,12 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <unordered_map>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -17,10 +16,7 @@ using ConfigValue = std::variant<
     int64_t,
     double,
     bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
+    std::string
 >;
 
 // Configuration source
@@ -41,6 +37,11 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Move constructor
+    ConfigEntry(ConfigEntry&& other) noexcept = default;
+    // Move assignment operator
+    ConfigEntry& operator=(ConfigEntry&& other) noexcept = default;
 };
 
 // Main configuration class
@@ -52,14 +53,18 @@ public:
     // Disable copying, enable moving
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
+    
+    // Move constructor
     Config(Config&&) noexcept;
+    
+    // Move assignment operator
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    bool loadFromArgs(int argc, char** argv) noexcept;
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -72,34 +77,42 @@ public:
     T getOr(const std::string& key, const T& defaultValue) const;
     
     // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime) noexcept;
     
     // Check existence
-    bool has(const std::string& key) const;
+    bool has(const std::string& key) const noexcept;
     
     // Remove key
-    void remove(const std::string& key);
+    void remove(const std::string& key) noexcept;
     
     // Get all keys
-    std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeys() const noexcept;
     
     // Clear all
-    void clear();
+    void clear() noexcept;
     
     // Get configuration summary
-    std::string summary() const;
+    std::string summary() const noexcept;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    static std::string trim(const std::string& str) noexcept;
+    static std::string toLower(const std::string& str) noexcept;
+    
+    // JSON parsing helpers
+    static bool parseJson(const std::string& content, nlohmann::json& result);
+    static bool parseYaml(const std::string& content, nlohmann::json& result);
+    static bool convertJsonToConfig(const nlohmann::json& j, std::vector<ConfigEntry>& entries);
+    static std::string configValueToString(const ConfigValue& value);
+    static ConfigValue stringToConfigValue(const std::string& str);
+    static bool validateConfigEntry(const ConfigEntry& entry);
 };
 
 } // namespace nlm

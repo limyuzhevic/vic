@@ -107,44 +107,119 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+# Core experiment system (integration framework)
+add_library(nlm_core_experiment STATIC
+    src/core/experiment/CoreExperimentSystem.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_core_experiment PUBLIC src)
+target_link_libraries(nlm_core_experiment PUBLIC nlm_core)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Brain system experiments (integrated from Phase 4)
+add_library(nlm_brain_experiments STATIC
+    src/brain/experiment/PredictionExperimentIntegration.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_brain_experiments PUBLIC src)
+target_link_libraries(nlm_brain_experiments PUBLIC nlm_core nlm_agent)
 
-# Main executable
+# Neuromodulation system experiments (integrated from Phase 4)
+add_library(nlm_neuromodulation_experiments STATIC
+    src/neuromodulation/experiment/NeuromodulationExperimentIntegration.cpp
+)
+target_include_directories(nlm_neuromodulation_experiments PUBLIC src)
+target_link_libraries(nlm_neuromodulation_experiments PUBLIC nlm_core)
+
+# Memory system experiments (integrated from Phase 4)
+add_library(nlm_memory_experiments STATIC
+    src/memory/experiment/MemoryExperimentIntegration.cpp
+)
+target_include_directories(nlm_memory_experiments PUBLIC src)
+target_link_libraries(nlm_memory_experiments PUBLIC nlm_core nlm_agent)
+
+# Cognition system experiments (integrated from Phase 4)
+add_library(nlm_cognition_experiments STATIC
+    src/cognition/experiment/CognitiveExperimentIntegration.cpp
+)
+target_include_directories(nlm_cognition_experiments PUBLIC src)
+target_link_libraries(nlm_cognition_experiments PUBLIC nlm_core nlm_agent)
+
+# Performance experiments and benchmarks
+add_library(nlm_performance_experiments STATIC
+    src/performance/experiment/PerformanceBenchmarks.cpp
+)
+target_include_directories(nlm_performance_experiments PUBLIC src)
+target_link_libraries(nlm_performance_experiments PUBLIC nlm_core)
+
+# Main executable (core system only)
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase 3 demonstration (now in tests)
 add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+    src/experiments/tests/BasicWorldInteractionDemo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_core_experiment)
 
-# Phase 4 demo executable
+# Phase 4 demonstration (now in tests)
 add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+    src/experiments/tests/AdvancedSystemIntegrationDemo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_core_experiment nlm_brain_experiments nlm_memory_experiments)
+
+# Phase 5 demonstration (now integrated in core)
+add_executable(nlm_phase5_demo
+    src/experiments/tests/LifetimeLearningDemo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_core_experiment nlm_brain_experiments nlm_neuromodulation_experiments)
+
+# Phase 6 demonstration (now integrated in core)
+add_executable(nlm_phase6_demo
+    src/experiments/tests/FullSystemDemo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_core_experiment nlm_brain_experiments nlm_memory_experiments nlm_cognition_experiments nlm_neuromodulation_experiments)
+
+# Integration tests (Phase 4, 5, 6 specific)
+add_executable(nlm_integration_tests
+    src/experiments/tests/Phase4IntegrationTest.cpp
+    src/experiments/tests/Phase5LifetimeLearningTest.cpp
+    src/experiments/tests/Phase6IntegrationTest.cpp
+)
+target_link_libraries(nlm_integration_tests PUBLIC nlm_core_experiment nlm_brain_experiments nlm_memory_experiments nlm_cognition_experiments nlm_neuromodulation_experiments)
+
+# Comprehensive integration tests framework
+add_executable(nlm_comprehensive_integration_tests
+    src/tests/integration/MainIntegrationTestRunner.cpp
+    src/tests/integration/IntegrationTestFramework.cpp
+    src/tests/integration/TestSystemIntegration.cpp
+    src/tests/integration/TestMemoryIntegration.cpp
+    src/tests/integration/TestCognitionIntegration.cpp
+    src/tests/integration/TestNeuromodulationIntegration.cpp
+    src/tests/integration/TestDevelopmentIntegration.cpp
+    src/tests/integration/TestCrossSystemIntegration.cpp
+)
+target_link_libraries(nlm_comprehensive_integration_tests
+    PUBLIC
+    nlm_core
+    nlm_agent
+    nlm_world
+    nlm_core_experiment
+    nlm_brain_experiments
+    nlm_memory_experiments
+    nlm_cognition_experiments
+    nlm_neuromodulation_experiments
+)
+target_include_directories(nlm_comprehensive_integration_tests
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_core_experiment nlm_phase3_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
