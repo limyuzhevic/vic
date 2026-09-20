@@ -6,14 +6,14 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -110,25 +110,35 @@ struct Brain::Impl {
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+        workingMemory->initialize(this);
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        episodicMemory->initialize(this);
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        associativeMemory->initialize(this);
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
+        planner->initialize(this);
         conceptFormation = std::make_unique<ConceptFormation>();
+        conceptFormation->initialize(this);
         attention = std::make_unique<AttentionalSelection>();
+        attention->initialize(this);
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        dopamine->initialize(this);
         curiosity = std::make_unique<Curiosity>();
+        curiosity->initialize(this);
         predictionError = std::make_unique<PredictionError>();
+        predictionError->initialize(this);
         novelty = std::make_unique<Novelty>();
+        novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -243,7 +253,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -609,9 +619,15 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Store in working memory for future retrieval
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+        
+        // Store in episodic memory with sensory state
+        if (pImpl->episodicMemory && !values.empty()) {
+            std::vector<float> sensoryState = values;
+            storeToEpisodicMemory(sensoryState, ActionType::Wait, normalizedValue);
         }
     }
 }

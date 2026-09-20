@@ -1,30 +1,24 @@
+// Curiosity implementation
 #include "Curiosity.hpp"
-#include "../core/Logger/Logger.hpp"
+#include <algorithm>
 
 namespace nlm {
 
 struct Curiosity::Impl {
-    class Brain* brain;
     float level;
     float noveltyWeight;
     float predictionErrorWeight;
-    float decayRate;
+    float baseline;
     
-    Impl() 
-        : brain(nullptr)
-        , level(0.0f)
-        , noveltyWeight(0.5f)
-        , predictionErrorWeight(0.5f)
-        , decayRate(0.05f) {}
+    Impl() : level(0.0f), noveltyWeight(0.5f), predictionErrorWeight(0.5f), baseline(0.0f) {}
 };
 
 Curiosity::Curiosity() : pImpl(new Impl) {}
 
 Curiosity::~Curiosity() = default;
 
-void Curiosity::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("Curiosity system initialized");
+void Curiosity::initialize(class Brain* brain) {
+    // Store brain reference if needed
 }
 
 float Curiosity::getLevel() const {
@@ -32,27 +26,26 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
-    // Curiosity increases with novelty and prediction error
-    float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
-    
-    // Smooth update
-    pImpl->level += (target - pImpl->level) * 0.1f;
-    
-    // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Curiosity is weighted combination of novelty and prediction error
+    float newLevel = pImpl->noveltyWeight * novelty + 
+                    pImpl->predictionErrorWeight * predictionError;
+    pImpl->level = (pImpl->level * 0.9f) + (newLevel * 0.1f);  // Smooth update
 }
 
 float Curiosity::getExplorationDrive() const {
-    return pImpl->level;
+    return getLevel();
 }
 
 void Curiosity::setNoveltyWeight(float weight) {
-    pImpl->noveltyWeight = weight;
+    pImpl->noveltyWeight = std::max(0.0f, std::min(1.0f, weight));
+    // Adjust prediction error weight to maintain sum = 1
+    pImpl->predictionErrorWeight = 1.0f - pImpl->noveltyWeight;
 }
 
 void Curiosity::setPredictionErrorWeight(float weight) {
-    pImpl->predictionErrorWeight = weight;
+    pImpl->predictionErrorWeight = std::max(0.0f, std::min(1.0f, weight));
+    // Adjust novelty weight to maintain sum = 1
+    pImpl->noveltyWeight = 1.0f - pImpl->predictionErrorWeight;
 }
 
 void Curiosity::reset() {

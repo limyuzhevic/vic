@@ -1,13 +1,15 @@
+// Reward implementation
 #include "Reward.hpp"
+#include <algorithm>
 
 namespace nlm {
 
 struct Reward::Impl {
-    float currentValue;
-    float accumulatedReward;
+    float value;
+    float accumulated;
     std::vector<float> history;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    Impl() : value(0.0f), accumulated(0.0f) {}
 };
 
 Reward::Reward() : pImpl(new Impl) {}
@@ -15,26 +17,30 @@ Reward::Reward() : pImpl(new Impl) {}
 Reward::~Reward() = default;
 
 float Reward::getValue() const {
-    return pImpl->currentValue;
+    return pImpl->value;
 }
 
 void Reward::setValue(float value) {
-    pImpl->currentValue = value;
+    pImpl->value = value;
+    pImpl->accumulated += value;
 }
 
 void Reward::add(float delta) {
-    pImpl->accumulatedReward += delta;
-    pImpl->currentValue += delta;
+    pImpl->value += delta;
+    pImpl->accumulated += delta;
+    pImpl->history.push_back(delta);
+    if (pImpl->history.size() > 10000) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
 }
 
 void Reward::reset() {
-    pImpl->currentValue = 0.0f;
-    pImpl->accumulatedReward = 0.0f;
+    pImpl->value = 0.0f;
+    pImpl->history.clear();
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // TODO PHASE 2: Implement real reward computation
     return 0.0f;
 }
 

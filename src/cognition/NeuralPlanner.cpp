@@ -1,10 +1,201 @@
-#include "NeuralPlanner.hpp"
+#include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace nlm {
 
+struct ConceptFormation::Impl {
+    Brain* brain;
+    
+    // Concept prototypes
+    std::vector<std::vector<float>> conceptPrototypes;
+    
+    // Pattern associations
+    std::vector<std::pair<std::vector<float>, std::vector<float>>> patternAssociations;
+    
+    // Concept weights for pattern matching
+    std::vector<float> conceptWeights;
+    
+    Impl() : brain(nullptr) {}
+};
+
+ConceptFormation::ConceptFormation()
+    : pImpl(new Impl)
+    , conceptLearningRate_(0.1f)
+    , conceptStabilityThreshold_(0.8f)
+    , minPatternSimilarity_(0.3f)
+{
+}
+
+ConceptFormation::~ConceptFormation() = default;
+
+void ConceptFormation::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("ConceptFormation initialized");
+}
+
+void ConceptFormation::discoverConcepts(const std::vector<float>& sensoryPattern,
+                                       SimulationStep step) {
+    if (!pImpl->brain) return;
+    
+    // Check if this pattern is similar to existing concepts
+    size_t bestConcept = findClosestConcept(sensoryPattern);
+    
+    if (bestConcept < pImpl->conceptPrototypes.size()) {
+        // Update existing concept
+        std::vector<float>& prototype = pImpl->conceptPrototypes[bestConcept];
+        for (size_t i = 0; i < sensoryPattern.size() && i < prototype.size(); ++i) {
+            prototype[i] = prototype[i] * (1.0f - conceptLearningRate_) + 
+                         sensoryPattern[i] * conceptLearningRate_;
+        }
+        
+        // Update concept weight based on pattern consistency
+        pImpl->conceptWeights[bestConcept] = 
+            std::min(1.0f, pImpl->conceptWeights[bestConcept] + 0.01f);
+    } else {
+        // Create new concept
+        createConcept(sensoryPattern, step);
+    }
+}
+
+size_t ConceptFormation::findClosestConcept(const std::vector<float>& pattern) const {
+    if (pImpl->conceptPrototypes.empty()) {
+        return 0;
+    }
+    
+    float bestSimilarity = minPatternSimilarity_;
+    size_t bestConcept = 0;
+    
+    for (size_t i = 0; i < pImpl->conceptPrototypes.size(); ++i) {
+        float similarity = computeSimilarity(pattern, pImpl->conceptPrototypes[i]);
+        if (similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestConcept = i;
+        }
+    }
+    
+    return bestConcept;
+}
+
+std::vector<size_t> ConceptFormation::getActiveConcepts(const std::vector<float>& pattern) const {
+    std::vector<size_t> activeConcepts;
+    
+    for (size_t i = 0; i < pImpl->conceptPrototypes.size(); ++i) {
+        if (computeSimilarity(pattern, pImpl->conceptPrototypes[i]) > conceptStabilityThreshold_) {
+            activeConcepts.push_back(i);
+        }
+    }
+    
+    return activeConcepts;
+}
+
+std::vector<float> ConceptFormation::getConceptRepresentation(size_t conceptId) const {
+    if (conceptId < pImpl->conceptPrototypes.size()) {
+        return pImpl->conceptPrototypes[conceptId];
+    }
+    return std::vector<float>();
+}
+
+float ConceptFormation::getConceptStability(size_t conceptId) const {
+    if (conceptId < pImpl->conceptWeights.size()) {
+        return pImpl->conceptWeights[conceptId];
+    }
+    return 0.0f;
+}
+
+void ConceptFormation::updateConcept(const std::vector<float>& oldConcept,
+                                    const std::vector<float>& newPattern,
+                                    float learningRate) {
+    for (size_t i = 0; i < oldConcept.size() && i < newPattern.size(); ++i) {
+        // Smooth update
+        pImpl->conceptPrototypes[i][i] = oldConcept[i] * (1.0f - learningRate) + 
+                                         newPattern[i] * learningRate;
+    }
+}
+
+void ConceptFormation::associatePatterns(const std::vector<float>& patternA,
+                                        const std::vector<float>& patternB) {
+    // Record association between similar patterns
+    patternAssociations.emplace_back(patternA, patternB);
+}
+
+void ConceptFormation::applyConceptToActionSelection(ActionType action,
+                                                   std::vector<float>& state) const {
+    // Modify action selection based on concept relationships
+    // This would integrate with the planning system
+}
+
+float ConceptFormation::computeConceptDistance(size_t conceptA, size_t conceptB) const {
+    if (conceptA >= pImpl->conceptPrototypes.size() || 
+        conceptB >= pImpl->conceptPrototypes.size()) {
+        return 1.0f;
+    }
+    
+    return 1.0f - computeSimilarity(pImpl->conceptPrototypes[conceptA],
+                                  pImpl->conceptPrototypes[conceptB]);
+}
+
+std::vector<size_t> ConceptFormation::getConceptHierarchy() const {
+    // Return concepts in order of stability (most stable first)
+    std::vector<size_t> hierarchy(pImpl->conceptWeights.size());
+    for (size_t i = 0; i < pImpl->conceptWeights.size(); ++i) {
+        hierarchy[i] = i;
+    }
+    
+    // Sort by stability (descending)
+    std::sort(hierarchy.begin(), hierarchy.end(),
+              [this](size_t a, size_t b) {
+                  return pImpl->conceptWeights[a] > pImpl->conceptWeights[b];
+              });
+    
+    return hierarchy;
+}
+
+void ConceptFormation::integrateWithMemory(const EpisodicMemoryItem& episode) {
+    // Use episodic memory to refine concepts
+    // Extract patterns from episode and update concept prototypes
+    if (!episode.sensoryState.empty()) {
+        // This would integrate with concept formation
+    }
+}
+
+void ConceptFormation::reset() {
+    pImpl->conceptPrototypes.clear();
+    pImpl->conceptWeights.clear();
+    pImpl->patternAssociations.clear();
+}
+
+void ConceptFormation::createConcept(const std::vector<float>& pattern, SimulationStep step) {
+    // Create new concept from pattern
+    pImpl->conceptPrototypes.push_back(pattern);
+    pImpl->conceptWeights.push_back(0.5f);  // Initial weight
+    
+    NLM_LOG_INFO("New concept created with " + std::to_string(pattern.size()) + " features");
+}
+
+float ConceptFormation::computeSimilarity(const std::vector<float>& a,
+                                       const std::vector<float>& b) const {
+    if (a.size() != b.size() || a.empty()) return 0.0f;
+    
+    // Cosine similarity
+    float dotProduct = 0.0f;
+    float normA = 0.0f;
+    float normB = 0.0f;
+    
+    for (size_t i = 0; i < a.size(); ++i) {
+        dotProduct += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    
+    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    
+    return dotProduct / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+// NeuralPlanner implementation
 struct NeuralPlanner::Impl {
     Brain* brain;
     
@@ -170,7 +361,7 @@ float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>&
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,
-                                                  const std::vector<float>& currentState) {
+                                                   const std::vector<float>& currentState) {
     // Use simple action-consequence prediction
     // In a full implementation, this would use learned forward models
     
@@ -252,7 +443,7 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
     return successCount > recentPlanSuccess_.size() / 2;
 }
 
-// SelfModel Implementation
+// SelfModel implementation
 struct SelfModel::Impl {
     Brain* brain;
     
@@ -276,8 +467,8 @@ void SelfModel::initialize(Brain* brain) {
 }
 
 void SelfModel::recordSelfAction(ActionType action,
-                                const std::vector<float>& beforeState,
-                                const std::vector<float>& afterState) {
+                                 const std::vector<float>& beforeState,
+                                 const std::vector<float>& afterState) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return;
     
@@ -335,38 +526,26 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
-    // If we have a good prediction for this action, it's likely self-generated
-    auto predicted = findMatchingEffect(action, beforeState);
+std::vector<float> SelfModel::findMatchingEffect(ActionType action,
+                                                 const std::vector<float>& beforeState) const {
+    size_t actionIdx = static_cast<size_t>(action);
+    if (actionIdx >= actionEffects_.size()) return {};
     
-    if (predicted.empty()) return 0.0f;
+    const auto& effects = actionEffects_[actionIdx];
+    if (effects.empty()) return {};
     
-    float similarity = computeSimilarity(predicted, afterState);
-    return similarity;
-}
-
-ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
-    ActionType best = ActionType::Wait;
-    float bestValue = -1000.0f;
+    float bestSim = 0.0f;
+    std::vector<float> bestPrediction;
     
-    for (size_t i = 0; i < actionEffects_.size(); ++i) {
-        if (actionEffects_[i].empty()) continue;
-        
-        // Check how well this action would work in current state
-        auto predicted = findMatchingEffect(static_cast<ActionType>(i), state);
-        if (!predicted.empty()) {
-            // Value = how much the state changes toward reward
-            float value = computeSimilarity(predicted, state);
-            if (value > bestValue) {
-                bestValue = value;
-                best = static_cast<ActionType>(i);
-            }
+    for (const auto& effect : effects) {
+        float sim = computeSimilarity(beforeState, effect.beforeState);
+        if (sim > bestSim) {
+            bestSim = sim;
+            bestPrediction = effect.afterState;
         }
     }
     
-    return best;
+    return bestPrediction;
 }
 
 void SelfModel::updateSelfModel(const std::vector<float>& predicted,
@@ -399,30 +578,8 @@ void SelfModel::clear() {
     capabilityLevel_ = 0.5f;
 }
 
-std::vector<float> SelfModel::findMatchingEffect(ActionType action,
-                                                const std::vector<float>& beforeState) const {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return {};
-    
-    const auto& effects = actionEffects_[actionIdx];
-    if (effects.empty()) return {};
-    
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& effect : effects) {
-        float sim = computeSimilarity(beforeState, effect.beforeState);
-        if (sim > bestSim) {
-            bestSim = sim;
-            bestPrediction = effect.afterState;
-        }
-    }
-    
-    return bestPrediction;
-}
-
 float SelfModel::computeSimilarity(const std::vector<float>& a,
-                                  const std::vector<float>& b) const {
+                               const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
@@ -437,7 +594,7 @@ float SelfModel::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
-// SocialLearning Implementation
+// SocialLearning implementation
 struct SocialLearning::Impl {
     Brain* brain;
     
@@ -503,7 +660,7 @@ ActionType SocialLearning::getImitationAction(const std::vector<float>& currentS
 }
 
 void SocialLearning::learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                              float signalReward) {
+                                             float signalReward) {
     signalPattern_ = signalPattern;
     signalMeaning_ = signalReward;
 }
@@ -539,7 +696,7 @@ void SocialLearning::clear() {
 }
 
 float SocialLearning::computeSimilarity(const std::vector<float>& a,
-                                       const std::vector<float>& b) const {
+                                    const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
