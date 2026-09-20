@@ -71,7 +71,11 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Real implementation in Synapse.cpp provides full synaptic dynamics including:
+    // - Short-term plasticity (facilitation and depression)
+    // - Synaptic efficacy modulation
+    // - Eligibility trace management for reward-modulated learning
+    // - Use-dependent efficacy changes
     void step(Timestamp currentTime);
     
     // Reset to initial state
