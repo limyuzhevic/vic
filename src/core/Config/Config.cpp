@@ -18,42 +18,56 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+// Helper function to check if a key exists in a config entry
+    static bool hasKey(const ConfigEntry& entry, const std::string& key) {
+        return entry.key == key;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Helper function to normalize config keys (case-insensitive comparison)
+    static bool hasKeyCaseInsensitive(const ConfigEntry& entry, const std::string& key) {
+        std::string entryKey = entry.key;
+        std::transform(entryKey.begin(), entryKey.end(), entryKey.begin(), ::tolower);
+        std::string searchKey = key;
+        std::transform(searchKey.begin(), searchKey.end(), searchKey.begin(), ::tolower);
+        return entryKey == searchKey;
+    }
+
+    bool Config::loadFromFile(const std::string& filepath) {
+        // TODO PHASE 2: Implement proper JSON/YAML parser
+        // PLACEHOLDER - Phase 1 uses a simple key=value format
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -200,16 +214,16 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
