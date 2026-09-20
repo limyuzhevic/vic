@@ -31,8 +31,18 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
-    void train(const SensoryInput& observation);
+        // Initialize prediction system with brain reference
+    /**
+     * @brief Initializes the prediction system with a brain reference
+     * 
+     * Sets up the prediction system with a reference to the brain instance, enabling
+     * future integration with the brain's neural substrate. This method prepares
+     * the prediction system for actual neural prediction implementation in Phase 2.
+     * 
+     * @param brain Pointer to the Brain instance that provides access to neural resources
+     *              and state information for prediction computations
+     */
+    void initialize(Brain* brain);
     
 private:
     struct Impl;

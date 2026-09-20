@@ -50,9 +50,24 @@ struct InterRegionConnection {
 
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Create brain with configuration
+     * 
+     * Initializes the brain system with the given configuration. The brain creates
+     * a BrainCore instance internally to handle the actual neural computation.
+     * This is the main entry point for creating a brain with specific parameters.
+     * 
+     * @param config Shared pointer to the configuration object containing brain
+     *               parameters such as neuron count, region count, and system settings
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destroy the Brain object
+     * 
+     * Cleans up the brain system and all its internal resources. This includes
+     * destroying the BrainCore instance and releasing any allocated memory.
+     */
     ~Brain();
     
     // Disable copying, enable moving
@@ -62,22 +77,70 @@ public:
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration
+    /**
+     * @brief Initializes the brain with configuration settings
+     * 
+     * This method initializes the brain core with the given configuration.
+     * It delegates the actual initialization to BrainCore and performs
+     * additional logging and statistics collection after successful initialization.
+     * 
+     * @return bool true if initialization succeeds, false otherwise
+     */
     bool initialize();
     
     // Main simulation step
+    /**
+     * @brief Executes one simulation step with current step number
+     * 
+     * Advances the neural simulation by one time step using the current step number
+     * to calculate the current time. This is a convenience overload that automatically
+     * uses the brain's timestep from BrainCore.
+     * 
+     * @param currentStep The current simulation step number (discrete time)
+     */
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
+    /**
+     * @brief Executes one simulation step with explicit time
+     * 
+     * Advances the neural simulation by one complete time step, including all neural
+     * computations, plasticity updates, memory updates, and neuromodulation. This
+     * is the core method that drives the entire brain simulation.
+     * 
+     * @param currentStep The current simulation step number (discrete time)
+     * @param currentTime The absolute timestamp for this simulation step
+     */
     void step(SimulationStep currentStep, Timestamp currentTime);
-    
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    /**
+     * @brief Receives and processes sensory input from the environment
+     * 
+     * Injects sensory input current into the brain's sensory neurons based on the
+     * provided SensoryInput object. This input represents external stimuli that
+     * will be processed by the neural network and influence behavior.
+     * 
+     * @param input The SensoryInput object containing environmental stimuli
+     */
     void receiveSensoryInput(const class SensoryInput& input);
-    
-    // Inject current directly into a specific neuron
+    /**
+     * @brief Injects current directly into a specific neuron
+     * 
+     * Directly applies membrane potential current to a specific neuron, bypassing
+     * the usual synaptic input pathway. This is useful for testing or for providing
+     * external control signals to specific neurons.
+     * 
+     * @param neuron Neuron ID of the target neuron
+     * @param current Membrane potential current to inject (positive for excitation,
+     *                   negative for inhibition)
+     */
     void injectCurrent(NeuronId neuron, MembranePotential current);
-    
-    // Inject current into all neurons of a specific type
+    /**
+     * @brief Injects current into all neurons of a specific type
+     * 
+     * Applies the specified current to all neurons of the given type (Sensory,
+     * Internal, or Motor). This is useful for bulk control of neural populations.
+     * 
+     * @param type Neuron type to target
+     * @param current Membrane potential current to inject to all neurons of this type
+     */
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
@@ -193,9 +256,11 @@ public:
     // Logging
     void logStatus() const;
     
+    // Connect to BrainCore for basic operations
+    void setBrainCore(BrainCore* core);
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    BrainCore* brainCore;
 };
 
 } // namespace nlm

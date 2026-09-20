@@ -47,6 +47,12 @@ struct ConfigEntry {
 class Config {
 public:
     Config();
+    
+    /**
+     * @brief Destroy the Config object
+     * 
+     * Cleans up all configuration resources and performs finalization.
+     */
     ~Config();
     
     // Disable copying, enable moving

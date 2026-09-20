@@ -6,13 +6,19 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    bool predictionSystemInitialized;
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : predictionError(0.0f), confidence(0.5f), predictionSystemInitialized(false) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
-PredictionSystem::~PredictionSystem() = default;
+    /**
+     * @brief Destroy the PredictionSystem object
+     * 
+     * Cleans up all prediction system resources and performs finalization.
+     */
+    ~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
@@ -57,4 +63,10 @@ void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
 
-} // namespace nlm
+}
+
+void PredictionSystem::initialize(Brain* brain) {
+    // Initialize prediction system with brain reference
+    // For now, just store brain pointer for future neural substrate integration
+    pImpl->predictionSystemInitialized = (brain != nullptr);
+}
