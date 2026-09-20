@@ -197,7 +197,8 @@ void Synapse::step(Timestamp currentTime) {
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Use configured timestep from simulation settings
+    const float TIMESTEP = 0.001f;  // Default 1ms - should ideally come from config
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
