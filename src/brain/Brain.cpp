@@ -4,6 +4,7 @@
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
+#include "../sensory/Vision.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
@@ -401,9 +402,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+    // ========== STEP 4 (enhanced): Update working memory with full maintenance ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Additional working memory maintenance that should happen each step
+        // Update recurrent connections for ongoing maintenance
+        pImpl->workingMemory->updateRecurrentConnections();
+        
+        // Keep working memory from growing too large
+        size_t maxWorkingMemorySize = pImpl->config->getOr<size_t>("working_memory_capacity", 100);
+        if (pImpl->workingMemory->getCapacity() > maxWorkingMemorySize) {
+            pImpl->workingMemory->setCapacity(maxWorkingMemorySize);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -446,36 +457,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
-            }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
-            }
-            
-            // Update synapse state
-            syn->step(currentTime);
-        }
-    }
+    // Apply plasticity to all synapses using unified method
+    applyPlasticityToAllRegions(plasticityMod);
+    
+    // Additional neuromodulator effects on neural excitability
+    applyNeuromodulatorEffectsToNeurons();
     
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
@@ -502,20 +488,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
-        }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make prediction based on current sensory state
+        // We need to get the current sensory state from working memory
+        // For now, we'll use a placeholder implementation
+        
+        // Create a simple sensory input from current neural state
+        auto currentState = std::make_unique<Vision>(16, 16);
+        
+        // Make prediction for next state
+        std::unique_ptr<SensoryInput> predicted = pImpl->predictionSystem->predictNextState(*currentState);
+        
+        // Use predicted state as actual for error computation
+        auto actualState = std::make_unique<Vision>(*predicted);
+        
+        // Update predictions and get error
+        pImpl->predictionSystem->updatePredictions(*predicted, *actualState);
+        
+        // Apply prediction error to neuromodulation (dopamine)
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            // Store prediction error in brain's prediction error signal
+            pImpl->predictionError->computeError(pImpl->predictionSystem->getConfidence(), predictionError);
+            
+            // Apply to neuromodulation system
+            pImpl->dopamine->signalPredictionError(predictionError);
+        }
     }
-    
-    // ========== STEP 9: Update attention system ==========
+
+        // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -528,8 +532,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity pattern from working memory
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            currentPattern.reserve(pImpl->workingMemory->getMemoryNeurons().size());
+            for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                currentPattern.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+            }
+        }
+        
+        // Extract features from sensory system if available
+        std::vector<float> currentFeatures;
+        if (pImpl->predictionSystem) {
+            // Use prediction confidence as a feature
+            currentFeatures.push_back(pImpl->predictionSystem->getConfidence());
+            // Add dopamine level as curiosity/feature
+            if (pImpl->dopamine) {
+                currentFeatures.push_back(pImpl->dopamine->getLevel());
+            }
+        }
+        
+        // Get reward signal from dopamine
+        float currentReward = 0.0f;
+        if (pImpl->dopamine) {
+            currentReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Present current experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern,
+            currentFeatures,
+            currentReward,
+            currentStep
+        );
+        
+        // If a new concept was formed (conceptId > 0), log it
+        if (conceptId > 0) {
+            NLM_LOG_INFO("Brain: New concept formed (ID: " + std::to_string(conceptId) + ")");
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -573,9 +613,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
-    }
-    
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
@@ -1112,6 +1149,66 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+// Add method declarations at the end of the file (before closing namespace)
+
+// Apply plasticity to all regions with neuromodulation factor
+void Brain::applyPlasticityToAllRegions(float plasticityMod) {
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Modify weight change based on dopamine
+                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
+            }
+            
+            // Apply Hebbian learning
+            if (syn->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                }
+            }
+            
+            // Update synapse state
+            syn->step(pImpl->currentTime);
+        }
+    }
 }
 
-} // namespace nlm
+// Apply neuromodulator effects to neurons
+void Brain::applyNeuromodulatorEffectsToNeurons() {
+    // Apply dopamine effects on neural excitability
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        float excitabilityMod = dopamineLevel * 0.5f;
+        if (excitabilityMod > 0.0f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Dopamine modulates excitability by injecting additional current
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Add sleep/rest cycle method
+void Brain::enableRestCycle(bool enable) {
+    pImpl->isResting = enable;
+}
+
+bool Brain::isResting() const {
+    return pImpl->isResting;
+}

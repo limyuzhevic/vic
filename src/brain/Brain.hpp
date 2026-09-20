@@ -193,6 +193,12 @@ public:
     // Logging
     void logStatus() const;
     
+    // New methods for enhanced integration
+    void applyPlasticityToAllRegions(float plasticityMod);
+    void applyNeuromodulatorEffectsToNeurons();
+    void enableRestCycle(bool enable);
+    bool isResting() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
