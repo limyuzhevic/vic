@@ -47,6 +47,11 @@ public:
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
     
+    // Coupling with SpikeSystem for event-driven synaptic transmission
+    void setSpikeSystem(SpikeSystem* spikeSystem);
+    SpikeSystem* getSpikeSystem();
+    const SpikeSystem* getSpikeSystem() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
