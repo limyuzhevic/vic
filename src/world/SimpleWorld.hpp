@@ -48,6 +48,15 @@ public:
     // Apply motor command to agent
     ActionResult applyMotorCommand(MotorCommand cmd, double currentTime);
     
+    // Apply action using agent body (Phase 6 integration interface)
+    ActionResult applyAction(const AgentBody* agent, MotorCommand cmd);
+    
+    // Get observation (sensory percept) for the agent
+    const SensoryPercept& observe(const AgentBody* agent) const;
+    
+    // Compute reward for the agent
+    float computeReward(const AgentBody* agent) const;
+    
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
@@ -82,6 +91,9 @@ public:
     // Seed for reproducibility
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
+    
+    // Get next random number (helper)
+    uint64_t nextRandom();
     
 private:
     // Generate vision from current view
