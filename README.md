@@ -63,8 +63,9 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
+
+### Standard Build (Recommended)
 
 ```bash
 mkdir build
@@ -73,14 +74,122 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+### Optimized Build (For Production)
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+    -DNLM_BUILD_SHARED=ON \
+    -DNLM_ENABLE_PYTHON_BINDINGS=ON
+make -j$(nproc)
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Python Development (For API Testing)
+
+```bash
+# Install Python dependencies first
+pip install scikit-build-core pybind11 pytest numpy
+
+# Build and install Python module
+pip install -e .
+```
+
+## Running
+
+### Phase 2: Real Neural Computation (Default Demo)
+
+```bash
+./nlm  # Run the main simulation demonstrating real LIF neurons
+```
+
+### Phase 6 Demo (Integration Test)
+
+```bash
+./nlm_phase6_demo  # Comprehensive integration test
+```
+
+### Phase 4 Demo
+
+```bash
+./nlm_phase4_demo  # Advanced cognitive capabilities demo
+```
+
+### Python Examples
+
+```python
+# Quick test of the NLM system
+python -c "import pynlm; config = pynlm.createDefaultConfig(); brain = pynlm.createBrain(config); brain.initialize(); print(f'Brain created: {brain.getTotalNeuronCount()} neurons')"
+
+# Run an example simulation
+python examples/example_simulation.py
+```
+
+### Running Tests
+
+```bash
+# Run all unit tests
+ctest --output-on-failure
+
+# Run specific test suite
+./nlm_test
+```
+
+### Benchmarking
+
+```bash
+# Run performance benchmarks
+./benchmark
+```
+
+## Quick Start for Developers
+
+```bash
+# Full development setup
+./scripts/setup_dev.sh
+
+# For rapid prototyping
+./scripts/quick_protoype.sh
+```
+
+## Performance Optimization Tips
+
+1. **Use Release Build:** Always build with `-DCMAKE_BUILD_TYPE=Release` for best performance
+2. **Parallel Processing:** Use `make -j$(nproc)` to utilize all CPU cores
+3. **Memory Management:** Monitor memory usage with `valgrind` for debugging
+4. **Python Bindings:** For better Python performance, compile with `-DNLM_BUILD_SHARED=ON`
+
+## Troubleshooting
+
+### "CMake cannot find Python"
+
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+### "Compilation errors with C++20"
+
+```bash
+# Use GCC 11+ or Clang 14+
+gcc --version  # Should show 11.x or higher
+```
+
+### "ImportError: No module named 'pynlm'"
+
+```bash
+pip install --force-reinstall .
+```
+
+### "Segmentation faults"
+
+```bash
+# Ensure proper initialization
+brain.initialize()  # Call this before any simulation steps
+brain.reset()       # Call before re-running simulation
+```
 
 ## Project Structure
 
@@ -161,6 +270,336 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+## Quick Start Examples
+
+### Example 1: Simple Neural Simulation
+
+```python
+import pynlm
+
+# Create a basic brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run for 100 simulation steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Simulation complete: {brain.getTotalSpikeCount()} spikes")
+```
+
+### Example 2: Complete Agent in Environment
+
+```python
+import pynlm
+
+# Create agent with world
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable advanced learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Example 3: Learning Experiment
+
+```python
+import pynlm
+
+# Create brain for learning experiment
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Record initial state
+initial_weights = []
+if region := brain.getRegion(1):
+    for syn in region.getSynapses():
+        initial_weights.append(syn.getWeight())
+
+print(f"Initial average weight: {sum(initial_weights)/len(initial_weights):.3f}")
+
+# Apply learning through experience
+for step in range(1000):
+    # Inject varied sensory input
+    brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 30.0 + (step % 100))
+    brain.step(step)
+
+# Check for learning
+final_weights = []
+if region := brain.getRegion(1):
+    for syn in region.getSynapses():
+        final_weights.append(syn.getWeight())
+
+initial_avg = sum(initial_weights)/len(initial_weights)
+final_avg = sum(final_weights)/len(final_weights)
+learning_detected = abs(final_avg - initial_avg) > 0.01
+
+print(f"Learning detected: {learning_detected}")
+print(f"Weight change: {final_avg - initial_avg:.3f}")
+```
+
+### Example 4: Advanced Features Demonstration
+
+```python
+import pynlm
+
+# Advanced configuration
+config = pynlm.createDefaultConfig()
+
+# Configure all major systems
+config.set("brain.neuron_count", 1000)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+config.set("plasticity.structural.enable", True)
+config.set("development.enable", True)
+
+# Create and initialize
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Enable everything
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run with monitoring
+def run_advanced_simulation():
+    stats = {
+        'steps': 0,
+        'total_reward': 0.0,
+        'curiosity': 0.0,
+        'novelty': 0.0,
+        'neurons_firing': 0,
+        'total_spikes': 0
+    }
+    
+    for step in range(200):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        agent.updateDevelopment(0.1)
+        
+        stats.update({
+            'steps': step + 1,
+            'total_reward': stats['total_reward'] + reward,
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'neurons_firing': brain.getFiringNeuronCount(),
+            'total_spikes': brain.getTotalSpikeCount()
+        })
+    
+    return stats
+
+results = run_advanced_simulation()
+print(f"Advanced simulation completed:")
+print(f"  Final curiosity: {results['curiosity']:.3f}")
+print(f"  Final novelty: {results['novelty']:.3f}")
+print(f"  Average firing rate: {results['neurons_firing']/results['steps']:.1f}")
+```
+
+## Quick Start Examples
+
+### Example 1: Simple Neural Simulation
+
+```python
+import pynlm
+
+# Create a basic brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run for 100 simulation steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Simulation complete: {brain.getTotalSpikeCount()} spikes")
+```
+
+### Example 2: Complete Agent in Environment
+
+```python
+import pynlm
+
+# Create agent with world
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable advanced learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Example 3: Learning Experiment
+
+```python
+import pynlm
+
+# Create brain for learning experiment
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Record initial state
+initial_weights = []
+if region := brain.getRegion(1):
+    for syn in region.getSynapses():
+        initial_weights.append(syn.getWeight())
+
+print(f"Initial average weight: {sum(initial_weights)/len(initial_weights):.3f}")
+
+# Apply learning through experience
+for step in range(1000):
+    # Inject varied sensory input
+    brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 30.0 + (step % 100))
+    brain.step(step)
+
+# Check for learning
+final_weights = []
+if region := brain.getRegion(1):
+    for syn in region.getSynapses():
+        final_weights.append(syn.getWeight())
+
+initial_avg = sum(initial_weights)/len(initial_weights)
+final_avg = sum(final_weights)/len(final_weights)
+learning_detected = abs(final_avg - initial_avg) > 0.01
+
+print(f"Learning detected: {learning_detected}")
+print(f"Weight change: {final_avg - initial_avg:.3f}")
+```
+
+### Example 4: Advanced Features Demonstration
+
+```python
+import pynlm
+
+# Advanced configuration
+config = pynlm.createDefaultConfig()
+
+# Configure all major systems
+config.set("brain.neuron_count", 1000)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+config.set("plasticity.structural.enable", True)
+config.set("development.enable", True)
+
+# Create and initialize
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Enable everything
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run with monitoring
+def run_advanced_simulation():
+    stats = {
+        'steps': 0,
+        'total_reward': 0.0,
+        'curiosity': 0.0,
+        'novelty': 0.0,
+        'neurons_firing': 0,
+        'total_spikes': 0
+    }
+    
+    for step in range(200):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        agent.updateDevelopment(0.1)
+        
+        stats.update({
+            'steps': step + 1,
+            'total_reward': stats['total_reward'] + reward,
+            'curiosity': agent.getCuriosityLevel(),
+            'novelty': agent.getNoveltyLevel(),
+            'neurons_firing': brain.getFiringNeuronCount(),
+            'total_spikes': brain.getTotalSpikeCount()
+        })
+    
+    return stats
+
+results = run_advanced_simulation()
+print(f"Advanced simulation completed:")
+print(f"  Final curiosity: {results['curiosity']:.3f}")
+print(f"  Final novelty: {results['novelty']:.3f}")
+print(f"  Average firing rate: {results['neurons_firing']/results['steps']:.1f}")
+```
 
 ## Scientific Limitations
 

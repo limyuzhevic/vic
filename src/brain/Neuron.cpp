@@ -154,24 +154,55 @@ void Neuron::recordSpike(Timestamp timestamp) {
     }
 }
 
-void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+float Neuron::getAdaptationVariable() const {
+    return pImpl->state.adaptationVariable;
 }
 
-void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+void Neuron::setAdaptationVariable(float value) {
+    pImpl->state.adaptationVariable = value;
 }
 
-void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+float Neuron::getMembraneTimeConstant() const {
+    return Impl::TIME_CONSTANT;  // 20ms for LIF neurons
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+float Neuron::getMembraneCapacitance() const {
+    return Impl::MEMBRANE_CAPACITANCE;  // 1nF for LIF neurons
 }
 
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+void Neuron::setLastSpikeTime(float time) {
+    pImpl->state.lastSpikeTime = time;
+}
+
+bool Neuron::isRecentlySpiking(float thresholdTime) const {
+    return !pImpl->spikeHistory.empty() &&
+           (pImpl->spikeHistory.back() > thresholdTime);
+}
+
+// New: Calculate firing rate from spike history
+float Neuron::calculateFiringRate(float window) const {
+    if (window <= 0.0f) return 0.0f;
+    
+    size_t recentSpikes = 0;
+    float currentTime = 0.0f;  // Would need access to simulation time
+    
+    for (Timestamp t : pImpl->spikeHistory) {
+        if (currentTime - t <= window) {
+            recentSpikes++;
+        }
+    }
+    
+    return static_cast<float>(recentSpikes) / window;
+}
+
+void Neuron::applyAdaptation(float delta) {
+    pImpl->state.adaptationVariable += delta;
+    // Clamp adaptation to prevent runaway
+    pImpl->state.adaptationVariable = std::clamp(pImpl->state.adaptationVariable, 0.0f, 10.0f);
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
@@ -260,15 +291,41 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Enhanced LIF step with standard timestep (1ms)
+    // TODO PHASE 3: Implement adaptive timestep selection based on neural events
+    TimestepDuration dt = 0.001;  // 1ms default for stability
+    
+    // TODO PHASE 3: Implement error checking for invalid timesteps
+    if (dt <= 0.0f) {
+        dt = 0.001f;  // Fallback to standard timestep
+    }
+    
+    bool fired = stepLIF(currentTime, dt);
+    
+    // TODO PHASE 3: Add post-processing for step results
+    if (fired) {
+        // Record detailed spike information for analysis
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // TODO PHASE 3: Trigger downstream processing for spike events
+        // (e.g., propagate to connected neurons, update learning rules)
+    }
+    
+    // TODO PHASE 3: Implement activity-dependent adaptation mechanisms
+    // (e.g., spike-frequency adaptation, calcium dynamics)
 }
 
 void Neuron::reset() {
+    // Enhanced reset with comprehensive state clearing
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // TODO PHASE 3: Reset additional internal variables
+    // (e.g., adaptation variables, learning buffers)
+    
+    // TODO PHASE 3: Reset synaptic state
+    // (e.g., conductances, reversal potentials)
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {

@@ -136,6 +136,66 @@ public:
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
+
+    // Apply synaptic input from incoming connections
+    // TODO PHASE 2: Implement proper synaptic current integration
+    void applySynapticInput();
+
+    // Update neuron state with LIF dynamics
+    // TODO PHASE 2: Implement proper LIF differential equation solver
+    void updateLIFDynamics(Timestamp currentTime, TimestepDuration dt);
+
+    // Handle spike threshold crossing and reset
+    // TODO PHASE 2: Implement biologically realistic spike reset mechanism
+    void handleThresholdCrossing(Timestamp currentTime);
+
+    // Update synaptic variables (conductances, potentials)
+    // TODO PHASE 2: Implement proper synaptic variable dynamics
+    void updateSynapticVariables(Timestamp currentTime);
+
+    // Apply neuromodulatory effects on neuron properties
+    // TODO PHASE 2: Integrate neuromodulation with neuron dynamics
+    void applyNeuromodulation();
+
+    // Update development stage effects on neuron properties
+    // TODO PHASE 2: Implement developmental stage-dependent dynamics
+    void applyDevelopmentEffects();
+
+    // Calculate and apply plastic changes to neuron properties
+    // TODO PHASE 2: Integrate plasticity rules with neuron state
+    void applyPlasticity(Timestamp currentTime);
+
+    // Update adaptation variables for spike-frequency adaptation
+    // TODO PHASE 2: Implement spike-frequency adaptation dynamics
+    void updateAdaptationVariables();
+
+    // Calculate and store neural outputs for downstream processing
+    // TODO PHASE 2: Implement proper output generation for different neuron types
+    void computeOutput();
+
+    // Synchronize neuron state with memory systems
+    // TODO PHASE 2: Integrate neuron activity with memory encoding
+    void synchronizeWithMemory();
+
+    // Apply homeostatic mechanisms to maintain stability
+    // TODO PHASE 2: Implement homeostatic plasticity and regulation
+    void applyHomeostasis();
+
+    // Generate and store prediction signals for learning
+    // TODO PHASE 2: Implement predictive coding at neuron level
+    void generatePredictionSignals();
+
+    // Apply attentional modulation to neuron responsiveness
+    // TODO PHASE 2: Implement attention gating mechanisms
+    void applyAttentionalModulation();
+
+    // Calculate and apply stress or fatigue effects
+    // TODO PHASE 2: Implement activity-dependent fatigue mechanisms
+    void applyFatigueEffects();
+
+    // Compute and apply quantum mechanical effects (if implementing quantum neurons)
+    // TODO PHASE 3: For future quantum neural implementations
+    void applyQuantumEffects();
     
     // Reset to initial state
     void reset();
