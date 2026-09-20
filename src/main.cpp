@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase6Demo.hpp"
 
 #include <iostream>
 #include <memory>
