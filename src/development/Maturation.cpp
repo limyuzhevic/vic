@@ -17,7 +17,9 @@ struct Maturation::Impl {
 
 Maturation::Maturation() : pImpl(new Impl) {}
 
-Maturation::~Maturation() = default;
+Maturation::~Maturation() {
+    delete pImpl;
+}
 
 float Maturation::getProgress() const {
     return pImpl->progress;

@@ -11,7 +11,9 @@ struct Synaptogenesis::Impl {
 
 Synaptogenesis::Synaptogenesis() : pImpl(new Impl) {}
 
-Synaptogenesis::~Synaptogenesis() = default;
+Synaptogenesis::~Synaptogenesis() {
+    delete pImpl;
+}
 
 float Synaptogenesis::getFormationRate() const {
     return pImpl->formationRate;

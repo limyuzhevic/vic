@@ -16,7 +16,9 @@ struct SimulationClock::Impl {
 
 SimulationClock::SimulationClock(TimestepDuration timestep) : pImpl(new Impl(timestep)) {}
 
-SimulationClock::~SimulationClock() = default;
+SimulationClock::~SimulationClock() {
+    delete pImpl;
+}
 
 SimulationClock::SimulationClock(SimulationClock&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;

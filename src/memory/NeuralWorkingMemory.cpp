@@ -25,7 +25,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 {
 }
 
-NeuralWorkingMemory::~NeuralWorkingMemory() = default;
+NeuralWorkingMemory::~NeuralWorkingMemory() {
+    delete pImpl;
+}
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;

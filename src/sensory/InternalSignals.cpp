@@ -11,7 +11,9 @@ struct InternalSignalsProcessor::Impl {
 
 InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
 
-InternalSignalsProcessor::~InternalSignalsProcessor() = default;
+InternalSignalsProcessor::~InternalSignalsProcessor() {
+    delete pImpl;
+}
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
     // TODO PHASE 2: Implement real internal signal processing

@@ -39,7 +39,9 @@ NeuralPrediction::NeuralPrediction()
 {
 }
 
-NeuralPrediction::~NeuralPrediction() = default;
+NeuralPrediction::~NeuralPrediction() {
+    delete pImpl;
+}
 
 void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;

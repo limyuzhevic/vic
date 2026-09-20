@@ -27,7 +27,9 @@ struct ExperimentLogger::Impl {
 ExperimentLogger::ExperimentLogger(const std::string& filename) 
     : pImpl(new Impl(filename)) {}
 
-ExperimentLogger::~ExperimentLogger() = default;
+ExperimentLogger::~ExperimentLogger() {
+    delete pImpl;
+}
 
 void ExperimentLogger::log(const std::string& message) {
     if (pImpl->isOpen) {

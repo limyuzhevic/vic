@@ -12,7 +12,9 @@ struct Reward::Impl {
 
 Reward::Reward() : pImpl(new Impl) {}
 
-Reward::~Reward() = default;
+Reward::~Reward() {
+    delete pImpl;
+}
 
 float Reward::getValue() const {
     return pImpl->currentValue;

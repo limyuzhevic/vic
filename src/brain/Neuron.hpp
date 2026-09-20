@@ -47,7 +47,7 @@ public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
-    ~Neuron();
+    ~Neuron() = default;
     
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;

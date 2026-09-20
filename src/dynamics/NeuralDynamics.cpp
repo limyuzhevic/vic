@@ -12,7 +12,9 @@ struct IntegrateAndFireDynamics::Impl {
 
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
-IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
+IntegrateAndFireDynamics::~IntegrateAndFireDynamics() {
+    delete pImpl;
+}
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
     // TODO PHASE 2: Implement real integrate-and-fire dynamics

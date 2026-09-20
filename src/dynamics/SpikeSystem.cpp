@@ -20,7 +20,9 @@ struct SpikeSystem::Impl {
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
 
-SpikeSystem::~SpikeSystem() = default;
+SpikeSystem::~SpikeSystem() {
+    delete pImpl;
+}
 
 SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;

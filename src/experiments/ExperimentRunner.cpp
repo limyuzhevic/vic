@@ -11,7 +11,9 @@ struct ExperimentRunner::Impl {
 
 ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
 
-ExperimentRunner::~ExperimentRunner() = default;
+ExperimentRunner::~ExperimentRunner() {
+    delete pImpl;
+}
 
 std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
     auto exp = std::make_shared<Experiment>(name);

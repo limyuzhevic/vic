@@ -11,7 +11,9 @@ struct VisionProcessor::Impl {
 
 VisionProcessor::VisionProcessor() : pImpl(new Impl) {}
 
-VisionProcessor::~VisionProcessor() = default;
+VisionProcessor::~VisionProcessor() {
+    delete pImpl;
+}
 
 void VisionProcessor::process(const Vision& input) {
     // TODO PHASE 2: Implement real vision processing using NLM's neural machinery

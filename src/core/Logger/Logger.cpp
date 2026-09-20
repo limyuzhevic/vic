@@ -20,7 +20,9 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    delete pImpl;
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
@@ -110,7 +112,9 @@ struct Logger::Impl {
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    delete pImpl;
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);

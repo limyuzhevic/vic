@@ -22,7 +22,9 @@ ConceptFormation::ConceptFormation()
 {
 }
 
-ConceptFormation::~ConceptFormation() = default;
+ConceptFormation::~ConceptFormation() {
+    delete pImpl;
+}
 
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
