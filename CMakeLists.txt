@@ -73,12 +73,8 @@ add_library(nlm_core STATIC
     # Prediction
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
+        src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
