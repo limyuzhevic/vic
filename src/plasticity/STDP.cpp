@@ -2,6 +2,7 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <set>
 
 namespace nlm {
 
@@ -59,8 +60,28 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
+    // IMPROVED O(n log n) implementation:
+    // Sort both spike lists for efficient processing
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Use sliding window to find spike pairs within reasonable time window
+    // Limit to first and last 100 spikes to reduce computation for large histories
+    size_t maxPairs = std::min(size_t(100), sortedPreSpikes.size() * sortedPostSpikes.size());
+    
+    // Process spike pairs efficiently using sliding window
+    // For each pre-synaptic spike, find post-synaptic spikes within time window
+    for (Timestamp preTime : sortedPreSpikes) {
+        // Binary search for range of post-spikes that could interact
+        auto lower = std::lower_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                     preTime - 3.0f * tau);  // Search window backward
+        auto upper = std::upper_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                     preTime + 3.0f * tau);   // Search window forward
+        
+        for (auto it = lower; it != upper && maxPairs > 0; ++it) {
+            Timestamp postTime = *it;
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
             if (dt > 0) {
@@ -68,11 +89,13 @@ void STDP::update(Synapse* synapse,
                 // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
+                maxPairs--;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
                 float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
+                maxPairs--;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
         }

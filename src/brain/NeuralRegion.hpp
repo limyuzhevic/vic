@@ -20,13 +20,13 @@ public:
     // Create region with ID and name
     NeuralRegion(RegionId id, const std::string& name);
     
-    ~NeuralRegion();
+    virtual ~NeuralRegion() = default;
     
     // Disable copying, enable moving
     NeuralRegion(const NeuralRegion&) = delete;
     NeuralRegion& operator=(const NeuralRegion&) = delete;
-    NeuralRegion(NeuralRegion&&) noexcept;
-    NeuralRegion& operator=(NeuralRegion&&) noexcept;
+    NeuralRegion(NeuralRegion&&) noexcept = default;
+    NeuralRegion& operator=(NeuralRegion&&) noexcept = default;
     
     // Identity
     RegionId getId() const;

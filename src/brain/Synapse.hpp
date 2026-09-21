@@ -15,13 +15,13 @@ public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     
-    ~Synapse();
+    virtual ~Synapse() = default;
     
     // Disable copying, enable moving
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    Synapse(Synapse&&) noexcept = default;
+    Synapse& operator=(Synapse&&) noexcept = default;
     
     // Identity
     SynapseId getId() const;

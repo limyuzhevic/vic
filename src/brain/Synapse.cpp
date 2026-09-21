@@ -44,6 +44,8 @@ struct Synapse::Impl {
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    virtual ~Impl() = default;  // Virtual destructor for proper cleanup
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)

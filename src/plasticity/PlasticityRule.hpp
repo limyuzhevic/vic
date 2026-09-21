@@ -59,8 +59,7 @@ private:
     Impl* pImpl;
 };
 
-// Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
+// Placeholders - will be implemented in future phases
 class AntiHebbianRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
@@ -81,6 +80,18 @@ public:
                  TimestepDuration dt) override {}
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "BCM"; }
+};
+
+// Reward-modulated plasticity (Dopamine-gated learning)
+// PLACEHOLDER - Phase 2
+class RewardModulatedRule : public PlasticityRule {
+public:
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override {}
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+    const char* getName() const override { return "RewardModulated"; }
 };
 
 } // namespace nlm

@@ -10,7 +10,7 @@ namespace nlm {
 class STDP : public PlasticityRule {
 public:
     STDP();
-    ~STDP() override;
+    virtual ~STDP() = default;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,

@@ -25,6 +25,8 @@ struct Neuron::Impl {
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
+    
+    virtual ~Impl() = default;  // Virtual destructor for proper cleanup
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
