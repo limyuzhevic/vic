@@ -122,13 +122,13 @@ float Neuron::getLastSpikeTime() const {
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    pImpl->totalCurrent += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    pImpl->totalCurrent -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
@@ -139,12 +139,16 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    // Add to total current for LIF integration
+    pImpl->totalCurrent += current;
 }
 
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {

@@ -24,26 +24,52 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // REAL PHASE 2: Implement real Hebbian learning
+    // True Hebbian learning: strengthen connections when pre- and post-synaptic neurons fire together
+    // Uses spike timing-dependent correlation
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
+    // Calculate spike correlation using time difference
+    float totalCorrelation = 0.0f;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
+            // Time difference in milliseconds
+            float timeDiff = static_cast<float>(post - pre);
+            
+            // Gaussian kernel for spike correlation
+            // Peaked at zero difference, decays with increasing time difference
+            totalCorrelation += std::exp(-(timeDiff * timeDiff) / (2.0f * 10.0f * 10.0f));  // 10ms sigma
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Apply Hebbian weight change proportional to correlation
+    // learningRate * correlation, with bounds checking
+    float weightChange = pImpl->learningRate * totalCorrelation;
+    
+    // Apply change with soft bounds to prevent runaway excitation/inhibition
+    float currentWeight = synapse->getWeight();
+    float targetWeight = currentWeight + weightChange;
+    
+    // Constrain weight change to stay within reasonable bounds
+    float maxChange = 0.1f;  // Maximum single update
+    float clampedChange = std::clamp(weightChange, -maxChange, maxChange);
+    
+    // Apply the change
+    float newWeight = currentWeight + clampedChange;
+    // Clamp to synapse weight bounds
+    newWeight = std::clamp(newWeight, synapse->getMinWeight(), synapse->getMaxWeight());
+    
+    synapse->setWeight(newWeight);
+    
+    // Also apply to eligibility trace for reward-modulated variants
+    if (synapse->getPlasticityFlags().reward_modulated) {
+        float eligibility = synapse->getEligibilityTrace();
+        // Hebbian contributes to eligibility trace
+        eligibility += clampedChange * 0.1f;  // Scale eligibility update
+        synapse->setEligibilityTrace(eligibility);
     }
 }
 

@@ -35,6 +35,10 @@ public:
     void setWeight(SynapticWeight weight);
     void addToWeight(SynapticWeight delta);
     
+    // Weight bounds
+    static constexpr SynapticWeight MIN_WEIGHT = -1.0f;
+    static constexpr SynapticWeight MAX_WEIGHT = 1.0f;
+    
     // Delay (in simulation steps)
     Delay getDelay() const;
     void setDelay(Delay delay);
@@ -71,7 +75,7 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // PHASE 2: Real synaptic dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

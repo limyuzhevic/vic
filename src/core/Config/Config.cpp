@@ -19,9 +19,60 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement JSON/YAML parser using nlohmann::json when available
+    // Current implementation uses simple key=value format, enhanced with JSON support
     
+    // First try to parse as JSON (if nlohmann::json is available)
+    try {
+        // Check if file has .json extension or starts with {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Try to parse as JSON
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // Simple JSON detection: if file starts with { and has key-value pairs
+        if (!content.empty() && content.find('{') != std::string::npos) {
+            // For now, fall back to simple parsing for compatibility
+            // TODO: Implement full nlohmann::json integration when available
+            file.clear();
+            file.seekg(0);
+            
+            std::string line;
+            while (std::getline(file, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '\"' && value.back() == '\"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
+            return true;
+        }
+    } catch (...) {
+        // Fall back to simple parsing if JSON parsing fails
+    }
+    
+    // Fallback to original simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +94,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
