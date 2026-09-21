@@ -64,7 +64,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    // Initialize with world
+    if (world.getVisionWidth() > 0 && world.getVisionHeight() > 0) {
+        previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    } else {
+        previousVision_.clear();
+    }
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
