@@ -282,17 +282,21 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
+    // === CONSTANTS ===
+    const double DEVELOPMENT_STAGE_INITIAL = 60.0;  // ~1 minute
+    const double DEVELOPMENT_STAGE_CRITICAL = 300.0;  // ~5 minutes  
+    const double DEVELOPMENT_STAGE_MATURATION = 900.0;  // ~15 minutes
+    
     developmentalAge_ += timestep;
     
     // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
+    if (developmentalAge_ < DEVELOPMENT_STAGE_INITIAL) {
         plasticityModifier_ = 1.0f;  // High plasticity
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+    } else if (developmentalAge_ < DEVELOPMENT_STAGE_CRITICAL) {
         plasticityModifier_ = 0.8f;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
+    } else if (developmentalAge_ < DEVELOPMENT_STAGE_MATURATION) {
         plasticityModifier_ = 0.5f;
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
     } else {
@@ -304,9 +308,14 @@ void AgentBrain::updateDevelopment(double timestep) {
     if (structuralPlasticityEnabled_) {
         auto* sp = brain_->getStructuralPlasticity();
         if (sp) {
+            // === CONSTANTS ===
+            const float SYNAPTOGENESIS_RATE_BASE = 0.0001f;  // Base synaptogenesis rate
+            const float PRUNING_RATE_BASE = 0.00001f;      // Base pruning rate
+            const float PLASTICITY_FACTOR = 2.0f;            // Inverse plasticity factor
+            
             // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+            float synRate = SYNAPTOGENESIS_RATE_BASE * plasticityModifier_;
+            float pruneRate = PRUNING_RATE_BASE * (PLASTICITY_FACTOR - plasticityModifier_);
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
         }

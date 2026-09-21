@@ -97,6 +97,11 @@ struct Brain::Impl {
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
+            // Validate seed is positive
+            if (seed == 0) {
+                NLM_LOG_WARNING("Random seed is 0, using default seed 42");
+                seed = 42;
+            }
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
@@ -805,10 +810,11 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
+            if (!writer.writeNeurons(neuronData)) {
+                NLM_LOG_ERROR("Failed to write neurons to checkpoint: " + filepath);
+                NLM_LOG_ERROR("This may be due to insufficient memory or corrupted brain state");
+                return false;
+            }
         
         // Write synapses
         SynapseCheckpointData synapseData;
