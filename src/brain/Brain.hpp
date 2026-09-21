@@ -152,8 +152,7 @@ public:
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
+    const PredictionSystem* getPredictionSystem() const;
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
@@ -163,6 +162,18 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Self-model of body and action consequences
+    SelfModel* getSelfModel();
+    const SelfModel* getSelfModel() const;
+    
+    // Spatial relationship learning
+    SpatialRepresentation* getSpatialRepresentation();
+    const SpatialRepresentation* getSpatialRepresentation() const;
+    
+    // Temporal relationship learning
+    TemporalRelation* getTemporalRelation();
+    const TemporalRelation* getTemporalRelation() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     

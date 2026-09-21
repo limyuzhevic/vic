@@ -14,6 +14,8 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SpatialRepresentation.hpp"
+#include "../cognition/TemporalRelation.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -36,12 +38,10 @@ struct Brain::Impl {
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
+    // ========== ADDITIONAL COGNITION SYSTEMS ==========
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
+    std::unique_ptr<SelfModel> selfModel;
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
     // ========== NEUROMODULATION SYSTEMS ==========
@@ -116,10 +116,13 @@ struct Brain::Impl {
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    spatialRepresentation = std::make_unique<SpatialRepresentation>();
+    temporalRelation = std::make_unique<TemporalRelation>();
+    selfModel = std::make_unique<SelfModel>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -1023,18 +1026,34 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+const PredictionSystem* Brain::getPredictionSystem() const {
+    return pImpl->predictionSystem.get();
 }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+// ========== ADDITIONAL COGNITION SYSTEM ACCESSORS ==========
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
 }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+const SelfModel* Brain::getSelfModel() const {
+    return pImpl->selfModel.get();
+}
+
+SpatialRepresentation* Brain::getSpatialRepresentation() {
+    return pImpl->spatialRepresentation.get();
+}
+
+const SpatialRepresentation* Brain::getSpatialRepresentation() const {
+    return pImpl->spatialRepresentation.get();
+}
+
+TemporalRelation* Brain::getTemporalRelation() {
+    return pImpl->temporalRelation.get();
+}
+
+const TemporalRelation* Brain::getTemporalRelation() const {
+    return pImpl->temporalRelation.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
