@@ -36,9 +36,14 @@ void Novelty::setLevel(float level) {
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+    // Convert observations to patterns for comparison
+    if (!observation.sensoryState.empty() && !previousObservation.sensoryState.empty()) {
+        detectNovelty(observation.sensoryState, previousObservation.sensoryState);
+    } else {
+        // Simple implementation: set to a placeholder
+        pImpl->level = 1.0f;
+        pImpl->history.push_back(pImpl->level);
+    }
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
