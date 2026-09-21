@@ -90,12 +90,8 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Validate key-value pairs for known configuration keys
+    static void validateKeyValue(const std::string& key, const std::string& value);
     
     // Internal helpers
     static std::string trim(const std::string& str);

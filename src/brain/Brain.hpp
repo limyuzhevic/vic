@@ -190,12 +190,68 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // ========== CONVENIENCE METHODS ==========
     
-private:
-    struct Impl;
-    Impl* pImpl;
+    // Quick setup helper methods
+    void quickSetup(size_t regionCount = 1, size_t neuronsPerRegion = 1000, 
+                   float connectionProb = 0.1f);
+    
+    // Batch sensory injection for easier world interaction
+    void injectSensoryBatch(const std::vector<float>& visionData, 
+                           const std::vector<float>& touchData,
+                           const std::vector<float>& internalData,
+                           double timestamp = 0.0);
+    
+    // Get neural activity statistics
+    float getMeanFiringRate() const;
+    float getFiringRateStdDev() const;
+    size_t getActiveNeuronCount() const;
+    
+    // Development control methods
+    void advanceDevelopment(double timestep = 1.0);
+    bool isDevelopmentComplete() const;
+    
+    // Memory management shortcuts
+    void storeCurrentState(const std::string& episodeName = "");
+    void replayLastNMinutes(int minutes);
+    
+    // Configuration utility methods
+    void resetToDefaults();
+    void applyConfigurationTemplate(const std::string& templateName);
+    
+    // Debugging and profiling helpers
+    std::string getDebugInfo() const;
+    void enableVerboseLogging(bool enable);
+    
+    // Memory efficiency methods
+    void compressMemory(bool aggressive = false);
+    size_t estimateMemoryUsage() const;
+    
+    // Performance monitoring
+    double getAverageStepTime() const;
+    size_t getStepsPerSecond() const;
+    void resetPerformanceCounters();
+    
+    // Agent integration helpers
+    void setupForAgent(const SimpleWorld& world, const AgentBrain& agent);
+    ActionResult processAgentInput(const SensoryPercept& percept);
+    void applyAgentOutput(const Action& action);
+    
+    // Experimental utilities
+    void enableReplayMode(bool enable, int replayInterval = 100);
+    void enableConsolidation(bool enable, int consolidationInterval = 1000);
+    
+    // State management
+    void saveCheckpoint(const std::string& filename = "brain_checkpoint");
+    bool loadCheckpoint(const std::string& filename = "brain_checkpoint");
+    
+    // Validation and health checks
+    bool validateConfiguration() const;
+    bool validateNeuralConnectivity() const;
+    bool checkForMemoryLeaks() const;
+    
+    // Experimental controls
+    void enableDebugMode(bool enable);
+    void setExperimentalParameter(const std::string& name, double value);
+    double getExperimentalParameter(const std::string& name) const;
 };
-
-} // namespace nlm

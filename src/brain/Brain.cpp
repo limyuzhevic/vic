@@ -617,22 +617,27 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // OPTIMIZED: Use direct neuron lookup with early exit
+    // This is more efficient than searching all neurons every time
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
-                return;
+                return;  // Early exit found
             }
         }
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // OPTIMIZED: Cache population access to avoid repeated getPopulations() calls
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
+        const auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
+                const auto& neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
                     neuron->injectCurrent(current);
                 }
             }

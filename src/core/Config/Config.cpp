@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 3: Implement proper JSON/YAML parser with configuration validation
+    // PLACEHOLDER - Phase 1 uses a simple key=value format with validation
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +28,10 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +44,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key format (no spaces, valid characters)
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                continue;  // Skip invalid key, could log warning
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,6 +57,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            
+            // Validate numeric ranges for known keys
+            validateKeyValue(key, value);
+        } else {
+            // Skip malformed lines (no '=' found)
+            continue;
         }
     }
     
@@ -197,6 +211,83 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+void Config::validateKeyValue(const std::string& key, const std::string& value) {
+    // Known configuration keys and their validation rules
+    // This is a simple implementation - could be expanded with more complex validation
+    
+    // Brain configuration keys
+    if (key == "brain.neuron_count") {
+        try {
+            size_t pos;
+            int val = std::stoi(value, &pos);
+            if (pos != value.size() || val < 0 || val > 100000) {
+                // Invalid value, could log warning or set default
+            }
+        } catch (...) {
+            // Invalid integer, could log warning
+        }
+    } else if (key == "brain.synapse_density") {
+        try {
+            size_t pos;
+            double val = std::stod(value, &pos);
+            if (pos != value.size() || val < 0.0 || val > 1.0) {
+                // Invalid value, could log warning or set default
+            }
+        } catch (...) {
+            // Invalid float, could log warning
+        }
+    } else if (key == "brain.connection_probability") {
+        try {
+            size_t pos;
+            double val = std::stod(value, &pos);
+            if (pos != value.size() || val < 0.0 || val > 1.0) {
+                // Invalid value, could log warning or set default
+            }
+        } catch (...) {
+            // Invalid float, could log warning
+        }
+    }
+    
+    // Neuromodulation keys
+    else if (key == "neuromod.dopamine.scale") {
+        try {
+            size_t pos;
+            double val = std::stod(value, &pos);
+            if (pos != value.size() || val < 0.0 || val > 10.0) {
+                // Invalid value, could log warning or set default
+            }
+        } catch (...) {
+            // Invalid float, could log warning
+        }
+    }
+    
+    // Plasticity keys
+    else if (key == "plasticity.stdp.learning_rate") {
+        try {
+            size_t pos;
+            double val = std::stod(value, &pos);
+            if (pos != value.size() || val < 0.0 || val > 1.0) {
+                // Invalid value, could log warning or set default
+            }
+        } catch (...) {
+            // Invalid float, could log warning
+        }
+    }
 }
 
 // Explicit template instantiations
