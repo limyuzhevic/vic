@@ -19,12 +19,6 @@ public:
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
-    
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
-    
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
@@ -68,6 +62,23 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Convenience methods (NEW)
+    void setBrain(std::shared_ptr<Brain> brain);
+    bool validateState() const;
+    float getSensoryActivitySum() const;
+    float getMotorActivitySum() const;
+    
+// Convenience methods (NEW)
+    void setBrain(std::shared_ptr<Brain> brain);
+    bool validateState() const;
+    float getSensoryActivitySum() const;
+    float getMotorActivitySum() const;
+    
+    // Debug and monitoring methods
+    size_t getTotalSensoryNeurons() const;
+    size_t getTotalMotorNeurons() const;
+    float getCombinedActivityLevel() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -113,5 +124,61 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
+
+// Inline implementations of convenience methods
+inline void AgentBrain::setBrain(std::shared_ptr<Brain> brain) {
+    assert(brain != nullptr);
+    brain_ = brain;
+}
+
+inline bool AgentBrain::validateState() const {
+    if (!brain_) return false;
+    
+    // Check that all neuron vectors are valid (may be empty but shouldn't be nullptr)
+    if (sensoryVision_.empty() && sensoryTouch_.empty() && 
+        sensoryInternal_.empty() && sensoryProprioception_.empty()) {
+        return false; // At least one sensory group should have neurons
+    }
+    
+    return true;
+}
+
+inline float AgentBrain::getSensoryActivitySum() const {
+    float totalActivity = 0.0f;
+    totalActivity += calculateNeuronActivity(sensoryVision_);
+    totalActivity += calculateNeuronActivity(sensoryTouch_);
+    totalActivity += calculateNeuronActivity(sensoryInternal_);
+    totalActivity += calculateNeuronActivity(sensoryProprioception_);
+    return totalActivity;
+}
+
+inline float AgentBrain::getMotorActivitySum() const {
+    float totalActivity = 0.0f;
+    totalActivity += calculateNeuronActivity(motorForward_);
+    totalActivity += calculateNeuronActivity(motorBackward_);
+    totalActivity += calculateNeuronActivity(motorTurnLeft_);
+    totalActivity += calculateNeuronActivity(motorTurnRight_);
+    totalActivity += calculateNeuronActivity(motorInteract_);
+    totalActivity += calculateNeuronActivity(motorWait_);
+    return totalActivity;
+}
+
+inline size_t AgentBrain::getTotalSensoryNeurons() const {
+    return sensoryVision_.size() + sensoryTouch_.size() + 
+           sensoryInternal_.size() + sensoryProprioception_.size();
+}
+
+inline size_t AgentBrain::getTotalMotorNeurons() const {
+    return motorForward_.size() + motorBackward_.size() + 
+           motorTurnLeft_.size() + motorTurnRight_.size() +
+           motorInteract_.size() + motorWait_.size();
+}
+
+inline float AgentBrain::getCombinedActivityLevel() const {
+    float sensory = getSensoryActivitySum();
+    float motor = getMotorActivitySum();
+    float total = sensory + motor;
+    return (total > 0.0f) ? (sensory / total) : 0.5f; // Return proportion of sensory vs motor activity
+}
 
 } // namespace nlm

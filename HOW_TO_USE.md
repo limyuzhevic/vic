@@ -4,10 +4,21 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**⚠️ Current Status Notice:**
+- This project is in **Phase 6: FINAL INTEGRATION** - all systems are integrated but the Python bindings have some issues
+- The Python bindings use some deprecated patterns that can cause crashes
+- Error handling is minimal in some areas
+- The Python API is mostly complete but lacks some convenience methods
+
+**For Beginners:** Start with `easy_usage.md` which provides a simplified introduction and works with the current version
+
+**For Advanced Users:** Use this guide with caution, check for return values and NULL pointers in your code
+
 This document covers:
 1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+2. Installing the Python library  
+3. Using the NLM Python API with examples
+4. Troubleshooting common issues
 
 ---
 
@@ -70,9 +81,35 @@ make install
 
 ---
 
+# NLM (Neural Learning Machine) - HOW TO USE
+
+## Overview
+
+NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+
+**⚠️ Current Status Notice:**
+- This project is in **Phase 6: FINAL INTEGRATION** - all systems are integrated but the Python bindings have some issues
+- The Python bindings use some deprecated patterns that can cause crashes
+- Error handling is minimal in some areas
+- The Python API is mostly complete but lacks some convenience methods
+
+**For Beginners:** Start with `easy_usage.md` which provides a simplified introduction and works with the current version
+
+**For Advanced Users:** Use this guide with caution, check for return values and NULL pointers in your code
+
+This document covers:
+1. Building the C++ project from source
+2. Installing the Python library  
+3. Using the NLM Python API with examples
+4. Troubleshooting common issues
+
+---
+
 ## Part 2: Installing the Python Library
 
 ### From Source (Recommended for Development)
+
+**Important:** The Python bindings use deprecated patterns that may cause crashes in some scenarios. The examples below work but use caution in production:
 
 ```bash
 # Install build dependencies
@@ -112,6 +149,10 @@ config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
+
+**⚠️ Important Note:** Some methods return `NULL` pointers that can cause crashes. Always check return values and use try-catch blocks where possible.
+
+---
 
 ---
 
