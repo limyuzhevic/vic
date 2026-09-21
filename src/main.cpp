@@ -56,13 +56,20 @@ struct LearningExperiment {
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
+    double startTime;
+    double endTime;
+    size_t totalSpikes;
+    float avgFiringRate;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), totalSpikes(0), avgFiringRate(0.0f) {
+        startTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    }
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
+        totalSpikes = brain->getTotalSpikeCount();
         
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
@@ -73,6 +80,7 @@ struct LearningExperiment {
         
         NLM_LOG_INFO("Initial state recorded:");
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        NLM_LOG_INFO("  Total spikes so far: " + std::to_string(totalSpikes));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
@@ -81,6 +89,7 @@ struct LearningExperiment {
     }
     
     void recordFinalState() {
+        endTime = std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         finalWeights.clear();
         
         // Record final weights from first region
@@ -90,10 +99,19 @@ struct LearningExperiment {
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        size_t spikeSystemAvailable = brain->getSpikeSystem() ? 1 : 0;
+        if (spikeSystemAvailable) {
+            mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        }
+        
+        totalSpikes = brain->getTotalSpikeCount();
+        size_t steps = 1000; // From plasticity experiment
+        avgFiringRate = static_cast<float>(totalSpikes) / steps;
         
         NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes));
+        NLM_LOG_INFO("  Average firing rate: " + std::to_string(avgFiringRate) + " Hz");
+        NLM_LOG_INFO("  Duration: " + std::to_string(endTime - startTime) + " s");
         if (!finalWeights.empty()) {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
@@ -107,7 +125,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded");
             return;
         }
         
@@ -116,11 +134,14 @@ struct LearningExperiment {
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
         float finalMean = finalSum / finalWeights.size();
+        float weightChange = finalMean - initialMean;
+        float relativeChange = std::abs(weightChange) / std::max(std::abs(initialMean), 0.001f) * 100.0f;
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        NLM_LOG_INFO("  Absolute change: " + std::to_string(weightChange));
+        NLM_LOG_INFO("  Relative change: " + std::to_string(relativeChange) + "%");
         
         // Count synapses that changed significantly
         size_t strengthened = 0;
@@ -128,11 +149,30 @@ struct LearningExperiment {
         size_t unchanged = 0;
         
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        std::vector<float> deltas;
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+            deltas.push_back(delta);
+            if (std::abs(delta) > 0.01f) {
+                if (delta > 0.01f) ++strengthened;
+                else ++weakened;
+            } else {
+                ++unchanged;
+            }
+        }
+        
+        // Compute statistics on weight changes
+        if (!deltas.empty()) {
+            float sumDeltas = std::accumulate(deltas.begin(), deltas.end(), 0.0f);
+            float avgDelta = sumDeltas / deltas.size();
+            float maxDelta = *std::max_element(deltas.begin(), deltas.end());
+            float minDelta = *std::min_element(deltas.begin(), deltas.end());
+            
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Weight Change Statistics:");
+            NLM_LOG_INFO("  Average delta: " + std::to_string(avgDelta));
+            NLM_LOG_INFO("  Max delta: " + std::to_string(maxDelta));
+            NLM_LOG_INFO("  Min delta: " + std::to_string(minDelta));
         }
         
         NLM_LOG_INFO("");
@@ -140,22 +180,47 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
         NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
         NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+        NLM_LOG_INFO("  Total changed: " + std::to_string(strengthened + weakened));
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes));
+        NLM_LOG_INFO("  Average firing rate: " + std::to_string(avgFiringRate) + " Hz");
+        NLM_LOG_INFO("  Duration: " + std::to_string(endTime - startTime) + " s");
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
+        // Determine if learning occurred with better thresholds
+        bool learningOccurred = (std::abs(weightChange) > 0.001f) ||
                                 (strengthened > 0 || weakened > 0);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
             NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
+            NLM_LOG_INFO("  Learning significance: " + std::to_string(relativeChange) + "% change in weights");
+            if (strengthened > weakened) {
+                NLM_LOG_INFO("  Net effect: Strengthening of connections (LTP)");
+            } else if (weakened > strengthened) {
+                NLM_LOG_INFO("  Net effect: Weakening of connections (LTD)");
+            } else {
+                NLM_LOG_INFO("  Net effect: Balanced strengthening and weakening");
+            }
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
+            NLM_LOG_INFO("  Weight change was below threshold (0.001)");
         }
+        
+        return learningOccurred;
+    }
+    
+    bool hasLearningOccurred() const {
+        if (initialWeights.empty() || finalWeights.empty()) return false;
+        
+        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
+        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
+        float initialMean = initialSum / initialWeights.size();
+        float finalMean = finalSum / finalWeights.size();
+        
+        return (std::abs(finalMean - initialMean) > 0.001f);
     }
 };
 
