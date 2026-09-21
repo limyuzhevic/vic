@@ -1,6 +1,7 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 2: Real Neural Computation Tests - Using Modern Test Framework
 
+#include "nlm_test_framework.h"
 #include <iostream>
 #include <cassert>
 
@@ -37,6 +38,32 @@ namespace test_brain {
     void runAll();
 }
 
+// Legacy test adapter - create simple test cases from existing test functions
+class LegacyTestCase : public nlm::test::TestCase {
+public:
+    std::function<void()> testFunction;
+    
+    LegacyTestCase(const std::string& name, std::function<void()> func, const std::string& category = "Compatibility")
+        : TestCase(name, category), testFunction(func) {}
+    
+    virtual nlm::test::TestResult run() {
+        nlm::test::TestResult result(name, category);
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        try {
+            testFunction();
+            result.passed = true;
+        } catch (const std::exception& e) {
+            result.passed = false;
+            result.failureMessage = e.what();
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        result.duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        return result;
+    }
+};
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -45,86 +72,48 @@ int main() {
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
     
+    // Initialize the test framework
+    nlm::test::initializeTestSuite();
+    
+    // Create legacy test cases for backward compatibility
+    auto typesTest = std::make_unique<LegacyTestCase>("Types Tests", []() { test_types::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(typesTest));
+    
+    auto configTest = std::make_unique<LegacyTestCase>("Config Tests", []() { test_config::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(configTest));
+    
+    auto randomTest = std::make_unique<LegacyTestCase>("Random Tests", []() { test_random::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(randomTest));
+    
+    auto clockTest = std::make_unique<LegacyTestCase>("Clock Tests", []() { test_clock::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(clockTest));
+    
+    auto neuronTest = std::make_unique<LegacyTestCase>("Neuron Tests", []() { test_neuron::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(neuronTest));
+    
+    auto synapseTest = std::make_unique<LegacyTestCase>("Synapse Tests", []() { test_synapse::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(synapseTest));
+    
+    auto stdpTest = std::make_unique<LegacyTestCase>("STDP Tests", []() { test_stdp::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(stdpTest));
+    
+    auto brainTest = std::make_unique<LegacyTestCase>("Brain Tests", []() { test_brain::runAll(); });
+    nlm::test::TestSuite::getInstance().registerTest(std::move(brainTest));
+    
+    // Run all tests using the new modern framework
+    std::vector<nlm::test::TestResult> results = nlm::test::TestSuite::getInstance().runAllTests();
+    
+    // Print report
+    nlm::test::TestSuite::getInstance().printReport(results);
+    
+    // Determine final result
     bool allPassed = true;
-    
-    std::cout << "Running Types tests..." << std::endl;
-    try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
+    for (const auto& result : results) {
+        if (!result.passed) {
+            allPassed = false;
+            break;
+        }
     }
     
-    std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
-        return 0;
-    } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
-        return 1;
-    }
+    return allPassed ? 0 : 1;
 }
