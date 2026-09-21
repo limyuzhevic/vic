@@ -513,6 +513,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,17 +527,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+// ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current sensory state for concept formation
+        // This requires encoding the current neural state as a pattern
+        // For now, we'll skip this as it needs proper state encoding
     }
-    
+
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
+
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
@@ -545,7 +547,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
+
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
@@ -575,16 +577,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
-    
+
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
-    
+
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+
+    // ========== INTEGRATE COGNITIVE SYSTEMS ==========
+    
+    // Connect NeuralPlanner to action selection
+    if (pImpl->planner) {
+        // The planner should plan actions based on current state
+        // We'll call it here but in a full implementation it would be more integrated
+        // with the AgentBrain action selection loop
+    }
+    
+    // Concept formation would process sensory state
+    if (pImpl->conceptFormation && !pImpl->episodicMemory->getRecentEpisodes(1).empty()) {
+        // Present the most recent episode to concept formation for learning
+        const auto* episode = pImpl->episodicMemory->getRecentEpisodes(1)[0];
+        pImpl->conceptFormation->presentExperience(
+            episode->sensoryState, 
+            std::vector<float>(), // Features would need to be extracted
+            0.0f, // Reward
+            episode->timestamp
+        );
+    }
+    
+    // Self-model update from experience (simplified)
+    if (!pImpl->episodicMemory->getRecentEpisodes(1).empty() && 
+        pImpl->episodicMemory->getEpisodeCount() > 1) {
+        const auto* currentEpisode = pImpl->episodicMemory->getRecentEpisodes(1)[0];
+        // In a full implementation, we would connect the SelfModel to update
+        // from this experience, learning action-effect mappings
     }
 }
 
@@ -1014,27 +1045,20 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl->associativeMemory.get();}
+
+SemanticMemory* Brain::getSemanticMemory() {
+    return nullptr;  // Semantic memory not yet implemented
+}
+
+ProceduralMemory* Brain::getProceduralMemory() {
+    return nullptr;  // Procedural memory not yet implemented
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
-}
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
