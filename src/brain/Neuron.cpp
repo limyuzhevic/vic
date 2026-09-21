@@ -250,6 +250,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is depolarized but hasn't reached threshold
+        // Set to Active state to indicate it's been activated
         pImpl->state.firingState = FiringState::Active;
     }
     
@@ -260,9 +262,37 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Update neuron for one simulation step with proper integrate-and-fire dynamics
+    // Integrate synaptic inputs and apply LIF dynamics
+    
+    // Calculate dt based on time since last spike for adaptive integration
+    TimestepDuration dt = 0.001;  // Default 1ms timestep
+    float timeSinceLastSpike = 0.0f;
+    
+    if (pImpl->state.lastSpikeTime >= 0.0f) {
+        timeSinceLastSpike = static_cast<float>(currentTime - pImpl->state.lastSpikeTime);
+        // Adaptive timestep: longer after spike, shorter during active periods
+        dt = std::min(0.001f, std::max(0.0001f, timeSinceLastSpike * 0.01f));
+    }
+    
+    // Apply LIF dynamics with synaptic integration
+    bool fired = stepLIF(currentTime, dt);
+    
+    if (fired) {
+        // Update firing rate based on activity
+        pImpl->state.firingRate = std::min(pImpl->state.firingRate + 1.0f, 1000.0f);  // Cap at 1000 Hz
+        
+        // Decay firing rate over time (homeostatic)
+        pImpl->state.firingRate *= 0.99f;
+    }
+    
+    // Apply spike-frequency adaptation more realistically
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        // Adaptation affects threshold over time (slow variable)
+        float thresholdChange = pImpl->state.adaptationVariable * 0.5f;
+        pImpl->state.threshold = std::max(-40.0f, 
+                                         std::min(-55.0f + thresholdChange, -20.0f));
+    }
 }
 
 void Neuron::reset() {

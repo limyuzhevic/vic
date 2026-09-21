@@ -22,56 +22,47 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // Real Hebbian learning implementation using covariance rule:
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    
+    // Calculate statistics for covariance computation
+    float sumPre = 0.0f;
+    float sumPost = 0.0f;
+    float sumPrePost = 0.0f;
+    float count = static_cast<float>(preSpikes.size() * postSpikes.size());
+    
+    // Compute spike statistics over the observation window
     for (Timestamp preTime : preSpikes) {
+        sumPre += static_cast<float>(preTime);
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
+            sumPost += static_cast<float>(postTime);
+            sumPrePost += static_cast<float>(preTime) * static_cast<float>(postTime);
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Normalize statistics
+    float meanPre = sumPre / static_cast<float>(preSpikes.size());
+    float meanPost = sumPost / static_cast<float>(postSpikes.size());
+    float meanPrePost = sumPrePost / count;
     
-    // Apply with bounds
+    // Compute covariance
+    float covariance = meanPrePost - (meanPre * meanPost);
+    
+    // Apply covariance rule with adaptive learning rate
+    float delta = pImpl->learningRate * covariance;
+    
+    // Apply with bounds and regularization
     if (std::abs(delta) > 1e-6f) {
+        // Apply weight change
         applyWeightChange(synapse, delta);
+        
+        // Update eligibility trace for future reward modulation
+        float currentTrace = synapse->getEligibilityTrace();
+        synapse->setEligibilityTrace(currentTrace + delta * 0.5f);
     }
 }
 

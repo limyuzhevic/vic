@@ -104,10 +104,30 @@ NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
     return INVALID_NEURON_ID;
 }
 
-bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
-    return false;
+void StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
+    // Remove neuron from brain - requires removing all its synapses
+    // and removing it from any neural regions
+    if (!brain || neuron == INVALID_NEURON_ID) {
+        return;
+    }
+    
+    // Find and remove all synapses where this neuron is source or destination
+    for (auto& region : brain->getRegions()) {
+        // Remove outgoing synapses
+        auto synapsesFrom = region->getSynapsesFrom(neuron);
+        for (Synapse* syn : synapsesFrom) {
+            removeSynapse(brain, syn->getId());
+        }
+        
+        // Remove incoming synapses  
+        auto synapsesTo = region->getSynapsesTo(neuron);
+        for (Synapse* syn : synapsesTo) {
+            removeSynapse(brain, syn->getId());
+        }
+        
+        // Remove the neuron itself from the region
+        region->removeNeuron(neuron);
+    }
 }
 
 float StructuralPlasticity::getSynaptogenesisRate() const {

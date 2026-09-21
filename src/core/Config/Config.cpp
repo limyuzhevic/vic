@@ -4,24 +4,113 @@
 #include <algorithm>
 #include <filesystem>
 
+// Logger declaration for warning messages
+#include "Logger.hpp"
+
+using json = nlohmann::json;
+
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parser first
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    std::string extension = "." + std::string(filepath.substr(filepath.find_last_of(".")));
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    try {
+        if (extension == ".json") {
+            json j;
+            file >> j;
+            
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                const json& value = it.value();
+                
+                ConfigValue configValue;
+                
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    configValue = value.get<int64_t>();
+                } else if (value.is_number_float()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Handle arrays
+                    std::vector<double> arr = value.get<std::vector<double>>();
+                    configValue = arr;
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+            
+            return true;
+        } else if (extension == ".yaml" || extension == ".yml") {
+            YAML::Node doc = YAML::LoadFile(filepath);
+            
+            for (const auto& it : doc) {
+                std::string key = it.first.as<std::string>();
+                const YAML::Node& value = it.second;
+                
+                ConfigValue configValue;
+                
+                if (value.IsScalar()) {
+                    std::string type = value.Scalar();
+                    if (type.find('.') != std::string::npos || type.find('e') != std::string::npos || type.find('E') != std::string::npos) {
+                        // Could be a float or scientific notation
+                        configValue = type;  // String to handle numbers as strings
+                    } else if (type == "true" || type == "false") {
+                        configValue = (type == "true");
+                    } else {
+                        try {
+                            size_t pos;
+                            int64_t intVal = std::stoll(type, &pos);
+                            if (pos == type.length()) {
+                                configValue = intVal;
+                            } else {
+                                double doubleVal = std::stod(type);
+                                configValue = doubleVal;
+                            }
+                        } catch (...) {
+                            configValue = type;
+                        }
+                    }
+                } else if (value.IsSequence()) {
+                    std::vector<double> arr;
+                    for (const auto& item : value) {
+                        try {
+                            size_t pos;
+                            double val = std::stod(item.as<std::string>());
+                            arr.push_back(val);
+                        } catch (...) {
+                            // Skip non-numeric items
+                        }
+                    }
+                    configValue = arr;
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+            
+            return true;
+        } else {
+            // Fall back to simple key=value format
+            return loadFromFileSimple(filepath);
+        }
+    } catch (const std::exception& e) {
+        // If parsing fails, fall back to simple format
+        NLM_LOG_WARNING(std::string("Failed to parse " + filepath + ": " + e.what() + ", falling back to simple format"));
+        return loadFromFileSimple(filepath);
+    }
+}
+
+// Helper method for simple key=value format
+bool Config::loadFromFileSimple(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,150 +142,6 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
 }
 
 // Explicit template instantiations

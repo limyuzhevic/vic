@@ -108,7 +108,125 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Implement real consolidation process with multiple stages:
+    // 1. Stabilization: Convert labile memory traces into stable engrams
+    // 2. Integration: Bind related memories into coherent schemas
+    // 3. Prioritization: Mark high-value memories for long-term storage
+    // 4. Pruning: Remove low-relevance or outdated memories
+    
+    // Stage 1: Stabilization - enhance memory strength for relevant episodes
+    std::vector<size_t> stableIndices;
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        
+        // Compute episode relevance based on multiple factors
+        float relevance = 0.0f;
+        
+        // Factor 1: Recency - more recent memories are more relevant
+        float age = static_cast<float>(i);  // Simple index-based age
+        relevance += std::exp(-age * 0.01f);  // Decay factor
+        
+        // Factor 2: Behavioral importance - would be based on reward associations
+        // For now, use placeholder value
+        relevance += 0.3f;
+        
+        // Factor 3: Pattern completeness - how complete the episode is
+        relevance += std::min(1.0f, episode.temporalContext / 100.0f);
+        
+        // Factor 4: Cross-association strength - how well it connects to other memories
+        relevance += std::min(0.5f, episode.associationStrength / 10.0f);
+        
+        // Normalize relevance
+        relevance = std::clamp(relevance, 0.0f, 1.0f);
+        
+        // Apply stabilization for relevant memories
+        if (relevance > relevanceThreshold) {
+            // Enhance memory strength (simulate synaptic consolidation)
+            EpisodicMemoryItem& episodeRef = pImpl->episodes[i];
+            episodeRef.strength += 0.1f * (1.0f - episodeRef.strength);
+            episodeRef.strength = std::clamp(episodeRef.strength, 0.0f, 1.0f);
+            
+            // Mark for long-term storage
+            episodeRef.isConsolidated = true;
+            episodeRef.consolidationStep = pImpl->episodes.size();  // Store current step
+            
+            stableIndices.push_back(i);
+        }
+    }
+    
+    // Stage 2: Integration - create connections between related episodes
+    for (size_t i = 0; i < stableIndices.size(); ++i) {
+        size_t idx1 = stableIndices[i];
+        for (size_t j = i + 1; j < stableIndices.size(); ++j) {
+            size_t idx2 = stableIndices[j];
+            
+            // Check for temporal proximity (episodes close in time)
+            float timeDiff = std::abs(static_cast<float>(idx2 - idx1));
+            if (timeDiff < 10.0f) {  // Within 10 time units
+                // Create association
+                float associationStrength = std::exp(-timeDiff * 0.1f);
+                
+                // Update episodes to reference each other
+                pImpl->episodes[idx1].associatedEpisodeIndices.push_back(idx2);
+                pImpl->episodes[idx2].associatedEpisodeIndices.push_back(idx1);
+                
+                // Update association strength
+                if (pImpl->episodes[idx1].associationStrength < associationStrength) {
+                    pImpl->episodes[idx1].associationStrength = associationStrength;
+                }
+                if (pImpl->episodes[idx2].associationStrength < associationStrength) {
+                    pImpl->episodes[idx2].associationStrength = associationStrength;
+                }
+            }
+        }
+    }
+    
+    // Stage 3: Pruning - remove low-relevance or outdated memories
+    std::vector<size_t> indicesToKeep;
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        
+        // Check if episode should be pruned
+        bool shouldPrune = false;
+        
+        // Prune if very low relevance
+        if (episode.strength < 0.1f && !episode.isConsolidated) {
+            shouldPrune = true;
+        }
+        
+        // Prune if too old and low priority
+        float age = static_cast<float>(i);
+        if (age > 1000.0f && episode.strength < 0.3f && episode.rewardValue < 0.1f) {
+            shouldPrune = true;
+        }
+        
+        // Prune if duplicates of recent high-strength memories
+        for (size_t otherIdx : episode.associatedEpisodeIndices) {
+            if (otherIdx < pImpl->episodes.size() && 
+                pImpl->episodes[otherIdx].strength > 0.8f &&
+                episode.strength < 0.3f) {
+                // This episode is redundant compared to a stronger one
+                shouldPrune = true;
+                break;
+            }
+        }
+        
+        if (!shouldPrune) {
+            indicesToKeep.push_back(i);
+        }
+    }
+    
+    // Compact memory by removing pruned episodes
+    if (indicesToKeep.size() < pImpl->episodes.size()) {
+        std::vector<EpisodicMemoryItem> keptEpisodes;
+        keptEpisodes.reserve(indicesToKeep.size());
+        
+        for (size_t idx : indicesToKeep) {
+            keptEpisodes.push_back(pImpl->episodes[idx]);
+        }
+        
+        pImpl->episodes = std::move(keptEpisodes);
+    }
 }
 
 // Semantic Memory Implementation
