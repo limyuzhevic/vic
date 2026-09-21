@@ -63,16 +63,27 @@ bool Config::loadFromArgs(int argc, char** argv) {
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
+                // Extract key (from index 2 to pos-1)
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle --key without = (set to true)
+                std::string key = arg.substr(2);
+                set(key, true, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc && arg.size() > 1) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle --key=value with equals at position 2 (edge case)
+        else if (arg == "--help" || arg == "--version" || arg == "--verbose") {
+            // Common command line flags - ignore them for now but log if needed
+            // This prevents crashes when unrecognized flags are passed
+            NLM_LOG_INFO("Ignoring command line flag: " + arg);
         }
     }
     return true;

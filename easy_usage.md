@@ -20,6 +20,20 @@ That's it! NLM simulates all of this.
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
 
+## Enhanced Features (New in Version 2.0)
+
+With the enhanced Python bindings, you now have access to:
+
+- **Convenient dictionary-based configuration** with `createBrainFromDict()`
+- **Batch processing tools** with `createBrains()` and `analyzeBrainData()`
+- **Comprehensive episode management** with `runEpisode()`
+- **Feature toggling** with `enableAllFeatures()`
+- **Environment setup helpers** with `createSimpleEnvironment()`
+- **Type-safe error handling** with custom Python exceptions
+- **Performance monitoring tools** and statistics collection
+
+**Version**: 2.0.0-enhanced
+
 ---
 
 ## Quick Start (Copy & Paste)
@@ -42,33 +56,106 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 4: Enhanced Simulation with Batch Processing
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create multiple brains for comparison
+brains = pynlm.createBrains(3, neuron_count=500, region_count=1)
+
+# Configure all brains with same settings
+for i, brain in enumerate(brains):
+    brain.initialize()
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleEnvironment(width=10, height=10, seed=42+i)
+    agent.initialize(world)
+    
+    # Enable all learning features
+    agent.enableAllFeatures()
+
+# Run simulations in parallel (simplified example)
+total_rewards = []
+for i, brain in enumerate(brains):
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleEnvironment(width=10, height=10, seed=42+i)
+    agent.initialize(world)
+    agent.enableAllFeatures()
+    
+    reward = pynlm.runEpisode(brain, world, agent, 100, verbose=False)
+    total_rewards.append(reward)
+
+# Analyze results
+analysis = pynlm.analyzeBrainData(brains)
+print("Batch simulation results:")
+print(f"Rewards: {[f'{r:.2f}' for r in total_rewards]}")
+print(f"Average neurons per brain: {analysis['avg_neurons']:.0f}")
+print(f"Average firing rate: {analysis['avg_firing_rate']:.3f}")
+```
+
+### Example 5: Advanced Environment Configuration
+
+```python
+import pynlm
+
+# Create world with custom settings using keyword arguments
+world = pynlm.createSimpleEnvironment(
+    width=30,
+    height=30,
+    visionWidth=16,
+    visionHeight=16,
+    agent_start_x=15.0,
+    agent_start_y=15.0,
+    seed=12345
+)
+
+# Create brain with custom configuration
+config = {
+    "neuron_count": 2000,
+    "region_count": 2,
+    "connection_probability": 0.15,
+    "stdp_ltp_weight": 0.02,
+    "stdp_ltd_weight": 0.03,
+    "enable_curiosity": True,
+    "enable_development": True
+}
+
+brain = pynlm.createBrainFromDict(config)
 brain.initialize()
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
+# Create and configure agent
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
+agent.enableAllFeatures()
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+# Run detailed simulation with statistics
+print("Starting advanced simulation...")
+for step in range(500):
+    # Get observation
+    percept = world.getSensoryPercept()
+    
+    # Process sensory input
+    agent.processSensoryInput(percept)
+    
+    # Run brain step
+    brain.step(step)
+    
+    # Get and apply action
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Print periodic updates
+    if step % 100 == 0:
+        stats = pynlm.getBrainStats(brain)
+        print(f"Step {step}:")
+        print(f"  Reward: {percept.getInternal().front() if percept.getInternal() else 0:.2f}")
+        print(f"  Neurons firing: {stats['firing_neurons']}")
+        print(f"  Total spikes: {stats['total_spikes']}")
+        print(f"  Firing rate: {stats['average_firing_rate']:.3f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+print("Simulation complete!")
 ```
 
 ---

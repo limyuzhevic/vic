@@ -720,9 +720,17 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Scale STDP learning rates - lower modulation reduces learning rate
+    float ltpWeight = 0.01f / (1.0f + modulation);
+    float ltdWeight = 0.012f / (1.0f + modulation);
+    pImpl->stdp->setLTPWeight(ltpWeight);
+    pImpl->stdp->setLTDWeight(ltdWeight);
+    
+    // Log modulation effect
+    if (modulation > 0.0f) {
+        NLM_LOG_INFO("Neuromodulation applied: dopamine level = " + std::to_string(modulation) +
+                    ", STDP learning rates reduced");
+    }
 }
 
 void Brain::updatePlasticity() {

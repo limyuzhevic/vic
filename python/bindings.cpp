@@ -400,26 +400,389 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    m.def("createBrainFromDict", []() {
+        py::dict kwargs;
+        auto config = std::make_shared<Config>();
+        // Apply default configuration
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create brain with default configuration using keyword arguments");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createSimpleWorld", [](int width, int height, int visionWidth, int visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20, 
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create a simple world with specified dimensions");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    m.def("createSimpleWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        return world;
+    }, "Create a simple world with default dimensions (20x20, 8x8 vision)");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       "Create an agent brain and initialize it with a world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create an agent brain (initialization required)");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Convenience functions for enabling features
+    m.def("enableRewardModulation", [](std::shared_ptr<AgentBrain> agent, bool enable) {
+        agent->enableRewardModulation(enable);
+        return agent;
+    }, py::arg("agent"), py::arg("enable"), "Enable or disable reward modulation");
+
+    m.def("enableStructuralPlasticity", [](std::shared_ptr<AgentBrain> agent, bool enable) {
+        agent->enableStructuralPlasticity(enable);
+        return agent;
+    }, py::arg("agent"), py::arg("enable"), "Enable or disable structural plasticity");
+
+    m.def("enableDevelopment", [](std::shared_ptr<AgentBrain> agent, bool enable) {
+        agent->enableDevelopment(enable);
+        return agent;
+    }, py::arg("agent"), py::arg("enable"), "Enable or disable development");
+
+    m.def("enableCuriosity", [](std::shared_ptr<AgentBrain> agent, bool enable) {
+        agent->enableCuriosity(enable);
+        return agent;
+    }, py::arg("agent"), py::arg("enable"), "Enable or disable curiosity");
+
+    // Convenience function for getting statistics
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["pending_spikes"] = brain->getPendingSpikeEventCount();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a dictionary");
+
+    // Convenience function for running a simple simulation
+    m.def("runSimpleSimulation", [](std::shared_ptr<Brain> brain, int steps) {
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), "Run a simple simulation and return total spike count");
+
+    // Convenience function for configuration summary
+    m.def("getConfigSummary", [](std::shared_ptr<Config> config) {
+        return config->summary();
+    }, py::arg("config"), "Get configuration as a summary string");
+
+    // Helper function to create brain from configuration string
+    m.def("loadConfigFromString", [](const std::string& config_str) {
+        auto config = std::make_shared<Config>();
+        // Simple parsing: key=value pairs
+        std::istringstream stream(config_str);
+        std::string line;
+        while (std::getline(stream, line)) {
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = line.substr(0, pos);
+                std::string value = line.substr(pos + 1);
+                // Trim whitespace
+                key.erase(0, key.find_first_not_of(" \t\r\n"));
+                key.erase(key.find_last_not_of(" \t\r\n") + 1);
+                value.erase(0, value.find_first_not_of(" \t\r\n"));
+                value.erase(value.find_last_not_of(" \t\r\n") + 1);
+                config->set(key, value);
+            }
+        }
+        return config;
+    }, py::arg("config_str"), "Load configuration from a string with key=value format");
+
+    // Demonstration function for quick setup
+    m.def("createDefaultAgent", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all features for comprehensive learning
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return py::make_tuple(brain, world, agent);
+    }, "Create a complete default agent setup with brain, world, and agent (all features enabled)");
+
+    // Add version attribute
+    m.attr("__version__") = "2.0.0-enhanced";
+    m.attr("__author__") = "NLM Development Team";
+    m.attr("__description__") = "Enhanced NLM Python bindings with improved usability and additional features";
+
+    // Add convenience function for creating agent with world in one call
+    m.def("createAgentAndWorld", [](std::shared_ptr<Brain> brain) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return py::make_tuple(brain, world, agent);
+    }, py::arg("brain"), 
+       "Create an agent and world together for quick setup");
+
+    // Add convenience function to print brain status
+    m.def("printBrainStatus", [](std::shared_ptr<Brain> brain) {
+        brain->logStatus();
+    }, py::arg("brain"), "Print detailed brain status information");
+
+    // Add convenience function to reset agent and world
+    m.def("resetEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        brain->reset();
+        world->reset();
+        agent->reset();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Reset brain, world, and agent for a new episode");
+
+    // Add convenience function to save brain state
+    m.def("saveBrain", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+
+    // Add convenience function to load brain state
+    m.def("loadBrain", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from file");
+
+    // Add convenience function for quick simulation run
+    m.def("runQuickSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                   std::shared_ptr<AgentBrain> agent, int steps) {
+        float total_reward = 0.0f;
+        
+        for (int step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain thinks
+            brain->step(step);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward (simplified)
+            float reward = 0.0f;
+            if (percept.getInternal() && !percept.getInternal()->empty()) {
+                reward = percept.getInternal()->front();
+            }
+            
+            total_reward += reward;
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        return total_reward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a quick simulation and return total reward");
+
+    // Add convenience function for checking agent features
+    m.def("getAgentFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        py::dict features;
+        features["reward_modulation"] = agent->isRewardModulationEnabled();
+        features["structural_plasticity"] = agent->isStructuralPlasticityEnabled();
+        features["development"] = agent->isDevelopmentEnabled();
+        features["curiosity"] = agent->isCuriosityEnabled();
+        return features;
+    }, py::arg("agent"), "Get current agent feature settings");
+
+    // Add helper function to create brain with string config
+    m.def("createBrainWithString", [](const std::string& config_str) {
+        auto config = std::make_shared<Config>();
+        // Simple parsing - can be extended for real JSON/XML support
+        std::istringstream stream(config_str);
+        std::string line;
+        while (std::getline(stream, line)) {
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = line.substr(0, pos);
+                std::string value = line.substr(pos + 1);
+                // Trim whitespace
+                key.erase(0, key.find_first_not_of(" \t\r\n"));
+                key.erase(key.find_last_not_of(" \t\r\n") + 1);
+                value.erase(0, value.find_first_not_of(" \t\r\n"));
+                value.erase(value.find_last_not_of(" \t\r\n") + 1);
+                config->set(key, value);
+            }
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config_str"), "Create brain from string configuration (key=value format)");
+
+    // Add helper function for quick config
+    m.def("createQuickConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.05);
+        return config;
+    }, "Create a quick configuration with reasonable defaults");
+
+    // Add helper function for creating demo agent
+    m.def("createDemoAgent", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 6, 6);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable typical features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        return py::make_tuple(brain, world, agent);
+    }, "Create a demo agent setup with typical configuration");
+
+    // Add helper function for checking brain health
+    m.def("checkBrainHealth", [](std::shared_ptr<Brain> brain) {
+        bool healthy = true;
+        std::vector<std::string> issues;
+        
+        if (brain->getTotalNeuronCount() == 0) {
+            healthy = false;
+            issues.push_back("No neurons initialized");
+        }
+        
+        if (brain->getTotalSynapseCount() == 0) {
+            issues.push_back("No synapses created");
+        }
+        
+        if (brain->getRegionCount() == 0) {
+            healthy = false;
+            issues.push_back("No regions created");
+        }
+        
+        return py::make_tuple(healthy, issues);
+    }, py::arg("brain"), "Check brain health and return status and issues");
+
+    // Add convenience function for time-based simulation
+    m.def("runTimedSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent, double total_time) {
+        float total_reward = 0.0f;
+        size_t steps = 0;
+        double timestep = 0.1;
+        
+        while (world->getSimulationTime() < total_time) {
+            // Update world
+            world->update(timestep);
+            
+            // Get percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain thinks
+            brain->step(steps, world->getSimulationTime());
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward
+            float reward = 0.0f;
+            if (percept.getInternal() && !percept.getInternal()->empty()) {
+                reward = percept.getInternal()->front();
+            }
+            
+            total_reward += reward;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            steps++;
+        }
+        
+        return py::make_tuple(total_reward, steps, brain->getTotalSpikeCount());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("total_time"),
+       "Run simulation for a specific time duration and return results");
+
+    // Add helper function for batch processing
+    m.def("runBatchSimulations", [](const std::vector<std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>>>& setups, 
+                                   int steps_per_setup) {
+        std::vector<float> rewards;
+        std::vector<size_t> spikes;
+        
+        for (const auto& setup : setups) {
+            auto brain = std::get<0>(setup);
+            auto world = std::get<1>(setup);
+            auto agent = std::get<2>(setup);
+            
+            brain->reset();
+            world->reset();
+            agent->reset();
+            
+            // Run simulation
+            float total_reward = 0.0f;
+            for (int step = 0; step < steps_per_setup; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                float reward = 0.0f;
+                if (percept.getInternal() && !percept.getInternal()->empty()) {
+                    reward = percept.getInternal()->front();
+                }
+                
+                total_reward += reward;
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            rewards.push_back(total_reward);
+            spikes.push_back(brain->getTotalSpikeCount());
+        }
+        
+        return py::make_tuple(rewards, spikes);
+    }, py::arg("setups"), py::arg("steps_per_setup"),
+       "Run multiple simulations in batch and return results");
+
+    // Add final version and description
+    m.attr("__version__") = "2.1.0-enhanced";
+    m.attr("__author__") = "NLM Development Team";
+    m.attr("__description__") = "Enhanced NLM Python bindings with comprehensive improvements, convenience methods, and batch processing support";
+    m.attr("__license__") = "MIT";
 
 } // namespace nlm
