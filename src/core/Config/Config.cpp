@@ -212,4 +212,159 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// Configuration validation and diagnostics utilities
+// These functions provide validation of configuration parameters and diagnostic reporting
+// to help users identify configuration issues before simulation runtime errors occur.
+
+namespace nlm {
+
+bool validateConfig(const Config& config) {
+    bool isValid = true;
+    
+    // Validate neuron_count
+    auto neuronCount = config.getOr<size_t>("neuron_count", 0);
+    if (neuronCount == 0) {
+        NLM_LOG_WARNING("neuron_count is not set or is 0");
+        isValid = false;
+    } else if (neuronCount > 10000) {
+        NLM_LOG_WARNING("neuron_count is very large (" + std::to_string(neuronCount) + ") - may impact performance");
+    }
+    
+    // Validate region_count
+    auto regionCount = config.getOr<size_t>("region_count", 0);
+    if (regionCount == 0) {
+        NLM_LOG_WARNING("region_count is not set or is 0");
+        isValid = false;
+    } else if (regionCount > 10) {
+        NLM_LOG_WARNING("region_count is large (" + std::to_string(regionCount) + ") - may impact performance");
+    }
+    
+    // Validate simulation_timestep
+    auto timestep = config.getOr<double>("simulation_timestep", 0.0);
+    if (timestep <= 0.0) {
+        NLM_LOG_WARNING("simulation_timestep must be positive, using default 0.001");
+        const_cast<Config&>(config).set("simulation_timestep", 0.001, ConfigSource::Default);
+    } else if (timestep > 0.1) {
+        NLM_LOG_WARNING("simulation_timestep is large (" + std::to_string(timestep) + ") - may impact stability");
+    }
+    
+    // Validate connection_probability
+    auto connProb = config.getOr<float>("connection_probability", 0.0f);
+    if (connProb < 0.0f || connProb > 1.0f) {
+        NLM_LOG_WARNING("connection_probability must be between 0.0 and 1.0, using default 0.15");
+        const_cast<Config&>(config).set("connection_probability", 0.15f, ConfigSource::Default);
+    }
+    
+    // Validate plasticity parameters
+    auto learningRate = config.getOr<float>("plasticity_learning_rate", 0.0f);
+    if (learningRate <= 0.0f) {
+        NLM_LOG_WARNING("plasticity_learning_rate should be positive");
+    }
+    
+    auto stdpLtp = config.getOr<float>("stdp_ltp_weight", 0.0f);
+    auto stdpLtd = config.getOr<float>("stdp_ltd_weight", 0.0f);
+    if (stdpLtp <= 0.0f) {
+        NLM_LOG_WARNING("stdp_ltp_weight should be positive");
+    }
+    if (stdpLtd <= 0.0f) {
+        NLM_LOG_WARNING("stdp_ltd_weight should be positive");
+    }
+    
+    // Validate development parameters
+    auto synaptogenesis = config.getOr<float>("development_synaptogenesis_rate", 0.0f);
+    auto pruning = config.getOr<float>("development_pruning_rate", 0.0f);
+    if (synaptogenesis < 0.0f) {
+        NLM_LOG_WARNING("development_synaptogenesis_rate should be non-negative");
+    }
+    if (pruning < 0.0f) {
+        NLM_LOG_WARNING("development_pruning_rate should be non-negative");
+    }
+    
+    // Validate random_seed
+    auto seed = config.getOr<int64_t>("random_seed", 0);
+    if (seed < 0) {
+        NLM_LOG_WARNING("random_seed should be non-negative");
+    }
+    
+    // Validate max_simulation_steps
+    auto maxSteps = config.getOr<size_t>("max_simulation_steps", 0);
+    if (maxSteps == 0) {
+        NLM_LOG_WARNING("max_simulation_steps should be positive");
+    } else if (maxSteps > 1000000) {
+        NLM_LOG_WARNING("max_simulation_steps is very large (" + std::to_string(maxSteps) + ") - may impact performance");
+    }
+    
+    return isValid;
+}
+
+std::string getConfigValidationReport(const Config& config) {
+    std::ostringstream oss;
+    oss << "=== Configuration Validation Report ===\n";
+    
+    bool allValid = true;
+    
+    // Check key required parameters
+    auto neuronCount = config.getOr<size_t>("neuron_count", 0);
+    if (neuronCount > 0) {
+        oss << "✓ neuron_count: " << neuronCount << " (OK)\n";
+    } else {
+        oss << "✗ neuron_count: not set or zero\n";
+        allValid = false;
+    }
+    
+    auto regionCount = config.getOr<size_t>("region_count", 0);
+    if (regionCount > 0) {
+        oss << "✓ region_count: " << regionCount << " (OK)\n";
+    } else {
+        oss << "✗ region_count: not set or zero\n";
+        allValid = false;
+    }
+    
+    auto timestep = config.getOr<double>("simulation_timestep", 0.0);
+    if (timestep > 0.0) {
+        oss << "✓ simulation_timestep: " << timestep << "s (OK)\n";
+    } else {
+        oss << "✗ simulation_timestep: invalid (" << timestep << ")\n";
+        allValid = false;
+    }
+    
+    auto connProb = config.getOr<float>("connection_probability", 0.0f);
+    if (connProb >= 0.0f && connProb <= 1.0f) {
+        oss << "✓ connection_probability: " << connProb << " (OK)\n";
+    } else {
+        oss << "✗ connection_probability: invalid (" << connProb << ")\n";
+        allValid = false;
+    }
+    
+    oss << "\n=== Configuration Summary ===\n";
+    oss << "Total parameters loaded: " << config.getKeys().size() << "\n";
+    oss << "Configuration is " << (allValid ? "valid" : "has issues") << "\n";
+    
+    return oss.str();
+}
+
+std::vector<std::string> getConfigErrors(const Config& config) {
+    std::vector<std::string> errors;
+    
+    // Check for known configuration issues
+    auto neuronCount = config.getOr<size_t>("neuron_count", 0);
+    if (neuronCount == 0) {
+        errors.push_back("neuron_count is not set or is 0");
+    } else if (neuronCount > 10000) {
+        errors.push_back("neuron_count is very large (" + std::to_string(neuronCount) + ") - may impact performance");
+    }
+    
+    auto timestep = config.getOr<double>("simulation_timestep", 0.0);
+    if (timestep <= 0.0) {
+        errors.push_back("simulation_timestep must be positive");
+    }
+    
+    auto connProb = config.getOr<float>("connection_probability", 0.0f);
+    if (connProb < 0.0f || connProb > 1.0f) {
+        errors.push_back("connection_probability must be between 0.0 and 1.0");
+    }
+    
+    return errors;
+}
+
 } // namespace nlm

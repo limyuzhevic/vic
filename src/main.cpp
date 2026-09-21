@@ -48,6 +48,36 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --version, -v           Show version information" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron_count <N>      Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count <N>      Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <T>          Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --seed <S>              Set random seed (default: 42)" << std::endl;
+    std::cout << "  --stdp_ltp <W>          Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd <W>          Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --synaptogenesis <R>    Set synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning <R>           Set pruning rate (default: 0.00001)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --neuron_count 1000 --region_count 2" << std::endl;
+    std::cout << "  " << programName << " --config my_config.cfg --seed 123" << std::endl;
+    std::cout << "  " << programName << " -h" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Neural Learning Machine - Phase 2" << std::endl;
+    std::cout << "Version: 2.0.0 (Phase 2.0)" << std::endl;
+    std::cout << "Build: Sep 21, 2026" << std::endl;
+    std::cout << "Architecture: Anti-Transformer, Neuroscientifically Informed" << std::endl;
+    std::cout << "Features: LIF neurons, STDP, Hebbian plasticity, Structural plasticity" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -159,7 +189,15 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void initializePlasticity(Brain* brain) {
+    if (!brain) return;
+    auto* region = brain->getRegion(RegionId(1));
+    if (region) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        }
+    }
+}
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
@@ -322,8 +360,40 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Handle command-line arguments before initialization
+    std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
+    bool showVersion = false;
     
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg.substr(0, 9) == "--config=") {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+    }
+    
+    // Show help or version and exit
+    if (showHelp) {
+        printBanner();
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    if (showVersion) {
+        printBanner();
+        printVersion();
+        return 0;
+    }
+    
+    printBanner();
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -345,9 +415,6 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -382,6 +449,16 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Validate configuration and log any issues
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Validating configuration...");
+    auto configErrors = nlm::getConfigErrors(*config);
+    if (!configErrors.empty()) {
+        for (const auto& error : configErrors) {
+            NLM_LOG_WARNING("Config error: " + error);
+        }
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -391,6 +468,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+    // Validate configuration and log detailed report
+    auto validationReport = nlm::getConfigValidationReport(*config);
+    NLM_LOG_INFO(validationReport);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
