@@ -187,8 +187,17 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Update prediction system with sensory input
+    void updatePredictionWithSensory(const class SensoryInput& input);
+    
+    // Update working memory with current state
+    void updateWorkingMemoryWithCurrentState();
+    
+    // Replay important episodes
+    void replayMemory(float replayThreshold);
+    
+    // Consolidate episodic memory
+    void consolidateEpisodicMemory(float consolidationThreshold);
     
     // Logging
     void logStatus() const;
