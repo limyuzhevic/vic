@@ -245,23 +245,104 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+    // Audio configuration and processing
+    py::class_<AudioConfig>(m, "AudioConfig", R"pbdoc(Audio configuration)")
+        .def(py::init<>())
+        .def_readwrite("channels", &AudioConfig::channels)
+        .def_readwrite("sampleRate", &AudioConfig::sampleRate)
+        .def_readwrite("duration", &AudioConfig::duration)
+        .def_readwrite("scale", &AudioConfig::scale)
+        .def_readwrite("enabled", &AudioConfig::enabled)
+        .def_readwrite("normalize", &AudioConfig::normalize)
+        .def("summary", &AudioConfig::summary);
+
+    // Enhanced SensoryPercept with audio and processing
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Enhanced sensory percept data with audio)")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
         .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
         .def("getVisionWidth", &SensoryPercept::getVisionWidth)
         .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("setVisionConfig", &SensoryPercept::setVisionConfig, py::arg("width"), py::arg("height"), 
+             py::arg("scale") = 5.0f, py::arg("normalize") = true)
+        .def("normalizeVision", &SensoryPercept::normalizeVision)
+        .def("scaleVision", &SensoryPercept::scaleVision, py::arg("scale"))
+        .def("adjustVisionDimensions", &SensoryPercept::adjustVisionDimensions, 
+             py::arg("width"), py::arg("height"))
         .def("getTouch", &SensoryPercept::getTouch)
         .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("setTouchConfig", &SensoryPercept::setTouchConfig, py::arg("scale") = 8.0f, 
+             py::arg("normalize") = true)
+        .def("normalizeTouch", &SensoryPercept::normalizeTouch)
+        .def("scaleTouch", &SensoryPercept::scaleTouch, py::arg("scale"))
         .def("getInternal", &SensoryPercept::getInternal)
         .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("setInternalConfig", &SensoryPercept::setInternalConfig, py::arg("scale") = 5.0f, 
+             py::arg("normalize") = true)
+        .def("normalizeInternal", &SensoryPercept::normalizeInternal)
+        .def("scaleInternal", &SensoryPercept::scaleInternal, py::arg("scale"))
         .def("getProprioception", &SensoryPercept::getProprioception)
         .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("setProprioceptionConfig", &SensoryPercept::setProprioceptionConfig, 
+             py::arg("scale") = 3.0f, py::arg("normalize") = true)
+        .def("normalizeProprioception", &SensoryPercept::normalizeProprioception)
+        .def("scaleProprioception", &SensoryPercept::scaleProprioception, py::arg("scale"))
         .def("getAudio", &SensoryPercept::getAudio)
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("setAudioConfig", &SensoryPercept::setAudioConfig, py::arg("channels") = 0, 
+             py::arg("scale") = 1.0f, py::arg("normalize") = true)
+        .def("enableAudio", &SensoryPercept::enableAudio, py::arg("enable"))
+        .def("isAudioEnabled", &SensoryPercept::isAudioEnabled)
+        .def("processAudio", &SensoryPercept::processAudio)
+        .def("normalizeAudio", &SensoryPercept::normalizeAudio)
+        .def("scaleAudio", &SensoryPercept::scaleAudio, py::arg("scale"))
+        .def("getAudioDuration", &SensoryPercept::getAudioDuration)
+        .def("setAudioDuration", &SensoryPercept::setAudioDuration, py::arg("duration"))
+        .def("getAudioSampleRate", &SensoryPercept::getAudioSampleRate)
+        .def("setAudioSampleRate", &SensoryPercept::setAudioSampleRate, py::arg("rate"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        .def("adjustTouchDimensions", &SensoryPercept::adjustTouchDimensions, py::arg("points"))
+        .def("adjustInternalDimensions", &SensoryPercept::adjustInternalDimensions, py::arg("signals"))
+        .def("adjustProprioceptionDimensions", &SensoryPercept::adjustProprioceptionDimensions, 
+             py::arg("points"))
+        .def("applyNoiseReduction", &SensoryPercept::applyNoiseReduction, 
+             py::arg("signal"), py::arg("threshold") = 0.1f)
+        .def("extractFrequencyFeatures", &SensoryPercept::extractFrequencyFeatures, 
+             py::arg("audio"))
+        .def("extractTemporalFeatures", &SensoryPercept::extractTemporalFeatures, 
+             py::arg("audio"))
+        .def("extractSpectralFeatures", &SensoryPercept::extractSpectralFeatures, 
+             py::arg("audio"));
+
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation with audio)")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("reset", &SimpleWorld::reset)
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
+        .def("update", &SimpleWorld::update, py::arg("timestep"))
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"))
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal)
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal)
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getWidth", &SimpleWorld::getWidth)
+        .def("getHeight", &SimpleWorld::getHeight)
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("setAudioSeed", &SimpleWorld::setAudioSeed, py::arg("seed"))
+        .def("getAudioSeed", &SimpleWorld::getAudioSeed);
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -354,23 +435,21 @@ PYBIND11_MODULE(pynlm, m) {
              "Log brain status");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def(py::init<std::shared_ptr<Brain>, nlm::AgentConfig>(), py::arg("brain"), py::arg("config") = nlm::AgentConfig::createDefaultConfig(),
+             "Create a new agent brain interface")
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
+        .def("processSensoryInput", &AgentBrain::processSensoryInput, py::arg("percept"),
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation, py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
+        .def("updateDevelopment", &AgentBrain::updateDevelopment, py::arg("timestep"),
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
@@ -384,21 +463,26 @@ PYBIND11_MODULE(pynlm, m) {
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
+        .def("getBrain", &AgentBrain::getBrain, py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation, py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity, py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment, py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getConfig", &AgentBrain::getConfig, py::return_value_policy::reference_internal,
+             "Get the agent configuration")
+        .def("updateConfig", &AgentBrain::updateConfig, py::arg("config"),
+             "Update agent configuration")
+        .def("enableSampling", &AgentBrain::enableSampling, py::arg("enable"),
+             "Enable neural activity sampling")
+        .def("isSamplingEnabled", &AgentBrain::isSamplingEnabled,
+             "Check if sampling is enabled")
+        .def("getPerformanceMetrics", &AgentBrain::getPerformanceMetrics,
+             "Get performance metrics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
