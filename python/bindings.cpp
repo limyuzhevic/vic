@@ -302,6 +302,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
@@ -366,9 +368,16 @@ PYBIND11_MODULE(pynlm, m) {
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+        .def("applyRewardModulation", [](AgentBrain& self, float reward, float predictedReward) {
+            self.applyRewardModulation(reward, predictedReward);
+        }, py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation (reward, predictedReward)")
+        .def("applyRewardModulationFull", [](AgentBrain& self, float reward, float predictedReward, float novelty) {
+            self.applyRewardModulation(reward, predictedReward);
+            // Note: applyRewardModulation doesn't currently accept novelty
+            // This is kept for API compatibility with potential future extensions
+        }, py::arg("reward"), py::arg("predictedReward"), py::arg("novelty"),
+             "Apply reward modulation with novelty (alternative signature)")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")

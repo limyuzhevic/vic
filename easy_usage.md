@@ -81,7 +81,7 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | Your brain processes it | `agent.processSensoryInput(percept)` |
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+| Your brain learns from results | `agent.applyRewardModulation(reward, predicted_reward)` |
 
 ---
 
@@ -150,7 +150,138 @@ print("Development stage:", brain.getDevelopmentalStage())
 agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+agent.enableCuriosity(True)              # Explore new things
+```
+
+### Pattern 4: Advanced Agent with Learning and Development
+
+```python
+def run_advanced_agent(brain, world, agent, num_steps):
+    """Run a complete agent simulation with advanced features."""
+    
+    # Enable all advanced subsystems
+    agent.enableRewardModulation(True)     # Learn from rewards
+    agent.enableCuriosity(True)            # Explore new things
+    agent.enableDevelopment(True)          # Brain matures over time
+    agent.enableStructuralPlasticity(True)  # Grow new connections
+    
+    for step in range(num_steps):
+        # 1. Update world
+        world.update(0.1)
+        
+        # 2. Get what the agent sees
+        percept = world.getSensoryPercept()
+        
+        # 3. Tell the brain
+        agent.processSensoryInput(percept)
+        
+        # 4. Brain thinks
+        brain.step(step)
+        
+        # 5. Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # 6. Do action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # 7. Apply learning with reward
+        # Get reward from internal signals (simulated reward)
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        # Predict reward (simple - could be improved)
+        predicted_reward = agent.getPredictionError()
+        agent.applyRewardModulation(reward, predicted_reward)
+        
+        # 8. Update development - brain matures
+        agent.updateDevelopment(0.1)
+        
+        # 9. Log advanced statistics
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+            print(f"  Average firing rate: {brain.getAverageFiringRate():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction error: {agent.getPredictionError():.3f}")
+            print(f"  Neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+    
+    return brain, world, agent
+
+# Use it like this:
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+run_advanced_agent(brain, world, agent, 500)
+```
+
+### Pattern 5: Complete Multi-Episode Training
+
+```python
+def run_training_session(brain, world, agent, num_episodes, steps_per_episode):
+    """Run complete training over multiple episodes."""
+    
+    # Enable learning systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    
+    print(f"Starting training for {num_episodes} episodes...")
+    
+    for episode in range(num_episodes):
+        print(f"\nEpisode {episode + 1}/{num_episodes}")
+        
+        # Reset for new episode
+        world.reset()
+        agent.reset()
+        
+        # Run episode
+        for step in range(steps_per_episode):
+            # Standard loop
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Learning
+            reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+            predicted_reward = agent.getPredictionError()
+            agent.applyRewardModulation(reward, predicted_reward)
+            
+            # Development
+            agent.updateDevelopment(0.1)
+            
+            # Progress indicator
+            if step % 100 == 0:
+                print(f"  Step {step}: "
+                      f"{brain.getFiringNeuronCount()} firing, "
+                      f"{agent.getCuriosityLevel():.3f} curiosity")
+        
+        # End of episode summary
+        print(f"  Episode complete - "
+              f"Total spikes: {brain.getTotalSpikeCount()}, "
+              f"Development: {brain.getDevelopmentalStage()}")
+    
+    print(f"\nTraining complete!")
+    print(f"Final development stage: {brain.getDevelopmentalStage()}")
+    print(f"Total spikes accumulated: {brain.getTotalSpikeCount()}")
+
+# Use it like this:
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+run_training_session(brain, world, agent, 10, 200)
 ```
 
 ---
@@ -178,6 +309,15 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+### `agent.applyRewardModulation(reward, predicted_reward)`
+Teaches the brain from experiences using reward prediction error.
+
+### `agent.updateDevelopment(timestep)`
+Allows the brain to mature and change over time.
+
+### `agent.enableFeature(True)`
+Turns on specific brain subsystems (curiosity, development, etc.).
 
 ---
 
@@ -221,7 +361,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning
 
 ```python
 import pynlm
@@ -254,6 +394,66 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Advanced Training with Development
+
+```python
+import pynlm
+
+# Create advanced brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create agent
+world = pynlm.createSimpleWorld()
+world.configure(width=25, height=25, visionWidth=12, visionHeight=12)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all subsystems for advanced learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+print("Starting advanced training with development...")
+
+# Run training
+for episode in range(5):
+    print(f"\nEpisode {episode + 1}/5")
+    
+    # Reset episode
+    world.reset()
+    agent.reset()
+    
+    # Run episode with development updates
+    for step in range(200):
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Learn from experience
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        predicted_reward = agent.getPredictionError()
+        agent.applyRewardModulation(reward, predicted_reward)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        if step % 50 == 0:
+            print(f"  Step {step}: "
+                  f"{brain.getDevelopmentalStage()}, "
+                  f"{agent.getCuriosityLevel():.3f} curiosity, "
+                  f"{brain.getFiringNeuronCount()} firing")
+
+print("\nAdvanced training complete!")
+print(f"Final development stage: {brain.getDevelopmentalStage()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
+
 ---
 
 ## Quick Reference
@@ -268,6 +468,8 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Learn from reward | `agent.applyRewardModulation(reward, predicted_reward)` |
+| Update development | `agent.updateDevelopment(timestep)` |
 
 ---
 
@@ -285,13 +487,85 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"The brain isn't learning"**
+- Make sure `agent.enableRewardModulation(True)` is called
+- Check that `agent.applyRewardModulation()` is being called
+- Try increasing curiosity: `agent.enableCuriosity(True)`
+
+**"The brain isn't developing"**
+- Make sure `agent.enableDevelopment(True)` is called
+- Check that `agent.updateDevelopment()` is being called
+- Development takes time and multiple episodes
+
+---
+
+## Advanced Usage Tips
+
+### For Faster Results
+```python
+# Use a larger brain with more neurons
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # More neurons = faster learning
+brain = pynlm.createBrain(config)
+```
+
+### For More Learning
+```python
+# Enable all learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# These enable:
+# - Reward learning from experiences
+# - Curiosity-driven exploration
+# - Brain maturation over time
+# - Growing new connections
+```
+
+### For Realistic Simulation
+```python
+# Set random seed for reproducible results
+world.setRandomSeed(42)
+
+# Configure world for specific task
+world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+```
+
+### For Monitoring Progress
+```python
+# Log detailed statistics every 100 steps
+if step % 100 == 0:
+    print(f"Step {step}:")
+    print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+    print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+    print(f"  Development: {brain.getDevelopmentalStage()}")
+```
+
 ---
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+When you're comfortable with the basics:
 
-That's it! You're now ready to use NLM.
+1. **Read HOW_TO_USE.md** - Get comprehensive documentation with all parameters
+2. **Read docs/ARCHITECTURE.md** - Understand the advanced architecture
+3. **Experiment with configurations** - Try different neuron counts, learning rates
+4. **Create custom worlds** - Design specific environments for your experiments
+5. **Build multi-agent systems** - Run teams of interacting brains
+6. **Analyze performance** - Use the advanced logging and monitoring features
+
+### Advanced Topics to Explore:
+
+- **Memory Systems**: How working and episodic memory work
+- **Prediction Systems**: How brains predict future events
+- **Attention Mechanisms**: How brains focus on important information
+- **Development**: How brains change and mature over time
+- **Neuromodulation**: How dopamine, curiosity, and other systems affect learning
+- **Plasticity**: How synapses strengthen and weaken
+
+That's it! You're now ready to use NLM at any level of complexity, from simple brain demonstrations to advanced learning systems with development and curiosity.
+
+**Remember**: Always call `brain.initialize()` before using the brain, and `agent.initialize(world)` before using the agent with a world!
