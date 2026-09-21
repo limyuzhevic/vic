@@ -404,6 +404,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Store active neuron firing in working memory
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    bool isActive = neuron->isFiring() || 
+                                   std::abs(state.membranePotential - state.restingPotential) > 5.0f;
+                    if (isActive) {
+                        // Store activation in working memory with strength based on membrane potential
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -488,7 +504,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their activations
+            std::vector<std::pair<NeuronId, float>> activeNeurons;
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -505,14 +522,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            pImpl->episodicMemory->storeEpisode(episode);
+            // Log this as an experience for episodic memory
+            if (pImpl->dopamine) {
+                float prediction = pImpl->predictionError ? pImpl->predictionError->getPrediction() : 0.0f;
+                float surprise = std::abs(episode.reward - prediction);
+                
+                // Store episode with prediction error as importance
+                episode.importance = surprise;
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // For now, update prediction error based on neuromodulation levels
+        // Create prediction error signal based on prediction vs actual reward
+        if (pImpl->dopamine) {
+            float prediction = 0.0f;
+            if (pImpl->predictionError) {
+                // Update prediction with current state
+                pImpl->predictionError->updatePrediction(prediction);
+            }
+            
+            // Calculate prediction error
+            float reward = pImpl->dopamine->getLevel();
+            float predictionError = reward - prediction;
+            
+            // Update prediction error signal
+            if (pImpl->predictionError) {
+                pImpl->predictionError->updateError(predictionError, pImpl->timestep);
+            }
+            
+            // Apply prediction error to dopamine level
+            if (pImpl->dopamine) {
+                // Dopamine levels are affected by prediction error
+                float errorMod = std::min(1.0f, std::abs(predictionError) * 0.5f);
+                if (predictionError > 0.1f) {
+                    pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * (1.0f + errorMod * 0.5f));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -522,7 +573,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            
+            // Get current attention focus
+            auto attendedRegions = pImpl->attention->getAttendedRegions();
+            
+            // Apply attention modulation based on brain state
+            float attentionGain = 1.0f;
+            if (pImpl->dopamine) {
+                attentionGain = std::min(2.0f, pImpl->dopamine->getLevel() * 0.2f + 1.0f);
+            }
+            
+            pImpl->attention->processCompetition(competitors, attentionGain);
+            
+            // Apply attentional enhancement to winners
+            const auto& winners = pImpl->attention->getWinners();
+            for (const auto& winner : winners) {
+                // Enhance winner neuron activity
+                if (brain_) {
+                    brain_->injectCurrent(winner, 2.0f * attentionGain);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 10: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Process current neural activity patterns to form concepts
+        // Concept formation operates on patterns of neural activity
+        // to extract higher-level regularities and abstractions
+        
+        if (pImpl->workingMemory) {
+            // Get current working memory content
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            auto memoryActivations = pImpl->workingMemory->retrieve();
+            
+            // Update concept formation with current activity patterns
+            pImpl->conceptFormation->updateConceptAssociations(
+                memoryNeurons, memoryActivations, pImpl->timestep);
+            
+            // Form new concepts when appropriate
+            if (pImpl->conceptFormation->shouldFormNewConcept(memoryActivations)) {
+                // Apply novelty signal to guide concept formation
+                if (pImpl->novelty) {
+                    float novelty = pImpl->novelty->getNoveltyLevel();
+                    pImpl->conceptFormation->formNewConcept(memoryNeurons, novelty);
+                }
+            }
         }
     }
     

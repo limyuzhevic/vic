@@ -114,7 +114,10 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    if (!brain_ && !pImpl->brain) return;
+    
+    // Use whichever brain pointer is available (brain_ takes precedence)
+    Brain* brain = brain_ ? brain_ : pImpl->brain;
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -123,7 +126,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         
         if (activation > 0.1f) {
             // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            brain->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -142,6 +145,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
