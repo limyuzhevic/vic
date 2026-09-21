@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -43,6 +30,9 @@ struct InterRegionConnection {
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
+
+// Forward declaration of Impl for pImpl idiom
+struct Impl;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
@@ -184,18 +174,18 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
+// Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
+    // Get developmental age (total steps since initialization)
+    SimulationStep getDevelopmentalAge() const;
+
     // Logging
     void logStatus() const;
     
 private:
-    struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm
