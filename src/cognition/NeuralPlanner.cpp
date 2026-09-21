@@ -335,7 +335,7 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                               const std::vector<float>& afterState,
                                               ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated
@@ -422,7 +422,7 @@ std::vector<float> SelfModel::findMatchingEffect(ActionType action,
 }
 
 float SelfModel::computeSimilarity(const std::vector<float>& a,
-                                  const std::vector<float>& b) const {
+                                      const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;

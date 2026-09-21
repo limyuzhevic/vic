@@ -52,28 +52,73 @@ private:
     Impl* pImpl;
 };
 
-// Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
-class HodgkinHuxleyDynamics : public NeuralDynamics {
+// Integrate-and-fire dynamics (simple model)
+class IntegrateAndFireDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    IntegrateAndFireDynamics();
+    ~IntegrateAndFireDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // Parameters
+    void setMembraneTimeConstant(float tau);
+    float getMembraneTimeConstant() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// Hodgkin-Huxley dynamics (detailed model)
+class HodgkinHuxleyDynamics : public NeuralDynamics {
+public:
+    HodgkinHuxleyDynamics();
+    ~HodgkinHuxleyDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // Parameters
+    void setMembraneTimeConstant(float tau);
+    float getMembraneTimeConstant() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// FitzHugh-Nagumo dynamics (simplified excitatory model)
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    FitzHughNagumoDynamics();
+    ~FitzHughNagumoDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // Parameters
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    void setResetVoltage(float voltage);
+    float getResetVoltage() const;
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
+
+} // namespace nlm
 
 } // namespace nlm

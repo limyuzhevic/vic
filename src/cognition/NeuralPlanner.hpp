@@ -129,7 +129,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -141,9 +141,6 @@ public:
     void updateSelfModel(const std::vector<float>& predicted,
                         const std::vector<float>& actual,
                         ActionType action);
-
-    // Get current capability level (0-1)
-    float getCapabilityLevel() const { return capabilityLevel_; }
 
     // Get body awareness (how accurately can predict consequences)
     float getBodyAwareness() const;
@@ -164,7 +161,7 @@ private:
 
     Brain* brain_;
     float capabilityLevel_;
-    
+
     // Action -> (beforeState -> afterState) mappings
     struct ActionEffect {
         std::vector<float> beforeState;
@@ -172,7 +169,7 @@ private:
         float confidence;
         size_t observationCount;
     };
-    
+
     std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
 };
 
@@ -207,7 +204,7 @@ public:
     // Learn simple communication signal from another agent
     // Signal is a neural pattern that predicts reward from other agent
     void learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                  float signalReward);
+                                 float signalReward);
 
     // Detect if another agent is signaling
     bool detectSignal(const std::vector<float>& neuralPattern) const;
@@ -236,16 +233,16 @@ private:
 
     Brain* brain_;
     size_t observationCount_;
-    
+
     // Observed action effects (other agent's actions)
     struct ObservedEffect {
         std::vector<float> state;
         std::vector<float> resultingState;
         float reward;
     };
-    
+
     std::vector<std::pair<ActionType, ObservedEffect>> observedActions_;
-    
+
     // Communication signal
     std::vector<float> signalPattern_;
     float signalMeaning_;
