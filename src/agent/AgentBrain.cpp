@@ -217,8 +217,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - FIXED: randint(0, 7) was invalid, max should be 7 (0-6 inclusive)
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 6); // Changed from 7 to 6
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;

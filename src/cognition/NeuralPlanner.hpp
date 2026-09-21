@@ -128,8 +128,8 @@ public:
     // Get confidence in self-model for a given action
     float getSelfModelConfidence(ActionType action) const;
 
-    // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+// Is this change likely caused by self (action) vs external?
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -164,7 +164,7 @@ private:
 
     Brain* brain_;
     float capabilityLevel_;
-    
+
     // Action -> (beforeState -> afterState) mappings
     struct ActionEffect {
         std::vector<float> beforeState;
@@ -172,7 +172,10 @@ private:
         float confidence;
         size_t observationCount;
     };
-    
+
+    std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
+};
+
     std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
 };
 
