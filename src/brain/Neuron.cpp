@@ -191,14 +191,12 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
+    // Handle refractory period using consistent method
+    decrementRefractory();
+    
+    if (isRefractory()) {
         // During refractory period, clear synaptic input but don't integrate
         pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
         return false;
     }
     
@@ -244,7 +242,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         V = V_reset;
         
         // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        setRefractoryPeriod(pImpl->state.refractoryPeriod);
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation

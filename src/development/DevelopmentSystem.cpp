@@ -48,6 +48,10 @@ void DevelopmentSystem::advanceStage() {
     pImpl->stageAge = 0.0;
     NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
 }
+    pImpl->stepsInCurrentStage = 0;
+    pImpl->stageAge = 0.0;
+    NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
+}
 
 const char* DevelopmentSystem::getStageName() const {
     switch (pImpl->stage) {
@@ -61,17 +65,19 @@ const char* DevelopmentSystem::getStageName() const {
 }
 
 void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
+    if (!brain) return;
+    
     ++pImpl->stepsInCurrentStage;
     age_ += 0.001;  // Approximate timestep
     pImpl->stageAge += 0.001;
     
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
+    // Auto-advance stage based on developmental age (more robust)
+    // Use deterministic thresholds
+    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge >= 60.0) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
+    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge >= 300.0) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
+    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge >= 600.0) {
         advanceStage();
     }
 }

@@ -238,16 +238,16 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
-    // Compute prediction error
+    // Compute prediction error with numerical stability
     predictionError_ = reward - predictedReward;
     
-    // Update expected reward (exponential moving average)
+    // Update expected reward using exponential moving average (stable)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
+    // Dopamine-like signal (bounded by prediction error)
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
+    // Clamp to biologically plausible range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
@@ -256,19 +256,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
+                // Apply reward-modulated weight change with plasticity modifier
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
+                // Decay eligibility trace (stable decay)
                 syn->decayEligibilityTrace(0.1f);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    // Modulate plasticity based on dopamine with sigmoid-like function
+    // Higher dopamine = more plasticity up to a point, negative dopamine = less
+    float plasticityFactor = 0.5f + 0.5f * std::tanh(dopamineLevel_);
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
