@@ -18,6 +18,12 @@ public:
     // TODO PHASE 2: Implement real action selection
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
+    // Enhanced action selection using working memory and neuromodulation
+    std::unique_ptr<Action> selectActionAdvanced(const class NeuralRegion& motorRegion,
+                                                 const class NeuralWorkingMemory* workingMemory,
+                                                 const class Neuromodulator* dopamine,
+                                                 const class Brain* brain);
+    
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;
     
@@ -32,5 +38,10 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
+
+// Motor system implementation header for convenience
+inline std::unique_ptr<Action> MotorSystem::selectAction(const class NeuralRegion& motorRegion) {
+    return selectActionAdvanced(motorRegion, nullptr, nullptr, nullptr);
+}
 
 } // namespace nlm

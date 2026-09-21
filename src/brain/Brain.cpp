@@ -528,8 +528,61 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation extracts patterns from working memory and neural activity
+        std::vector<NeuronId> activeNeurons;
+        float avgActivation = 0.0f;
+        size_t activationCount = 0;
+        
+        // Collect currently active neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        activeNeurons.push_back(neuron->getId());
+                        avgActivation += 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        ++activationCount;
+                    }
+                }
+            }
+        }
+        
+        if (!activeNeurons.empty() && pImpl->conceptFormation) {
+            avgActivation /= activationCount;
+            
+            // Form new concepts from current activation patterns
+            if (avgActivation > 0.3f) {  // Significant activation
+                pImpl->conceptFormation->processActivity(activeNeurons, avgActivation);
+            }
+            
+            // Check for concept consolidation
+            pImpl->conceptFormation->update(pImpl->timestep);
+        }
+    }
+    
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner evaluates action sequences based on current state
+        // Uses working memory and attention to guide planning
+        
+        // Get current goals from working memory if available
+        std::vector<NeuronId> planningNeurons;
+        if (pImpl->workingMemory) {
+            planningNeurons = pImpl->workingMemory->getMemoryNeurons();
+        }
+        
+        // Generate action plans based on current state and goals
+        pImpl->planner->update(pImpl->timestep);
+        
+        // Get planned actions (for agent's action selection)
+        std::vector<MotorCommand> plannedActions = pImpl->planner->getPlannedActions();
+        
+        // Store planned actions in working memory for agent's use
+        if (!plannedActions.empty() && pImpl->workingMemory) {
+            pImpl->workingMemory->storeActionPlan(plannedActions);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
