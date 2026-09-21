@@ -191,36 +191,89 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
-void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    void Synapse::step(Timestamp currentTime) {
+        // Real synaptic dynamics with improved numerical stability:
+        // 1. Decay short-term plasticity state using exponential decay
+        // 2. Update synaptic efficacy based on usage patterns
+        // 3. Ensure all state variables stay within valid bounds
+        
+        TimestepDuration dt = 0.001;  // 1ms timestep
+        
+        // Decay short-term facilitation (Tsodyks-Markram model) with numerical stability
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+            // Exponential decay with safe maximum
+            float decayFactor = std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+            pImpl->shortTermFacilitation = std::max(0.0f, pImpl->shortTermFacilitation * decayFactor);
+        }
+        
+        // Decay short-term depression with numerical stability
+        if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSinceActivity = std::max(
+                pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+                pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            );
+            // Recovery from depression toward 1.0 with safe computation
+            float recoveryFactor = 1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU);
+            pImpl->shortTermDepression = 1.0f - (1.0f - pImpl->shortTermDepression) * recoveryFactor;
+        }
+        
+        // Decay eligibility trace for reward-modulated learning
+        decayEligibilityTrace(0.001f);  // Fast decay
+        
+        // Clamp weight bounds to prevent instability
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        
+        // Update efficacy based on use-dependent modulation
+        // Cap efficacy to reasonable range [0.1, 2.0]
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.1f, 2.0f);
     }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+
+    void Synapse::stepWithSTDP(Timestamp currentTime, const std::vector<float>& preSpikeHistory,
+                             const std::vector<float>& postSpikeHistory) {
+        // STDP (Spike-Timing-Dependent Plasticity) implementation
+        // Strengthen synapses when presynaptic spike precedes postsynaptic spike
+        // Weaken synapses when postsynaptic spike precedes presynaptic spike
+        
+        // Find closest pre- and post-synaptic spikes
+        Timestamp preSpikeTime = -1.0f;
+        Timestamp postSpikeTime = -1.0f;
+        
+        if (!preSpikeHistory.empty()) {
+            preSpikeTime = preSpikeHistory.back();
+        }
+        if (!postSpikeHistory.empty()) {
+            postSpikeTime = postSpikeHistory.back();
+        }
+        
+        // Calculate time difference
+        float timeDiff = 0.0f;
+        if (preSpikeTime >= 0.0f && postSpikeTime >= 0.0f) {
+            timeDiff = postSpikeTime - preSpikeTime;  // Positive if post after pre
+        } else if (preSpikeTime >= 0.0f) {
+            timeDiff = -1000.0f;  // Presynaptic spike only
+        } else if (postSpikeTime >= 0.0f) {
+            timeDiff = 1000.0f;  // Postsynaptic spike only
+        }
+        
+        // Apply STDP rules
+        if (timeDiff > 0.0f && timeDiff < 100.0f) {  // Post after pre (LTP)
+            float weightChange = Impl::STD_LEARNING_RATE * std::exp(-timeDiff / Impl::STD_TIME_CONSTANT);
+            addToWeight(weightChange);
+        } else if (timeDiff < 0.0f && timeDiff > -100.0f) {  // Pre after post (LTD)
+            float weightChange = -Impl::STD_LEARNING_RATE * std::exp(timeDiff / Impl::STD_TIME_CONSTANT);
+            addToWeight(weightChange);
+        }
+        
+        // Update eligibility trace for reward-modulated learning
+        float rewardFactor = std::min(1.0f, pImpl->efficacy * 0.1f);  // Reward-based modulation
+        setEligibilityTrace(getEligibilityTrace() + rewardFactor * 0.01f);
+        
+        // Update synaptic efficacy based on usage
+        // Efficacy increases with total spike activity
+        float spikeActivity = std::max(preSpikeHistory.size(), postSpikeHistory.size()) * 0.001f;
+        pImpl->efficacy = std::min(2.0f, pImpl->efficacy + spikeActivity * 0.001f);
     }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
-}
 
 void Synapse::reset() {
     pImpl->weight = 0.0f;
@@ -228,6 +281,10 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {

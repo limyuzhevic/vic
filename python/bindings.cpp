@@ -404,18 +404,129 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Advanced statistics
+    .def("getNetworkDensity", &Brain::getNetworkDensity,
+         "Get synaptic network density (connections per neuron)")
+    .def("getAverageConnectionDistance", &Brain::getAverageConnectionDistance,
+         "Get average connection distance between neurons")
+    .def("getHighDegreeNeurons", &Brain::getHighDegreeNeurons, py::arg("threshold") = 10,
+         "Get neurons with high connectivity (degree > threshold)")
+    .def("getClusters", &Brain::getClusters,
+         "Get neural clusters (connected components)")
+    // Advanced configuration options
+    .def("setExplorationDrive", &AgentBrain::setExplorationDrive, py::arg("drive"),
+         "Set exploration drive multiplier (0.0-1.0)")
+    .def("setLearningRate", &AgentBrain::setLearningRate, py::arg("rate"),
+         "Set learning rate for plasticity (0.0-1.0)")
+    .def("setNoiseLevel", &AgentBrain::setNoiseLevel, py::arg("noise"),
+         "Set neural noise level for exploration (0.0-1.0)")
+    // Development stage setting
+    .def("setDevelopmentalStage", &Brain::setDevelopmentalStage, py::arg("stage"),
+         "Set developmental stage");
+
+    // Enhanced agent with more configuration options
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+             "Create agent brain interface")
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        // Enhanced configuration options
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"), "Enable/disable reward modulation")
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"), "Enable/disable structural plasticity")
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"), "Enable/disable development")
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"), "Enable/disable curiosity")
+        .def("setExplorationDrive", &AgentBrain::setExplorationDrive, py::arg("drive"),
+             "Set exploration drive multiplier")
+        .def("setLearningRate", &AgentBrain::setLearningRate, py::arg("rate"),
+             "Set learning rate for plasticity")
+        .def("setNoiseLevel", &AgentBrain::setNoiseLevel, py::arg("noise"),
+             "Set neural noise level for exploration")
+        // Status checks
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration")
+    
+    // Advanced configuration creation functions
+    m.def("createDefaultConfigWithSize", [](size_t neuronCount, size_t synapseDensity) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int>(neuronCount));
+        config->set("brain.synapse_density", static_cast<double>(synapseDensity));
+        return config;
+    }, py::arg("neuronCount"), py::arg("synapseDensity"),
+       "Create a default configuration with custom size")
+    
+    m.def("createDevelopmentConfig", [](const std::string& stage) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("development.stage", stage);
+        config->set("development.enable_plasticity", true);
+        config->set("development.critical_period", 100);
+        return config;
+    }, py::arg("stage"), "Create configuration optimized for specific developmental stage")
+    
+    m.def("createResearchConfig", [](const std::string& researchGoal) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.enable_structural_plasticity", true);
+        config->set("neuromodulation.enable_all", true);
+        config->set("memory.enable_working_memory", true);
+        config->set("memory.enable_episodic_memory", true);
+        config->set("prediction.enable_prediction", true);
+        config->set("curiosity.enable", true);
+        config->set("novelty.enable", true);
+        config->set("research.goal", researchGoal);
+        return config;
+    }, py::arg("researchGoal"), "Create configuration optimized for research purposes")
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
-
+    
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

@@ -335,6 +335,10 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    if (!brain_) return;
+    
+    // Reset agent state
+    previousVision_.clear();
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
@@ -343,8 +347,8 @@ void AgentBrain::reset() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Reset brain
+    brain_->reset();
 }
 
 } // namespace nlm

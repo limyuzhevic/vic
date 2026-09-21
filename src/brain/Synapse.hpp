@@ -71,8 +71,11 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
+    
+    // STDP update with spike timing dependence
+    void stepWithSTDP(Timestamp currentTime, const std::vector<float>& preSpikeHistory,
+                     const std::vector<float>& postSpikeHistory);
     
     // Reset to initial state
     void reset();
