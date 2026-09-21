@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <cctype>
 
 using namespace nlm;
 
