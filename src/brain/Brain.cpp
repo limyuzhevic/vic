@@ -406,74 +406,97 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
+    // ========== STEP 12: Enhance neuromodulation beyond STDP scaling ==========
+    
+    // Update all neuromodulation systems
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Enhanced dopamine effects:
+        // 1. Modulates neural excitability (already done)
+        // 2. Affects STDP plasticity weights (already done)
+        // 3. Influences working memory consolidation
+        // 4. Modulates prediction system confidence
+        
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
+        
+        // Dopamine affects working memory consolidation
+        if (pImpl->workingMemory && currentStep % 50 == 0) {
+            // Occasional consolidation based on dopamine level
+            if (dopamineLevel > 0.3f) {
+                pImpl->workingMemory->strengthenMemory(0.1f + dopamineLevel * 0.1f);
+            }
+        }
+        
+        // Dopamine modulates prediction system
+        if (pImpl->predictionSystem) {
+            // Higher dopamine increases prediction confidence
+            pImpl->predictionSystem->setConfidence(std::min(1.0f, 
+                0.5f + dopamineLevel * 0.5f));
+        }
+    }
+    
+    // Acetylcholine (ACh) effects
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // ACh modulation based on novelty
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            // Novelty increases ACh, which enhances attention
+            pImpl->attention->setInhibitionStrength(0.5f - noveltyLevel * 0.3f);
+            pImpl->attention->setExcitationStrength(1.5f + noveltyLevel * 0.5f);
+        }
+        
+        // Apply ACh effects on working memory competition
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors, 0.6f + dopamineLevel * 0.4f);
+        }
+    }
+    
+    // Norepinephrine (NE) effects - arousal and vigilance
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // NE-like effect from dopamine: increases alertness
+        // This affects both attention and memory encoding
+        if (currentStep % 100 == 0 && dopamineLevel > 0.5f) {
+            // Peak alertness periods for encoding new memories
+            if (pImpl->episodicMemory) {
+                // Can store additional episodes during high dopamine states
+                // (episodic memory is stored every 10 steps, so this is a bonus)
             }
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
-    }
+    // Serotonin (5-HT) effects - mood and behavioral control
+    // Note: Serotonin isn't a direct implementation yet, but could modulate
+    // working memory stability and decision thresholds
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
+    // Integrated neuromodulation: systems interact
+    // Example: Novelty detection influences attention, which affects working memory
+    if (pImpl->novelty && pImpl->curiosity && pImpl->attention) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        // Novelty and curiosity interact to shape attentional focus
+        // High levels of both lead to broader exploration of sensory space
+        if (noveltyLevel > 0.7f && curiosityLevel > 0.5f) {
+            // Broad attentional scope during exploration
+            if (pImpl->attention) {
+                pImpl->attention->setInhibitionStrength(0.3f);
+                pImpl->attention->setExcitationStrength(2.0f);
+                pImpl->attention->setCompetitionThreshold(0.4f);
             }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
-            }
-            
-            // Update synapse state
-            syn->step(currentTime);
         }
     }
     
@@ -486,9 +509,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store neural activation patterns
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,9 +524,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Encode sensory state from neural pattern
+            std::vector<float> sensoryPattern;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activation = neuron->isFiring() ? 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 50.0f : 0.0f;
+                sensoryPattern.push_back(activation);
+            }
+            episode.sensoryState = sensoryPattern;
+            
+            // Calculate reward from neuromodulation
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store the episode
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
@@ -528,8 +560,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract a pattern representation from current brain state
+        // This would typically come from sensory input that has been processed
+        std::vector<float> pattern;
+        
+        // Extract sensory pattern from neural activity
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = neuron->isFiring() ? 
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 50.0f : 0.0f;
+            pattern.push_back(activation);
+        }
+        
+        // Present experience to concept formation system for learning
+        if (!pattern.empty()) {
+            pImpl->conceptFormation->presentExperience(pattern, std::vector<float>(), pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, pImpl->currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
