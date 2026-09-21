@@ -126,9 +126,35 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Configure neuromodulator baselines from config
+        float dopamineBase = config->getOr<float>("neuromod.dopamine.baseline", 0.1f);
+        float acetylcholineBase = config->getOr<float>("neuromod.acetylcholine.baseline", 0.2f);
+        float norepinephrineBase = config->getOr<float>("neuromod.norepinephrine.baseline", 0.3f);
+        float serotoninBase = config->getOr<float>("neuromod.serotonin.baseline", 0.4f);
+        
+        dopamine->setLevel(dopamineBase);
+        acetylcholine->setLevel(acetylcholineBase);
+        norepinephrine->setLevel(norepinephrineBase);
+        serotonin->setLevel(serotoninBase);
+        
+        // Configure decay rates from config
+        float dopamineDecay = config->getOr<float>("neuromod.dopamine.decay_rate", 0.1f);
+        float acetylcholineDecay = config->getOr<float>("neuromod.acetylcholine.decay_rate", 0.05f);
+        float norepinephrineDecay = config->getOr<float>("neuromod.norepinephrine.decay_rate", 0.08f);
+        float serotoninDecay = config->getOr<float>("neuromod.serotonin.decay_rate", 0.06f);
+        
+        // TODO: Add decay rate setters to neuromodulator classes
+        // dopamine->setDecayRate(dopamineDecay);
+        // acetylcholine->setDecayRate(acetylcholineDecay);
+        // norepinephrine->setDecayRate(norepinephrineDecay);
+        // serotonin->setDecayRate(serotoninDecay);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);

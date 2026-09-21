@@ -1,16 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -25,9 +12,15 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -174,6 +167,80 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
+    
+    // Get current configuration
+    std::shared_ptr<const Config> getConfig() const;
+    
+    // Get random generator
+    RandomGenerator* getRandomGenerator();
+    
+    // Logging
+    void logStatus() const;
+    
+    // ========== ADDITIONAL NEUROMODULATION SYSTEMS ==========
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // ========== PREDICTION SYSTEM ==========
+    
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <string>
 
 namespace nlm {
 
@@ -129,7 +130,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 

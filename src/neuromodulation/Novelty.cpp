@@ -68,9 +68,18 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     pImpl->lastPattern = currentPattern;
 }
 
+float Novelty::getPlasticityFactor() const {
+    // Novelty increases plasticity for exploratory learning
+    return 0.5f + 0.5f * pImpl->level;
+}
+
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
+    // Novelty decays over time
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Novelty::setDecayRate(float rate) {
+    pImpl->decayRate = rate;
 }
 
 const std::vector<float>& Novelty::getHistory() const {
@@ -79,6 +88,10 @@ const std::vector<float>& Novelty::getHistory() const {
 
 void Novelty::clearHistory() {
     pImpl->history.clear();
+}
+
+const char* Novelty::getName() const {
+    return "NOVELTY"; // Novelty signal name
 }
 
 } // namespace nlm

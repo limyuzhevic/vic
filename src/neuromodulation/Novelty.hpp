@@ -7,17 +7,21 @@ namespace nlm {
 // Novelty detection signal
 // Computes novelty from comparison with previous observations
 
-class Novelty {
+class Novelty : public Neuromodulator {
 public:
     Novelty();
-    ~Novelty();
+    ~Novelty() override;
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
-    // Get novelty level
-    float getLevel() const;
-    void setLevel(float level);
+    // Neuromodulator overrides
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    void setDecayRate(float rate) override;
     
     // Detect novelty from observation
     void detectNovelty(const class Observation& observation, 
@@ -28,11 +32,14 @@ public:
                        const std::vector<float>& previousPattern);
     
     // Decay novelty over time
-    void update(TimestepDuration dt);
+    // (update override already declared above)
     
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Set decay rate
+    // (setDecayRate override already declared above)
     
 private:
     struct Impl;

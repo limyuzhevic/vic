@@ -59,4 +59,8 @@ void Curiosity::reset() {
     pImpl->level = 0.0f;
 }
 
+void Curiosity::setDecayRate(float rate) {
+    pImpl->decayRate = rate;
+}
+
 } // namespace nlm

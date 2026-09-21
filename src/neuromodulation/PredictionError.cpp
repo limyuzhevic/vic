@@ -10,8 +10,9 @@ struct PredictionError::Impl {
     float predictedValue;
     float actualValue;
     std::vector<float> history;
+    float decayRate;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f), decayRate(0.1f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
@@ -48,6 +49,26 @@ void PredictionError::clearHistory() {
 
 float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
+}
+
+const char* PredictionError::getName() const {
+    return "PE";
+}
+
+float PredictionError::getLevel() const {
+    return pImpl->error;
+}
+
+void PredictionError::setLevel(float level) {
+    pImpl->error = level;
+}
+
+float PredictionError::getPlasticityFactor() const {
+    return 0.5f + 0.5f * std::abs(pImpl->error);
+}
+
+void PredictionError::update(TimestepDuration dt) {
+    pImpl->error = pImpl->error * std::max(0.0f, 1.0f - pImpl->decayRate * static_cast<float>(dt));
 }
 
 } // namespace nlm

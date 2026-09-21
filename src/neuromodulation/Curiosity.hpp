@@ -7,19 +7,19 @@ namespace nlm {
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
 
-class Curiosity {
+class Curiosity : public Neuromodulator {
 public:
     Curiosity();
-    ~Curiosity();
+    ~Curiosity() override;
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
     // Get curiosity level
-    float getLevel() const;
+    float getLevel() const override;
     
     // Update curiosity based on novelty and prediction error
-    void update(float novelty, float predictionError, TimestepDuration dt);
+    void update(float novelty, float predictionError, TimestepDuration dt) override;
     
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
@@ -30,6 +30,9 @@ public:
     
     // Reset
     void reset();
+    
+    // Set decay rate
+    void setDecayRate(float rate) override;
     
 private:
     struct Impl;

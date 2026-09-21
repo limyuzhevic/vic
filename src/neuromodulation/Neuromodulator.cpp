@@ -53,4 +53,8 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::setDecayRate(float rate) {
+    pImpl->decayRate = rate;
+}
+
 } // namespace nlm
