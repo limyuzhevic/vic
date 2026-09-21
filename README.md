@@ -73,6 +73,17 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Python Installation (Alternative to C++ Build)
+
+```bash
+# Install Python dependencies and build Python bindings
+pip install scikit-build-core pybind11>=2.11.0
+pip install .
+
+# Or install in development mode for faster iteration
+pip install -e .
+```
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
@@ -81,6 +92,22 @@ make -j4
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python Usage
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
 
 ## Project Structure
 
