@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <string>
 
 namespace nlm {
 
@@ -43,7 +45,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with validation and schema support
 class Config {
 public:
     Config();
@@ -64,14 +66,20 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with type safety
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
+    std::optional<T> getValidated(const std::string& key) const;
+    
+    template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
+    template<typename T>
+    void set(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
+    
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +101,37 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation functions
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    std::string getValidationErrorMessage(const std::string& key, const ConfigValue& value) const;
+    
+    template<typename T>
+    bool validateValue(const T& value) const;
+    
+    // Type conversion helpers
+    template<typename From, typename To>
+    std::optional<To> convertType(const From& value) const;
+    
+    // Convenience validation methods
+    template<typename T>
+    bool isValidValue(const std::string& key, const T& value) const;
+    
+    // Schema-based validation
+    void addValidationRule(const std::string& key, 
+                          std::function<bool(const ConfigValue&)> validator,
+                          const std::string& errorMessage);
+    bool validateAll() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration schema
+    template<typename T>
+    void setSchema(const std::string& key, const std::string& type, 
+                   const std::string& description = "",
+                   const std::string& validationRule = "");
+    bool hasSchema(const std::string& key) const;
+    std::string getSchema(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +139,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Try to convert value to target type
+    template<typename T>
+    std::optional<T> tryConvertType(const ConfigValue& value) const;
 };
 
 } // namespace nlm

@@ -37,10 +37,9 @@ brain.initialize()
 
 # Step 3: Make it think for 100 steps
 for i in range(100):
-    brain.step(i)  # One step of thinking
+    brain.step(static_cast[SimulationStep](i))  # One step of thinking
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
-```
 
 ### Example 2: Brain in a Simple World
 
@@ -63,7 +62,7 @@ for step in range(50):
     world.update(0.1)  # Update world
     percept = world.getSensoryPercept()  # What does the agent see?
     agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
+    brain.step(static_cast[SimulationStep](step))  # Brain thinks
     action = agent.decodeMotorCommand()  # Brain decides action
     world.applyMotorCommand(action, world.getSimulationTime())  # Do action
 
@@ -121,7 +120,7 @@ def run_simulation(brain, world, agent, num_steps):
         agent.processSensoryInput(percept)
         
         # 4. Brain thinks
-        brain.step(step)
+        brain.step(static_cast[SimulationStep](step))
         
         # 5. Get action from brain
         action = agent.decodeMotorCommand()
@@ -170,6 +169,8 @@ Makes the brain process one moment in time. The brain:
 - Sends signals between connected neurons
 - Updates connections based on learning rules
 
+**Note**: Use `static_cast[SimulationStep](step_number)` for type safety.
+
 ### `world.update(time)`
 Updates the virtual world by `time` seconds.
 
@@ -192,7 +193,7 @@ brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
 for i in range(10):
-    brain.step(i)
+    brain.step(static_cast[SimulationStep](i))
 
 print("Silent brain test done!")
 ```
@@ -215,7 +216,7 @@ agent.initialize(world)
 for i in range(30):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+    brain.step(static_cast[SimulationStep](i))
     
 print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
@@ -244,7 +245,7 @@ agent.enableCuriosity(True)
 for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
+    brain.step(static_cast[SimulationStep](step))
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     

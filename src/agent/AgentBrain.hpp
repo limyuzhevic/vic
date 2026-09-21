@@ -55,8 +55,8 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get brain pointer (returns reference for safety)
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

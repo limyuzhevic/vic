@@ -6,9 +6,10 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -19,6 +20,10 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <numeric>
+#include <vector>
+#include <unordered_map>
+#include <random>
 
 namespace nlm {
 
@@ -69,11 +74,12 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // Action selection state
+    std::unordered_map<ActionType, SimulationStep> lastActionTime;  // Cooldown tracking
+    std::vector<ActionType> lastActions;  // History for variety
+    float explorationTemperature;  // For softmax exploration
+    float actionSelectionNoise;    // Random noise for exploration
+    size_t maxActionHistory;      // Max actions to track for variety
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -88,74 +94,25 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , explorationTemperature(1.0f)
+        , actionSelectionNoise(0.1f)
+        , maxActionHistory(10)
+        , lastActionTime()
+        , lastActions()
+        , checkpointManager(nullptr)
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -690,28 +647,227 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection algorithm with neuromodulation integration
+    // Implements weighted softmax selection with exploration, curiosity, and cooldown mechanisms
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Calculate action preferences based on neural activity
+    std::unordered_map<ActionType, float> actionPreferences;
+    const size_t numActionTypes = 15; // 0 to 14 for all ActionType enum values
+    
+    // Initialize all action preferences to minimum values
+    for (int i = 0; i < numActionTypes; ++i) {
+        ActionType type = static_cast<ActionType>(i);
+        actionPreferences[type] = 1e-6f; // Small non-zero value to avoid log(0)
+    }
+    
+    // 1. Calculate base preferences from motor neuron activity patterns
+    // Group motor neurons by their target action preferences based on firing patterns
+    float totalFiringIntensity = 0.0f;
+    
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+        if (!neuron->isFiring()) continue;
+        
+        float neuronActivity = neuron->getState().membranePotential;
+        if (neuronActivity < 0) neuronActivity = 0;
+        
+        // Based on neuron type, assign preference to relevant action types
+        totalFiringIntensity += neuronActivity;
+        
+        // This is a simplified mapping - in a full implementation, motor neurons
+        // would have specific action type preferences based on their connectivity
+        switch (neuron->getType()) {
+            case NeuronType::Motor:
+                // Motor neurons have a base preference for their target action
+                // This would be determined by synaptic targets and motor pool organization
+                actionPreferences[ActionType::MoveForward] += neuronActivity * 0.3f;
+                actionPreferences[ActionType::MoveBackward] += neuronActivity * 0.1f;
+                actionPreferences[ActionType::TurnLeft] += neuronActivity * 0.15f;
+                actionPreferences[ActionType::TurnRight] += neuronActivity * 0.15f;
+                break;
+            default:
+                // Other neuron types contribute to movement or perception actions
+                actionPreferences[ActionType::Look] += neuronActivity * 0.1f;
+                actionPreferences[ActionType::Interact] += neuronActivity * 0.2f;
+                break;
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    if (totalFiringIntensity > 0.0f) {
+        // Normalize preferences by total firing intensity
+        for (auto& pair : actionPreferences) {
+            pair.second /= totalFiringIntensity;
+        }
+    } else {
+        // No firing neurons - return Wait or apply exploration bias
+        // Add small exploration bias to all actions
+        for (auto& pair : actionPreferences) {
+            pair.second += pImpl->actionSelectionNoise * (rng->nextFloat() - 0.5f) * 0.1f;
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // 2. Apply neuromodulation effects on action selection
+    
+    // Dopamine (reward prediction error) modulates exploration vs exploitation
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        // High dopamine increases exploration of novel actions
+        float explorationBoost = dopamineLevel * pImpl->explorationTemperature * 0.5f;
+        for (auto& pair : actionPreferences) {
+            // Boost actions with history penalty (to encourage exploration)
+            ActionType action = pair.first;
+            float historyPenalty = 0.0f;
+            if (pImpl->currentStep > pImpl->lastActionTime.at(action)) {
+                size_t stepsSinceAction = pImpl->currentStep - pImpl->lastActionTime.at(action);
+                historyPenalty = std::min(1.0f, static_cast<float>(stepsSinceAction) / 50.0f);
+            }
+            pair.second *= (1.0f + explorationBoost * historyPenalty);
+        }
+    }
+    
+    // 3. Apply curiosity-driven exploration
+    if (pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        float curiosityBoost = curiosityLevel * pImpl->explorationTemperature * 0.3f;
+        for (auto& pair : actionPreferences) {
+            // Curiosity encourages trying actions with low recent history
+            ActionType action = pair.first;
+            float noveltyScore = 0.0f;
+            
+            // Count occurrences in recent action history
+            size_t actionCount = std::count(
+                pImpl->lastActions.begin(), pImpl->lastActions.end(), action
+            );
+            
+            noveltyScore = std::max(0.0f, 1.0f - static_cast<float>(actionCount) / 5.0f);
+            pair.second *= (1.0f + curiosityBoost * noveltyScore);
+        }
+    }
+    
+    // 4. Apply novelty detection influence
+    if (pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        // Novelty encourages switching to different action patterns
+        for (auto& pair : actionPreferences) {
+            ActionType action = pair.first;
+            float actionNovelty = 1.0f;
+            
+            // Reduce preference for frequently repeated actions
+            size_t frequency = std::count(
+                pImpl->lastActions.begin(), pImpl->lastActions.end(), action
+            );
+            actionNovelty = std::max(0.0f, 1.0f - static_cast<float>(frequency) / 3.0f);
+            
+            pair.second *= (1.0f + noveltyLevel * actionNovelty * 0.2f);
+        }
+    }
+    
+    // 5. Apply reward prediction error influence
+    if (pImpl->predictionError) {
+        float errorLevel = pImpl->predictionError->getError();
+        // Prediction error modulates learning and exploration
+        if (std::abs(errorLevel) > 0.0f) {
+            float errorInfluence = std::min(1.0f, std::abs(errorLevel) * 2.0f);
+            for (auto& pair : actionPreferences) {
+                // Actions taken around prediction errors receive a boost
+                pair.second *= (1.0f + errorInfluence * 0.1f);
+            }
+        }
+    }
+    
+    // 6. Apply action cooldown to prevent rapid switching
+    SimulationStep currentStep = pImpl->currentStep;
+    for (auto& pair : actionPreferences) {
+        ActionType action = pair.first;
+        // Check if action is on cooldown
+        if (pImpl->lastActionTime.count(action) > 0) {
+            size_t stepsSinceLast = currentStep - pImpl->lastActionTime.at(action);
+            // Cooldown period of 20 steps (approximately 20ms at 1ms timestep)
+            if (stepsSinceLast < 20) {
+                // Reduce preference for actions that were recently taken
+                float cooldownPenalty = 1.0f - (static_cast<float>(stepsSinceLast) / 20.0f);
+                pair.second *= cooldownPenalty * 0.1f;
+            }
+        }
+    }
+    
+    // 7. Apply exploration-exploitation tradeoff using softmax
+    float temperature = pImpl->explorationTemperature * (0.5f + pImpl->actionSelectionNoise);
+    
+    // Convert preferences to log probabilities for numerical stability
+    float maxPreference = 0.0f;
+    for (const auto& pair : actionPreferences) {
+        maxPreference = std::max(maxPreference, pair.second);
+    }
+    
+    std::vector<float> logProbabilities;
+    for (int i = 0; i < numActionTypes; ++i) {
+        ActionType type = static_cast<ActionType>(i);
+        // Apply temperature scaling and log transform
+        float logProb = actionPreferences[type] / temperature;
+        logProbabilities.push_back(logProb);
+        maxPreference = std::max(maxPreference, logProb);
+    }
+    
+    // Compute softmax probabilities
+    std::vector<float> probabilities;
+    float sumExp = 0.0f;
+    for (float logProb : logProbabilities) {
+        probabilities.push_back(std::exp(logProb - maxPreference));
+        sumExp += probabilities.back();
+    }
+    
+    // Normalize probabilities
+    if (sumExp > 0.0f) {
+        for (float& prob : probabilities) {
+            prob /= sumExp;
+        }
+    } else {
+        // Fallback to uniform distribution if all probabilities are zero
+        for (int i = 0; i < numActionTypes; ++i) {
+            probabilities[i] = 1.0f / numActionTypes;
+        }
+    }
+    
+    // 8. Sample action from probability distribution
+    std::discrete_distribution<size_t> actionDist(probabilities.begin(), probabilities.end());
+    size_t selectedIndex = actionDist(*pImpl->rng);
+    ActionType selectedType = static_cast<ActionType>(selectedIndex);
+    
+    // 9. Update action history and cooldown
+    pImpl->lastActions.push_back(selectedType);
+    pImpl->lastActionTime[selectedType] = currentStep;
+    
+    // Maintain action history limit
+    if (pImpl->lastActions.size() > pImpl->maxActionHistory) {
+        pImpl->lastActions.erase(pImpl->lastActions.begin());
+    }
+    
+    // 10. Handle special actions based on system state
+    if (pImpl->isResting) {
+        selectedType = ActionType::Rest;
+    } else if (totalFiringIntensity < 0.05f) {
+        // Very low activity - default to Wait
+        selectedType = ActionType::Wait;
+    } else if (pImpl->currentStep % 1000 == 0) {
+        // Periodically reset exploration temperature
+        pImpl->explorationTemperature = 1.0f + rng->nextFloat() * 2.0f;
+    }
+    
+    // Create and return the selected action
+    auto action = std::make_unique<Action>(selectedType);
+    
+    // Add context parameters based on selection
+    std::vector<float> parameters;
+    parameters.push_back(totalFiringIntensity); // Neural activity level
+    parameters.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f); // Dopamine level
+    parameters.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f); // Curiosity level
+    parameters.push_back(temperature); // Selection temperature
+    
+    action->setParameters(parameters);
     
     return action;
 }
