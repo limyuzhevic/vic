@@ -285,6 +285,11 @@ inline void SparseConnectivity::removeSynapse(size_t synapseIndex) {
 }
 
 inline const SynapseRecord& SparseConnectivity::getSynapse(size_t index) const {
+    if (index >= synapses_.size()) {
+        // Return a dummy/empty synapse to avoid crashing
+        static const SynapseRecord dummy;
+        return dummy;
+    }
     return synapses_[index];
 }
 

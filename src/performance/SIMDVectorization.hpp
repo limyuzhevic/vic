@@ -316,16 +316,21 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     __m512 vInputCoeff = _mm512_set1_ps(inputCoeff);
     
     size_t i = 0;
-    size_t vectorSize = count - (count % 16);
+    size_t vectorSize = count - (count % SIMD_WIDTH);
     
-    for (; i < vectorSize; i += 16) {
-        // Load membrane potentials
+    for (; i < vectorSize; i += SIMD_WIDTH) {
+        // Safe bounds checking before SIMD operations
+        if (i + SIMD_WIDTH > count) {
+            break;
+        }
+        
+        // Load membrane potentials (with bounds check)
         __m512 vV = _mm512_loadu_ps(&V_inout[i]);
         __m512 vI = _mm512_loadu_ps(&I[i]);
         
         // Load refractory counters as float
-        alignas(64) float refractoryFloat[16];
-        for (int j = 0; j < 16; ++j) {
+        alignas(64) float refractoryFloat[SIMD_WIDTH];
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
         }
         __m512 vRefractory = _mm512_load_ps(refractoryFloat);
@@ -359,16 +364,16 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         _mm512_storeu_ps(&V_inout[i], vV);
         
         // Update refractory counters
-        alignas(64) float refractoryOut[16];
+        alignas(64) float refractoryOut[SIMD_WIDTH];
         _mm512_store_ps(refractoryOut, vRefractory);
-        for (int j = 0; j < 16; ++j) {
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
         }
         
         // Record fired neurons
-        alignas(64) uint32_t firedMask[16];
+        alignas(64) uint32_t firedMask[SIMD_WIDTH];
         _mm512_storeu_si512(firedMask, _mm512_castps_si32(maskSpike));
-        for (int j = 0; j < 16; ++j) {
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             if (firedMask[j] & 0x80000000) {
                 fired[i + j] = 1;
                 ++numFired;
@@ -408,15 +413,21 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     __m256 vInputCoeff = _mm256_set1_ps(inputCoeff);
     
     size_t i = 0;
-    size_t vectorSize = count - (count % 8);
+    size_t vectorSize = count - (count % SIMD_WIDTH);
     
-    for (; i < vectorSize; i += 8) {
+    for (; i < vectorSize; i += SIMD_WIDTH) {
+        // Safe bounds checking before SIMD operations
+        if (i + SIMD_WIDTH > count) {
+            break;
+        }
+        
+        // Load membrane potentials (with bounds check)
         __m256 vV = _mm256_loadu_ps(&V_inout[i]);
         __m256 vI = _mm256_loadu_ps(&I[i]);
         
         // Refractory handling
-        alignas(32) float refractoryFloat[8];
-        for (int j = 0; j < 8; ++j) {
+        alignas(32) float refractoryFloat[SIMD_WIDTH];
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
         }
         __m256 vRefractory = _mm256_load_ps(refractoryFloat);
@@ -438,15 +449,15 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         
         _mm256_storeu_ps(&V_inout[i], vV);
         
-        alignas(32) float refractoryOut[8];
+        alignas(32) float refractoryOut[SIMD_WIDTH];
         _mm256_store_ps(refractoryOut, vRefractory);
-        for (int j = 0; j < 8; ++j) {
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
         }
         
-        alignas(32) uint32_t firedMask[8];
+        alignas(32) uint32_t firedMask[SIMD_WIDTH];
         _mm256_storeu_si256(firedMask, _mm256_castps_si32(maskSpike));
-        for (int j = 0; j < 8; ++j) {
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             fired[i + j] = (firedMask[j] & 0x80000000) ? 1 : 0;
             if (fired[i + j]) ++numFired;
         }
@@ -482,14 +493,20 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     __m128 vInputCoeff = _mm_set1_ps(inputCoeff);
     
     size_t i = 0;
-    size_t vectorSize = count - (count % 4);
+    size_t vectorSize = count - (count % SIMD_WIDTH);
     
-    for (; i < vectorSize; i += 4) {
+    for (; i < vectorSize; i += SIMD_WIDTH) {
+        // Safe bounds checking before SIMD operations
+        if (i + SIMD_WIDTH > count) {
+            break;
+        }
+        
+        // Load membrane potentials (with bounds check)
         __m128 vV = _mm_loadu_ps(&V_inout[i]);
         __m128 vI = _mm_loadu_ps(&I[i]);
         
-        alignas(16) float refractoryFloat[4];
-        for (int j = 0; j < 4; ++j) {
+        alignas(16) float refractoryFloat[SIMD_WIDTH];
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
         }
         __m128 vRefractory = _mm_load_ps(refractoryFloat);
@@ -507,15 +524,15 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         
         _mm_storeu_ps(&V_inout[i], vV);
         
-        alignas(16) float refractoryOut[4];
+        alignas(16) float refractoryOut[SIMD_WIDTH];
         _mm_store_ps(refractoryOut, vRefractory);
-        for (int j = 0; j < 4; ++j) {
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
         }
         
-        alignas(16) uint32_t firedMask[4];
+        alignas(16) uint32_t firedMask[SIMD_WIDTH];
         _mm_storeu_si128(firedMask, _mm_castps_si32(maskSpike));
-        for (int j = 0; j < 4; ++j) {
+        for (int j = 0; j < SIMD_WIDTH; ++j) {
             fired[i + j] = (firedMask[j] & 0x80000000) ? 1 : 0;
             if (fired[i + j]) ++numFired;
         }
