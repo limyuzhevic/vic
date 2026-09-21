@@ -56,25 +56,37 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Parse command line arguments and set configuration values
+    // Supports formats: --key=value and -key value
+    // Values are stored with CommandLine source priority
+    
+    NLM_LOG_INFO("Parsing command line arguments...");
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --key=value format (long options)
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_DEBUG("Command line set: " + key + " = " + value);
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format: " + arg);
             }
         }
-        // Handle -key value format
+        // Handle -key value format (short options)
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_DEBUG("Command line set: " + key + " = " + value);
         }
     }
+    
+    NLM_LOG_INFO("Command line parsing complete. Loaded " + std::to_string(pImpl->entries.size()) + " entries");
     return true;
 }
 

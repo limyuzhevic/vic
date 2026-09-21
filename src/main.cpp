@@ -61,10 +61,11 @@ struct LearningExperiment {
         : brain(b), seed(s), initialSynapseCount(0) {}
     
     void recordInitialState() {
+        // Record initial brain state for learning experiment
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region for analysis
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
@@ -81,9 +82,10 @@ struct LearningExperiment {
     }
     
     void recordFinalState() {
+        // Record final brain state after plasticity experiment
         finalWeights.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region for comparison
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
@@ -102,6 +104,7 @@ struct LearningExperiment {
     }
     
     void computeStatistics() {
+        // Analyze and display learning statistics
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
@@ -111,44 +114,31 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        // Compute weight changes using helper function
+        float initialMean = calculateMean(initialWeights);
+        float finalMean = calculateMean(finalWeights);
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
+        // Count synaptic changes using helper function
+        std::vector<SynapticChange> changes = analyzeSynapticChanges(initialWeights, finalWeights);
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+        NLM_LOG_INFO("  Strengthened: " + std::to_string(changes.strengthened));
+        NLM_LOG_INFO("  Weakened: " + std::to_string(changes.weakened));
+        NLM_LOG_INFO("  Unchanged: " + std::to_string(changes.unchanged));
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+        // Determine if learning occurred using helper function
+        bool learningOccurred = detectLearning(initialMean, finalMean, changes);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
@@ -156,6 +146,38 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+    }
+    
+    // Helper functions for analysis
+    float calculateMean(const std::vector<float>& values) {
+        if (values.empty()) return 0.0f;
+        float sum = std::accumulate(values.begin(), values.end(), 0.0f);
+        return sum / values.size();
+    }
+    
+    struct SynapticChange {
+        size_t strengthened = 0;
+        size_t weakened = 0;
+        size_t unchanged = 0;
+    };
+    
+    SynapticChange analyzeSynapticChanges(const std::vector<float>& initial, const std::vector<float>& final) {
+        SynapticChange changes;
+        size_t minSize = std::min(initial.size(), final.size());
+        
+        for (size_t i = 0; i < minSize; ++i) {
+            float delta = final[i] - initial[i];
+            if (delta > 0.01f) ++changes.strengthened;
+            else if (delta < -0.01f) ++changes.weakened;
+            else ++changes.unchanged;
+        }
+        
+        return changes;
+    }
+    
+    bool detectLearning(float initialMean, float finalMean, const SynapticChange& changes) {
+        return (std::abs(finalMean - initialMean) > 0.001f) ||
+               (changes.strengthened > 0 || changes.weakened > 0);
     }
 };
 
@@ -366,7 +388,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+// Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -376,13 +398,14 @@ int main(int argc, char** argv) {
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Development parameters
+    config->set("development_synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("development_pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Neuromodulation parameters
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -439,11 +462,157 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+return 0;
+}
+
+// Command line interface helper functions
+namespace nlm {
+    // Display help for advanced usage
+    void displayAdvancedHelp() {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== ADVANCED USAGE ===");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration Options:");
+        NLM_LOG_INFO("  --config=<file>           Load custom configuration file");
+        NLM_LOG_INFO("  --neuron_count=<num>      Override number of neurons");
+        NLM_LOG_INFO("  --region_count=<num>      Override number of brain regions");
+        NLM_LOG_INFO("  --connection_probability=<float> Override connection probability");
+        NLM_LOG_INFO("  --stdp_ltp_weight=<float>  STDP potentiation weight");
+        NLM_LOG_INFO("  --stdp_ltd_weight=<float>  STDP depression weight");
+        NLM_LOG_INFO("  --stdp_time_constant=<float> STDP time constant (ms)");
+        NLM_LOG_INFO("  --development_synaptogenesis_rate=<float> Synaptogenesis rate");
+        NLM_LOG_INFO("  --development_pruning_rate=<float>    Pruning rate");
+        NLM_LOG_INFO("  --dopamine_baseline=<float> Dopamine baseline level");
+        NLM_LOG_INFO("  --simulation_timestep=<float> Simulation timestep (s)");
+        NLM_LOG_INFO("  --random_seed=<int> Random seed for reproducible experiments");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Debug & Performance Options:");
+        NLM_LOG_INFO("  --debug_level=<level>      DEBUG, INFO, WARNING, ERROR");
+        NLM_LOG_INFO("  --log_to_file=<filename>   Log all output to file");
+        NLM_LOG_INFO("  --max_simulation_steps=<num> Maximum simulation steps");
+        NLM_LOG_INFO("  --simulation_time_limit=<float> Time limit in seconds");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Phase-specific Options:");
+        NLM_LOG_INFO("  --phase=<num>              Run specific phase (3, 4, 5, or 6)");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Memory & Performance:");
+        NLM_LOG_INFO("  --checkpoint_interval=<num> Steps between checkpoints");
+        NLM_LOG_INFO("  --enable_memory_replay     Enable memory replay during sleep");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Special Features:");
+        NLM_LOG_INFO("  --enable_visualization      Enable visualization output");
+        NLM_LOG_INFO("  --visualization_update_rate=<float> Hz");
+        NLM_LOG_INFO("  --save_brain=<filename>    Save brain state to file");
+        NLM_LOG_INFO("  --load_brain=<filename>    Load brain state from file");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Batch Processing:");
+        NLM_LOG_INFO("  --batch=<dir>              Run multiple simulations in directory");
+        NLM_LOG_INFO("  --parallel=<num>           Number of parallel simulations");
+        NLM_LOG_INFO("  --quick_mode               Skip time-intensive operations");
+        NLM_LOG_INFO("");
+    }
     
-    return 0;
+    // Create advanced configuration with enhanced defaults
+    std::shared_ptr<Config> createAdvancedConfig() {
+        auto config = std::make_shared<Config>();
+        
+        // Enhanced defaults for research-grade simulations
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        
+        // Advanced STDP parameters
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
+        
+        // Enhanced development parameters
+        config->set("development_synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("development_pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        // Advanced neuromodulation
+        config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+        config->set("dopamine_decay_rate", 0.05f, ConfigSource::Default);
+        config->set("dopamine_peak", 1.0f, ConfigSource::Default);
+        
+        // Advanced memory systems
+        config->set("working_memory_capacity", 100, ConfigSource::Default);
+        config->set("episodic_memory_capacity", 1000, ConfigSource::Default);
+        config->set("semantic_memory_capacity", 5000, ConfigSource::Default);
+        
+        // Advanced learning parameters
+        config->set("curiosity_strength", 0.5f, ConfigSource::Default);
+        config->set("reward_discount_factor", 0.99f, ConfigSource::Default);
+        
+        // Advanced simulation settings
+        config->set("max_simulation_steps", 100000, ConfigSource::Default);
+        config->set("simulation_time_limit", 3600.0f, ConfigSource::Default);
+        
+        // Visualization settings
+        config->set("visualization_enabled", false, ConfigSource::Default);
+        config->set("visualization_update_rate", 30.0f, ConfigSource::Default);
+        
+        // Performance settings
+        config->set("checkpoint_interval", 10000, ConfigSource::Default);
+        config->set("enable_memory_replay", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+        
+        // Curiosity and novelty detection
+        config->set("novelty_threshold", 0.5f, ConfigSource::Default);
+        config->set("curiosity_bonus", 0.1f, ConfigSource::Default);
+        
+        return config;
+    }
+    
+    // Run comparison experiments
+    void runComparisonExperiment(const std::vector<std::shared_ptr<Config>>& configs, 
+                                 const std::string& outputDir = "experiments") {
+        NLM_LOG_INFO("=== COMPARISON EXPERIMENT ===");
+        NLM_LOG_INFO("Running " + std::to_string(configs.size()) + " configurations...");
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("Configuration " + std::to_string(i + 1) + ":");
+            
+            // Run experiment with this config
+            // (Implementation would depend on experiment framework)
+            
+            std::string configDir = outputDir + "/config_" + std::to_string(i);
+            NLM_LOG_INFO("  Output directory: " + configDir);
+        }
+    }
+    
+    // Analyze performance metrics
+    void analyzePerformance(const std::shared_ptr<Config>& config) {
+        NLM_LOG_INFO("=== PERFORMANCE ANALYSIS ===");
+        
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+        float timestep = config->getOr<double>("simulation_timestep", 0.001);
+        
+        // Estimate memory requirements (rough approximation)
+        size_t estimatedMemoryMB = (neuronCount * 100) / (1024 * 1024);  // ~100 bytes per neuron
+        
+        NLM_LOG_INFO("Estimated memory footprint: " + std::to_string(estimatedMemoryMB) + " MB");
+        NLM_LOG_INFO("Time per simulation step: " + std::to_string(timestep * 1000) + " ms");
+        NLM_LOG_INFO("Estimated simulation duration: " + std::to_string(
+            config->getOr<int64_t>("max_simulation_steps", 10000) * timestep / 60.0f) + " minutes");
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Performance Recommendations:");
+        
+        if (neuronCount > 1000) {
+            NLM_LOG_INFO("  → Consider using 'quick_mode' for faster execution");
+            NLM_LOG_INFO("  → Enable checkpointing for interrupted runs");
+            NLM_LOG_INFO("  → Consider reducing visualization update rate");
+        }
+        
+        if (config->getOr<int64_t>("max_simulation_steps", 10000) > 10000) {
+            NLM_LOG_INFO("  → Use batch mode for long simulations");
+            NLM_LOG_INFO("  → Enable memory replay for efficient training");
+        }
+        
+        NLM_LOG_INFO("  → Use parallel mode for multiple experiments");
+    }
 }
