@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +132,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -477,12 +483,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
+    // ========== STEP 7: Update episodic memory with current experience ==========
+    if (pImpl->episodicMemory) {
+        pImpl->stepsSinceLastEpisode++;
+        if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+            pImpl->stepsSinceLastEpisode = 0;
+            
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
@@ -511,7 +517,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
+        // Update prediction system with current sensory state
         // For now, just track prediction error history
     }
     
@@ -1007,6 +1013,10 @@ float Brain::getAverageFiringRate() const {
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
+}
+
+NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
