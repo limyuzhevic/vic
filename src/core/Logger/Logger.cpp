@@ -75,8 +75,9 @@ void ConsoleLogger::setOutputFile(const std::string& filepath) {
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+        pImpl::fileOut.close();
     }
 }
 

@@ -23,11 +23,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
+            if (!region) continue;  // Safety check
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;  // Safety check
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue;  // Safety check - skip null neurons
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +47,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue;  // Safety check - skip null neurons
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -90,37 +94,54 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        if (sensoryVision_[i]) {  // Check if neuron pointer is valid
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+            try {
+                sensoryVision_[i]->injectCurrent(current);
+            } catch (...) {
+                // Ignore errors in injection to prevent crashing
+                NLM_LOG_ERROR("Error injecting current into vision neuron");
+            }
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+        if (sensoryTouch_[i]) {  // Check if neuron pointer is valid
             float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+            try {
+                sensoryTouch_[i]->injectCurrent(current);
+            } catch (...) {
+                NLM_LOG_ERROR("Error injecting current into touch neuron");
+            }
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
+        if (sensoryInternal_[i]) {  // Check if neuron pointer is valid
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+            try {
+                sensoryInternal_[i]->injectCurrent(current);
+            } catch (...) {
+                NLM_LOG_ERROR("Error injecting current into internal neuron");
+            }
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+        if (sensoryProprioception_[i]) {  // Check if neuron pointer is valid
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+            try {
+                sensoryProprioception_[i]->injectCurrent(current);
+            } catch (...) {
+                NLM_LOG_ERROR("Error injecting current into proprioception neuron");
+            }
         }
     }
     
@@ -168,8 +189,14 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (!n) continue;  // Safety check - skip null neurons
+            try {
+                const auto& state = n->getState();
+                sum += std::abs(state.membranePotential - state.restingPotential);
+            } catch (...) {
+                // Skip neurons that cause errors
+                continue;
+            }
         }
         return sum / neurons.size();
     };
@@ -273,7 +300,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
-    if (stdp) {
+    if (!stdp) {
+        NLM_LOG_ERROR("STDP system not available for reward modulation");
+    } else {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }

@@ -177,49 +177,26 @@ void Synapse::setEligibilityTrace(float trace) {
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Decay eligibility trace
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
     }
 }
 
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
-}
-
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
-}
-
-void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+void Synapse::recordPostSpike(Timestamp time) {
+    // Only record if there's enough space and time gap
+    if (pImpl->postSpikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        // Filter out duplicate spikes within 0.5ms
+        if (pImpl->postSpikeHistory.empty() || 
+            (time - pImpl->postSpikeHistory.back()) > 0.5f) {
+            pImpl->postSpikeHistory.push_back(time);
+        }
+    } else {
+        // Remove oldest spike
+        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+        pImpl->postSpikeHistory.push_back(time);
     }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
