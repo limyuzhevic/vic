@@ -255,9 +255,10 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize neuromodulation systems
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->setMemorySystems(pImpl->workingMemory.get(), pImpl->episodicMemory.get());
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -406,36 +407,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
+        // Integrate dopamine with episodic memory systems
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
+        // Connect dopamine to memory consolidation
+        if (pImpl->episodicMemory) {
+            pImpl->dopamine->consolidateEpisodicMemory(pImpl->episodicMemory);
+        }
+        
+        if (pImpl->workingMemory) {
+            pImpl->dopamine->modulateMemoryRehearse(pImpl->workingMemory);
         }
     }
     
@@ -482,13 +465,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
-        if (pImpl->episodicMemory) {
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Get action from produceAction()
+            auto action = produceAction();
+            if (action) {
+                episode.action = action->getType();
+            }
+            
+            // Store working memory content as sensory state (past sensory input)
+            std::vector<float> sensoryState = pImpl->workingMemory->retrieve();
+            if (!sensoryState.empty()) {
+                episode.sensoryState = sensoryState;
+            }
+            
+            // Store position information (simplified - would come from environment)
+            episode.positionX = 0.0f;  // TODO: Get from environment
+            episode.positionY = 0.0f;  // TODO: Get from environment
+            episode.orientation = 0.0f;  // TODO: Get from environment
+            
+            // Store reward and energy from neuromodulation systems
+            if (pImpl->dopamine) {
+                episode.reward = pImpl->dopamine->getLevel();
+            }
+            if (pImpl->novelty) {
+                episode.energy = pImpl->novelty->getLevel();
+            }
+            episode.novelty = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+            
+            // Store prediction error if available
+            if (pImpl->predictionError) {
+                // Prediction error can be used as part of the episode
+                // For now, we'll use it to modulate episode importance
+            }
+            
+            // Store active neurons and their activations (current brain state)
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,16 +516,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store resulting state (current neural activity after action)
+            episode.resultingSensoryState = sensoryState;
+            episode.resultingReward = episode.reward;
+            
+            // Connect episodic memory with dopamine-based consolidation
+            if (pImpl->dopamine) {
+                // Dopamine modulates memory consolidation strength
+                float dopamineLevel = pImpl->dopamine->getLevel();
+                // Higher dopamine = more salient memory, enhance consolidation
+                // For now, we just store the dopamine level as part of episode metadata
+                // In a full implementation, this would affect storage priority and retrieval
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // Update prediction system
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
+        // The prediction system should be updated with sensory observations
         // For now, just track prediction error history
     }
     
@@ -598,6 +622,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
+    // Store sensory input in working memory as full pattern
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(values.size());
+    
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
@@ -606,12 +634,39 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
+        // Store pattern for working memory
+        sensoryPattern.push_back(normalizedValue / 10.0f);
+        
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+    }
+    
+    // Store complete sensory pattern in working memory
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->store(sensoryPattern, 1.0f);
+    }
+    
+    // Update prediction system with sensory input
+    if (pImpl->predictionSystem) {
+        // The prediction system would receive sensory input for prediction error
+        // For now, this is a placeholder for integration
+    }
+    
+    // Update attention based on novel sensory input
+    if (pImpl->attention) {
+        // Update salience for sensory neurons
+        for (size_t i = 0; i < numSensory; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                pImpl->attention->applyBottomUpSalience(
+                    pImpl->sensoryNeurons[i]->getId(),
+                    std::abs(sensoryPattern[i]) * 0.5f  // Salience based on input strength
+                );
+            }
         }
     }
 }

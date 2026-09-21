@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Connects to episodic memory for consolidation
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -47,6 +47,13 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Memory consolidation
+    void consolidateEpisodicMemory(class NeuralEpisodicMemory* episodicMemory);
+    void modulateMemoryRehearse(class NeuralWorkingMemory* workingMemory);
+    
+    // Set memory system references from brain
+    void setMemorySystems(class NeuralWorkingMemory* workingMem, class NeuralEpisodicMemory* episodicMem);
     
 private:
     struct Impl;

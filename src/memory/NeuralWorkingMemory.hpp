@@ -33,6 +33,9 @@ public:
     // Store specific neuron activation
     void storeToNeuron(NeuronId neuron, float activation);
 
+    // Store complete sensory pattern
+    void storePattern(const std::vector<float>& pattern, float strength = 1.0f);
+
     // Retrieve current working memory content as activity levels
     std::vector<float> retrieve() const;
 

@@ -36,36 +36,69 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    // Store pattern using neural encoding
+    // Find matching neurons or create new ones for pattern storage
+    size_t patternSize = pattern.size();
     
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+    // Create temporary storage for pattern neurons
+    std::vector<NeuronId> patternNeurons;
+    
+    // Try to reuse existing memory neurons for efficiency
+    if (!memoryNeurons_.empty()) {
+        // Use existing neurons to encode the pattern
+        for (size_t i = 0; i < patternSize && i < memoryNeurons_.size(); ++i) {
+            // Update existing neuron's activation
+            size_t idx = i % memoryNeurons_.size();
+            memoryActivations_[idx] = pattern[i] * strength;
+            memoryTimestamps_[idx] = 0;  // Reset age for recently used neurons
+            patternNeurons.push_back(memoryNeurons_[idx]);
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
+    } else {
+        // Create new memory neurons for this pattern
+        for (size_t i = 0; i < patternSize && memoryNeurons_.size() < capacity_; ++i) {
+            // Generate unique neuron IDs for memory encoding
+            NeuronId neuronId(i + 10000 + static_cast<uint64_t>(memoryNeurons_.size() * 1000));
+            memoryNeurons_.push_back(neuronId);
+            memoryActivations_.push_back(pattern[i] * strength);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            patternNeurons.push_back(neuronId);
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Create recurrent connections to maintain pattern
+    for (size_t i = 0; i < patternNeurons.size() - 1; ++i) {
+        createRecurrentConnection(patternNeurons[i], patternNeurons[i + 1], strength * 0.3f);
+    }
+    
+    // Inject current to activate pattern neurons
+    for (size_t i = 0; i < patternNeurons.size(); ++i) {
+        NeuronId neuronId = patternNeurons[i];
+        float activation = memoryActivations_[i];
+        
+        // Try to find and activate the neuron
+        if (brain_) {
+            bool found = false;
+            for (auto& region : brain_->getRegions()) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            neuron->injectCurrent(activation * 3.0f);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) break;
+                }
+                if (found) break;
+            }
+        }
+    }
+    
+    // Limit the number of stored neurons to capacity
+    if (memoryNeurons_.size() > capacity_) {
+        memoryNeurons_.resize(capacity_);
+        memoryActivations_.resize(capacity_);
+        memoryTimestamps_.resize(capacity_);
     }
 }
 
