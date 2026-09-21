@@ -49,6 +49,9 @@ public:
     size_t getSynapseCount() const;
     const std::vector<std::unique_ptr<Synapse>>& getSynapses() const;
     
+    // Remove synapse
+    bool removeSynapse(SynapseId id);
+    
     // Connectivity queries
     std::vector<Synapse*> getSynapsesFrom(NeuronId neuron);
     std::vector<Synapse*> getSynapsesTo(NeuronId neuron);

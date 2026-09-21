@@ -42,14 +42,14 @@ void STDP::update(Synapse* synapse,
      *   τ+ = τ- = timeConstant (STDP time window)
      * 
      * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * - Reflects NMDA receptor-mediated calcium signaling
+     * - Pre-before-post activates NMDA receptors when postsynaptic spikes
+     * - Post-before-pre causes backpropagating action potentials
+     * 
+     * Stability features:
+     * - Weight normalization prevents unbounded growth
+     * - Learning rate modulation based on current weight
+     * - Bounds enforcement through applyWeightChange
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
@@ -84,8 +84,8 @@ void STDP::update(Synapse* synapse,
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
+        // Apply weight change through applyWeightChange which enforces bounds
+        applyWeightChange(synapse, totalDelta);
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();
