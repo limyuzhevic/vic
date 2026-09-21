@@ -4,6 +4,14 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../core/SimulationClock/SimulationClock.hpp"
 #include <memory>
 #include <vector>
 
@@ -69,6 +77,47 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Integration with disconnected systems
+    void setNeuralPlanner(std::unique_ptr<NeuralPlanner> planner) {
+        neuralPlanner_ = std::move(planner);
+    }
+    void setPredictionSystem(std::unique_ptr<PredictionSystem> predictor) {
+        predictionSystem_ = std::move(predictor);
+    }
+    void setConceptFormation(std::unique_ptr<ConceptFormation> conceptForm) {
+        conceptFormation_ = std::move(conceptForm);
+    }
+    void setEpisodicMemory(std::unique_ptr<NeuralEpisodicMemory> episodicMem) {
+        episodicMemory_ = std::move(episodeMem);
+    }
+    void setWorkingMemory(std::unique_ptr<NeuralWorkingMemory> workingMem) {
+        workingMemory_ = std::move(workingMem);
+    }
+    void setNeuromodulator(std::unique_ptr<Neuromodulator> neuromod) {
+        neuromodulator_ = std::move(neuromod);
+    }
+    void setDevelopmentSystem(std::unique_ptr<DevelopmentSystem> devSystem) {
+        developmentSystem_ = std::move(devSystem);
+    }
+    
+    // Integration methods
+    void integrateNeuromodulation(double timestep);
+    void updateMemoryConsolidation();
+    void updateAdvancedSensoryProcessing();
+    void updateMemoryReplay();
+    
+    // Get brain pointer (const version)
+    const Brain* getBrain() const { return brain_.get(); }
+    
+    // Non-const version for backward compatibility
+    Brain* getBrain() { return brain_.get(); }
+    
+    // Update all integrated systems
+    void update(double timestep);
+    
+    // Main processing pipeline
+    void processFrame(const SimpleWorld& world, const SensoryPercept& percept);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +126,18 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Simulation clock reference
+    const SimulationClock* simulation_clock_ = nullptr;
+    
+    // Integrated systems
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<PredictionSystem> predictionSystem_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory_;
+    std::unique_ptr<NeuralWorkingMemory> workingMemory_;
+    std::unique_ptr<Neuromodulator> neuromodulator_;
+    std::unique_ptr<DevelopmentSystem> developmentSystem_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
