@@ -1,14 +1,3 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -68,6 +57,10 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Simplified neuron distribution helper methods
+    void distributeMotorNeurons(std::vector<Neuron*>& neurons);
+    void distributeSensoryNeurons(std::vector<Neuron*>& neurons);
     
 private:
     // Motor decoding: convert neural activity to motor command
