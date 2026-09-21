@@ -64,10 +64,21 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // Advanced behavioral control
+    void setExplorationThreshold(float threshold) { explorationThreshold_ = threshold; }
+    void setRandomSeed(uint64_t seed) {
+        if (brain_) {
+            brain_->getRandomGenerator()->setSeed(seed);
+        }
+    }
+    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Get exploration threshold
+    float getExplorationThreshold() const { return explorationThreshold_; }
     
 private:
     // Motor decoding: convert neural activity to motor command

@@ -353,52 +353,70 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+         "Create an agent brain interface with the given brain")
+    .def("initialize", &AgentBrain::initialize, py::arg("world"),
+         "Initialize the agent brain with a world environment")
+    .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+         "Get the expected sensory input size for processing")
+    .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+         "Get the expected motor output size for decoding")
+    .def("processSensoryInput", &AgentBrain::processSensoryInput,
+         py::arg("percept"),
+         "Process sensory percept and inject into brain neurons")
+    .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+         "Decode brain motor activity into motor command for world interaction")
+    .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+         py::arg("reward"), py::arg("predictedReward"),
+         "Apply reward-based neuromodulation to learn from outcomes")
+    .def("updateDevelopment", &AgentBrain::updateDevelopment,
+         py::arg("timestep"),
+         "Update the development system based on current age")
+    .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+         "Get the current developmental stage of the brain")
+    .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+         "Get the current neuromodulation level (dopamine)")
+    .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+         "Get the current curiosity level (exploration motivation)")
+    .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+         "Get the current novelty detection level")
+    .def("getPredictionError", &AgentBrain::getPredictionError,
+         "Get the prediction error signal from reward processing")
+    .def("reset", &AgentBrain::reset,
+         "Reset the agent for a new episode (clears memory, neuromodulation, etc.)")
+    .def("getBrain", &AgentBrain::getBrain,
+         py::return_value_policy::reference_internal,
+         "Get the underlying Brain object for direct access")
+    
+    // Subsystem configuration methods
+    .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+         py::arg("enable"), "Enable or disable reward modulation")
+    .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+         py::arg("enable"), "Enable or disable structural plasticity (growth of new connections)")
+    .def("enableDevelopment", &AgentBrain::enableDevelopment,
+         py::arg("enable"), "Enable or disable developmental processes")
+    .def("enableCuriosity", &AgentBrain::enableCuriosity,
+         py::arg("enable"), "Enable or disable curiosity-driven exploration")
+    
+    // Configuration queries
+    .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+         "Check if reward modulation is currently enabled")
+    .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+         "Check if structural plasticity is currently enabled")
+    .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+         "Check if development processes are currently enabled")
+    .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+         "Check if curiosity-driven exploration is currently enabled")
+    
+    // Advanced behavioral control
+    .def("setExplorationThreshold", &AgentBrain::setExplorationThreshold,
+         py::arg("threshold"), "Set the curiosity threshold for exploration behavior")
+    .def("setRandomSeed", [](AgentBrain& self, uint64_t seed) {
+        if (self.getBrain()) {
+            self.getBrain()->getRandomGenerator()->setSeed(seed);
+        }
+    }, py::arg("seed"), "Set the random seed for reproducible behavior")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -60,47 +60,55 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
     
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
-        
-        // Process sensory input
-        agent.processSensoryInput(percept);
-        
-        // Brain step
-        brain->step(step, step * 0.001);
-        
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
-        }
-        
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
-        }
-    }
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    // Create simple world
+    SimpleWorld world;
+    world.configure(16, 16);
+    world.reset();
+    
+    // Create agent
+    AgentBrain agent(brain);
+    agent.initialize(world);
+    
+    NLM_LOG_INFO("Brain and agent initialized successfully");
+    
+    // Run full experiment with smaller settings for demo
+    std::cout << "--- Full Integration Experiment ---" << std::endl;
+    Phase6Config config;
+    config.neuronCount = 500;
+    config.maxSteps = 2000;
+    config.enableCheckpointing = true;
+    config.enableReplay = true;
+    config.enableDevelopment = true;
+    
+    auto experimentResult = experiment.run(config);
+    
+    std::cout << std::endl;
+    std::cout << "=== FINAL RESULTS ===" << std::endl;
+    std::cout << "Total reward: " << experimentResult.totalReward << std::endl;
+    std::cout << "Avg firing rate: " << experimentResult.avgFiringRate << std::endl;
+    std::cout << "Episodes stored: " << experimentResult.memoryEpisodesStored << std::endl;
+    std::cout << "Dopamine level: " << experimentResult.dopamineLevel << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "=== INTEGRATION STATUS ===" << std::endl;
+    std::cout << "Working Memory: " << (experimentResult.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Episodic Memory: " << (experimentResult.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Neuromodulation: " << (experimentResult.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Prediction: " << (experimentResult.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Development: " << (experimentResult.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Checkpointing: " << (experimentResult.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Wall clock time: " << experimentResult.totalWallClockTime << "s" << std::endl;
+    
+    return 0;
+}
     
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;

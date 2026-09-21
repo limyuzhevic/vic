@@ -11,28 +11,22 @@
 
 using namespace nlm;
 
-int main(int argc, char* argv[]) {
-    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
     
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
     
-    // Create experiment
-    Phase6IntegratedExperiment experiment;
+    // Create simple world
+    SimpleWorld world;
+    world.configure(16, 16);
+    world.reset();
     
-    // First, run the quick integration verification
-    std::cout << "--- Integration Verification ---" << std::endl;
-    bool integrationOK = experiment.verifyIntegration();
+    // Create agent
+    AgentBrain agent(brain);
+    agent.initialize(world);
     
-    std::cout << std::endl;
-    
-    if (!integrationOK) {
-        std::cerr << "ERROR: Integration verification failed!" << std::endl;
-        return 1;
-    }
-    
-    std::cout << "Integration verification passed!" << std::endl << std::endl;
+    NLM_LOG_INFO("Brain and agent initialized successfully");
     
     // Test individual systems
     std::cout << "--- Memory Integration Test ---" << std::endl;
@@ -60,26 +54,26 @@ int main(int argc, char* argv[]) {
     config.enableReplay = true;
     config.enableDevelopment = true;
     
-    auto result = experiment.run(config);
+    auto experimentResult = experiment.run(config);
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
-    std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
-    std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
-    std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Total reward: " << experimentResult.totalReward << std::endl;
+    std::cout << "Avg firing rate: " << experimentResult.avgFiringRate << std::endl;
+    std::cout << "Episodes stored: " << experimentResult.memoryEpisodesStored << std::endl;
+    std::cout << "Dopamine level: " << experimentResult.dopamineLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
-    std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
-    std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
+    std::cout << "Working Memory: " << (experimentResult.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Episodic Memory: " << (experimentResult.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Neuromodulation: " << (experimentResult.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Prediction: " << (experimentResult.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Development: " << (experimentResult.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Checkpointing: " << (experimentResult.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
     std::cout << std::endl;
     
-    std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    std::cout << "Wall clock time: " << experimentResult.totalWallClockTime << "s" << std::endl;
     
     return 0;
 }

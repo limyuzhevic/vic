@@ -18,43 +18,92 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , explorationEnabled_(true)
+    , explorationThreshold_(0.5f)
+    , behaviorScore_(0.0f)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
+    // Initialize neuron groups
+    initializeNeuronGroups();
+}
+
+void AgentBrain::initializeNeuronGroups() {
+    if (!brain_) return;
+    
+    // Create helper function to distribute neurons to groups
+    auto distributeNeurons = [this](const std::vector<Neuron*>& neurons, 
+                                  const std::vector<std::vector<Neuron*>>& groups) {
+        size_t groupIndex = 0;
+        for (Neuron* n : neurons) {
+            if (groupIndex < groups.size()) {
+                groups[groupIndex].push_back(n);
+            }
+            groupIndex++;
+        }
+    };
+    
+    // Collect all neurons by type
+    std::vector<Neuron*> motorNeurons;
+    std::vector<Neuron*> sensoryNeurons;
+    
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    motorNeurons.push_back(n);
+                }
+            } else if (type == NeuronType::Sensory) {
+                for (Neuron* n : pop->getNeurons()) {
+                    sensoryNeurons.push_back(n);
+                }
+            }
+        }
+    }
+    
+    // Distribute neurons to specific groups
+    if (!motorNeurons.empty()) {
+        // Equal distribution across 6 motor action groups
+        size_t neuronsPerGroup = motorNeurons.size() / 6;
+        size_t remainder = motorNeurons.size() % 6;
+        
+        size_t startIndex = 0;
+        for (int i = 0; i < 6; ++i) {
+            size_t groupSize = neuronsPerGroup + (i < remainder ? 1 : 0);
+            for (size_t j = 0; j < groupSize; ++j) {
+                if (startIndex < motorNeurons.size()) {
+                    switch (i) {
+                        case 0: motorForward_.push_back(motorNeurons[startIndex]); break;
+                        case 1: motorBackward_.push_back(motorNeurons[startIndex]); break;
+                        case 2: motorTurnLeft_.push_back(motorNeurons[startIndex]); break;
+                        case 3: motorTurnRight_.push_back(motorNeurons[startIndex]); break;
+                        case 4: motorInteract_.push_back(motorNeurons[startIndex]); break;
+                        case 5: motorWait_.push_back(motorNeurons[startIndex]); break;
                     }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
+                    startIndex++;
+                }
+            }
+        }
+    }
+    
+    if (!sensoryNeurons.empty()) {
+        // Equal distribution across 4 sensory input groups
+        size_t neuronsPerGroup = sensoryNeurons.size() / 4;
+        size_t remainder = sensoryNeurons.size() % 4;
+        
+        size_t startIndex = 0;
+        for (int i = 0; i < 4; ++i) {
+            size_t groupSize = neuronsPerGroup + (i < remainder ? 1 : 0);
+            for (size_t j = 0; j < groupSize; ++j) {
+                if (startIndex < sensoryNeurons.size()) {
+                    switch (i) {
+                        case 0: sensoryVision_.push_back(sensoryNeurons[startIndex]); break;
+                        case 1: sensoryTouch_.push_back(sensoryNeurons[startIndex]); break;
+                        case 2: sensoryInternal_.push_back(sensoryNeurons[startIndex]); break;
+                        case 3: sensoryProprioception_.push_back(sensoryNeurons[startIndex]); break;
                     }
+                    startIndex++;
                 }
             }
         }
