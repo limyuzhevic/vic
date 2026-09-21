@@ -22,9 +22,85 @@ namespace nlm {
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        -----------------------------------------------
+        
+        A Python binding for the NLM C++ neural simulation framework. This module
+        provides complete access to all neural components including the central
+        brain, sensory processing, motor output, world simulation, and configuration
+        management.
+        
+        The NLM system implements Phase 6: Integrated Artificial Brain, featuring:
+        - Real spiking neural computation with event-driven dynamics
+        - Integrated memory systems (working, episodic, associative)
+        - Prediction, cognition, and neuromodulation systems
+        - Developmental stages and structural plasticity
+        - Embodied intelligence in the SimpleWorld environment
+        
+        Classes provided:
+        - Brain: Central neural simulation brain class
+        - Config: Configuration class for NLM system
+        - Vision: Vision sensory input (grayscale intensity grid)
+        - Audio: Audio sensory input (sound samples)
+        - InternalSignals: Internal homeostatic signals
+        - SensoryInput: Base class for all sensory input
+        - Action: Action representation for motor output
+        - AgentBody: Agent body state (position, velocity, energy)
+        - ActionResult: Result of applying a motor command
+        - SensoryPercept: Sensory data packet from the world
+        - SimpleWorld: Simple 2D world for NLM simulation
+        - AgentBrain: Agent brain interface connecting NLM to world
+        
+        Enumerations:
+        - NeuronType: Types of neurons (Excitatory, Inhibitory, Sensory, etc.)
+        - SynapseType: Types of synaptic connections
+        - DevelopmentalStage: Brain development stages
+        - FiringState: Neuron firing states
+        - ActionType: Available motor actions
+        - MotorCommand: Low-level motor commands
+        - WorldObjectType: Types of objects in the world
+        
+        Usage example:
+            import nlm
+            
+            # Create and configure a brain
+            config = nlm.createDefaultConfig()
+            config.set("neuron_count", 1000)
+            config.set("region_count", 2)
+            brain = nlm.createBrain(config)
+            brain.initialize()
+            
+            # Create world and agent
+            world = nlm.createSimpleWorld()
+            world.configure(100.0, 100.0, 16, 16)  # 100x100m, 16x16 vision
+            world.addObject(nlm.WorldObject(50.0, 50.0, 
+                                          nlm.WorldObjectType.Resource, 10.0))
+            world.setAgentStart(10.0, 10.0)
+            
+            agent_brain = nlm.createAgentBrain(brain)
+            agent_brain.initialize(world)
+            
+            # Main simulation loop
+            for step in range(100):
+                # Agent perceives world
+                percept = world.getSensoryPercept()
+                agent_brain.processSensoryInput(percept)
+                
+                # Brain processes and produces action
+                brain.step(step)
+                action = brain.produceAction()
+                
+                # Decode to motor command and execute
+                cmd = agent_brain.decodeMotorCommand()
+                result = world.applyMotorCommand(cmd, step)
+                
+                # Update development
+                agent_brain.updateDevelopment(step)
+                
+                print(f"Step {step}: Action={action.getName()}, "
+                      f"Reward={result.reward}, Success={result.success}")
+        
+        For more detailed examples and documentation, see:
+        https://github.com/nlm/nlm-python-bindings
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -350,8 +426,32 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+.def("logStatus", &Brain::logStatus,
+              "Log brain status")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+              "Get working memory")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+              "Get episodic memory")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+              "Get associative memory")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+              "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+              "Get planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+              "Get concept formation")
+        .def("getAttention", &Brain::getAttention,
+              "Get attention")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+              "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+              "Get dopamine")
+        .def("getCuriosity", &Brain::getCuriosity,
+              "Get curiosity")
+        .def("getNovelty", &Brain::getNovelty,
+              "Get novelty")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+              "Get prediction error signal");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

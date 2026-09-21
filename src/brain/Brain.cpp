@@ -732,7 +732,9 @@ void Brain::updatePlasticity() {
 
 void Brain::develop() {
     // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->update(this, *pImpl->rng);
+    }
 }
 
 void Brain::reset() {
@@ -1043,12 +1045,48 @@ DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();
 }
 
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
+// ========== NEUROMODULATION SYSTEMS ==========
+
+Dopamine* Brain::getDopamine() {
+    return pImpl->dopamine.get();
 }
 
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
+Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+Novelty* Brain::getNovelty() {
+    return pImpl->novelty.get();
+}
+
+PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+// ========== PREDICTION SYSTEM ACCESSOR ==========
+
+PredictionSystem* Brain::getPredictionSystem() {
+    return pImpl->predictionSystem.get();
+}
+
+// ========== COGNITION SYSTEM ACCESSORS ==========
+
+NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+ConceptFormation* Brain::getConceptFormation() {
+    return pImpl->conceptFormation.get();
+}
+
+AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+// ========== DEVELOPMENT SYSTEM ==========
+
+DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
 }
 
 // ========== NEUROMODULATION SYSTEMS ==========
