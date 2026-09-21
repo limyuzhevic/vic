@@ -12,64 +12,15 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
----
+## Prerequisites
 
-## The 3 Things You Need to Know
+To use NLM, you need:
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
-
----
-
-## Quick Start (Copy & Paste)
-
-### Example 1: Simplest Brain
-
-```python
-import pynlm
-
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
-```
-
-### Example 2: Brain in a Simple World
-
-```python
-import pynlm
-
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
-```
+1. **Python 3.8+** installed
+2. The **pynlm** Python package installed
+   ```bash
+   pip install pynlm
+   ```
 
 ---
 
@@ -284,6 +235,19 @@ print("Agent simulation complete!")
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+
+**"ImportError: No module named 'pynlm'"**
+- Ensure pynlm is installed: `pip install pynlm`
+- If installing from source, run: `pip install -e .`
+
+**"RuntimeError: Brain not initialized"**
+- Always call `brain.initialize()` before any `brain.step()` calls
+- This error typically occurs when `brain.step()` is called without first initializing the brain
+
+**"Segmentation fault"**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+- Try installing with: `pip install --force-reinstall .`
 
 ---
 

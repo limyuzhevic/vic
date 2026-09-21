@@ -160,6 +160,47 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Value getter methods
+        .def("get", [](const Config& self, const std::string& key) {
+            // Try common types in order
+            auto val = self.get<int>(key);
+            if (val.has_value()) return *val;
+            val = self.get<int64_t>(key);
+            if (val.has_value()) return *val;
+            val = self.get<double>(key);
+            if (val.has_value()) return *val;
+            val = self.get<bool>(key);
+            if (val.has_value()) return *val;
+            val = self.get<std::string>(key);
+            if (val.has_value()) return *val;
+            // Return empty string if not found
+            return std::string();
+        }, py::arg("key"), "Get a configuration value")
+        
+        .def("getOr", [](const Config& self, const std::string& key, const ConfigValue& defaultValue) {
+            // Try to get the value, return default if not found
+            if (self.has(key)) {
+                auto val = self.get<ConfigValue>(key);
+                if (val.has_value()) return *val;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"), "Get a configuration value or return default if missing")
+        
+        // Set convenience methods
+        .def("set", static_cast<void (Config::*)(const std::string&, int, ConfigSource)>(&Config::set), 
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set an integer configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, double, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a float/double configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, bool, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a boolean configuration value")
+        .def("set", static_cast<void (Config::*)(const std::string&, const std::string&, ConfigSource)>(&Config::set),
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a string configuration value")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -391,7 +432,7 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
              py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+.def("enableDevelopment", &AgentBrain::enableDevelopment,
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
@@ -415,6 +456,46 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createVision", []() -> std::unique_ptr<Vision> {
+        return std::make_unique<Vision>();
+    }, "Create a vision sensory input");
+
+    m.def("createVision", [](size_t width, size_t height, size_t channels) -> std::unique_ptr<Vision> {
+        return std::make_unique<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3, "Create a vision sensory input with specified dimensions");
+
+    m.def("createAudio", []() -> std::unique_ptr<Audio> {
+        return std::make_unique<Audio>();
+    }, "Create an audio sensory input");
+
+    m.def("createAudio", [](size_t sampleRate, size_t numSamples) -> std::unique_ptr<Audio> {
+        return std::make_unique<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"), "Create an audio sensory input with specified sample rate and number of samples");
+
+    m.def("createInternalSignals", []() -> std::unique_ptr<InternalSignals> {
+        return std::make_unique<InternalSignals>();
+    }, "Create internal signals sensory input");
+
+    m.def("createAction", []() -> std::unique_ptr<Action> {
+        return std::make_unique<Action>();
+    }, "Create an action");
+
+    m.def("createAction", [](ActionType type) -> std::unique_ptr<Action> {
+        return std::make_unique<Action>(type);
+    }, py::arg("type"), "Create an action with specified type");
+
+    m.def("createAction", [](ActionType type, const std::vector<float>& parameters) -> std::unique_ptr<Action> {
+        return std::make_unique<Action>(type, parameters);
+    }, py::arg("type"), py::arg("parameters"), "Create an action with specified type and parameters");
+
+    m.def("createWorldObject", []() -> WorldObject {
+        return WorldObject();
+    }, "Create a world object");
+
+    m.def("createWorldObject", [](float x, float y, WorldObjectType type, float value, float radius) -> WorldObject {
+        return WorldObject(x, y, type, value, radius);
+    }, py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f, py::arg("radius") = 0.5f, "Create a world object at specified position with type and properties");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
