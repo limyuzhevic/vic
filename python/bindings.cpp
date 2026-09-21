@@ -416,10 +416,172 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add batch processing methods for efficiency
+    py::class_<BatchProcessor>(m, "BatchProcessor", R"pbdoc(Batch processor for efficient NLM operations)pbdoc")
+        .def(py::init<>())
+        .def("processBatch", &BatchProcessor::processBatch,
+             py::arg("brains"), py::arg("steps"),
+             "Process multiple brains simultaneously for efficiency")
+        .def("processBatchWithWorld", [](BatchProcessor& self,
+              const std::vector<std::shared_ptr<Brain>>& brains,
+              const std::vector<std::shared_ptr<SimpleWorld>>& worlds,
+              const std::vector<std::shared_ptr<AgentBrain>>& agents,
+              int steps) {
+            self.processBatchWithWorld(brains, worlds, agents, steps);
+        }, py::arg("brains"), py::arg("worlds"), py::arg("agents"), py::arg("steps"),
+              "Process multiple brains with their respective worlds and agents")
+        .def("saveBatchStates", &BatchProcessor::saveBatchStates,
+             py::arg("batchName"), py::arg("directory"),
+             "Save states of all brains in a batch to files")
+        .def("loadBatchStates", &BatchProcessor::loadBatchStates,
+             py::arg("batchName"), py::arg("directory"),
+             "Load states of all brains from a batch directory")
+        .def("getBatchStatistics", &BatchProcessor::getBatchStatistics,
+             py::arg("brains"), py::return_value_policy::reference_internal,
+             "Get statistics for a batch of brains");
+
+    // Add advanced configuration presets
+    m.def("getAdvancedConfigPresets", []() -> std::map<std::string, std::shared_ptr<Config>> {
+        std::map<std::string, std::shared_ptr<Config>> presets;
+        
+        // Default preset
+        auto defaultConfig = std::make_shared<Config>();
+        defaultConfig->set("brain.neuron_count", 1000);
+        defaultConfig->set("brain.synapse_density", 0.1f);
+        defaultConfig->set("simulation.timestep", 0.001);
+        presets["default"] = defaultConfig;
+        
+        // High performance preset
+        auto highPerfConfig = std::make_shared<Config>();
+        highPerfConfig->set("brain.neuron_count", 5000);
+        highPerfConfig->set("brain.synapse_density", 0.15f);
+        highPerfConfig->set("simulation.timestep", 0.0005);
+        highPerfConfig->set("plasticity.stdp.enable", true);
+        highPerfConfig->set("plasticity.hebbian.enable", true);
+        highPerfConfig->set("plasticity.structural.enable", true);
+        presets["high_performance"] = highPerfConfig;
+        
+        // Low memory preset
+        auto lowMemConfig = std::make_shared<Config>();
+        lowMemConfig->set("brain.neuron_count", 500);
+        lowMemConfig->set("brain.synapse_density", 0.05f);
+        lowMemConfig->set("simulation.timestep", 0.002);
+        lowMemConfig->set("memory.working_memory_capacity", 50);
+        lowMemConfig->set("memory.episodic_max_episodes", 500);
+        presets["low_memory"] = lowMemConfig;
+        
+        // Development preset
+        auto devConfig = std::make_shared<Config>();
+        devConfig->set("brain.neuron_count", 2000);
+        devConfig->set("brain.synapse_density", 0.1f);
+        devConfig->set("development.initial_stage", "CriticalPeriod");
+        devConfig->set("development.plasticity_modulation", true);
+        presets["development"] = devConfig;
+        
+        return presets;
+    }, "Get advanced configuration presets for common use cases");
+
+    // Add visualization integration capabilities
+    m.def("createVisualizer", []() -> std::shared_ptr<Visualizer> {
+        return std::make_shared<Visualizer>();
+    }, "Create a visualizer for brain activity");
+
+    m.def("createNeuralPlotter", []() -> std::shared_ptr<NeuralPlotter> {
+        return std::make_shared<NeuralPlotter>();
+    }, "Create a neural activity plotter");
+
+    m.def("createBrainViewer", []() -> std::shared_ptr<BrainViewer> {
+        return std::make_shared<BrainViewer>();
+    }, "Create a 3D brain viewer");
+
+    m.def("exportForVisualization", [](const Brain& brain, const std::string& format) {
+        // Export brain state for visualization in external tools
+        // Formats: "json", "csv", "npy", "neurolux"
+        return brain.exportForVisualization(format);
+    }, py::arg("brain"), py::arg("format"), "Export brain state for visualization");
+
+    // Add tutorial examples
+    m.def("getTutorialExamples", []() -> std::map<std::string, std::string> {
+        std::map<std::string, std::string> examples;
+        
+        examples["simple_brain"] = R"(
+import pynlm
+
+# Create and initialize a simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run for 100 steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+        )";
+        
+        examples["agent_world"] = R"(
+import pynlm
+
+# Setup brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Setup world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Setup agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+        )";
+        
+        examples["memory_learning"] = R"(
+import pynlm
+
+# Create brain and enable memory
+config = pynlm.createDefaultConfig()
+config.set("memory.working_memory_capacity", 200)
+config.set("memory.episodic_max_episodes", 1000)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Simulate learning with memory
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=6, visionHeight=6)
+world.reset()
+agent.initialize(world)
+
+# Run many episodes for memory formation
+for episode in range(50):
+    for step in range(50):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+
+    # Check memory stats
+    print(f"Episode {episode}:")
+    print(f"  Memory traces: {brain.getWorkingMemory().getActiveTraces()}")
+    print(f"  Episodes stored: {brain.getEpisodicMemory().getEpisodeCount()}")
+        )";
+        
+        return examples;
+    }, "Get tutorial examples for getting started with NLM");
 
 } // namespace nlm

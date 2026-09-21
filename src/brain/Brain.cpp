@@ -243,7 +243,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +511,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Track current sensory state if available
+        if (pImpl->sensoryNeurons.size() > 0) {
+            std::vector<float> currentSensoryState;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    currentSensoryState.push_back(
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                } else {
+                    currentSensoryState.push_back(0.0f);
+                }
+            }
+            
+            // Update prediction system with current state
+            pImpl->predictionSystem->recordSensoryState(currentSensoryState, currentStep);
+            
+            // Apply prediction error to neural dynamics for learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            if (predictionError > 0.0f) {
+                // Scale prediction error by confidence for stronger influence
+                float errorMagnitude = predictionError * confidence;
+                
+                // Apply prediction error as neuromodulatory signal to enhance learning
+                // High prediction error increases plasticity and excitability
+                if (pImpl->dopamine) {
+                    // Use prediction error as dopamine-like signal
+                    pImpl->dopamine->setLevel(std::min(1.0f, pImpl->dopamine->getLevel() + errorMagnitude * 0.1f));
+                }
+                
+                // Inject error-based current into key neurons to drive learning
+                // Sensory neurons get stronger input when prediction is inaccurate
+                for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), currentSensoryState.size()); ++i) {
+                    if (currentSensoryState[i] > 0.5f) {
+                        // Stronger input for more active sensory features
+                        float errorCurrent = errorMagnitude * 2.0f * currentSensoryState[i];
+                        pImpl->sensoryNeurons[i]->injectCurrent(errorCurrent);
+                    }
+                }
+                
+                // Apply prediction error to synaptic plasticity via dopamine
+                if (pImpl->dopamine && pImpl->stdp) {
+                    // Scale STDP learning rates based on prediction error
+                    float plasticityFactor = std::clamp(1.0f + errorMagnitude * 0.5f, 0.1f, 2.0f);
+                    pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * plasticityFactor);
+                    pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * plasticityFactor);
+                }
+                
+                // Log significant prediction errors
+                if (predictionError > 0.5f) {
+                    NLM_LOG_INFO("High prediction error: " + std::to_string(predictionError) + 
+                                " (confidence: " + std::to_string(confidence) + ")");
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +582,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Integrate prediction errors for concept formation
+        if (pImpl->predictionSystem && pImpl->conceptFormation) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->conceptFormation->integratePredictionError(predictionError, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1006,15 +1065,15 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return pImpl->workingMemory ? pImpl->workingMemory.get() : nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return pImpl->episodicMemory ? pImpl->episodicMemory.get() : nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl->associativeMemory ? pImpl->associativeMemory.get() : nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========

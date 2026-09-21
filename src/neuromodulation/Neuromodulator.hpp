@@ -48,9 +48,14 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Advanced dopamine functions
+    void setExplorationBonus(float bonus);
+    float getEligibilityTrace() const;
+    void resetEligibilityTrace();
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
