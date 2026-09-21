@@ -726,8 +726,8 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
 }
 
 void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
+    // Plasticity is now applied during each step as part of the simulation step
+    // STDP, Hebbian, and structural plasticity are updated in each step's main loop
 }
 
 void Brain::develop() {
