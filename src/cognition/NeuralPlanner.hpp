@@ -34,14 +34,6 @@ public:
     NeuralPlanner();
     ~NeuralPlanner();
 
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
-    // Plan next action given current state and goal
-    // Returns the best action to take now
-    ActionType planAction(const std::vector<float>& currentState,
-                         float targetReward = 0.5f);
-
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
     PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
@@ -73,6 +65,59 @@ public:
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+
+    // Generate action plan from current state
+    std::vector<ActionType> generatePlan(const std::vector<float>& currentState,
+                                        float targetReward = 0.5f);
+
+    // Get attention focus for planning
+    std::vector<NeuronId> getPlanningFocus() const;
+
+    // Get memory patterns for planning
+    std::vector<float> getMemoryPatternsForPlanning() const;
+
+    // Present sensory observation to planner
+    void presentObservation(const std::vector<float>& observation);
+
+    // Update planner with attention signals
+    void updateWithAttention(const std::vector<NeuronId>& winners);
+
+    // Connect concept formation to planning
+    void connectConcepts(const std::vector<DiscoveredConcept>& concepts);
+
+    // Get available concepts for planning
+    const std::vector<DiscoveredConcept>& getAvailableConcepts() const;
+
+    // Get current planning goal
+    std::vector<float> getPlanningGoal() const { return planningGoal_; }
+    void setPlanningGoal(const std::vector<float>& goal) { planningGoal_ = goal; }
+
+    // Get planning confidence from prediction system
+    float getPlanningConfidenceFromPrediction() const;
+
+    // Get action selection from working memory
+    ActionType selectActionFromWorkingMemory() const;
+
+    // Evaluate plan quality based on episodic memory
+    float evaluatePlanQuality(const std::vector<ActionType>& actions) const;
+
+    // Get development stage for planning adaptation
+    DevelopmentalStage getDevelopmentalStage() const;
+
+    // Update planner with development changes
+    void updateForDevelopment(DevelopmentalStage stage);
+
+    // Get planning statistics
+    std::string getPlanningStats() const;
+
+    // Get prediction error for planning adaptation
+    float getPredictionError() const;
+
+    // Get curiosity level for exploration in planning
+    float getCuriosityLevel() const;
+
+    // Get reward prediction for planning
+    float getExpectedReward() const;
 
 private:
     // Generate possible action sequences

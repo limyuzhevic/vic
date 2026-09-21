@@ -62,17 +62,45 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
-    float getMemoryActivity() const;
+    // Store prediction error in working memory
+    void storePredictionError(float error);
+    
+    // Store replay in working memory for reinforcement
+    void storeReplay(const EpisodicMemoryItem* episode);
+    
+    // Retrieve memory patterns for concept formation
+    std::vector<float> retrieveMemoryPatterns() const;
+    
+    // Get activation pattern for planning
+    std::vector<float> retrieveForPlanning() const;
+    
+    // Get reward signal for learning
+    float getRewardSignal() const;
+    
+    // Get attention winners for cognitive planning
+    const std::vector<NeuronId>& getWinners() const { return winners_; }
+    
+    // Get novelty signal for exploration
+    float getNoveltyLevel() const { return noveltyLevel_; }
+    void setNoveltyLevel(float level) { noveltyLevel_ = level; }
+    
+    // Get prediction error signal for learning
+    float getPredictionErrorSignal() const { return predictionError_; }
+    void setPredictionErrorSignal(float error) { predictionError_ = error; }
+    
+    // Get curiosity signal for exploration
+    float getCuriositySignal() const { return curiosity_; }
+    void setCuriositySignal(float curiosity) { curiosity_ = curiosity; }
+    
+    // Get development stage for plasticity modulation
+    DevelopmentalStage getDevelopmentalStage() const { return developmentalStage_; }
+    void setDevelopmentalStage(DevelopmentalStage stage) { developmentalStage_ = stage; }
+    
+    // Get memory consolidation opportunity
+    bool needsConsolidation() const;
+    
+    // Get memory replay opportunity
+    bool needsReplay() const;
 
 private:
     // Create recurrent connection for maintenance

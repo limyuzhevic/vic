@@ -14,7 +14,15 @@ struct NeuralWorkingMemory::Impl {
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    // Neuromodulation signals for learning
+    float noveltyLevel_;
+    float predictionError_;
+    float curiosity_;
+    float rewardSignal_;
+    float developmentalStage_;
+    
+    Impl() : brain(nullptr), noveltyLevel_(0.0f), predictionError_(0.0f), 
+             curiosity_(0.0f), rewardSignal_(0.0f), developmentalStage_(0.0f) {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
