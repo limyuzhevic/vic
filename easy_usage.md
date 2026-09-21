@@ -1,12 +1,21 @@
 # NLM - Easy Usage Guide for Beginners
 
+> **NOTE**: This document is being consolidated into `HOW_TO_USE.md`. 
+> The main `HOW_TO_USE.md` now contains this beginner-friendly content plus comprehensive technical documentation.
+> 
+> For the full experience, please use `HOW_TO_USE.md` which includes:
+> - This beginner guide (Part 3.1)
+> - Complete Python API reference (Part 3.2+) 
+> - Building and installation instructions (Parts 1-2)
+> - Advanced usage patterns and examples
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
@@ -22,7 +31,7 @@ That's it! NLM simulates all of this.
 
 ---
 
-## Quick Start (Copy & Paste)
+## Quick Start (Copy & Paste Examples)
 
 ### Example 1: Simplest Brain
 
@@ -290,8 +299,15 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more details (includes this guide plus advanced topics)
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**That's it! You're now ready to use NLM.**
+
+> **For the complete documentation, use `HOW_TO_USE.md` which includes this beginner guide plus:**
+> - Building and installation instructions
+> - Complete Python API documentation
+> - Advanced usage patterns and examples
+> - Troubleshooting and FAQs
+> - Configuration options and parameters
