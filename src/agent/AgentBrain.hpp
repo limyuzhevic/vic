@@ -4,16 +4,19 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "neuromodulation/NeuromodulationConfig.hpp"
+#include "neuromodulation/NeuromodulationController.hpp"
 #include <memory>
 #include <vector>
+#include "EnhancedAgentBrainLogger.hpp"
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding, and integrates with neuromodulation systems
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, const NeuromodulationConfig& config);
     ~AgentBrain();
     
     // Initialize with world
@@ -58,16 +61,58 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Configuration through neuromodulation config
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isRewardModulationEnabled() const;
+    bool isStructuralPlasticityEnabled() const;
+    bool isDevelopmentEnabled() const;
+    bool isCuriosityEnabled() const;
+    
+    // Access neuromodulation controller
+    NeuromodulationController* getNeuromodulationController() { return neuromodulationController_.get(); }
+    
+    // Update neuromodulation controller
+    void update(double timestep);
+    
+    // Signal reward to neuromodulation
+    void signalReward(float reward);
+    
+    // Signal prediction error to neuromodulation
+    void signalPredictionError(float error);
+    
+    // Enable/disable debug mode with enhanced logging
+    void enableDebugMode();
+    void disableDebugMode();
+    bool isDebugModeEnabled() const;
+    
+    // Get performance metrics
+    AgentBrainMetrics getPerformanceMetrics() const;
+    
+    // Log current state
+    void logState(const std::string& snapshotName) const;
+    
+    // Set logging configuration
+    void configureLogging(const AgentBrainLoggingConfig& config);
+    
+    // Enable/disable specific logging features
+    void enablePerformanceMonitoring(bool enable);
+    void enableVerboseLogging(bool enable);
+    void enableStateDumping(bool enable);
+    void enableEventLogging(bool enable);
+    void enableMemoryTracking(bool enable);
+    void enableDecisionLogging(bool enable);
+    
+    // Enable/disable specific logging features
+    void enablePerformanceMonitoring(bool enable);
+    void enableVerboseLogging(bool enable);
+    void enableStateDumping(bool enable);
+    void enableEventLogging(bool enable);
+    void enableMemoryTracking(bool enable);
+    void enableDecisionLogging(bool enable);
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -78,7 +123,10 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Neuromodulation controller
+    std::unique_ptr<NeuromodulationController> neuromodulationController_;
+    
+    // AgentBrain-specific state variables (duplicates from original AgentBrain.cpp for backward compatibility)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,32 +134,29 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups (for backward compatibility)
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Previous sensory state for novelty detection (in controller now)
+    std::vector<float> previousVision_;
+    float sensoryNoveltyDecay_;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    // Enhanced logging and performance tracking
+    std::unique_ptr<AgentBrainLogger> logger_;
+    mutable AgentBrainMetrics metrics_;
+    double lastUpdateTime_;
     
-    // Configuration flags
+    // Configuration for logging
+    AgentBrainLoggingConfig loggingConfig_;
+    
+    // Feature flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm
