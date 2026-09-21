@@ -113,6 +113,17 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     return 0.0f;
 }
 
+SimulationStep NeuralWorkingMemory::getMemoryTimestamp(const NeuronId& neuron) const {
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        if (idx < memoryTimestamps_.size()) {
+            return memoryTimestamps_[idx];
+        }
+    }
+    return 0;
+}
+
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     

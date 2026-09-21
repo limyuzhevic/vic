@@ -6,6 +6,9 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include <memory>
 #include <string>
 
@@ -16,9 +19,6 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;

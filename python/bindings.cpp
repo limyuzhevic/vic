@@ -416,6 +416,178 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // ============ ADVANCED MEMORY MANAGEMENT METHODS =============
+
+    // Store a custom experience in episodic memory
+    m.def("storeEpisodicExperience", [](std::shared_ptr<Brain> brain, SimulationStep timestamp,
+                                          const std::vector<float>& sensoryState, float positionX,
+                                          float positionY, float orientation, ActionType action,
+                                          float reward, const std::vector<float>& resultingSensoryState,
+                                          float resultingReward,
+                                          const std::vector<NeuronId>& activeNeurons,
+                                          const std::vector<float>& neuronActivations) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        auto* episodicMemory = brain->getEpisodicMemory();
+        if (!episodicMemory) throw std::runtime_error("Episodic memory not available");
+        
+        EpisodicMemoryItem episode;
+        episode.timestamp = timestamp;
+        episode.sensoryState = sensoryState;
+        episode.positionX = positionX;
+        episode.positionY = positionY;
+        episode.orientation = orientation;
+        episode.action = action;
+        episode.reward = reward;
+        episode.energy = 1.0f;  // Default energy value
+        episode.novelty = 0.0f;  // Default novelty
+        episode.resultingSensoryState = resultingSensoryState;
+        episode.resultingReward = resultingReward;
+        episode.activeNeurons = activeNeurons;
+        episode.neuronActivations = neuronActivations;
+        episode.age = 0;
+        
+        episodicMemory->storeEpisode(episode);
+    }, py::arg("brain"), py::arg("timestamp") = 0,
+          py::arg("sensoryState") = std::vector<float>(),
+          py::arg("positionX") = 0.0f, py::arg("positionY") = 0.0f,
+          py::arg("orientation") = 0.0f, py::arg("action") = ActionType::Wait,
+          py::arg("reward") = 0.0f,
+          py::arg("resultingSensoryState") = std::vector<float>(),
+          py::arg("resultingReward") = 0.0f,
+          py::arg("activeNeurons") = std::vector<NeuronId>(),
+          py::arg("neuronActivations") = std::vector<float>(),
+          "Store a custom experience in episodic memory");
+
+    // Find past experiences similar to a query pattern
+    m.def("retrieveSimilarExperiences", [](std::shared_ptr<Brain> brain,
+                                            const std::vector<float>& sensoryPattern,
+                                            size_t maxResults = 5) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        auto* episodicMemory = brain->getEpisodicMemory();
+        if (!episodicMemory) throw std::runtime_error("Episodic memory not available");
+        
+        auto results = episodicMemory->retrieveSimilar(sensoryPattern, maxResults);
+        std::vector<std::tuple<SimulationStep, float, float, ActionType>> experiences;
+        for (const auto* episode : results) {
+            experiences.emplace_back(episode->timestamp, episode->reward, 
+                                   episode->energy, episode->action);
+        }
+        return experiences;
+    }, py::arg("brain"), py::arg("sensoryPattern") = std::vector<float>(),
+          py::arg("maxResults") = 5,
+          "Find past experiences similar to a query pattern");
+
+    // Get episodes from a specific time range
+    m.def("getEpisodicMemoryByTime", [](std::shared_ptr<Brain> brain,
+                                        SimulationStep startTime, SimulationStep endTime,
+                                        size_t maxResults = 10) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        auto* episodicMemory = brain->getEpisodicMemory();
+        if (!episodicMemory) throw std::runtime_error("Episodic memory not available");
+        
+        auto results = episodicMemory->retrieveTemporal(startTime, endTime, maxResults);
+        std::vector<std::tuple<SimulationStep, float, float, float, float>> episodes;
+        for (const auto* episode : results) {
+            episodes.emplace_back(episode->timestamp, episode->positionX,
+                                episode->positionY, episode->reward, episode->energy);
+        }
+        return episodes;
+    }, py::arg("brain"), py::arg("startTime"), py::arg("endTime"),
+          py::arg("maxResults") = 10,
+          "Get episodes from a specific time range");
+
+    // Get current working memory state
+    m.def("getWorkingMemoryContents", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        auto* workingMemory = brain->getWorkingMemory();
+        if (!workingMemory) throw std::runtime_error("Working memory not available");
+        
+        auto neurons = workingMemory->getMemoryNeurons();
+        std::vector<NeuronId> memoryNeurons;
+        std::vector<float> activations;
+        std::vector<size_t> timestamps;
+        
+        for (size_t i = 0; i < neurons.size(); ++i) {
+            memoryNeurons.push_back(neurons[i]);
+            activations.push_back(workingMemory->getNeuronActivation(neurons[i]));
+            timestamps.push_back(workingMemory->getMemoryTimestamp(neurons[i]));
+        }
+        
+        return std::make_tuple(memoryNeurons, activations, timestamps);
+    }, py::arg("brain"), "Get current working memory state");
+
+    // Check associative memory for pattern
+    m.def("checkAssociativeMemory", [](std::shared_ptr<Brain> brain,
+                                       const std::vector<float>& queryPattern,
+                                       size_t maxResults = 5) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        auto* associativeMemory = brain->getAssociativeMemory();
+        if (!associativeMemory) throw std::runtime_error("Associative memory not available");
+        
+        auto results = associativeMemory->retrieve(queryPattern, maxResults);
+        return results;
+    }, py::arg("brain"), py::arg("queryPattern") = std::vector<float>(),
+          py::arg("maxResults") = 5,
+          "Check associative memory for pattern");
+
+    // Clear all memory systems
+    m.def("clearAllMemory", [](std::shared_ptr<Brain> brain) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        auto* workingMemory = brain->getWorkingMemory();
+        auto* episodicMemory = brain->getEpisodicMemory();
+        auto* associativeMemory = brain->getAssociativeMemory();
+        
+        if (workingMemory) workingMemory->clear();
+        if (episodicMemory) episodicMemory->clear();
+        if (associativeMemory) associativeMemory->clear();
+    }, py::arg("brain"), "Clear all memory systems");
+
+    // Create advanced brain with optimal memory configuration
+    m.def("createAdvancedBrain", [](std::shared_ptr<Config> config,
+                                   size_t neuronCount = 2000,
+                                   size_t episodeCapacity = 2000,
+                                   float workingMemoryDecayRate = 0.02f,
+                                   float episodicMemoryConsolidationThreshold = 0.3f) {
+        if (!config) config = std::make_shared<Config>();
+        
+        config->set<size_t>("working_memory_capacity", neuronCount / 20);
+        config->set<size_t>("max_episodes", episodeCapacity);
+        config->set<float>("memory_consolidation_threshold", episodicMemoryConsolidationThreshold);
+        config->set<float>("working_memory_decay_rate", workingMemoryDecayRate);
+        config->set<float>("novelty_threshold", 0.5f);
+        config->set<float>("curiosity_decay", 0.95f);
+        config->set<float>("prediction_error_threshold", 0.3f);
+        
+        // Create and initialize brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Configure memory systems with optimal parameters
+        if (auto* wm = brain->getWorkingMemory()) {
+            wm->setCapacity(config->getOr<size_t>("working_memory_capacity", neuronCount / 20));
+            wm->setDecayRate(config->getOr<float>("working_memory_decay_rate", 0.02f));
+        }
+        
+        if (auto* em = brain->getEpisodicMemory()) {
+            em->setMaxEpisodes(config->getOr<size_t>("max_episodes", episodeCapacity));
+            em->setConsolidationThreshold(config->getOr<float>("memory_consolidation_threshold", 0.3f));
+        }
+        
+        // Log configuration
+        NLM_LOG_INFO("Advanced brain created with optimal memory configuration");
+        NLM_LOG_INFO("  - Neurons: " + std::to_string(neuronCount));
+        NLM_LOG_INFO("  - Episode capacity: " + std::to_string(episodeCapacity));
+        NLM_LOG_INFO("  - Working memory decay: " + std::to_string(workingMemoryDecayRate));
+        NLM_LOG_INFO("  - Consolidation threshold: " + std::to_string(episodicMemoryConsolidationThreshold));
+        
+        return brain;
+    }, py::arg("config") = nullptr,
+          py::arg("neuronCount") = 2000,
+          py::arg("episodeCapacity") = 2000,
+          py::arg("workingMemoryDecayRate") = 0.02f,
+          py::arg("episodicMemoryConsolidationThreshold") = 0.3f,
+          "Create advanced brain with optimal memory configuration for learning");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

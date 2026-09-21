@@ -61,6 +61,9 @@ public:
 
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Get memory timestamp for a neuron
+    SimulationStep getMemoryTimestamp(const NeuronId& neuron) const;
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);

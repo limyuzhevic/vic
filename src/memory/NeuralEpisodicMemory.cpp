@@ -218,9 +218,23 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
+void NeuralEpisodicMemory::setMaxEpisodes(size_t maxEpisodes) {
+    maxEpisodes_ = maxEpisodes;
+    // Remove old episodes if over capacity
+    while (episodes_.size() > maxEpisodes_) {
+        episodes_.erase(episodes_.begin());
+        if (!pImpl->episodeNeurons.empty()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        }
+    }
+}
+
+void NeuralEpisodicMemory::setConsolidationThreshold(float threshold) {
+    consolidationThreshold_ = threshold;
+}
+
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
     // For now, just enforce max capacity
     while (episodes_.size() > maxEpisodes_ * 0.8f) {
         episodes_.erase(episodes_.begin());

@@ -105,11 +105,18 @@ public:
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
 
+    // Get recent episodes
+    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
+
     // Get average reward from episodes
     float getAverageReward() const;
 
     // Clear old episodes
     void consolidate(float relevanceThreshold);
+
+    // Set memory parameters
+    void setMaxEpisodes(size_t maxEpisodes) { maxEpisodes_ = maxEpisodes; }
+    void setConsolidationThreshold(float threshold) { consolidationThreshold_ = threshold; }
 
     // Clear all episodes
     void clear();
