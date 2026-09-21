@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -70,6 +71,19 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
+    // Short-term plasticity
+    float getShortTermDepression() const;
+    void setShortTermDepression(float depression);
+    
+    float getShortTermFacilitation() const;
+    void setShortTermFacilitation(float facilitation);
+    
+    // Last spike times for STP
+    float getLastPreSpikeTime() const;
+    float getLastPostSpikeTime() const;
+    
+    void setLastSpikeTimes(float pre, float post);
+    
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
@@ -79,6 +93,20 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
+    
+    // Helper methods for short-term dynamics
+    void updateShortTermPlasticity(float currentTime, float dt);
+    
+    // Weight bounds
+    static constexpr float MIN_WEIGHT = -1.0f;
+    static constexpr float MAX_WEIGHT = 1.0f;
+    
+    // Short-term plasticity parameters
+    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
+    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
+    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    
+    static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
 private:
     struct Impl;
