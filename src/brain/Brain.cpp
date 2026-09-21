@@ -7,8 +7,9 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -49,6 +50,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +133,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -801,6 +808,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getNeuronType()));
+                    neuronData.regionId.push_back(static_cast<uint64_t>(region->getId().index()));
+                    neuronData.populationId.push_back(static_cast<uint64_t>(pop->getId().index()));
                 }
             }
         }
@@ -819,7 +829,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags().asUint8());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -828,7 +842,62 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Finalize
+        // Write development system state
+        if (pImpl->developmentSystem) {
+            // TODO: Add development system checkpointing
+        }
+        
+        // Write neuromodulation systems
+        if (pImpl->dopamine) {
+            // TODO: Add dopamine checkpointing
+        }
+        if (pImpl->curiosity) {
+            // TODO: Add curiosity checkpointing
+        }
+        if (pImpl->predictionError) {
+            // TODO: Add prediction error checkpointing
+        }
+        if (pImpl->novelty) {
+            // TODO: Add novelty checkpointing
+        }
+        if (pImpl->acetylcholine) {
+            // TODO: Add acetylcholine checkpointing
+        }
+        if (pImpl->norepinephrine) {
+            // TODO: Add norepinephrine checkpointing
+        }
+        if (pImpl->serotonin) {
+            // TODO: Add serotonin checkpointing
+        }
+        
+        // Write memory systems
+        if (pImpl->workingMemory) {
+            // TODO: Add working memory checkpointing
+        }
+        if (pImpl->episodicMemory) {
+            // TODO: Add episodic memory checkpointing
+        }
+        if (pImpl->associativeMemory) {
+            // TODO: Add associative memory checkpointing
+        }
+        
+        // Write prediction system
+        if (pImpl->predictionSystem) {
+            // TODO: Add prediction system checkpointing
+        }
+        
+        // Write cognition systems
+        if (pImpl->planner) {
+            // TODO: Add planner checkpointing
+        }
+        if (pImpl->conceptFormation) {
+            // TODO: Add concept formation checkpointing
+        }
+        if (pImpl->attention) {
+            // TODO: Add attention checkpointing
+        }
+        
+        // Finalize checkpoint
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
             return false;
@@ -1006,10 +1075,22 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory.get();
+    }
+    // Create working memory if it doesn't exist
+    pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
+    pImpl->workingMemory->initialize(this);
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory.get();
+    }
+    // Create episodic memory if it doesn't exist
+    pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    pImpl->episodicMemory->initialize(this);
     return pImpl->episodicMemory.get();
 }
 

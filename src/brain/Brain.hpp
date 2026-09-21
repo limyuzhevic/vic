@@ -17,17 +17,19 @@ class RandomGenerator;
 class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class NeuralEpisodicMemory;
+    class NeuralSemanticMemory;
+    class NeuralProceduralMemory;
+    class NeuralAssociativeMemory;
+    class PredictionSystem;
+    class NeuralPlanner;
+    class ConceptFormation;
+    class AttentionalSelection;
+    class DevelopmentSystem;
+    class Dopamine;
+    class Acetylcholine;
+    class Norepinephrine;
+    class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
