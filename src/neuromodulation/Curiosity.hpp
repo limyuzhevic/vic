@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
 
 namespace nlm {
 
@@ -30,6 +32,9 @@ public:
     
     // Reset
     void reset();
+    
+    // Apply curiosity effects to plasticity rules
+    void applyToPlasticity(STDP* stdp, Hebbian* hebbian);
     
 private:
     struct Impl;

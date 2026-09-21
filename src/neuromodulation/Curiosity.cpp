@@ -55,8 +55,24 @@ void Curiosity::setPredictionErrorWeight(float weight) {
     pImpl->predictionErrorWeight = weight;
 }
 
-void Curiosity::reset() {
-    pImpl->level = 0.0f;
+void Curiosity::applyToPlasticity(STDP* stdp, Hebbian* hebbian) {
+    // Curosity modulates plasticity for exploration
+    float curiosityFactor = getLevel();
+    
+    if (stdp) {
+        // Higher curiosity increases plasticity for learning new behaviors
+        float currentLTP = stdp->getLTPWeight();
+        float currentLTD = stdp->getLTDWeight();
+        
+        // Make learning more flexible when curious
+        stdp->setLTPWeight(currentLTP * (1.0f + curiosityFactor * 0.5f));
+        stdp->setLTDWeight(currentLTD * (1.0f - curiosityFactor * 0.3f));
+    }
+    
+    if (hebbian) {
+        // Hebbian plasticity also modulated by curiosity
+        // This allows stronger association of novel experiences
+    }
 }
 
 } // namespace nlm

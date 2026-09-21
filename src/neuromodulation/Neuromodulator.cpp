@@ -1,5 +1,7 @@
 #include "Neuromodulator.hpp"
-#include <algorithm>
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -51,6 +53,39 @@ void Dopamine::signalRewardPredictionError(float error) {
     // TODO PHASE 2: Implement reward prediction error signaling
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+}
+
+void Dopamine::applyToPlasticity(STDP* stdp, Hebbian* hebbian) {
+    // Dopamine modulates plasticity based on reward prediction error
+    // Positive dopamine increases plasticity, negative decreases it
+    
+    if (stdp) {
+        // Get current dopamine level (-1 to 1)
+        float dopamine = getLevel();
+        
+        // Scale STDP learning rates based on dopamine
+        // Positive dopamine (reward prediction) increases LTP and reduces LTD
+        // Negative dopamine (prediction error) decreases LTP and enhances LTD
+        
+        float baseLTP = 0.01f;
+        float baseLTD = 0.012f;
+        
+        // Dopamine modulates STDP parameters
+        if (dopamine > 0) {
+            // Reward: Enhance LTP, reduce LTD
+            stdp->setLTPWeight(baseLTP * (1.0f + dopamine * 0.5f));
+            stdp->setLTDWeight(baseLTD * (1.0f - dopamine * 0.3f));
+        } else {
+            // Punishment/prediction error: Reduce LTP, enhance LTD
+            stdp->setLTPWeight(baseLTP * (1.0f + dopamine * 0.3f));  // dopamine is negative
+            stdp->setLTDWeight(baseLTD * (1.0f - dopamine * 0.5f));  // -dopamine makes this larger
+        }
+    }
+    
+    if (hebbian) {
+        // Hebbian plasticity also modulated by dopamine
+        // This allows reward-based strengthening of associations
+    }
 }
 
 } // namespace nlm

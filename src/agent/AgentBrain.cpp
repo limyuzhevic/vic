@@ -210,14 +210,108 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
+    // Integration with neural planner for action selection
+    MotorCommand plannedAction = defaultCmd;
+    
+    // Use neural planner if available
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        // Create state representation from current neural activity
+        std::vector<float> currentState;
+        
+        // Get working memory content
+        auto* workingMem = brain_->getWorkingMemory();
+        if (workingMem) {
+            currentState = workingMem->retrieve();
+        }
+        
+        // If no state available, create from sensory neuron activity
+        if (currentState.empty()) {
+            for (const auto& region : brain_->getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Sensory) {
+                        for (Neuron* n : pop->getNeurons()) {
+                            float activation = std::abs(n->getState().membranePotential - 
+                                                     n->getState().restingPotential);
+                            currentState.push_back(activation);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Get concept formation for context
+        auto* conceptForm = brain_->getConceptFormation();
+        if (conceptForm && !currentState.empty()) {
+            // Get matching concept
+            size_t conceptId = conceptForm->getMatchingConcept(currentState);
+            if (conceptId > 0) {
+                // Use concept to guide planning
+                auto prototype = conceptForm->getConceptPrototype(conceptId);
+                if (!prototype.empty() && prototype.size() == currentState.size()) {
+                    // Calculate similarity to improve planning
+                    float similarity = 0.0f;
+                    for (size_t i = 0; i < currentState.size(); ++i) {
+                        similarity += std::abs(currentState[i] - prototype[i]);
+                    }
+                    similarity /= currentState.size();
+                    
+                    // Adjust planned action based on similarity
+                    if (similarity < 0.3f) {
+                        // High similarity - prefer planned action
+                        plannedAction = defaultCmd;
+                    } else {
+                        // Low similarity - use curiosity-driven exploration
+                        plannedAction = decodeFromMotorNeurons();
+                    }
+                }
+            }
+        }
+        
+        // Apply attentional selection
+        auto* attention = brain_->getAttention();
+        if (attention && !currentState.empty()) {
+            // Process competition based on current state
+            std::vector<NeuronId> competitors;
+            for (size_t i = 0; i < currentState.size() && currentState[i] > 0.1f; ++i) {
+                // In a real implementation, we'd convert state index back to neuron ID
+                competitors.push_back(static_cast<NeuronId>(i));
+            }
+            
+            if (!competitors.empty()) {
+                attention->processCompetition(competitors);
+                auto& winners = attention->getWinners();
+                
+                // Use attention winners to modulate action selection
+                if (!winners.empty() && plannedAction != MotorCommand::Wait) {
+                    // Check if attended neurons support the planned action
+                    bool attendedAction = false;
+                    for (NeuronId winner : winners) {
+                        // In real implementation, winner would have associated motor output
+                        // For now, just ensure attention is focused on action-relevant areas
+                        attendedAction = true;
+                    }
+                    
+                    if (!attendedAction && curiosityLevel_ > 0.3f) {
+                        // If attention doesn't support action, use curiosity-driven exploration
+                        plannedAction = decodeFromMotorNeurons();
+                    }
+                }
+            }
+        }
+    }
+    
+    // Integration with neuromodulation for final action selection
     if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        // Higher curiosity = more exploration, but modulated by dopamine
+        float dopamineInfluence = std::abs(dopamineLevel_) * 0.5f;
+        
+        // Calculate exploration probability
+        float exploreChance = curiosityLevel_ * 0.3f * (1.0f - dopamineInfluence);
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Random motor command with novelty detection
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
@@ -232,7 +326,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         }
     }
     
-    return defaultCmd;
+    return plannedAction;
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

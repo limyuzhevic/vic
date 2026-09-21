@@ -1,4 +1,3 @@
-#include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -403,7 +402,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // WORKING MEMORY: Maintain active neural traces with competition
+        // Working memory stores active neuronal activity patterns for immediate use
+        // This provides the "business memory" for ongoing cognitive tasks
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Get current working memory neurons and apply attention competition
+        auto& wmNeurons = pImpl->workingMemory->getMemoryNeurons();
+        if (!wmNeurons.empty() && pImpl->attention) {
+            pImpl->attention->processCompetition(wmNeurons);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -444,6 +452,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply neuromodulation effects on plasticity
+    if (pImpl->dopamine) {
+        // Dopamine modulates STDP and Hebbian plasticity
+        pImpl->dopamine->applyToPlasticity(pImpl->stdp.get(), pImpl->hebbian.get());
     }
     
     for (auto& region : pImpl->regions) {
