@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <iostream>
 
 namespace nlm {
 
@@ -55,11 +57,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    void loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,6 +95,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and utility methods
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    bool validateAll() const;
+    void printHelp() const;
+    
+    // Utility methods
+    void addDefaultConfig(const std::string& key, const ConfigValue& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +111,18 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection
+    static std::string detectFileFormat(const std::string& filepath);
+    
+    // JSON parsing
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // JSON/YAML helper functions
+    static std::string configValueToString(const ConfigValue& value);
+    static ConfigValue stringToConfigValue(const std::string& key, const std::string& value);
 };
 
 } // namespace nlm
