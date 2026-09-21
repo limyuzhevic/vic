@@ -473,27 +473,111 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
-### Environment Interaction
+### Multi-Agent Simulation
 
 ```python
 import pynlm
 
-# Setup
+def run_multi_agent_simulation(num_agents=3, steps=500):
+    """Run multiple interacting agents in the same world."""
+    
+    # Create shared world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=50, height=50, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setRandomSeed(12345)
+    
+    agents = []
+    
+    # Create multiple agents
+    for i in range(num_agents):
+        config = pynlm.createDefaultConfig()
+        
+        # Different configurations for different agents
+        if i == 0:
+            config.set("brain.neuron_count", 500)
+            config.set("stdp_ltp_weight", 0.02)
+        elif i == 1:
+            config.set("brain.neuron_count", 1000)
+            config.set("stdp_ltp_weight", 0.015)
+        else:
+            config.set("brain.neuron_count", 750)
+            config.set("stdp_ltp_weight", 0.025)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable different subsystems for variety
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        agents.append((brain, agent))
+        
+        # Position agents randomly
+        x = pynlm.RandomFloat(5, 45)
+        y = pynlm.RandomFloat(5, 45)
+        world.setAgentStart(x, y)
+    
+    # Run simulation with inter-agent interaction
+    for step in range(steps):
+        world.update(0.1)
+        
+        # Each agent perceives the world state
+        percept = world.getSensoryPercept()
+        
+        # Process through all agents
+        for brain, agent in agents:
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            
+            # Get actions
+            action = agent.decodeMotorCommand()
+            
+            # Apply actions (agents interact through world state)
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Apply learning
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+        
+        # Log progress periodically
+        if step % 100 == 0:
+            print(f"Step {step}: World time {world.getSimulationTime():.1f}s")
+            for i, (brain, _) in enumerate(agents):
+                print(f"  Agent {i}: {brain.getFiringNeuronCount()} neurons firing, "
+                      f"{brain.getAverageFiringRate():.1f} Hz")
+    
+    return agents, world
+
+# Run multi-agent simulation
+agents, final_world = run_multi_agent_simulation(3, 1000)
+print("Multi-agent simulation complete!")
+```
+
+### Advanced Configuration
+
+```python
+# Create and customize configuration
 config = pynlm.createDefaultConfig()
+
+# Customize settings
+config.set("brain.neuron_count", 2000)           # Double the neurons
+config.set("brain.synapse_density", 0.15)       # More connections
+config.set("stdp_ltp_weight", 0.03)             # Stronger potentiation
+config.set("plasticity.stdp.enable", True)     # Enable STDP
+config.set("plasticity.hebbian.enable", True)  # Enable Hebbian
+config.set("plasticity.structural.enable", True) # Enable structural
+
+# Create and initialize brain
 brain = pynlm.createBrain(config)
 brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
 ```
 
 ---

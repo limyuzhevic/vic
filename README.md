@@ -66,21 +66,143 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Quick Start (Recommended)
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+make -j$(nproc)
 ```
+
+### Advanced Build Options
+
+For development or debugging:
+```bash
+# Debug build (with symbols and assertions)
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+
+# Install to system (development)
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release
+```
+
+### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo (if built) |
+| `nlm_test` | Executable | Unit test suite |
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Integration Demo
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 3 Demo (Basic Neural Computation)
+```bash
+./nlm_phase3_demo
+```
+
+Demonstrates LIF neurons, STDP, Hebbian learning, and structural plasticity.
+
+### Phase 4 Demo (Advanced Cognitive Functions)
+```bash
+./nlm_phase4_demo
+```
+
+Shows concept formation, predictive planning, and self-modeling.
+
+### Running Tests
+```bash
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test
+./nlm_test TestSuite::BasicConnectivity
+```
+
+### Python Bindings (if installed)
+```bash
+# Install Python bindings
+pip install .
+
+# Run Python example
+python3 -c "import pynlm; brain = pynlm.createBrain(pynlm.createDefaultConfig()); brain.initialize(); print(f'Neurons: {brain.getTotalNeuronCount()}')"
+```
+
+## Command Line Options
+
+Most executables support these options:
+
+```bash
+# General options (for nlm, nlm_phase3_demo, nlm_phase4_demo, nlm_phase6_demo)
+./nlm --help                    # Show help
+./nlm --config path/to/config.cfg  # Load configuration
+./nlm --neuron_count 1000        # Override neuron count
+./nlm --debug                    # Enable debug logging
+
+# Build-specific options
+./nlm_phase3_demo --stdp_ltp_weight 0.02  # Custom STDP parameters
+./nlm_phase4_demo --concept_threshold 0.5  # Concept formation threshold
+```
+
+## Configuration Files
+
+### Default Configuration
+Configuration is loaded from `configs/default.cfg`:
+
+```ini
+# Core neural parameters
+brain.neuron_count = 500
+brain.synapse_density = 0.1
+brain.connection_probability = 0.05
+
+# Neuron parameters
+brain.v_thresh = -50.0
+brain.v_rest = -70.0
+brain.v_reset = -75.0
+brain.tau_mem = 20.0
+brain.tau_ref = 2.0
+
+# Plasticity parameters
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+plasticity.stdp.enable = true
+plasticity.hebbian.enable = true
+plasticity.structural.enable = true
+
+# Development parameters
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+# Random seed
+random_seed = 42
+```
+
+### Creating Custom Configs
+Create `~/.nlm_config.cfg` or pass `--config your_config.cfg`.
+
+## Environment Variables
+
+- `NLM_LOG_LEVEL`: Set logging level (DEBUG, INFO, WARNING, ERROR)
+- `NLM_CPU_AFFINITY`: CPU cores for parallel processing (e.g., "0-3,5")
+- `NLM_USE_SIMD`: Enable/disable SIMD optimizations (true/false)
 
 ## Project Structure
 
