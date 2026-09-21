@@ -177,10 +177,28 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration parameters
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: 0. Using minimum value of 1.");
+        neuronCount = 1;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: 0. Using minimum value of 1.");
+        regionCount = 1;
+    }
+    if (neuronCount < regionCount) {
+        NLM_LOG_ERROR("neuron_count (" + std::to_string(neuronCount) + ") < region_count (" + std::to_string(regionCount) + "). Adjusting region_count to neuron_count.");
+        regionCount = neuronCount;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProbability) + ". Clamping to [0, 1].");
+        connectionProbability = std::max(0.0f, std::min(1.0f, connectionProbability));
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -195,10 +213,15 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
+            // Ensure at least 1 neuron per population
+            size_t sensoryNeurons = std::max(size_t(1), neuronsPerRegion / 4);
+            size_t internalNeurons = std::max(size_t(1), neuronsPerRegion / 2);
+            size_t motorNeurons = std::max(size_t(1), neuronsPerRegion / 4);
+            
             // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            auto sensoryPopId = region->addPopulation(sensoryNeurons, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(internalNeurons, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(motorNeurons, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -758,11 +781,50 @@ void Brain::reset() {
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setLevel(0.0f);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->setLevel(0.0f);
+    }
+    if (pImpl->novelty) {
+        pImpl->novelty->setLevel(0.0f);
+    }
+    
+    // Reset prediction system if it exists
+    if (pImpl->predictionSystem) {
+        // PredictionSystem doesn't have a reset method currently
+    }
+    
+    // Reset development system if it exists
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->reset();
+    }
+    
+    // Reset agent-related state
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
+    
+    // Validate file path
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Empty file path provided for save");
+        return false;
+    }
+    
+    // Check if path is writable (at least attempt to create)
+    std::ofstream testFile(filepath, std::ios::out);
+    if (!testFile) {
+        NLM_LOG_ERROR("Cannot write to file path: " + filepath);
+        return false;
+    }
+    testFile.close();
     
     try {
         CheckpointWriter writer;
@@ -839,6 +901,8 @@ bool Brain::save(const std::string& filepath) const {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        // Attempt to remove partially written file
+        std::remove(filepath.c_str());
         return false;
     }
 }
