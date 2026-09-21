@@ -1,6 +1,12 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "pybind11[global-include]>=2.11.0"]
 build-backend = "scikit_build_core.build"
+
+# Additional build options
+tool.scikit-build.verbose = true
+
+# Define CMake project
+tool.scikit-build.cmake.define = { "NLM_SOURCE_DIR" = "src" }
 
 [project]
 name = "pynlm"

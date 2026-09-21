@@ -294,4 +294,302 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## Learning Path
+
+### Phase 1: Basic Usage (You are here)
+- Create simple brains and run simulations
+- Understand the brain-world-agent relationship
+- Use basic examples from this guide
+
+### Phase 2: Advanced Usage
+- Enable learning systems (reward, curiosity, development)
+- Create complex world environments
+- Save and load brain states
+- Work with different brain configurations
+
+### Phase 3: Expert Usage
+- Create custom worlds with obstacles and rewards
+- Implement reinforcement learning scenarios
+- Use advanced memory systems
+- Performance optimization and debugging
+
+## Error Handling
+
+Even simple NLM code can encounter issues. Here's how to handle common problems:
+
+```python
+import pynlm
+import traceback
+
+def safe_run_simulation(brain_config, steps=100):
+    try:
+        # Create brain
+        brain = pynlm.createBrain(brain_config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(steps):
+            brain.step(step)
+            
+            # Check for issues
+            if brain.getFiringNeuronCount() == 0:
+                print(f"Warning: No neurons firing at step {step}")
+                
+        return brain
+        
+    except Exception as e:
+        print(f"Error during simulation: {e}")
+        traceback.print_exc()
+        return None
+
+# Usage
+config = pynlm.createDefaultConfig()
+brain = safe_run_simulation(config, 500)
+if brain:
+    print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+## Common Troubleshooting
+
+**"My brain isn't doing anything"
+- Did you call `brain.initialize()`? (This is crucial!)
+- Check that neuron parameters are set correctly
+- Enable development to see changes over time
+
+**"The simulation crashes with segmentation fault"
+- Ensure `brain.initialize()` is called before `brain.step()`
+- Check that you're not passing null/empty percepts to agent
+- Use smaller brain sizes for debugging
+
+**"Learning doesn't seem to work"
+- Check that learning systems are enabled with `agent.enableRewardModulation(True)`
+- Verify reward signals are being applied
+- Ensure curiosity and development systems are working
+
+**"Memory usage is too high"
+- Consider reducing brain size
+- Use checkpointing to save state frequently
+- Monitor brain statistics regularly
+
+## Performance Tips
+
+```python
+import pynlm
+import time
+
+def measure_performance(config, steps=1000):
+    """Measure simulation performance"""
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    start_time = time.time()
+    for step in range(steps):
+        brain.step(step)
+    end_time = time.time()
+    
+    duration = end_time - start_time
+    steps_per_second = steps / duration
+    
+    print(f"Simulation: {steps} steps in {duration:.2f}s")
+    print(f"Performance: {steps_per_second:.1f} steps/second")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+    
+    return brain, duration
+
+# Use smaller brains for testing
+config = pynlm.createDefaultConfig()
+# config.set("brain.neuron_count", 100)  # Uncomment to customize
+brain, duration = measure_performance(config)
+```
+
+## Advanced Configuration
+
+```python
+import pynlm
+
+# Create and customize configuration
+config = pynlm.createDefaultConfig()
+
+# Modify brain parameters
+config.set("brain.neuron_count", 500)           # Number of neurons
+config.set("brain.synapse_density", 0.2)        # Connectivity
+config.set("brain.v_thresh", -50.0)             # Threshold
+config.set("brain.v_rest", -70.0)               # Resting potential
+
+# Enable plasticity
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+
+# Configure neuromodulation
+config.set("neuromod.dopamine.scale", 1.0)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+
+# Enable development
+config.set("development.enable", True)
+config.set("development.initial_plasticity_rate", 0.1)
+
+print("Configuration:")
+print(config.summary())
+
+# Create brain with custom config
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+## State Management
+
+```python
+import pynlm
+import tempfile
+import os
+
+def save_load_demo(config, steps=100):
+    """Demonstrate brain save/load functionality"""
+    print("=== Brain Save/Load Demo ===")
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run simulation
+    for step in range(steps):
+        brain.step(step)
+        if step % 50 == 0:
+            print(f"Step {step}")
+    
+    # Save brain state
+    with tempfile.NamedTemporaryFile(suffix='.nlm', delete=False) as f:
+        save_path = f.name
+    
+    if brain.save(save_path):
+        print(f"Brain saved to: {save_path}")
+        print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"Neurons firing: {brain.getFiringNeuronCount()}")
+        
+        # Load brain state
+        loaded_brain = pynlm.createBrain(config)
+        if loaded_brain.load(save_path):
+            print(f"Brain loaded successfully!")
+            print(f"Loaded brain spikes: {loaded_brain.getTotalSpikeCount()}")
+            
+            # Continue simulation
+            for step in range(steps, steps * 2):
+                loaded_brain.step(step)
+            
+            print(f"After loading and continuing: {loaded_brain.getTotalSpikeCount()} total spikes")
+        
+        # Clean up
+        os.unlink(save_path)
+    else:
+        print("Failed to save brain")
+    
+    return brain
+
+# Run demo
+config = pynlm.createDefaultConfig()
+save_load_demo(config)
+```
+
+## Complete Example: Learning Agent
+
+```python
+import pynlm
+import random
+
+def create_learning_agent(config=None, steps=1000):
+    """Create a complete learning agent with all systems enabled"""
+    if config is None:
+        config = pynlm.createDefaultConfig()
+    
+    # Setup brain with configuration
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent and world
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # Initialize agent
+    agent.initialize(world)
+    
+    # Enable all learning systems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Add some resources to the world for the agent to discover
+    for i in range(5):
+        x = random.uniform(2, 18)
+        y = random.uniform(2, 18)
+        world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
+    
+    # Run simulation with learning
+    for step in range(steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # Execute action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply learning
+        reward = 0.0
+        if world.getAgentBody().energy > 50:
+            reward = 1.0  # Positive reward for survival
+        if random.random() < 0.1:  # Random resource discovery
+            reward += 2.0
+            
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 200 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Agent position: ({world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f})")
+            print(f"  Agent energy: {world.getAgentBody().energy:.1f}")
+    
+    print(f"\nFinal Statistics:")
+    print(f"Total simulation steps: {steps}")
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Final novelty level: {agent.getNoveltyLevel():.3f}")
+    
+    return brain, agent, world
+
+# Run complete learning agent
+config = pynlm.createDefaultConfig()
+# Customize config
+config.set("brain.neuron_count", 1000)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+brain, agent, world = create_learning_agent(config, 2000)
+```
+
+That's it! You're now ready to use NLM at an expert level with comprehensive error handling, performance monitoring, configuration management, and complete learning agents!
