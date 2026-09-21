@@ -93,6 +93,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // ========== ADVANCED CONFIGURATION MANAGEMENT ==========
+    
+    // Generate preset configurations
+    static std::vector<std::shared_ptr<Config>> generatePresets();
+    
+    // Compare with other config
+    std::map<std::string, bool> compareConfigs(const Config& other) const;
+    
+    // Get optimization suggestions
+    std::vector<std::string> suggestOptimizations() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

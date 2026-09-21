@@ -42,6 +42,44 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+### Example 1b: Brain with Dictionary Config
+
+```python
+import pynlm
+
+# Create brain from Python dictionary
+config_dict = {
+    "brain.neuron_count": 500,
+    "brain.v_thresh": -55.0,
+    "brain.tau_mem": 15.0
+}
+brain = pynlm.createBrainFromDict(config_dict)
+brain.initialize()
+
+for i in range(50):
+    brain.step(i)
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+### Example 1c: Run Simulation with Logging
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation with automatic logging
+brain.run_simulation(steps=1000, verbose=True)
+
+# Get final statistics
+stats = brain.get_stats()
+print(f"Simulation complete: {stats['total_spikes']} total spikes")
+print(f"Average firing rate: {stats['average_firing_rate']:.2f} Hz")
+```
+
 ### Example 2: Brain in a Simple World
 
 ```python
@@ -69,6 +107,66 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 2b: Adding Resources to World
+
+```python
+import pynlm
+
+# Create brain and world
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Add resources and hazards
+world.add_resource(5.0, 5.0, 10.0)  # Resource at (5,5) with value 10
+world.add_resource(15.0, 15.0, 20.0)  # Another resource
+world.add_hazard(10.0, 10.0, 5.0)  # Hazard with damage 5
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("Resource and hazard simulation complete!")
+print("World stats:", world.world_stats())
+```
+
+### Example 2c: Checking World State
+
+```python
+import pynlm
+
+# Create world
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Check world state before any changes
+valid, errors = world.check_world_state()
+if not valid:
+    print("World validation errors:", errors)
+else:
+    print("World state is valid")
+
+# Add an invalid object (outside bounds)
+# This would be caught by validation
+
+# Check again
+valid, errors = world.check_world_state()
+print(f"After changes: valid={valid}, errors={errors}")
 ```
 
 ---

@@ -83,6 +83,43 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
+    // ========== ADVANCED SIMULATION FEATURES ==========
+    
+    // Run episode with exploration
+    bool runEpisode(size_t numSteps, bool explore = true);
+    
+    // Generate visualization data
+    std::string visualize() const;
+    
+    // Monitor specific agent
+    std::string monitorAgent(size_t agentId) const;
+    
+    // Monitor all agents
+    std::map<size_t, std::string> monitorAllAgents() const;
+    
+    // Get visualization data
+    std::map<std::string, float> getVisualizationData() const;
+    
+    // Get world statistics for debugging
+    std::map<std::string, double> getDebugStats() const;
+    
+    // ========== MULTI-AGENT SUPPORT ==========
+    
+    // Add agent to world
+    void addAgent(const AgentBody& agent);
+    
+    // Remove agent by ID
+    bool removeAgent(size_t agentId);
+    
+    // Get list of agent IDs
+    std::vector<size_t> getAgentIds() const;
+    
+    // Get agent by ID
+    const AgentBody* getAgent(size_t agentId) const;
+    
+    // Broadcast message to all agents
+    void broadcastMessage(const std::string& message);
+    
 private:
     // Generate vision from current view
     void generateVision();

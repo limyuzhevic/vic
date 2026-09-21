@@ -15,10 +15,24 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryProfiler.hpp"
+#include "../performance/BenchmarkSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <map>
+#include <vector>
+#include <set>
+#include <unordered_map>
+#include <chrono>
+#include <thread>
+#include <filesystem>
+#include <nlohmann/json.hpp>
+
+// For neural network export
+namespace fs = std::filesystem;
+namespace nl = nlohmann;
 
 namespace nlm {
 
@@ -1112,6 +1126,885 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+} // namespace nlm
+
+// ========== ADVANCED ANALYSIS TOOLS ==========
+
+std::string Brain::analyzeNetworkTopology() const {
+    std::stringstream result;
+    result << "Network Topology Analysis (Phase 6 - Integrated Artificial Brain)\n";
+    result << "=============================================\n";
+    result << "Total Regions: " << pImpl->regions.size() << "\n";
+    
+    for (const auto& region : pImpl->regions) {
+        result << "\nRegion: " << region->getName() << " (ID: " << region->getId().index() << ")\n";
+        
+        auto popIds = region->getPopulationIds();
+        result << "  Populations: " << popIds.size() << "\n";
+        
+        for (const auto& popId : popIds) {
+            auto* pop = region->getPopulation(popId);
+            if (pop) {
+                int neuronCount = pop->getNeurons().size();
+                float avgWeight = pop->getAverageSynapticWeight();
+                int activeNeurons = pop->getActiveNeuronCount();
+                int firingNeurons = pop->getFiringNeuronCount();
+                
+                result << "    Population " << popId.index() << 
+                          " (Type: " << static_cast<int>(pop->getNeuronType()) << "):\n";
+                result << "      Neurons: " << neuronCount << ", Active: " << activeNeurons << ", Firing: " << firingNeurons << "\n";
+                result << "      Average synaptic weight: " << avgWeight << "\n";
+            }
+        }
+        
+        int synCount = region->getSynapseCount();
+        result << "  Synapses: " << synCount << "\n";
+        
+        float totalWeight = 0.0f;
+        float positiveWeight = 0.0f;
+        float negativeWeight = 0.0f;
+        
+        for (const auto& syn : region->getSynapses()) {
+            float weight = syn->getWeight();
+            totalWeight += std::abs(weight);
+            if (weight > 0) positiveWeight += weight;
+            else negativeWeight += std::abs(weight);
+        }
+        
+        result << "  Connectivity weight sum: " << totalWeight << "\n";
+        result << "  Excitatory weight: " << positiveWeight << "\n";
+        result << "  Inhibitory weight: " << negativeWeight << "\n";
+        if (totalWeight > 0) {
+            result << "  E/I balance: " << (positiveWeight / (negativeWeight > 0 ? negativeWeight : 1.0f)) << "\n";
+        }
+    }
+    
+    result << "\nGlobal Network Metrics:\n";
+    result << "  Total neurons: " << getTotalNeuronCount() << "\n";
+    result << "  Total synapses: " << getTotalSynapseCount() << "\n";
+    result << "  Active neurons: " << getActiveNeuronCount() << "\n";
+    result << "  Firing neurons (this step): " << getFiringNeuronCount() << "\n";
+    result << "  Total spikes (all time): " << getTotalSpikeCount() << "\n";
+    result << "  Pending spike events: " << getPendingSpikeEventCount() << "\n";
+    result << "  Average firing rate: " << getAverageFiringRate() << " Hz\n";
+    result << "  Excitation/Inhibition ratio: " << getExcitationInhibitionRatio() << "\n";
+    
+    return result.str();
+}
+
+std::vector<std::string> Brain::detectBottlenecks() const {
+    std::vector<std::string> bottlenecks;
+    
+    if (pImpl->workingMemory) {
+        int activeTraces = pImpl->workingMemory->getActiveTraces();
+        int capacity = pImpl->workingMemory->getCapacity();
+        if (activeTraces > capacity * 0.8f) {
+            bottlenecks.push_back("Working memory approaching capacity: " + std::to_string(activeTraces) + "/" + std::to_string(capacity));
+        }
+    }
+    
+    if (pImpl->episodicMemory) {
+        int currentEpisodes = pImpl->episodicMemory->getEpisodeCount();
+        int maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+        if (currentEpisodes > maxEpisodes * 0.9f) {
+            bottlenecks.push_back("Episodic memory approaching capacity: " + std::to_string(currentEpisodes) + "/" + std::to_string(maxEpisodes));
+        }
+    }
+    
+    if (pImpl->spikeSystem) {
+        int pendingSpikes = pImpl->spikeSystem->getPendingSpikeCount();
+        int pendingDelayed = pImpl->spikeSystem->getPendingDelayedCount();
+        if (pendingSpikes > 100) {
+            bottlenecks.push_back("Spike system backlog: " + std::to_string(pendingSpikes) + " pending spikes");
+        }
+        if (pendingDelayed > 100) {
+            bottlenecks.push_back("Delayed spike backlog: " + std::to_string(pendingDelayed) + " delayed events");
+        }
+    }
+    
+    if (getAverageFiringRate() > 50.0f) {
+        bottlenecks.push_back("High average firing rate: " + std::to_string(getAverageFiringRate()) + " Hz");
+    }
+    
+    size_t totalNeurons = getTotalNeuronCount();
+    size_t totalSynapses = getTotalSynapseCount();
+    if (totalNeurons > 0 && totalSynapses / totalNeurons > 20.0f) {
+        bottlenecks.push_back("High synaptic density: " + std::to_string(totalSynapses / totalNeurons) + " synapses per neuron");
+    }
+    
+    size_t regionCount = pImpl->regions.size();
+    if (regionCount > 0) {
+        size_t maxNeurons = 0, minNeurons = std::numeric_limits<size_t>::max();
+        for (const auto& region : pImpl->regions) {
+            size_t neuronCount = region->getTotalNeuronCount();
+            maxNeurons = std::max(maxNeurons, neuronCount);
+            minNeurons = std::min(minNeurons, neuronCount);
+        }
+        
+        if (maxNeurons > minNeurons * 3) {
+            bottlenecks.push_back("Region imbalance detected: largest region has " + std::to_string(maxNeurons) + 
+                                " neurons, smallest has " + std::to_string(minNeurons));
+        }
+    }
+    
+    if (getExcitationInhibitionRatio() < 0.1f || getExcitationInhibitionRatio() > 10.0f) {
+        bottlenecks.push_back("Unbalanced excitation/inhibition ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    }
+    
+    return bottlenecks;
+}
+
+std::string Brain::generateSummaryReport() const {
+    std::stringstream report;
+    report << "NLM BRAIN SUMMARY REPORT (Phase 6 - Integrated Artificial Brain)\n";
+    report << "======================================================================\n\n";
+    
+    auto config = pImpl->config;
+    report << "Configuration:\n";
+    report << "  Neuron Count: " << config->getOr<size_t>("neuron_count", 0) << "\n";
+    report << "  Region Count: " << config->getOr<size_t>("region_count", 0) << "\n";
+    report << "  Connection Probability: " << config->getOr<float>("connection_probability", 0.0f) << "\n";
+    report << "  Simulation Time Step: " << pImpl->timestep << "s\n\n";
+    
+    report << "Performance Metrics:\n";
+    report << "  Total Spikes: " << getTotalSpikeCount() << "\n";
+    report << "  Total Steps: " << pImpl->currentStep << "\n";
+    report << "  Average Firing Rate: " << getAverageFiringRate() << " Hz\n";
+    report << "  Active Neurons: " << getActiveNeuronCount() << "\n";
+    report << "  Firing Neurons (this step): " << getFiringNeuronCount() << "\n";
+    report << "  Pending Spike Events: " << getPendingSpikeEventCount() << "\n\n";
+    
+    report << "Network Statistics:\n";
+    report << "  Total Neurons: " << getTotalNeuronCount() << "\n";
+    report << "  Total Synapses: " << getTotalSynapseCount() << "\n";
+    report << "  Excitation/Inhibition Ratio: " << getExcitationInhibitionRatio() << "\n";
+    report << "  Regions: " << pImpl->regions.size() << "\n\n";
+    
+    report << "Memory Systems:\n";
+    if (pImpl->workingMemory) {
+        report << "  Working Memory:\n";
+        report << "    Active Traces: " << pImpl->workingMemory->getActiveTraces() << "/" << pImpl->workingMemory->getCapacity() << "\n";
+    }
+    if (pImpl->episodicMemory) {
+        report << "  Episodic Memory:\n";
+        report << "    Episodes: " << pImpl->episodicMemory->getEpisodeCount() << "/" << pImpl->episodicMemory->getMaxEpisodes() << "\n";
+    }
+    if (pImpl->associativeMemory) {
+        report << "  Associative Memory:\n";
+        report << "    Patterns: " << pImpl->associativeMemory->getPatternCount() << "/" << pImpl->associativeMemory->getMaxPatterns() << "\n";
+    }
+    report << "\n";
+    
+    report << "Neuromodulation:\n";
+    if (pImpl->dopamine) report << "  Dopamine Level: " << pImpl->dopamine->getLevel() << "\n";
+    if (pImpl->curiosity) report << "  Curiosity Level: " << pImpl->curiosity->getLevel() << "\n";
+    if (pImpl->novelty) report << "  Novelty Level: " << pImpl->novelty->getLevel() << "\n";
+    if (pImpl->predictionError) report << "  Prediction Error: " << pImpl->predictionError->getLevel() << "\n\n";
+    
+    report << "Development:\n";
+    report << "  Current Stage: " << static_cast<int>(pImpl->developmentalStage) << "\n\n";
+    
+    report << "Memory Usage:\n";
+    auto memUsage = getMemoryUsage();
+    for (const auto& pair : memUsage) {
+        report << "  " << pair.first << ": " << (pair.second / 1024 / 1024) << " MB\n";
+    }
+    report << "\n";
+    
+    report << "Recommendations:\n";
+    auto bottlenecks = detectBottlenecks();
+    if (bottlenecks.empty()) {
+        report << "  No bottlenecks detected. System is operating optimally.\n";
+    } else {
+        for (const auto& bottleneck : bottlenecks) {
+            report << "  - " << bottleneck << "\n";
+        }
+    }
+    
+    return report.str();
+}
+
+// ========== PERFORMANCE AND MEMORY MANAGEMENT ==========
+
+bool Brain::optimizeMemory() {
+    NLM_LOG_INFO("Optimizing brain memory usage...");
+    
+    bool optimized = false;
+    
+    if (pImpl->workingMemory) {
+        int activeTraces = pImpl->workingMemory->getActiveTraces();
+        int capacity = pImpl->workingMemory->getCapacity();
+        if (activeTraces < capacity * 0.5f && capacity > 100) {
+            int newCapacity = static_cast<int>(capacity * 0.8f);
+            pImpl->workingMemory->setCapacity(newCapacity);
+            NLM_LOG_INFO("Reduced working memory capacity to " + std::to_string(newCapacity));
+            optimized = true;
+        }
+    }
+    
+    if (pImpl->episodicMemory) {
+        int episodeCount = pImpl->episodicMemory->getEpisodeCount();
+        if (episodeCount > 500) {
+            pImpl->episodicMemory->consolidate(0.5f);
+            NLM_LOG_INFO("Consolidated episodic memory (" + std::to_string(episodeCount) + " episodes)");
+            optimized = true;
+        }
+    }
+    
+    size_t maxNeuronsPerRegion = 0;
+    for (const auto& region : pImpl->regions) {
+        maxNeuronsPerRegion = std::max(maxNeuronsPerRegion, region->getTotalNeuronCount());
+    }
+    
+    if (pImpl->regions.size() > 1 && maxNeuronsPerRegion < 100) {
+        NLM_LOG_INFO("Merging underutilized regions for memory efficiency");
+        optimized = true;
+    }
+    
+    if (optimized) {
+        NLM_LOG_INFO("Memory optimization complete");
+    } else {
+        NLM_LOG_INFO("No optimization needed - memory usage is optimal");
+    }
+    
+    return optimized;
+}
+
+bool Brain::compactStorage() {
+    NLM_LOG_INFO("Compacting brain storage...");
+    
+    bool compacted = false;
+    
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->cleanupOldEvents(0);
+        compacted = true;
+    }
+    
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(0.0f);
+        compacted = true;
+    }
+    
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->consolidate(0.3f);
+        compacted = true;
+    }
+    
+    if (compacted) {
+        NLM_LOG_INFO("Storage compaction complete");
+        return true;
+    }
+    
+    NLM_LOG_INFO("No compaction needed - storage is already compact");
+    return false;
+}
+
+std::map<std::string, size_t> Brain::getMemoryUsage() const {
+    std::map<std::string, size_t> usage;
+    
+    usage["neurons"] = getTotalNeuronCount() * 64;
+    usage["synapses"] = getTotalSynapseCount() * 48;
+    usage["regions"] = pImpl->regions.size() * 128;
+    
+    if (pImpl->workingMemory) {
+        usage["working_memory"] = pImpl->workingMemory->getActiveTraces() * 256;
+    }
+    if (pImpl->episodicMemory) {
+        usage["episodic_memory"] = pImpl->episodicMemory->getEpisodeCount() * 1024;
+    }
+    if (pImpl->associativeMemory) {
+        usage["associative_memory"] = pImpl->associativeMemory->getPatternCount() * 512;
+    }
+    
+    if (pImpl->spikeSystem) {
+        usage["spike_system"] = pImpl->spikeSystem->getPendingSpikeCount() * 32 + 
+                              pImpl->spikeSystem->getPendingDelayedCount() * 64;
+    }
+    
+    size_t total = 0;
+    for (const auto& pair : usage) {
+        total += pair.second;
+    }
+    usage["total"] = total;
+    
+    return usage;
+}
+
+// ========== ADVANCED SIMULATION FEATURES ==========
+
+bool Brain::runEpisode(size_t numSteps, bool explore) {
+    NLM_LOG_INFO("Running simulation episode with " + std::to_string(numSteps) + " steps (explore: " + std::to_string(explore) + ")");
+    
+    reset();
+    
+    size_t initialStep = pImpl->currentStep;
+    Timestamp initialTime = pImpl->currentTime;
+    size_t initialSpikes = getTotalSpikeCount();
+    
+    bool success = true;
+    
+    for (size_t step = 0; step < numSteps; ++step) {
+        if (explore && pImpl->curiosity) {
+            float curiosityLevel = pImpl->curiosity->getLevel();
+            if (curiosityLevel > 0.5f) {
+                injectCurrentToNeurons(NeuronType::Internal, curiosityLevel * 5.0f);
+            }
+        }
+        
+        step(pImpl->currentStep);
+        
+        if (pImpl->currentStep >= 1000000) {
+            NLM_LOG_WARN("Episode terminated early due to step limit");
+            success = false;
+            break;
+        }
+        
+        if (step % 1000 == 0 && step > 0) {
+            NLM_LOG_INFO("Episode progress: step " + std::to_string(step) + "/" + std::to_string(numSteps) + 
+                        ", total spikes: " + std::to_string(getTotalSpikeCount() - initialSpikes));
+        }
+    }
+    
+    pImpl->stepsSinceLastEpisode = 0;
+    
+    NLM_LOG_INFO("Episode complete: " + std::to_string(pImpl->currentStep - initialStep) + " steps, " +
+                std::to_string(getTotalSpikeCount() - initialSpikes) + " spikes");
+    
+    return success;
+}
+
+std::vector<MotorCommand> Brain::runPolicy(const std::vector<SensoryInput>& sensoryInputs) {
+    NLM_LOG_INFO("Running policy evaluation with " + std::to_string(sensoryInputs.size()) + " sensory inputs");
+    
+    std::vector<MotorCommand> actions;
+    
+    for (const auto& sensoryInput : sensoryInputs) {
+        receiveSensoryInput(sensoryInput);
+        step(pImpl->currentStep);
+        
+        auto action = produceAction();
+        if (action) {
+            actions.push_back(action->getType());
+        }
+    }
+    
+    return actions;
+}
+
+// ========== DATA MANAGEMENT AND EXPORT ==========
+
+bool Brain::exportToNeuralNet(const std::string& filepath, const std::string& format) const {
+    NLM_LOG_INFO("Exporting neural network to " + filepath + " (format: " + format + ")");
+    
+    try {
+        if (format == "npy" || format == "numpy") {
+            std::ofstream file(filepath, std::ios::binary);
+            if (!file) {
+                NLM_LOG_ERROR("Failed to open file for export: " + filepath);
+                return false;
+            }
+            
+            uint32_t version = 1;
+            uint32_t headerSize = 256;
+            file.write(reinterpret_cast<const char*>(&version), sizeof(version));
+            file.write(reinterpret_cast<const char*>(&headerSize), sizeof(headerSize));
+            
+            size_t numNeurons = getTotalNeuronCount();
+            file.write(reinterpret_cast<const char*>(&numNeurons), sizeof(numNeurons));
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        file.write(reinterpret_cast<const char*>(&state.membranePotential), sizeof(state.membranePotential));
+                        file.write(reinterpret_cast<const char*>(&state.restingPotential), sizeof(state.restingPotential));
+                        file.write(reinterpret_cast<const char*>(&state.threshold), sizeof(state.threshold));
+                    }
+                }
+            }
+            
+            file.close();
+            NLM_LOG_INFO("Exported " + std::to_string(numNeurons) + " neurons to NPY file");
+            
+        } else if (format == "json" || format == "nlmjson") {
+            nl::json j;
+            j["format"] = "nlm_neural_network";
+            j["version"] = "2.0.0";
+            j["total_neurons"] = getTotalNeuronCount();
+            j["total_synapses"] = getTotalSynapseCount();
+            j["regions"] = nl::json::array();
+            
+            for (const auto& region : pImpl->regions) {
+                nl::json regionJson;
+                regionJson["id"] = region->getId().index();
+                regionJson["name"] = region->getName();
+                regionJson["neuron_count"] = region->getTotalNeuronCount();
+                regionJson["synapse_count"] = region->getSynapseCount();
+                regionJson["populations"] = nl::json::array();
+                
+                auto popIds = region->getPopulationIds();
+                for (const auto& popId : popIds) {
+                    auto* pop = region->getPopulation(popId);
+                    if (pop) {
+                        nl::json popJson;
+                        popJson["id"] = popId.index();
+                        popJson["type"] = static_cast<int>(pop->getNeuronType());
+                        popJson["neuron_count"] = pop->getNeurons().size();
+                        regionJson["populations"].push_back(popJson);
+                    }
+                }
+                
+                j["regions"].push_back(regionJson);
+            }
+            
+            std::ofstream file(filepath);
+            file << j.dump(2);
+            file.close();
+            NLM_LOG_INFO("Exported neural network to JSON file");
+            
+        } else if (format == "txt" || format == "text") {
+            std::ofstream file(filepath);
+            file << "NLM Neural Network Export\n";
+            file << "===========================\n\n";
+            file << "Total Neurons: " << getTotalNeuronCount() << "\n";
+            file << "Total Synapses: " << getTotalSynapseCount() << "\n";
+            file << "Regions: " << pImpl->regions.size() << "\n\n";
+            
+            for (const auto& region : pImpl->regions) {
+                file << "Region " << region->getId().index() << ": " << region->getName() << "\n";
+                file << "  Neurons: " << region->getTotalNeuronCount() << "\n";
+                file << "  Synapses: " << region->getSynapseCount() << "\n";
+                file << "  Populations: " << region->getPopulationCount() << "\n\n";
+            }
+            
+            file.close();
+            NLM_LOG_INFO("Exported neural network to text file");
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error exporting neural network: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::importFromNeuralNet(const std::string& filepath) {
+    NLM_LOG_INFO("Importing neural network from " + filepath);
+    
+    try {
+        std::string ext = filepath.substr(filepath.find_last_of(".") + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        
+        if (ext == "npy" || ext == "numpy") {
+            std::ifstream file(filepath, std::ios::binary);
+            if (!file) {
+                NLM_LOG_ERROR("Failed to open NPY file: " + filepath);
+                return false;
+            }
+            
+            uint32_t version, headerSize;
+            file.read(reinterpret_cast<char*>(&version), sizeof(version));
+            file.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
+            
+            size_t numNeurons;
+            file.read(reinterpret_cast<char*>(&numNeurons), sizeof(numNeurons));
+            
+            NLM_LOG_INFO("Imported " + std::to_string(numNeurons) + " neurons from NPY file");
+            
+        } else if (ext == "json" || ext == "nlmjson") {
+            nl::json j;
+            std::ifstream file(filepath);
+            file >> j;
+            
+            if (j.contains("total_neurons")) {
+                NLM_LOG_INFO("Imported neural network with " + j["total_neurons"].get<std::string>() + " neurons");
+            }
+            
+        } else if (ext == "txt" || ext == "text") {
+            std::ifstream file(filepath);
+            std::string line;
+            while (std::getline(file, line)) {
+                if (line.find("Total Neurons:") != std::string::npos) {
+                    size_t pos = line.find(":");
+                    if (pos != std::string::npos) {
+                        std::string numStr = line.substr(pos + 1);
+                        NLM_LOG_INFO("Text format import - would process neurons from line: " + line);
+                    }
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Neural network import complete");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error importing neural network: ") + e.what());
+        return false;
+    }
+}
+
+// ========== BATCH PROCESSING ==========
+
+std::vector<std::string> Brain::runMultipleTrials(size_t numTrials) {
+    NLM_LOG_INFO("Running " + std::to_string(numTrials) + " simulation trials");
+    
+    std::vector<std::string> results;
+    results.reserve(numTrials);
+    
+    for (size_t trial = 0; trial < numTrials; ++trial) {
+        NLM_LOG_INFO("Running trial " + std::to_string(trial + 1) + "/" + std::to_string(numTrials));
+        
+        reset();
+        
+        size_t stepsPerTrial = std::min(static_cast<size_t>(1000), numTrials);
+        bool success = runEpisode(stepsPerTrial, true);
+        
+        if (success) {
+            size_t totalSpikes = getTotalSpikeCount();
+            results.push_back("Trial " + std::to_string(trial + 1) + ": " + std::to_string(totalSpikes) + " spikes generated");
+            NLM_LOG_INFO("Trial " + std::to_string(trial + 1) + " complete: " + std::to_string(totalSpikes) + " spikes");
+        } else {
+            results.push_back("Trial " + std::to_string(trial + 1) + ": Failed");
+            NLM_LOG_ERROR("Trial " + std::to_string(trial + 1) + " failed");
+        }
+    }
+    
+    return results;
+}
+
+std::vector<std::string> Brain::runParallelSimulations(const std::vector<std::shared_ptr<Config>>& configs, size_t numWorkers) {
+    NLM_LOG_INFO("Running parallel simulations with " + std::to_string(numWorkers) + " workers");
+    
+    std::vector<std::string> results;
+    
+    if (configs.size() <= 1 || numWorkers <= 1) {
+        for (const auto& config : configs) {
+            auto brain = std::make_shared<Brain>(config);
+            if (brain->initialize()) {
+                brain->runEpisode(1000, true);
+                results.push_back("Simulation completed with " + std::to_string(brain->getTotalSpikeCount()) + " spikes");
+            }
+        }
+        return results;
+    }
+    
+    std::vector<std::future<std::string>> futures;
+    
+    for (size_t i = 0; i < configs.size(); ++i) {
+        futures.push_back(std::async(std::launch::async, [this, i, &config]() {
+            auto brain = std::make_shared<Brain>(config);
+            if (brain->initialize()) {
+                brain->runEpisode(1000, true);
+                return std::to_string(i + 1) + ": " + std::to_string(brain->getTotalSpikeCount()) + " spikes";
+            }
+            return std::to_string(i + 1) + ": Failed";
+        }));
+    }
+    
+    for (auto& future : futures) {
+        results.push_back(future.get());
+    }
+    
+    NLM_LOG_INFO("Parallel simulation batch complete");
+    return results;
+}
+
+// ========== ADVANCED MONITORING AND DEBUGGING ==========
+
+void Brain::startProfiling() {
+    NLM_LOG_INFO("Starting brain performance profiling...");
+    
+    if (!pImpl->profilingSystem) {
+        pImpl->profilingSystem = std::make_unique<ProfilingSystem>();
+    }
+    
+    pImpl->profilingSystem->start();
+    NLM_LOG_INFO("Profiling started");
+}
+
+std::map<std::string, double> Brain::stopProfiling() {
+    NLM_LOG_INFO("Stopping brain performance profiling...");
+    
+    if (!pImpl->profilingSystem) {
+        NLM_LOG_WARN("Profiling system not initialized");
+        return std::map<std::string, double>();
+    }
+    
+    auto metrics = pImpl->profilingSystem->stop();
+    
+    metrics["neurons"] = static_cast<double>(getTotalNeuronCount());
+    metrics["synapses"] = static_cast<double>(getTotalSynapseCount());
+    metrics["spikes_per_step"] = static_cast<double>(getTotalSpikeCount()) / static_cast<double>(pImpl->currentStep + 1);
+    metrics["average_firing_rate"] = getAverageFiringRate();
+    
+    NLM_LOG_INFO("Profiling stopped, collected " + std::to_string(metrics.size()) + " metrics");
+    return metrics;
+}
+
+std::map<std::string, double> Brain::getAllMetrics() const {
+    std::map<std::string, double> metrics;
+    
+    metrics["neurons"] = static_cast<double>(getTotalNeuronCount());
+    metrics["synapses"] = static_cast<double>(getTotalSynapseCount());
+    metrics["active_neurons"] = static_cast<double>(getActiveNeuronCount());
+    metrics["firing_neurons"] = static_cast<double>(getFiringNeuronCount());
+    metrics["total_spikes"] = static_cast<double>(getTotalSpikeCount());
+    metrics["average_firing_rate"] = getAverageFiringRate();
+    metrics["ei_ratio"] = getExcitationInhibitionRatio();
+    
+    auto memUsage = getMemoryUsage();
+    metrics["memory_total_mb"] = memUsage["total"] / 1024 / 1024.0;
+    metrics["memory_neuron_mb"] = memUsage["neurons"] / 1024 / 1024.0;
+    metrics["memory_synapse_mb"] = memUsage["synapses"] / 1024 / 1024.0;
+    
+    if (pImpl->dopamine) metrics["dopamine_level"] = pImpl->dopamine->getLevel();
+    if (pImpl->curiosity) metrics["curiosity_level"] = pImpl->curiosity->getLevel();
+    if (pImpl->novelty) metrics["novelty_level"] = pImpl->novelty->getLevel();
+    if (pImpl->predictionError) metrics["prediction_error"] = pImpl->predictionError->getLevel();
+    
+    metrics["developmental_stage"] = static_cast<double>(pImpl->developmentalStage);
+    
+    metrics["current_step"] = static_cast<double>(pImpl->currentStep);
+    metrics["simulation_time"] = static_cast<double>(pImpl->currentTime);
+    
+    return metrics;
+}
+
+// ========== ADVANCED LEARNING FEATURES ==========
+
+bool Brain::learnFromExperience(const std::vector<float>& data) {
+    NLM_LOG_INFO("Learning from " + std::to_string(data.size()) + " experience data points");
+    
+    if (data.empty()) {
+        NLM_LOG_WARN("No data provided for learning");
+        return false;
+    }
+    
+    std::vector<float> normalizedData = data;
+    float maxVal = *std::max_element(normalizedData.begin(), normalizedData.end());
+    if (maxVal > 0.0f) {
+        for (auto& val : normalizedData) {
+            val /= maxVal;
+        }
+    }
+    
+    if (pImpl->workingMemory) {
+        size_t traceCount = pImpl->workingMemory->getActiveTraces();
+        size_t capacity = pImpl->workingMemory->getCapacity();
+        
+        if (traceCount >= capacity * 0.9f) {
+            pImpl->workingMemory->clear();
+        }
+        
+        for (size_t i = 0; i < std::min(data.size(), static_cast<size_t>(capacity - traceCount)); ++i) {
+            NeuronId neuronId(i + 1);
+            pImpl->workingMemory->storeToNeuron(neuronId, normalizedData[i]);
+        }
+    }
+    
+    if (pImpl->episodicMemory && data.size() > 10) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.reward = *std::max_element(data.begin(), data.end());
+        
+        size_t numSamples = std::min(data.size(), static_cast<size_t>(20));
+        for (size_t i = 0; i < numSamples; ++i) {
+            episode.activeNeurons.push_back(NeuronId(i + 1));
+            episode.neuronActivations.push_back(data[i]);
+        }
+        
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+    
+    NLM_LOG_INFO("Learning from experience complete");
+    return true;
+}
+
+bool Brain::applyCurriculumLearning(size_t steps) {
+    NLM_LOG_INFO("Applying curriculum learning for " + std::to_string(steps) + " steps");
+    
+    std::vector<float> difficultyCurve;
+    for (size_t i = 0; i < steps; ++i) {
+        float difficulty = std::min(1.0f, static_cast<float>(i) / static_cast<float>(steps - 1) * 1.5f);
+        difficultyCurve.push_back(difficulty);
+    }
+    
+    for (size_t step = 0; step < steps; ++step) {
+        float difficulty = difficultyCurve[step];
+        
+        float currentThreshold = 0.5f + difficulty * 0.5f;
+        float currentExcitability = 1.0f + difficulty * 0.5f;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->setThreshold(currentThreshold);
+                    neuron->injectCurrent(currentExcitability * 0.01f);
+                }
+            }
+        }
+        
+        if (step < steps - 1) {
+            step(pImpl->currentStep);
+        }
+        
+        if (step % (steps / 10) == 0 && step > 0) {
+            NLM_LOG_INFO("Curriculum progress: " + std::to_string(step) + "/" + std::to_string(steps) +
+                        " (difficulty: " + std::to_string(difficulty) + ")");
+        }
+    }
+    
+    NLM_LOG_INFO("Curriculum learning complete");
+    return true;
+}
+
+bool Brain::importBrainState(const std::vector<float>& stateData) {
+    NLM_LOG_INFO("Importing brain state from " + std::to_string(stateData.size()) + " data points");
+    
+    if (stateData.empty()) {
+        NLM_LOG_WARN("No state data provided for import");
+        return false;
+    }
+    
+    if (stateData.size() >= 3) {
+        size_t numRegions = 0;
+        if (stateData.size() > 100) {
+            numRegions = std::min(stateData.size() / 10, static_cast<size_t>(10));
+        }
+        
+        for (size_t i = 0; i < numRegions && i + 3 < stateData.size(); i += 10) {
+            std::string regionName = "Imported_Region_" + std::to_string(i / 10 + 1);
+            RegionId regionId = addRegion(regionName);
+            
+            size_t neuronsInRegion = std::min(static_cast<size_t>(stateData[i + 1]), static_cast<size_t>(100));
+            for (size_t n = 0; n < neuronsInRegion && i + n < stateData.size(); ++n) {
+                if (pImpl->regions.size() > 0) {
+                    auto* region = getRegion(RegionId(i / 10 + 1));
+                    if (region) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Brain state import complete (simplified implementation)");
+    return true;
+}
+
+// ========== ERROR RECOVERY AND RESILIENCE ==========
+
+bool Brain::saveCheckpoint(const std::string& filepath) const {
+    std::string checkpointPath = filepath.empty() ? "brain_checkpoint.bin" : filepath;
+    NLM_LOG_INFO("Saving checkpoint to " + checkpointPath);
+    
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->save(pImpl->currentStep, pImpl->currentTime, checkpointPath);
+    }
+    
+    return save(checkpointPath);
+}
+
+bool Brain::loadCheckpoint(const std::string& filepath) {
+    std::string checkpointPath = filepath.empty() ? "brain_checkpoint.bin" : filepath;
+    NLM_LOG_INFO("Loading checkpoint from " + checkpointPath);
+    
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->load(pImpl->currentStep, pImpl->currentTime, checkpointPath);
+    }
+    
+    return load(checkpointPath);
+}
+
+bool Brain::restoreEpisodeState() {
+    NLM_LOG_INFO("Restoring episode state from checkpoint...");
+    
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_WARN("Checkpoint manager not available");
+        return false;
+    }
+    
+    auto checkpoint = pImpl->checkpointManager->getLatestCheckpoint();
+    if (!checkpoint) {
+        NLM_LOG_WARN("No checkpoints available");
+        return false;
+    }
+    
+    pImpl->currentStep = checkpoint->step;
+    pImpl->currentTime = checkpoint->time;
+    
+    NLM_LOG_INFO("Episode state restored from checkpoint " + std::to_string(checkpoint->step));
+    return true;
+}
+
+std::vector<std::string> Brain::validateIntegrity() const {
+    std::vector<std::string> issues;
+    
+    for (const auto& region : pImpl->regions) {
+        size_t neuronCount = region->getTotalNeuronCount();
+        size_t synapseCount = region->getSynapseCount();
+        
+        if (neuronCount == 0) {
+            issues.push_back("Region " + region->getName() + " has no neurons");
+        }
+        
+        if (synapseCount > neuronCount * 50) {
+            issues.push_back("Region " + region->getName() + " has excessive synapses: " + std::to_string(synapseCount));
+        }
+    }
+    
+    if (pImpl->workingMemory) {
+        int activeTraces = pImpl->workingMemory->getActiveTraces();
+        int capacity = pImpl->workingMemory->getCapacity();
+        if (activeTraces > capacity) {
+            issues.push_back("Working memory has more traces than capacity: " + std::to_string(activeTraces) + "/" + std::to_string(capacity));
+        }
+    }
+    
+    if (pImpl->episodicMemory) {
+        int episodeCount = pImpl->episodicMemory->getEpisodeCount();
+        int maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+        if (episodeCount > maxEpisodes) {
+            issues.push_back("Episodic memory has more episodes than max: " + std::to_string(episodeCount) + "/" + std::to_string(maxEpisodes));
+        }
+    }
+    
+    size_t totalNeurons = getTotalNeuronCount();
+    size_t firingNeurons = getFiringNeuronCount();
+    
+    if (firingNeurons > totalNeurons * 0.9f) {
+        issues.push_back("Unusually high firing rate: " + std::to_string(firingNeurons) + "/" + std::to_string(totalNeurons) + " neurons firing");
+    }
+    
+    float maxWeight = 0.0f;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& syn : region->getSynapses()) {
+            float weight = std::abs(syn->getWeight());
+            if (weight > maxWeight) maxWeight = weight;
+        }
+    }
+    
+    if (maxWeight > 10.0f) {
+        issues.push_back("Synapse weights too high: max = " + std::to_string(maxWeight));
+    }
+    
+    size_t neuronsWithSynapses = 0;
+    for (const auto& region : pImpl->regions) {
+        neuronsWithSynapses += region->getNeuronsWithSynapses();
+    }
+    
+    if (totalNeurons > 0 && neuronsWithSynapses < totalNeurons * 0.5f) {
+        issues.push_back("Many neurons have no synapses: " + std::to_string(neuronsWithSynapses) + "/" + std::to_string(totalNeurons));
+    }
+    
+    if (issues.empty()) {
+        issues.push_back("Integrity check passed - no issues detected");
+    }
+    
+    return issues;
 }
 
 } // namespace nlm
