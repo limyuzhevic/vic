@@ -112,6 +112,80 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cache for motor activity calculations (performance optimization)
+    mutable float cachedForwardActivity_;
+    mutable float cachedBackwardActivity_;
+    mutable float cachedLeftActivity_;
+    mutable float cachedRightActivity_;
+    mutable float cachedInteractActivity_;
+    mutable float cachedWaitActivity_;
+    mutable bool cachedActivityValid_;
+    
+    // Statistics tracking
+    uint64_t totalStepsProcessed_;
+    uint64_t sensoryInputsProcessed_;
+    uint64_t motorCommandsGenerated_;
+    float cumulativeReward_;
+    size_t episodeCount_;
+    
+    // Performance optimization flags
+    bool enableActivityCaching_;
+    bool enableStatisticsTracking_;
+    
+    // Configuration for advanced users
+    float activityThreshold_;
+    float curiosityThreshold_;
+    float noveltyThreshold_;
+    
+    // Debug and development support
+    std::vector<std::string> debugLog_;
+    size_t maxDebugLogSize_;
+    
+    // Development-specific state
+    float developmentalPlasticityRate_;
+    float maturationProgress_;
+    float synapticGrowthRate_;
+    
+    // Environmental adaptation
+    float adaptationRate_;
+    float environmentalStability_;
+    float habitatComplexity_;
+    
+    // Learning parameters
+    float learningRate_;
+    float explorationRate_;
+    float exploitationRate_;
+    
+    // Social learning
+    bool enableSocialLearning_;
+    float socialLearningRate_;
+    std::vector<float> socialInfluence_;
+    
+    // Stress and recovery
+    float stressLevel_;
+    float recoveryRate_;
+    float stressThreshold_;
+    
+    // Sleep and consolidation
+    bool isSleeping_;
+    float sleepDebt_;
+    float consolidationEfficiency_;
+    
+    // Meta-learning
+    bool enableMetaLearning_;
+    float metaLearningRate_;
+    std::vector<float> metaFeatureBuffer_;
+    
+    // Energy management
+    float energyBudget_;
+    float energyConsumptionRate_;
+    float energyRegenerationRate_;
+    
+    // Evolution
+    float mutationRate_;
+    float selectionPressure_;
+    float populationDiversity_;
 };
 
 } // namespace nlm

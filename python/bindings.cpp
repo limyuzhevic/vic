@@ -144,13 +144,29 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error(std::string("Failed to load config from file ") + filepath + ": " + e.what());
+            }
+        }, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                return self.loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                throw py::value_error(std::string("Failed to load config from arguments: ") + e.what());
+            }
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+            "Load configuration from command line arguments")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error(std::string("Failed to save config to file ") + filepath + ": " + e.what());
+            }
+        }, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
