@@ -598,6 +598,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
+    // Store sensory input for prediction error computation
+    pImpl->lastSensoryInput = input;
+    
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
@@ -1021,6 +1024,102 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
+}
+
+// ========== PREDICTION INTEGRATION ==========
+
+std::unique_ptr<SensoryInput> Brain::predictNextState() {
+    if (pImpl->predictionSystem) {
+        // Get current sensory state from working memory or external sources
+        // For now, use working memory patterns as prediction input
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Create internal signal for prediction
+        auto internalSignals = std::make_unique<InternalSignals>();
+        internalSignals->clearSignals();
+        
+        // Convert neural activity to prediction input
+        for (size_t i = 0; i < currentState.size(); ++i) {
+            internalSignals->addSignal(currentState[i]);
+        }
+        
+        // Use prediction system to predict next state
+        return pImpl->predictionSystem->predictNextState(*internalSignals);
+    }
+    return nullptr;
+}
+
+void Brain::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->updatePredictions(predicted, actual);
+    }
+}
+
+float Brain::getPredictionError() const {
+    if (pImpl->predictionSystem) {
+        return pImpl->predictionSystem->getPredictionError();
+    }
+    return 0.0f;
+}
+
+float Brain::getPredictionConfidence() const {
+    if (pImpl->predictionSystem) {
+        return pImpl->predictionSystem->getConfidence();
+    }
+    return 0.0f;
+}
+
+const std::vector<float>& Brain::getPredictionErrorHistory() const {
+    if (pImpl->predictionSystem) {
+        return pImpl->predictionSystem->getErrorHistory();
+    }
+    static const std::vector<float> empty;
+    return empty;
+}
+
+void Brain::clearPredictionHistory() {
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->clearHistory();
+    }
+}
+
+void Brain::trainPredictionModel(const SensoryInput& observation) {
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->train(observation);
+    }
+}
+
+Brain::PredictionStats Brain::getPredictionStats() const {
+    PredictionStats stats;
+    stats.averageError = 0.0f;
+    stats.confidence = 0.0f;
+    stats.predictionCount = 0;
+    stats.errorCount = 0;
+    
+    if (pImpl->predictionSystem) {
+        const auto& errorHistory = pImpl->predictionSystem->getErrorHistory();
+        
+        if (!errorHistory.empty()) {
+            float sumError = 0.0f;
+            for (float error : errorHistory) {
+                sumError += error;
+            }
+            stats.averageError = sumError / errorHistory.size();
+            stats.predictionCount = errorHistory.size();
+            
+            // Count significant errors (greater than threshold)
+            float errorThreshold = 0.5f;
+            stats.errorCount = std::count_if(errorHistory.begin(), errorHistory.end(),
+                                          [errorThreshold](float error) { return error > errorThreshold; });
+        }
+        
+        stats.confidence = pImpl->predictionSystem->getConfidence();
+    }
+    
+    return stats;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

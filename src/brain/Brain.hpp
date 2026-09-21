@@ -153,6 +153,37 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
+    // Predict next state based on current neural activity
+    std::unique_ptr<class SensoryInput> predictNextState();
+    
+    // Update predictions with actual observation and compute prediction error
+    void updatePredictions(const class SensoryInput& predicted, const class SensoryInput& actual);
+    
+    // Get current prediction error
+    float getPredictionError() const;
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const;
+    
+    // Get prediction error history
+    const std::vector<float>& getPredictionErrorHistory() const;
+    
+    // Clear prediction history
+    void clearPredictionHistory();
+    
+    // Train prediction model with new observations
+    void trainPredictionModel(const class SensoryInput& observation);
+    
+    // Get prediction statistics
+    struct PredictionStats {
+        float averageError;
+        float confidence;
+        size_t predictionCount;
+        size_t errorCount;
+    };
+    
+    PredictionStats getPredictionStats() const;
+    
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
