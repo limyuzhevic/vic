@@ -32,6 +32,8 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
+        .def(py::init<const NeuronId&>())  // Copy constructor
+        .def(py::init<NeuronId&&>());       // Move constructor
         .def_readwrite("value", &NeuronId::value)
         .def("index", &NeuronId::index)
         .def("__eq__", &NeuronId::operator==)
