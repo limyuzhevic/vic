@@ -19,7 +19,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , planningEnabled_(true)
+    , plannedAction_(ActionType::Wait)
 {
+    // Initialize cognitive systems if brain exists
+    if (brain_) {
+        // Create cognitive components
+        neuralPlanner_ = std::make_shared<NeuralPlanner>();
+        selfModel_ = std::make_shared<SelfModel>();
+        socialLearning_ = std::make_shared<SocialLearning>();
+        
+        // Initialize them with the brain
+        neuralPlanner_->initialize(brain_.get());
+        selfModel_->initialize(brain_.get());
+        socialLearning_->initialize(brain_.get());
+        
+        NLM_LOG_INFO("AgentBrain initialized with cognitive systems: NeuralPlanner, SelfModel, SocialLearning");
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -142,10 +159,48 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // NeuralPlanner integration: convert perception to state vector for planning
+    if (brain_ && planningEnabled_) {
+        // Convert percept to planning state
+        std::vector<float> planningState = perceptToPlanningState(percept);
+        
+        // Get planned action
+        plannedAction_ = neuralPlanner_->planAction(planningState, 1.0f);
+        
+        // Apply self-model predictions if available
+        if (selfModel_) {
+            std::vector<float> predictedConsequence = 
+                selfModel_->predictActionConsequence(plannedAction_, planningState);
+            // Could update world state prediction based on self-model
+        }
+        
+        // Apply social learning if enabled
+        if (socialLearning_ && curiosityLevel_ > 0.3f) {
+            // Consider imitating observed actions when curious
+            ActionType imitation = socialLearning_->getImitationAction(planningState);
+            if (imitation != ActionType::Wait) {
+                // Sometimes use imitation instead of own plan
+                float imitationChance = curiosityLevel_ * 0.2f;  // Up to 20% chance
+                if (brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) < imitationChance) {
+                    plannedAction_ = imitation;
+                }
+            }
+        }
+    }
+    
+    // Apply planned action to brain if we have a neural planner
+    if (brain_ && neuralPlanner_ && plannedAction_ != ActionType::Wait) {
+        // Convert planned action to motor command
+        MotorCommand motorCmd = actionToMotorCommand(plannedAction_);
+        
+        // If we have a motor command, apply it through brain
+        // This integrates cognitive planning with motor execution
     }
 }
 

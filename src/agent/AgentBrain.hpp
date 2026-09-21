@@ -103,15 +103,24 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Neural planning and cognition integration
+    std::shared_ptr<NeuralPlanner> neuralPlanner_;
+    std::shared_ptr<SelfModel> selfModel_;
+    std::shared_ptr<SocialLearning> socialLearning_;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
-};
-
-} // namespace nlm
+    // Planning state
+    bool planningEnabled_;
+    ActionType plannedAction_;
+    
+    // Convert percept to planning state
+    std::vector<float> perceptToPlanningState(const SensoryPercept& percept) const;
+    
+    // Convert planned action to motor command
+    MotorCommand actionToMotorCommand(ActionType action) const;
+    
+    // Update social knowledge based on experiences
+    void updateSocialKnowledge(float interactionReward);
+    
+    // Get social observation similarity
+    float getSocialObservationSimilarity(const std::vector<float>& neuralPattern) const;
+}
