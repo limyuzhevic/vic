@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -19,9 +21,17 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
     
+    // Try YAML next
+    if (loadFromYAML(filepath)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +65,126 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json json;
+        file >> json;
+        
+        for (const auto& [key, value] : json.items()) {
+            // Handle different JSON types
+            if (value.is_string()) {
+                set(key, value.get<std::string>(), ConfigSource::File);
+            } else if (value.is_number_integer()) {
+                set(key, value.get<int64_t>(), ConfigSource::File);
+            } else if (value.is_number_float()) {
+                set(key, value.get<double>(), ConfigSource::File);
+            } else if (value.is_boolean()) {
+                set(key, value.get<bool>(), ConfigSource::File);
+            } else if (value.is_array()) {
+                // Handle arrays - determine element type
+                if (!value.empty()) {
+                    if (value[0].is_string()) {
+                        std::vector<std::string> strArray;
+                        for (const auto& item : value) {
+                            strArray.push_back(item.get<std::string>());
+                        }
+                        set(key, ConfigValue(strArray), ConfigSource::File);
+                    } else if (value[0].is_number_integer()) {
+                        std::vector<int64_t> intArray;
+                        for (const auto& item : value) {
+                            intArray.push_back(item.get<int64_t>());
+                        }
+                        set(key, ConfigValue(intArray), ConfigSource::File);
+                    } else if (value[0].is_number_float()) {
+                        std::vector<double> floatArray;
+                        for (const auto& item : value) {
+                            floatArray.push_back(item.get<double>());
+                        }
+                        set(key, ConfigValue(floatArray), ConfigSource::File);
+                    }
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // JSON parsing failed
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        for (const auto& node : doc) {
+            std::string key = node.first.as<std::string>();
+            
+            // Determine YAML type and handle appropriately
+            if (node.second.IsScalar()) {
+                // Get scalar type
+                YAML::NodeType type = node.second.Type();
+                if (type == YAML::NodeType::SCALAR) {
+                    std::string value = node.second.as<std::string>();
+                    // Try to convert to numeric
+                    try {
+                        if (value.find('.') != std::string::npos) {
+                            double num = std::stod(value);
+                            set(key, num, ConfigSource::File);
+                        } else {
+                            int64_t num = std::stoll(value);
+                            set(key, num, ConfigSource::File);
+                        }
+                    } catch (...) {
+                        // Not a number, store as string
+                        set(key, value, ConfigSource::File);
+                    }
+                    // Handle boolean
+                    if (value == "true" || value == "false") {
+                        set(key, value == "true", ConfigSource::File);
+                    }
+                }
+            } else if (node.second.IsSequence()) {
+                // Handle arrays - determine element type
+                YAML::NodeType childType = YAML::NodeType::NONE;
+                if (!node.second.empty()) {
+                    childType = node.second[0].Type();
+                }
+                
+                if (childType == YAML::NodeType::SCALAR) {
+                    std::vector<std::string> array;
+                    for (const auto& item : node.second) {
+                        array.push_back(item.as<std::string>());
+                    }
+                    set(key, ConfigValue(array), ConfigSource::File);
+                } else if (childType == YAML::NodeType::INT) {
+                    std::vector<int64_t> array;
+                    for (const auto& item : node.second) {
+                        array.push_back(item.as<int64_t>());
+                    }
+                    set(key, ConfigValue(array), ConfigSource::File);
+                } else if (childType == YAML::NodeType::DOUBLE) {
+                    std::vector<double> array;
+                    for (const auto& item : node.second) {
+                        array.push_back(item.as<double>());
+                    }
+                    set(key, ConfigValue(array), ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // YAML parsing failed
+        return false;
+    }
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -86,7 +216,42 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Save the actual value based on its type
+        std::visit([&file](const auto& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else {
+                // Handle numeric types
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
