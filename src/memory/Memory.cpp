@@ -17,14 +17,31 @@ WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
+    
+    // Input validation
+    if (!neuron) {
+        NLM_LOG_ERROR("Cannot store invalid neuron ID in working memory");
+        return;
+    }
+    
+    // Update existing entry
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
+            NLM_LOG_DEBUG("Updated working memory entry for neuron " + std::to_string(neuron.getId()));
             return;
         }
     }
+    
+    // Add new entry if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+        NLM_LOG_DEBUG("Added new working memory entry for neuron " + std::to_string(neuron.getId()));
+    } else {
+        // Simple capacity management: discard oldest
+        pImpl->items.erase(pImpl->items.begin());
+        pImpl->items.emplace_back(neuron, value);
+        NLM_LOG_WARNING("Working memory full, discarded oldest entry");
     }
 }
 
@@ -108,7 +125,18 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // TODO PHASE 2: Implement real consolidation based on relevance
+    // For now, simple threshold-based cleanup
+    if (relevanceThreshold <= 0.0f) return;
+    
+    // Filter episodes by relevance - simpler implementation
+    // In real implementation, would use more sophisticated relevance scoring
+    std::vector<EpisodicMemoryItem> relevantEpisodes;
+    relevantEpisodes.reserve(pImpl->episodes.size() * relevanceThreshold);
+    
+    // This is a placeholder implementation
+    // Phase 2 should implement proper consolidation algorithms
+    // including memory aging, strengthening weak memories, pruning irrelevant ones
 }
 
 // Semantic Memory Implementation

@@ -304,6 +304,22 @@ void Brain::step(SimulationStep currentStep) {
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
+    // Input validation
+    if (currentStep < 0) {
+        NLM_LOG_ERROR("Step number cannot be negative: " + std::to_string(currentStep));
+        return;
+    }
+    
+    if (currentTime < 0.0) {
+        NLM_LOG_ERROR("Time cannot be negative: " + std::to_string(currentTime));
+        return;
+    }
+    
+    if (pImpl->regions.empty()) {
+        NLM_LOG_ERROR("Brain not properly initialized - no regions available");
+        return;
+    }
+    
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
@@ -334,8 +350,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_ERROR("Null region found in regions vector");
+            continue;
+        }
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_ERROR("Null population found in region");
+                continue;
+            }
+            
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) {
+                    NLM_LOG_ERROR("Null neuron found in population");
+                    continue;
+                }
+                
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -343,8 +374,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) continue;
+            
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) continue;
+                
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -359,12 +396,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        if (syn) {
+                            syn->recordPostSpike(currentTime);
+                        }
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
+                        if (!syn) continue;
+                        
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
@@ -426,8 +467,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
+            if (!region) continue;
+            
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;
+                
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) continue;
+                    
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
                     float excitabilityMod = dopamineLevel * 0.5f;
@@ -447,7 +494,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
+        if (!region) continue;
+        
         for (auto& syn : region->getSynapses()) {
+            if (!syn) continue;
+            
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -490,8 +541,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
+                if (!region) continue;
+                
                 for (auto& pop : region->getPopulations()) {
+                    if (!pop) continue;
+                    
                     for (auto* neuron : pop->getNeurons()) {
+                        if (!neuron) continue;
+                        
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());

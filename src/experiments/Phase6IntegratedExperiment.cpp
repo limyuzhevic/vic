@@ -62,7 +62,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        SensoryPercept percept = world.observe(const_cast<NeuralRegion*>(agent.getBrain()->getRegions()[0].get()));
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +74,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(const_cast<NeuralRegion*>(agent.getBrain()->getRegions()[0].get()), cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(const_cast<NeuralRegion*>(agent.getBrain()->getRegions()[0].get()));
         totalReward += reward;
         
         // Apply reward modulation
@@ -172,11 +172,6 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         NLM_LOG_ERROR("Brain initialization failed");
         return false;
     }
-    
-    bool success = true;
-    
-    // Test 1: Memory systems exist and are connected
-    if (brain->getWorkingMemory() != nullptr) {
         NLM_LOG_INFO("[PASS] Working memory is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
