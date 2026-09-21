@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <typeinfo>
 
 namespace nlm {
 
@@ -199,17 +200,42 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+// Type-specific getters
+int Config::getInt(const std::string& key, int defaultValue) const {
+    auto val = get<int>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+double Config::getDouble(const std::string& key, double defaultValue) const {
+    auto val = get<double>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+bool Config::getBool(const std::string& key, bool defaultValue) const {
+    auto val = get<bool>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+std::string Config::getString(const std::string& key, const std::string& defaultValue) const {
+    auto val = get<std::string>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// Type-specific setters
+void Config::setInt(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setDouble(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setBool(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setString(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

@@ -64,9 +64,15 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values (type-specific convenience methods)
     template<typename T>
     std::optional<T> get(const std::string& key) const;
+    
+    // Type-specific getters with direct return (more Pythonic)
+    int getInt(const std::string& key, int defaultValue = 0) const;
+    double getDouble(const std::string& key, double defaultValue = 0.0) const;
+    bool getBool(const std::string& key, bool defaultValue = false) const;
+    std::string getString(const std::string& key, const std::string& defaultValue = "") const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
@@ -77,6 +83,12 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Type-specific setters (more Pythonic)
+    void setInt(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setDouble(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setBool(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
