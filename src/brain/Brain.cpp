@@ -56,6 +56,12 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Phase 2: ADVANCED PLASTICITY SYSTEMS
+    std::unique_ptr<AntiHebbianRule> antiHebbian;
+    std::unique_ptr<BCMRule> bcm;
+    std::unique_ptr<RewardModulatedSTDP> rstdp;
+    std::unique_ptr<TripletSTDP> tripletSTDP;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -100,11 +106,43 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        // Initialize advanced plasticity systems
+        antiHebbian = std::make_unique<AntiHebbianRule>();
+        bcm = std::make_unique<BCMRule>();
+        rstdp = std::make_unique<RewardModulatedSTDP>();
+        tripletSTDP = std::make_unique<TripletSTDP>();
+        
+        // Configure advanced plasticity parameters
+        // Anti-Hebbian
+        antiHebbian->setLearningRate(0.005f);
+        
+        // BCM rule
+        bcm->setLearningRate(0.01f);
+        bcm->setThreshold(1.5f);
+        bcm->setTimeConstant(200.0f);
+        
+        // Reward-modulated STDP
+        rstdp->setModulationStrength(0.5f);
+        rstdp->setRewardBaseline(0.0f);
+        rstdp->setEligibilityTraceDecay(0.95f);
+        
+        // Triplet STDP
+        tripletSTDP->setTripletPotentiation(0.02f);
+        tripletSTDP->setTripletDepression(0.015f);
+        tripletSTDP->setPotentiationTraceTimeConstant(200.0f);
+        tripletSTDP->setDepressionTraceTimeConstant(200.0f);
+        
+        // Configure legacy plasticity for backward compatibility
+        float ltpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = pImpl->config->getOr<float>("stdp_tau", 20.0f);
+        pImpl->stdp->configure(ltpWeight, ltdWeight, tau);
+        
+        // Configure structural plasticity
+        float synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+        pImpl->structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        pImpl->structuralPlasticity->setPruningRate(pruningRate);
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         

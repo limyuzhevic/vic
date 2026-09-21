@@ -1,0 +1,68 @@
+# Build directories
+build/
+build-*
+
+# Compiled binaries
+*.out
+nlm
+nlm_phase3_demo
+nlm_phase4_demo
+nlm_phase6_demo
+nlm_phase6_integrated_experiment
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+*.eggs
+build/
+
+# C++ build artifacts
+*.o
+*.obj
+*.so
+*.dylib
+*.a
+*.lib
+
+# Logs
+*.log
+logs/
+
+# Config files
+to = "configs/default.cfg"
+*.cfg
+*.json
+!configs/default.cfg
+
+# Core dump files
+core*
+
+# Temporary files
+*~
+*.bak
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation build files
+*.html
+*.css
+*.js
+
+# Testing artifacts
+test_output/
+test_results/

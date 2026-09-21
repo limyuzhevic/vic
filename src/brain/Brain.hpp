@@ -3,9 +3,10 @@
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/AntiHebbian.hpp"
+#include "../plasticity/BCM.hpp"
+#include "../plasticity/RewardModulatedSTDP.hpp"
+#include "../plasticity/TripletSTDP.hpp"
 #include <memory>
 #include <string>
 
@@ -84,10 +85,19 @@ public:
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
     
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    // ========== ADVANCED PLASTICITY ==========
+
+    // Anti-Hebbian plasticity (neurons that fire together, weaken together)
+    AntiHebbianRule* getAntiHebbian();
+    
+    // BCM (Bienenstock-Cooper-Munro) rule
+    BCMRule* getBCM();
+    
+    // Reward-modulated STDP (R-STDP)
+    RewardModulatedSTDP* getRSTDP();
+    
+    // Triplet STDP with complex spike timing dependencies
+    TripletSTDP* getTripletSTDP();
     
     // Statistics
     float getExcitationInhibitionRatio() const;
