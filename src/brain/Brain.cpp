@@ -404,6 +404,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply working memory to brain state for integration
+        std::vector<float> wmContent = pImpl->workingMemory->retrieve();
+        if (!wmContent.empty()) {
+            // Log working memory activity for debugging
+            NLM_LOG_INFO("Working memory active traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+            NLM_LOG_INFO("Working memory capacity: " + std::to_string(pImpl->workingMemory->getCapacity()));
+            NLM_LOG_INFO("Working memory activity: " + std::to_string(pImpl->workingMemory->getMemoryActivity()));
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -506,6 +515,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Log episodic memory activity
+            NLM_LOG_INFO("Episodic memory stored episode, total: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+            NLM_LOG_INFO("Episodic memory reward: " + std::to_string(episode.reward));
         }
     }
     
@@ -513,23 +526,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        // TODO: Integrate real prediction using brain state
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        const auto& errorHistory = pImpl->predictionSystem->getErrorHistory();
+        
+        // Log prediction system activity
+        NLM_LOG_INFO("Prediction system error: " + std::to_string(predictionError));
+        NLM_LOG_INFO("Prediction system confidence: " + std::to_string(pImpl->predictionSystem->getConfidence()));
+        NLM_LOG_INFO("Prediction system error history size: " + std::to_string(errorHistory.size()));
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
+        // Apply attention to working memory winners and/or sensory input
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            std::vector<NeuronId> attended = pImpl->attention->processCompetition(competitors);
+            
+            // Store attended neurons for next step integration
+            if (!attended.empty()) {
+                NLM_LOG_INFO("Attention selected " + std::to_string(attended.size()) + " winner neurons");
+                // Attention helps prioritize working memory and sensory processing
+            }
+        }
+        
+        // Also attend to sensory neurons if available
+        if (pImpl->sensoryNeurons.size() > 0) {
+            std::vector<NeuronId> sensoryCompetitors(pImpl->sensoryNeurons.begin(), pImpl->sensoryNeurons.end());
+            std::vector<NeuronId> sensoryAttended = pImpl->attention->processCompetition(sensoryCompetitors);
+            if (!sensoryAttended.empty()) {
+                NLM_LOG_INFO("Attention focused on " + std::to_string(sensoryAttended.size()) + " sensory neurons");
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation would process current neural activity patterns to form concepts
+        // This requires sensory state encoding and working memory integration
+        // For now, log activity for debugging
+        NLM_LOG_INFO("Concept formation active, concepts: " + std::to_string(pImpl->conceptFormation->getConceptCount()));
+        
+        // Log concept stability statistics
+        for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+            const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(i);
+            if (concept) {
+                NLM_LOG_INFO("  Concept " + std::to_string(concept->id) + 
+                           ": " + concept->categoryHint + 
+                           " (stability: " + std::to_string(concept->avgStability) + 
+                           ", observations: " + std::to_string(concept->totalObservations) + ")");
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
