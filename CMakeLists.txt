@@ -6,17 +6,30 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Build type options
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo;MinSizeRel")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build" FORCE)
 endif()
 
-# Enable warnings
+# Enable warnings and compiler features
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /permissive-)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion)
 endif()
+
+# Default positions for installs
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/install" CACHE PATH "Install path prefix" FORCE)
+endif()
+
+# Project options
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+option(BUILD_TESTS "Build tests" ON)
+option(BUILD_DOCS "Build documentation" OFF)
+option(BUILD_DEMOS "Build demo applications" ON)
+option(NLM_INSTALL_PYTHON "Install Python package" ON)
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -132,20 +145,87 @@ add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Add Python bindings if enabled
+if(BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Testing
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# Package configuration
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Create a version file
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
 )
+
+# Create a config file for CMake package management
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/NLMConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM
+)
+
+# Install package configuration files
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/NLM
+)
+
+# Install targets
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
+    EXPORT NLMTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(TARGETS nlm_phase3_demo nlm_phase4_demo
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# Install Python package if enabled and requested
+if(BUILD_PYTHON_BINDINGS AND NLM_INSTALL_PYTHON)
+    install(DIRECTORY python/
+        DESTINATION ${CMAKE_INSTALL_PYTHONDIR}
+        FILES_MATCHING PATTERN "*.py"
+    )
+endif()
+
+# Documentation generation
+if(BUILD_DOCS)
+    find_package(Doxygen)
+    if(DOXYGEN_FOUND)
+        set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
+        set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+        configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+        add_custom_target(docs
+            COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            COMMENT "Generating Doxygen documentation"
+            VERBATIM
+        )
+    endif()
+endif()

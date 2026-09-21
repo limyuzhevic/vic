@@ -74,7 +74,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyMotorCommand(cmd, step * 0.001f);
         
         // Compute reward
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
