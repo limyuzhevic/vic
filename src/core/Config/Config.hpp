@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <any>
 
 namespace nlm {
 
@@ -55,13 +57,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from string (JSON/YAML format)
+    bool loadFromString(const std::string& content);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +98,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Merge another config
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +108,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool parseJsonValue(const std::string& key, const std::any& jsonValue, ConfigValue& configValue);
+    static std::string configValueToJsonString(const ConfigValue& value) const;
 };
 
 } // namespace nlm
