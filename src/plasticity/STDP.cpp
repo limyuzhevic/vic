@@ -66,12 +66,15 @@ void STDP::update(Synapse* synapse,
             if (dt > 0) {
                 // Pre before post: POTENTIATION
                 // "Cells that fire together, wire together" - but only if pre fires before post
+                // LTD depression only happens for post-before-pre
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                // dt is negative, use absolute value for time difference
+                float absDt = std::abs(dt);
+                float delta = -pImpl->ltdWeight * std::exp(-absDt / tau);
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
@@ -134,6 +137,36 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+bool STDP::validateParameters() const {
+    bool valid = true;
+    if (pImpl->ltpWeight < MIN_LTP_WEIGHT || pImpl->ltpWeight > MAX_LTP_WEIGHT) {
+        return false;
+    }
+    if (pImpl->ltdWeight < MIN_LTD_WEIGHT || pImpl->ltdWeight > MAX_LTD_WEIGHT) {
+        return false;
+    }
+    if (pImpl->timeConstant < MIN_TIME_CONSTANT || pImpl->timeConstant > MAX_TIME_CONSTANT) {
+        return false;
+    }
+    return valid;
+}
+
+void STDP::setMinWeight(float weight) {
+    pImpl->minWeight = std::clamp(weight, -2.0f, 2.0f);
+}
+
+float STDP::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
+void STDP::setMaxWeight(float weight) {
+    pImpl->maxWeight = std::clamp(weight, -2.0f, 2.0f);
+}
+
+float STDP::getMaxWeight() const {
+    return pImpl->maxWeight;
 }
 
 } // namespace nlm

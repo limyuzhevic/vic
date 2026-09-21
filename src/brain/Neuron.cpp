@@ -11,8 +11,7 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
+    MembranePotential synapticInput;  // Accumulated synaptic input (consolidated)
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
@@ -24,7 +23,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             synapticInput(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -170,7 +169,15 @@ NeuronState& Neuron::getState() {
     return pImpl->state;
 }
 
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
 PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
     return pImpl->plasticityFlags;
 }
 
@@ -297,6 +304,98 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active ||
+           pImpl->state.firingState == FiringState::Refractory;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+void Neuron::setFiringRate(FiringRate rate) {
+    pImpl->state.firingRate = rate;
+}
+
+void Neuron::setLeakConductance(MembranePotential conductance) {
+    pImpl->state.leakConductance = conductance;
+}
+
+MembranePotential Neuron::getLeakConductance() const {
+    return pImpl->state.leakConductance;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+void Neuron::recordSpike(Timestamp timestamp) {
+    pImpl->spikeHistory.push_back(timestamp);
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+void Neuron::clearSpikeHistory() {
+    pImpl->spikeHistory.clear();
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    pImpl->incomingSynapses.push_back(handle);
+}
+
+void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    pImpl->outgoingSynapses.push_back(handle);
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+void Neuron::setRegionId(RegionId region) {
+    pImpl->regionId = region;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
 }
 
 } // namespace nlm
