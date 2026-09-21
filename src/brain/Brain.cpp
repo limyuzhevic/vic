@@ -404,6 +404,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with sensory processing
+        // Working memory stores active neural patterns for later recall
+        // This helps maintain context across steps for prediction and planning
+        if (pImpl->predictionSystem) {
+            // Work with prediction error to strengthen predictions that were correct
+            float predictionError = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // If prediction error is small, reinforce the working memory pattern
+            if (std::abs(predictionError) < 0.1f) {
+                pImpl->workingMemory->strengthenMemory(1.01f);
+            }
+        }
+        
+        // Integrate working memory with attention system
+        if (pImpl->attention) {
+            // Get working memory patterns for attention competition
+            auto workingMemoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!workingMemoryNeurons.empty()) {
+                // Process competition for attention - working memory competes for selection
+                std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+                pImpl->attention->processCompetition(competitors);
+            }
+            
+            // Reactivate patterns based on attention winners
+            // If a neuron is attended, strengthen its working memory trace
+            const auto& winners = pImpl->attention->getWinners();
+            for (const NeuronId& winner : winners) {
+                if (pImpl->workingMemory->contains(winner)) {
+                    // Boost winner's working memory representation
+                    float currentActivation = pImpl->workingMemory->getNeuronActivation(winner);
+                    pImpl->workingMemory->storeToNeuron(winner, currentActivation * 1.1f);
+                }
+            }
+        }
+        
+        // Store current sensory activity patterns in working memory
+        // Gather current neural activity levels as sensory representation
+        std::vector<float> sensoryPattern;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                       neuron->getState().restingPotential) / 10.0f;
+            if (activation > 0.1f) {  // Only store meaningful activity
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        // Store sensory patterns in working memory for context maintenance
+        if (!sensoryPattern.empty() && pImpl->workingMemory) {
+            pImpl->workingMemory->store(sensoryPattern, 0.5f);
+        }
+        
+        // Ensure working memory maintains important patterns across steps
+        // This helps with pattern completion and memory consolidation
+        if (pImpl->workingMemory->getMemoryActivity() > 0.5f) {
+            // Rehearsal of active traces to maintain them
+            pImpl->workingMemory->runCompetition();
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -511,8 +570,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system should be updated with sensory observations
+        // For Phase 6 integration, connect prediction to working memory
+        
+        // Update predictions based on current sensory input through working memory
+        if (pImpl->workingMemory) {
+            // Get working memory patterns as potential predictions
+            auto patterns = pImpl->workingMemory->retrieve();
+            if (!patterns.empty()) {
+                // Create a simple prediction based on working memory
+                // In full implementation, this would use neural prediction mechanisms
+                // For now, set a baseline prediction error based on working memory stability
+                float workingMemStability = pImpl->workingMemory->getMemoryActivity();
+                float predictionError = 0.5f - workingMemStability;  // Lower stability = higher error
+                pImpl->predictionSystem->setPredictionError(predictionError);
+            }
+        }
+        
+        // Update prediction based on actual sensory observations
+        // This would happen through AgentBrain.processSensoryInput
+        
+        // Update confidence based on prediction accuracy
+        if (pImpl->dopamine) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            // High error reduces confidence, low error increases confidence
+            float newConfidence = 0.5f - std::abs(error) * 0.4f;
+            pImpl->predictionSystem->setConfidence(newConfidence);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +610,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 12: Update neural planner ==========
+    if (pImpl->planner) {
+        pImpl->planner->update(pImpl->timestep);
+        
+        // Integrate planner with prediction system
+        // Planner can use predictions to generate better action sequences
+        if (pImpl->predictionSystem && pImpl->dopamine) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            // High prediction error suggests uncertainty - planner should be more exploratory
+            if (predictionError > 0.3f) {
+                // Make planning more exploratory
+                pImpl->planner->setPlanningDepth(5);  // Simple, shallow planning
+                pImpl->planner->setPlanningConfidence(0.3f);
+            } else {
+                // Can afford deeper planning
+                pImpl->planner->setPlanningDepth(8);
+                pImpl->planner->setPlanningConfidence(confidence);
+            }
+        }
+        
+        // Use concept formation to guide planning
+        if (pImpl->conceptFormation) {
+            // Present current neural state to concept formation
+            // This would help the planner understand the situation better
+            std::vector<float> statePattern;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            float activation = std::abs(
+                                neuron->getState().membranePotential - 
+                                neuron->getState().restingPotential) / 50.0f;
+                            statePattern.push_back(std::min(activation, 1.0f));
+                        }
+                    }
+                }
+            }
+            
+            if (!statePattern.empty()) {
+                // Concept formation can suggest context for planning
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    statePattern, statePattern, pImpl->dopamine->getLevel(), currentStep);
+                
+                if (conceptId > 0) {
+                    // Concept exists - planner can use this knowledge
+                    NLM_LOG_INFO("Planner using concept " + std::to_string(conceptId) + 
+                                " for action selection");
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

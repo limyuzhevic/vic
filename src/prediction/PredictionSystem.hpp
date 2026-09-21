@@ -24,6 +24,12 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Set prediction error (Phase 6 integration)
+    void setPredictionError(float error);
+    
+    // Set confidence (Phase 6 integration)
+    void setConfidence(float confidence);
+    
     // Get prediction confidence
     float getConfidence() const;
     

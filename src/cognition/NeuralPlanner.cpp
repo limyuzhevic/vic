@@ -28,6 +28,22 @@ void NeuralPlanner::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
+void NeuralPlanner::update(TimestepDuration timestep) {
+    // Update planning system based on prediction confidence
+    // if prediction system is available
+    if (brain_ && planningDepth_ > 0) {
+        // Could integrate with prediction system for better planning
+        // For now, just log the update
+        NLM_LOG_INFO("NeuralPlanner updated, depth=" + std::to_string(planningDepth_));
+        
+        // Could decrease planning depth if uncertain
+        if (planningConfidence_ < 0.3f) {
+            setPlanningDepth(std::max<size_t>(1, planningDepth_ - 1));
+            setPlanningConfidence(0.5f);
+        }
+    }
+}
+
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
                                     float targetReward) {
     // Generate possible action sequences
