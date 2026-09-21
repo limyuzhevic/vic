@@ -70,9 +70,16 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        // Fix: Check if other.pImpl is valid before deleting
+        if (other.pImpl != nullptr) {
+            delete pImpl;
+            pImpl = other.pImpl;
+            other.pImpl = nullptr;
+        } else {
+            // If other is in a null state, just delete our current implementation
+            delete pImpl;
+            pImpl = nullptr;
+        }
     }
     return *this;
 }

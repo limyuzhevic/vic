@@ -19,13 +19,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    if (filepath.empty()) {
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    clear();  // Clear existing entries for fresh load
     
     std::string line;
     while (std::getline(file, line)) {
@@ -52,7 +55,7 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
-    return true;
+    return !pImpl->entries.empty();  // Return true only if entries were loaded
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

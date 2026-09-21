@@ -1,3 +1,15 @@
+// Forward declarations for improved modularity
+namespace nlm {
+    class Config;
+    class Brain;
+    class Logger;
+    class ConsoleLogger;
+    class SimulationClock;
+    class SensoryInput;
+    class MotorSystem;
+    class Environment;
+}
+
 // NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
@@ -19,14 +31,97 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
+// Additional includes for improved error handling and validation
+#include <stdexcept>
+#include <sstream>
+#include <filesystem>
+#include <algorithm>
+#include <chrono>
 #include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
 
 using namespace nlm;
+
+// Namespace alias for cleaner code
+namespace fs = std::filesystem;
+
+// Simulation configuration
+class SimulationConfig {
+private:
+    std::shared_ptr<Config> config;
+    
+public:
+    SimulationConfig(std::shared_ptr<Config> cfg) : config(cfg) {}
+    
+    uint64_t getRandomSeed() const {
+        return config->getOr<uint64_t>(ConfigConstants::RANDOM_SEED_KEY, 42);
+    }
+    
+    double getTimeStep() const {
+        return config->getOr<double>(ConfigConstants::SIMULATION_TIMESTEP_KEY, 0.001);
+    }
+    
+    size_t getNeuronCount() const {
+        return config->getOr<size_t>(ConfigConstants::NEURON_COUNT_KEY, 1000);
+    }
+    
+    size_t getRegionCount() const {
+        return config->getOr<size_t>(ConfigConstants::REGION_COUNT_KEY, 1);
+    }
+    
+    float getConnectionProbability() const {
+        return config->getOr<float>(ConfigConstants::CONNECTION_PROBABILITY_KEY, 0.15f);
+    }
+    
+    void printConfigurationSummary() const {
+        NLM_LOG_INFO("Configuration Summary:");
+        NLM_LOG_INFO("  Random seed: " + std::to_string(getRandomSeed()));
+        NLM_LOG_INFO("  Simulation timestep: " + std::to_string(getTimeStep()) + "s");
+        NLM_LOG_INFO("  Neuron count: " + std::to_string(getNeuronCount()));
+        NLM_LOG_INFO("  Region count: " + std::to_string(getRegionCount()));
+        NLM_LOG_INFO("  Connection probability: " + std::to_string(getConnectionProbability()));
+    }
+};
+
+// Global configuration validation
+class ConfigValidator {
+public:
+    static bool validateConfig(const Config& config) {
+        bool isValid = true;
+        
+        // Validate required parameters
+        if (!config.has(ConfigConstants::RANDOM_SEED_KEY)) {
+            NLM_LOG_WARNING("Random seed not found, using default value");
+        }
+        
+        if (!config.has(ConfigConstants::SIMULATION_TIMESTEP_KEY)) {
+            NLM_LOG_WARNING("Simulation timestep not found, using default");
+        }
+        
+        // Validate parameter ranges
+        if (auto timestep = config.get<double>(ConfigConstants::SIMULATION_TIMESTEP_KEY)) {
+            if (*timestep <= 0.0) {
+                NLM_LOG_ERROR("Invalid timestep: must be positive");
+                isValid = false;
+            }
+        }
+        
+        if (auto neuronCount = config.get<int64_t>(ConfigConstants::NEURON_COUNT_KEY)) {
+            if (*neuronCount <= 0) {
+                NLM_LOG_ERROR("Invalid neuron count: must be positive");
+                isValid = false;
+            }
+        }
+        
+        if (auto connProb = config.get<float>(ConfigConstants::CONNECTION_PROBABILITY_KEY)) {
+            if (*connProb < 0.0f || *connProb > 1.0f) {
+                NLM_LOG_ERROR("Invalid connection probability: must be between 0 and 1");
+                isValid = false;
+            }
+        }
+        
+        return isValid;
+    }
+};
 
 void printBanner() {
     std::cout << R"(
