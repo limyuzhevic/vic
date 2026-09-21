@@ -243,7 +243,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -328,6 +328,79 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    
+    // ========== INTEGRATION VERIFICATION ==========
+    NLM_LOG_INFO("Verifying integrated systems for step " + std::to_string(currentStep));
+    
+    // Verify all integrated systems are properly initialized
+    bool systemsInitialized = true;
+    
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Working memory system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Episodic memory system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Associative memory system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_ERROR("Prediction system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->attention) {
+        NLM_LOG_ERROR("Attention system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_ERROR("Concept formation system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->planner) {
+        NLM_LOG_ERROR("Planner system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->dopamine) {
+        NLM_LOG_ERROR("Dopamine system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->curiosity) {
+        NLM_LOG_ERROR("Curiosity system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->predictionError) {
+        NLM_LOG_ERROR("Prediction error system not initialized");
+        systemsInitialized = false;
+    }
+    
+    if (!pImpl->novelty) {
+        NLM_LOG_ERROR("Novelty system not initialized");
+        systemsInitialized = false;
+    }
+    
+    // Check that prediction system has been initialized with brain reference
+    if (pImpl->predictionSystem && !pImpl->predictionSystem->getBrain()) {
+        NLM_LOG_WARNING("Prediction system not properly initialized with brain reference");
+    }
+    
+    if (!systemsInitialized) {
+        NLM_LOG_ERROR("CRITICAL: Not all integrated systems are initialized - step " + std::to_string(currentStep) + " cannot proceed");
+        return;
+    }
+    
+    NLM_LOG_INFO("Integrated systems verification passed - proceeding with step " + std::to_string(currentStep));
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -735,31 +808,80 @@ void Brain::develop() {
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
-void Brain::reset() {
-    NLM_LOG_INFO("Resetting NLM Brain...");
-    
-    pImpl->currentStep = 0;
-    pImpl->currentTime = 0.0;
-    pImpl->totalSpikesThisStep = 0;
-    pImpl->totalSpikesTotal = 0;
-    pImpl->isResting = false;
-    pImpl->stepsSinceLastEpisode = 0;
-    
-    for (auto& region : pImpl->regions) {
-        region->reset();
+// Reset brain state
+    void Brain::reset() {
+        NLM_LOG_INFO("Resetting NLM Brain...");
+        
+        pImpl->currentStep = 0;
+        pImpl->currentTime = 0.0;
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->totalSpikesTotal = 0;
+        pImpl->isResting = false;
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        for (auto& region : pImpl->regions) {
+            region->reset();
+        }
+        
+        pImpl->spikeSystem->reset();
+        pImpl->developmentalStage = DevelopmentalStage::Initial;
+        
+        // Reset memory systems
+        if (pImpl->workingMemory) pImpl->workingMemory->clear();
+        if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+        if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+        if (pImpl->attention) pImpl->attention->reset();
+        
+        // Reset prediction system
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->clearHistory();
+        }
+        
+        // Reset cognition systems
+        if (pImpl->planner) {
+            pImpl->planner->reset();
+        }
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->reset();
+        }
+        
+        // Reset development system
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->reset();
+        }
+        
+        // Reset neuromodulation systems
+        if (pImpl->dopamine) {
+            pImpl->dopamine->reset();
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->reset();
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->reset();
+        }
+        if (pImpl->novelty) {
+            pImpl->novelty->reset();
+        }
+        
+        // Reset plasticity systems
+        if (pImpl->stdp) {
+            pImpl->stdp->reset();
+        }
+        if (pImpl->hebbian) {
+            pImpl->hebbian->reset();
+        }
+        if (pImpl->structuralPlasticity) {
+            pImpl->structuralPlasticity->reset();
+        }
+        
+        // Reset checkpoint manager
+        if (pImpl->checkpointManager) {
+            pImpl->checkpointManager->reset();
+        }
+        
+        NLM_LOG_INFO("NLM Brain reset complete");
     }
-    
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
-    
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
-    
-    NLM_LOG_INFO("NLM Brain reset complete");
-}
 
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
@@ -1006,20 +1128,36 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getWorkingMemory called but pImpl is null");
+        return nullptr;
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getEpisodicMemory called but pImpl is null");
+        return nullptr;
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getAssociativeMemory called but pImpl is null");
+        return nullptr;
+    }
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    if (!pImpl) {
+        NLM_LOG_ERROR("Brain::getPredictionSystem called but pImpl is null");
+        return nullptr;
+    }
     return pImpl->predictionSystem.get();
 }
 

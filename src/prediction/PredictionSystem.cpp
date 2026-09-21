@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -6,13 +7,31 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
-    
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Brain* brainReference;
 };
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::PredictionSystem() : pImpl(new Impl), brain_(nullptr) {
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 1.0f;
+    pImpl->errorHistory.clear();
+    pImpl->brainReference = nullptr;
+}
 
 PredictionSystem::~PredictionSystem() = default;
+
+// Initialize prediction system with brain reference
+void PredictionSystem::initialize(Brain* brain) {
+    brain_ = brain;
+    if (brain) {
+        pImpl->brainReference = brain;
+    }
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
+
+// Get brain reference (for integration)
+Brain* PredictionSystem::getBrain() const {
+    return brain_ ? brain_ : pImpl->brainReference;
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
@@ -34,6 +53,10 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        // Maintain history size
+        if (pImpl->errorHistory.size() > 100) {
+            pImpl->errorHistory.erase(pImpl->errorHistory.begin());
+        }
     }
 }
 
@@ -55,6 +78,15 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // For now, just update confidence based on prediction error
+    // Positive learning when error is low
+    if (pImpl->predictionError < 0.1f) {
+        pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.01f);
+    }
+    // Reduce confidence when error is high
+    else if (pImpl->predictionError > 0.5f) {
+        pImpl->confidence = std::max(0.1f, pImpl->confidence - 0.02f);
+    }
 }
 
 } // namespace nlm

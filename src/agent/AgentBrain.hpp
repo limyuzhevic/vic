@@ -1,16 +1,20 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+//
+// Phase 6 Integration: 
+// - Connects sensory processing to working memory
+// - Integrates higher cognition (planning, concept formation)
+// - Links prediction system with action selection
+// - Uses neuromodulation for adaptive behavior
+
+// Sensory input types for AgentBrain
+enum class SensoryType {
+    Vision = 0,
+    Touch = 1,
+    Internal = 2,
+    Proprioception = 3
+};
+
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,14 +73,38 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Cognitive integration
+    bool isCognitiveEnabled() const { return cognitiveEnabled_; }
+    void enableCognitiveProcessing(bool enable) { cognitiveEnabled_ = enable; }
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Get cognitive statistics
+    float getCognitiveActivity() const { return cognitiveActive_; }
+    float getConceptActivation() const { return conceptActivation_; }
+    float getPlanProgress() const { return planProgress_; }
+    float getAttentionFocus() const { return attentionFocus_; }
+    float getCognitiveNovelty() const { return cognitiveNovelty_; }
+    
+    // Get current self state for cognitive systems
+    std::vector<float> getCurrentSelfState() const;
+    
+    // Process cognitive input and update internal state
+    void processCognitiveInput(const std::vector<float>& input);
+    
+private:
+    // Helper methods for cognitive state
+    float getMotorCommandActivity(MotorCommand cmd) const;
+    float getSensoryActivity(SensoryType type) const;
+    
+    // Update cognitive processing
+    void updateHigherCognition(double timestep);
     
     std::shared_ptr<Brain> brain_;
+    
+    // BRAIN INTEGRATION SYSTEMS
+    std::shared_ptr<NeuralPlanner> planner_;
+    std::shared_ptr<ConceptFormation> conceptFormation_;
+    std::shared_ptr<PredictionSystem> predictionSystem_;
+    std::shared_ptr<DevelopmentSystem> developmentSystem_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -108,10 +136,26 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool cognitiveEnabled_;
+    
+    // COGNITIVE PROCESSING STATE
+    float cognitiveActive_;           // Overall cognitive activity level
+    float conceptActivation_;         // Concept formation activity
+    float planProgress_;              // Planning progress
+    float attentionFocus_;            // Attention focus level
+    
+    // Cognitive novelty and tracking
+    float cognitiveNovelty_;
+    float cognitiveNoveltyDecay_;
+    std::vector<float> previousCognitiveState_;
+    
+    // Cognitive integration points (signals to cognition systems)
+    std::vector<std::function<void(const std::vector<float>&)>> cognitiveIntegration_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Reward prediction error for cognitive learning
+    std::vector<float> rewardPredictionErrors_;
 };
-
-} // namespace nlm

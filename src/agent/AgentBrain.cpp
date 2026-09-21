@@ -1,5 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../development/DevelopmentSystem.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -20,6 +24,34 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize cognitive systems
+    if (brain_) {
+        // Get references to higher cognition systems
+        planner_ = brain_->getPlanner();
+        conceptFormation_ = brain_->getConceptFormation();
+        predictionSystem_ = brain_->getPredictionSystem();
+        developmentSystem_ = brain_->getDevelopmentSystem();
+        
+        // Initialize cognitive features
+        cognitiveEnabled_ = true;
+        
+        // Set up cognitive integration points
+        cognitiveIntegration_.reserve(8);
+        
+        // Add cognitive tracking variables
+        cognitiveActive_ = 0.0f;
+        conceptActivation_ = 0.0f;
+        planProgress_ = 0.0f;
+        attentionFocus_ = 0.0f;
+        
+        // Initialize cognitive novelty detection
+        cognitiveNovelty_ = 0.0f;
+        cognitiveNoveltyDecay_ = 0.98f;
+        
+        // Set up cognitive state tracking
+        previousCognitiveState_.reserve(64);
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -68,10 +100,27 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Initialize cognitive state tracking
+    previousCognitiveState_.assign(64, 0.0f);
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    // Log integrated cognition systems
+    if (planner_) {
+        NLM_LOG_INFO("AgentBrain: Integrated with NeuralPlanner");
+    }
+    if (conceptFormation_) {
+        NLM_LOG_INFO("AgentBrain: Integrated with ConceptFormation");
+    }
+    if (predictionSystem_) {
+        NLM_LOG_INFO("AgentBrain: Integrated with PredictionSystem");
+    }
+    if (developmentSystem_) {
+        NLM_LOG_INFO("AgentBrain: Integrated with DevelopmentSystem");
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -278,39 +327,192 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
 }
-
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+void AgentBrain::updateHigherCognition(double timestep) {
+    if (!brain_ || !cognitiveEnabled_) return;
     
-    developmentalAge_ += timestep;
+    // Update cognitive activity based on neuromodulation
+    // Dopamine enhances cognitive processing when within optimal range
+    float dopamineOptimal = 0.3f;
+    cognitiveActive_ = std::exp(-std::pow(dopamineLevel_ - dopamineOptimal, 2) / 0.1f);
     
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    // Update concept activation based on novelty and reward prediction
+    conceptActivation_ = (cognitiveNovelty_ + std::abs(predictionError_) * 0.5f) * 0.5f;
+    conceptActivation_ = std::clamp(conceptActivation_, 0.0f, 1.0f);
+    
+    // Update planning progress based on developmental stage
+    float planProgressFactor = plasticityModifier_;
+    if (brain_->getDevelopmentalStage() == DevelopmentalStage::CriticalPeriod) {
+        planProgressFactor *= 1.5f;
+    } else if (brain_->getDevelopmentalStage() == DevelopmentalStage::Adult) {
+        planProgressFactor *= 0.5f;
     }
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+    planProgress_ = std::clamp(planProgress_ + planProgressFactor * (float)timestep * 0.01f, 0.0f, 1.0f);
+    
+    // Update attention focus based on sensory input and prediction error
+    float attentionInput = noveltyLevel_ * 0.4f + std::abs(predictionError_) * 0.3f + curiosityLevel_ * 0.3f;
+    attentionFocus_ = attentionFocus_ * 0.95f + attentionInput * 0.05f;
+    attentionFocus_ = std::clamp(attentionFocus_, 0.0f, 1.0f);
+    
+    // Update cognitive novelty with decay
+    cognitiveNovelty_ *= cognitiveNoveltyDecay_;
+    
+    // Update prediction error with noisy decay
+    predictionError_ *= 0.99f;
+    
+    // Update cognitive integration points with current cognitive state
+    std::vector<float> cognitiveState(64, 0.0f);
+    // Fill cognitive state with relevant features
+    cognitiveState[0] = cognitiveActive_;
+    cognitiveState[1] = conceptActivation_;
+    cognitiveState[2] = planProgress_;
+    cognitiveState[3] = attentionFocus_;
+    cognitiveState[4] = cognitiveNovelty_;
+    cognitiveState[5] = dopamineLevel_;
+    cognitiveState[6] = curiosityLevel_;
+    cognitiveState[7] = noveltyLevel_;
+    
+    // Decay old cognitive state
+    if (previousCognitiveState_.size() >= cognitiveState.size()) {
+        for (size_t i = 0; i < cognitiveState.size(); ++i) {
+            previousCognitiveState_[i] = previousCognitiveState_[i] * 0.95f + cognitiveState[i] * 0.05f;
         }
     }
+    
+    // Log cognitive processing
+    if (cognitiveActive_ > 0.1f || conceptActivation_ > 0.1f) {
+        NLM_LOG_INFO("AgentBrain: Cognitive processing - Active: " + 
+                     std::to_string(cognitiveActive_) + 
+                     ", Concepts: " + std::to_string(conceptActivation_) + 
+                     ", Plan: " + std::to_string(planProgress_) + 
+                     ", Attention: " + std::to_string(attentionFocus_));
+    }
+}
+
+// Cognitive tracking methods
+float AgentBrain::getAttentionFocus() const {
+    return attentionFocus_;
+}
+
+float AgentBrain::getCognitiveNovelty() const {
+    return cognitiveNovelty_;
+}
+
+// Get current self state for cognitive systems
+std::vector<float> AgentBrain::getCurrentSelfState() const {
+    std::vector<float> state(32, 0.0f);
+    if (!brain_) return state;
+    
+    // Fill self state with current cognitive and neural properties
+    state[0] = cognitiveActive_;
+    state[1] = conceptActivation_;
+    state[2] = planProgress_;
+    state[3] = attentionFocus_;
+    state[4] = cognitiveNovelty_;
+    state[5] = dopamineLevel_;
+    state[6] = curiosityLevel_;
+    state[7] = noveltyLevel_;
+    state[8] = predictionError_;
+    
+    // Add motor system state
+    state[9] = getMotorCommandActivity(MotorCommand::MoveForward);
+    state[10] = getMotorCommandActivity(MotorCommand::MoveBackward);
+    state[11] = getMotorCommandActivity(MotorCommand::TurnLeft);
+    state[12] = getMotorCommandActivity(MotorCommand::TurnRight);
+    state[13] = getMotorCommandActivity(MotorCommand::Interact);
+    state[14] = getMotorCommandActivity(MotorCommand::Wait);
+    
+    // Add sensory system state
+    state[15] = getSensoryActivity(SensoryType::Vision);
+    state[16] = getSensoryActivity(SensoryType::Touch);
+    state[17] = getSensoryActivity(SensoryType::Internal);
+    state[18] = getSensoryActivity(SensoryType::Proprioception);
+    
+    // Add developmental state
+    state[19] = (float)getDevelopmentalStage();
+    state[20] = (float)plasticityModifier_;
+    
+    // Add previous cognitive state
+    for (size_t i = 0; i < std::min(previousCognitiveState_.size(), size_t(13)); ++i) {
+        state[21 + i] = previousCognitiveState_[i];
+    }
+    
+    return state;
+}
+
+// Process cognitive input and update internal state
+void AgentBrain::processCognitiveInput(const std::vector<float>& input) {
+    if (!brain_ || input.empty()) return;
+    
+    // Extract cognitive features from input
+    float inputAttention = input.size() > 0 ? input[0] : 0.0f;
+    float inputCuriosity = input.size() > 1 ? input[1] : 0.0f;
+    float inputPlan = input.size() > 2 ? input[2] : 0.0f;
+    float inputNovelty = input.size() > 3 ? input[3] : 0.0f;
+    
+    // Update attention focus with cognitive input
+    attentionFocus_ = attentionFocus_ * 0.9f + inputAttention * 0.1f;
+    attentionFocus_ = std::clamp(attentionFocus_, 0.0f, 1.0f);
+    
+    // Update curiosity with cognitive input
+    if (curiosityEnabled_) {
+        curiosityLevel_ = curiosityLevel_ * 0.95f + inputCuriosity * 0.05f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update planning progress with cognitive input
+    planProgress_ = planProgress_ * 0.9f + inputPlan * 0.1f;
+    planProgress_ = std::clamp(planProgress_, 0.0f, 1.0f);
+    
+    // Update cognitive novelty with input
+    cognitiveNovelty_ = cognitiveNovelty_ * cognitiveNoveltyDecay_ + inputNovelty * 0.05f;
+    cognitiveNovelty_ = std::clamp(cognitiveNovelty_, 0.0f, 1.0f);
+    
+    // Update previous cognitive state
+    std::vector<float> currentCognitiveState(64, 0.0f);
+    currentCognitiveState[0] = cognitiveActive_;
+    currentCognitiveState[1] = conceptActivation_;
+    currentCognitiveState[2] = planProgress_;
+    currentCognitiveState[3] = attentionFocus_;
+    currentCognitiveState[4] = cognitiveNovelty_;
+    currentCognitiveState[5] = dopamineLevel_;
+    currentCognitiveState[6] = curiosityLevel_;
+    currentCognitiveState[7] = noveltyLevel_;
+    
+    // Integrate with cognitive systems if available
+    if (planner_ && input.size() > 8) {
+        // Pass planning-related input to neural planner
+        std::vector<float> planningInput(input.begin(), input.begin() + 16);
+        planner_->updatePlanning(planningInput);
+    }
+    
+    if (conceptFormation_ && input.size() > 16) {
+        // Pass concept-related input to concept formation
+        std::vector<float> conceptInput(input.begin() + 16, input.begin() + 32);
+        conceptFormation_->updateConcepts(conceptInput);
+    }
+    
+    if (predictionSystem_ && input.size() > 32) {
+        // Pass prediction-related input to prediction system
+        std::vector<float> predictionInput(input.begin() + 32, input.begin() + 48);
+        predictionSystem_->updatePredictions(predictionInput);
+    }
+    
+    if (developmentSystem_ && input.size() > 48) {
+        // Pass development-related input to development system
+        std::vector<float> developmentInput(input.begin() + 48, std::min(input.begin() + 64, input.end()));
+        developmentSystem_->updateDevelopment(developmentInput);
+    }
+    
+    // Update cognitive integration points
+    for (const auto& integrationFunc : cognitiveIntegration_) {
+        integrationFunc(currentCognitiveState);
+    }
+    
+    // Log cognitive processing
+    NLM_LOG_DEBUG("AgentBrain: Cognitive input processed - Attention: " + 
+                  std::to_string(attentionFocus_) + 
+                  ", Curiosity: " + std::to_string(curiosityLevel_));
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -345,6 +547,49 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+float AgentBrain::getMotorCommandActivity(MotorCommand cmd) const {
+    switch (cmd) {
+        case MotorCommand::MoveForward:
+            return motorForward_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(motorForward_);
+        case MotorCommand::MoveBackward:
+            return motorBackward_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(motorBackward_);
+        case MotorCommand::TurnLeft:
+            return motorTurnLeft_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(motorTurnLeft_);
+        case MotorCommand::TurnRight:
+            return motorTurnRight_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(motorTurnRight_);
+        case MotorCommand::Interact:
+            return motorInteract_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(motorInteract_);
+        case MotorCommand::Wait:
+            return motorWait_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(motorWait_);
+        default:
+            return 0.0f;
+    }
+}
+
+float AgentBrain::getSensoryActivity(SensoryType type) const {
+    switch (type) {
+        case SensoryType::Vision:
+            return sensoryVision_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(sensoryVision_);
+        case SensoryType::Touch:
+            return sensoryTouch_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(sensoryTouch_);
+        case SensoryType::Internal:
+            return sensoryInternal_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(sensoryInternal_);
+        case SensoryType::Proprioception:
+            return sensoryProprioception_.empty() ? 0.0f : decodeFromMotorNeuronsMotorGroup(sensoryProprioception_);
+        default:
+            return 0.0f;
+    }
+}
+
+float AgentBrain::decodeFromMotorNeuronsMotorGroup(const std::vector<Neuron*>& neurons) const {
+    if (neurons.empty()) return 0.0f;
+    float sum = 0.0f;
+    for (Neuron* n : neurons) {
+        sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    }
+    return sum / neurons.size();
 }
 
 } // namespace nlm
