@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -92,6 +94,9 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validate configuration
+    bool validate(const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& validators) const;
     
 private:
     struct Impl;

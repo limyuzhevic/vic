@@ -155,6 +155,14 @@ void Config::remove(const std::string& key) {
     );
 }
 
+void Config::remove(const std::string& key) {
+    pImpl->entries.erase(
+        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; }),
+        pImpl->entries.end()
+    );
+}
+
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
@@ -199,7 +207,21 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+bool Config::validate(const std::unordered_map<std::string, std::function<bool(const ConfigValue&)>>& validators) const {
+    for (const auto& validator : validators) {
+        if (has(validator.first)) {
+            const auto& value = get<ConfigValue>(validator.first).value();
+            if (!validator.second(value)) {
+                std::cerr << "Validation failed for parameter: " << validator.first << std::endl;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
