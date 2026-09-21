@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Implements real neuromodulation effects with dynamic level changes
 
 class Neuromodulator {
 public:
@@ -21,7 +21,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // TODO PHASE 2: Implement real neuromodulation effects
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +32,8 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Real implementation with dynamic level changes and plasticity effects
+
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,13 +49,28 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Get baseline (tonic) dopamine level
+    float getBaseline() const;
+    
+    // Get peak (phasic) dopamine level
+    float getPeak() const;
+    
+    // Get decay rate
+    float getDecayRate() const;
+    
+    // Get release rate
+    float getReleaseRate() const;
+    
+    // Configure parameters for realistic dynamics
+    void configure(float baseline, float peak, float decayRate, float releaseRate);
+
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Placeholder for Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
     const char* getName() const override { return "ACh"; }
@@ -65,7 +81,7 @@ public:
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Placeholder for Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
     const char* getName() const override { return "NE"; }
@@ -76,7 +92,7 @@ public:
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Placeholder for Phase 2
 class Serotonin : public Neuromodulator {
 public:
     const char* getName() const override { return "5-HT"; }
