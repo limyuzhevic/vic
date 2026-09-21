@@ -52,23 +52,35 @@ enum class CompressionLevel {
     Best
 };
 
-// Checkpoint section types
-enum class CheckpointSection : uint32_t {
-    Header = 0,
-    Config = 1,
-    Neurons = 2,
-    Synapses = 3,
-    Connectivity = 4,
-    Plasticity = 5,
-    Development = 6,
-    Neuromodulation = 7,
-    Memory = 8,
-    SpikeHistory = 9,
-    RandomState = 10,
-    SimulationState = 11,
-    Environment = 12,
-    Checksum = 13,
-    End = 14
+// Development system state for checkpointing
+struct DevelopmentCheckpointData {
+    uint8_t stage;              // Developmental stage
+    float synaptogenesisRate;   // Synaptogenesis rate
+    float pruningRate;          // Pruning rate
+    float currentAge;           // Current developmental age
+};
+
+// Neuromodulation system state for checkpointing
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;              // Dopamine level
+    float dopaminePlasticityFactor;   // Dopamine effect on plasticity
+    float noveltyLevel;              // Novelty detection level
+    float curiosityLevel;            // Curiosity level
+    float predictionError;           // Prediction error signal
+};
+
+// Working memory state for checkpointing
+struct WorkingMemoryCheckpointData {
+    size_t activeTraceCount;        // Number of active memory traces
+    std::vector<uint64_t> memoryNeurons;    // Neurons in working memory
+    std::vector<float> memoryActivations;  // Activation levels
+};
+
+// Episodic memory state for checkpointing
+struct EpisodicMemoryCheckpointData {
+    size_t episodeCount;          // Number of stored episodes
+    size_t maxEpisodes;          // Maximum number of episodes
+    bool replayEnabled;          // Whether replay is enabled
 };
 
 /**
