@@ -1,25 +1,45 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
+# C++20 standard with modern features
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Optimization and debugging options
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # PIC for shared libraries
+
+# Link-time optimization (LTO)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.9)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT lipo_supported OUTPUT_VAR lipo_reason)
+    if(lipo_supported)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
 endif()
 
-# Enable warnings
+# Memory allocation strategies
+set(CMAKE_MACOSX_RPATH ON)
+set(CMAKE_INSTALL_RPATH "$ORIGIN")
+
+# Installation directories
+set(CMAKE_INSTALL_BINDIR bin)
+set(CMAKE_INSTALL_LIBDIR lib)
+
+# Build type configuration
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# Enhanced warning levels configuration
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX /permissive-)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wshadow -Wformat=2 -Wconversion -Wnull-dereference -Wduplicated-cond -Wduplicated-branches)
 endif()
 
 # Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
@@ -139,13 +159,89 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Enhanced Python bindings support (optional)
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+
+# Python bindings executable (optional standalone test)
+add_executable(nlm_enhanced_bindings_test
+    python/bindings_enhanced.cpp
+)
+target_link_libraries(nlm_enhanced_bindings_test PUBLIC nlm_core nlm_agent nlm_world pybind11::module)
+target_compile_definitions(nlm_enhanced_bindings_test PRIVATE PYTHON_BINDINGS_ENABLED)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
+# Installation targets
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install Python bindings
+if(PYTHON_BINDINGS_ENABLED)
+    install(TARGETS nlm_enhanced_bindings_test
+        RUNTIME DESTINATION bin
+    )
+endif()
+
+# Package configuration for find_package support
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/NLMConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/NLM
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake"
+    DESTINATION lib/cmake/NLM
+)
+
+# Export targets for downstream usage
+export(EXPORT nlm_targets
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/NLMTargets.cmake"
+    NAMESPACE NLM::
+)
+
+install(EXPORT nlm_targets
+    FILE NLMTargets.cmake
+    NAMESPACE NLM::
+    DESTINATION lib/cmake/NLM
+)
+
+# Add custom targets for convenience
+add_custom_target(build-all
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target nlm nlm_core nlm_agent nlm_world
+    COMMENT "Building all core targets"
+)
+
+add_custom_target(build-demos
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target nlm_phase3_demo nlm_phase4_demo
+    COMMENT "Building demo executables"
+)
+
+add_custom_target(build-python
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target nlm_enhanced_bindings_test
+    COMMENT "Building enhanced Python bindings test"
+)
+
+add_custom_target(run-tests
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target test
+    COMMENT "Running test suite"
+)
+
+add_custom_target(install-all
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target install
+    COMMENT "Installing all targets"
 )
