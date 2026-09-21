@@ -414,7 +414,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        float novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionError = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+        pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -511,8 +513,61 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction system with sensory input
+        // The prediction system generates predictions about sensory input
+        // and produces prediction error signals for learning
+        
+        // Get recent sensory state from working memory
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory) {
+            sensoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Generate prediction based on current sensory pattern
+        // Prediction system learns patterns and makes forward predictions
+        float prediction = pImpl->predictionSystem->predict(sensoryPattern);
+        
+        // Get actual sensory input if available
+        // (In a real system, this would come from environment perception)
+        // For now, we simulate prediction error based on pattern complexity
+        float actual = 0.0f;
+        for (float val : sensoryPattern) {
+            actual += val;
+        }
+        actual /= sensoryPattern.empty() ? 1.0f : sensoryPattern.size();
+        
+        // Calculate prediction error
+        float predictionError = actual - prediction;
+        
+        // Update prediction error signal (neuromodulation)
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(predictionError);
+        }
+        
+        // Store prediction error for learning
+        pImpl->predictionSystem->update(predictionError, sensoryPattern);
+        
+        // Use prediction error to modulate synaptic plasticity
+        if (pImpl->predictionError) {
+            float errorSignal = pImpl->predictionError->getLevel();
+            if (std::abs(errorSignal) > 0.001f) {
+                // Scale plasticity based on prediction error
+                // Larger errors produce larger synaptic changes
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        if (syn->getPlasticityFlags().stdp) {
+                            float weight = syn->getWeight();
+                            // Error-driven weight modification
+                            float weightChange = errorSignal * 0.001f * 
+                                               (weight > 0 ? 1.0f : -1.0f);
+                            weight += weightChange;
+                            weight = std::max(0.0f, std::min(weight, 2.0f));
+                            syn->setWeight(weight);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,13 +583,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation abstracts from sensory input to create patterns
+        // This helps with generalization and prediction
+        
+        // Get current neural activity state
+        std::vector<float> neuralPattern;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    neuralPattern.push_back(neuron->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Get prediction system output for context
+        float prediction = 0.0f;
+        if (pImpl->predictionSystem) {
+            prediction = pImpl->predictionSystem->getCurrentPrediction();
+        }
+        
+        // Form concepts from neural patterns
+        pImpl->conceptFormation->process(neuralPattern, prediction);
+        
+        // Apply concept-based modulation to neural activity
+        // This allows learned concepts to guide processing
+        auto concepts = pImpl->conceptFormation->getActiveConcepts();
+        if (!concepts.empty()) {
+            // Apply concept-based gain modulation
+            float conceptStrength = concepts[0].strength;  // Use strongest concept
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Concept enhances related neural activity
+                        neuron->injectCurrent(conceptStrength * 0.1f);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        
+        // Apply concept-driven structural changes
+        // When new concepts form, we may want to create new connections
+        // or strengthen existing ones related to the concept
+        if (pImpl->conceptFormation) {
+            auto concepts = pImpl->conceptFormation->getActiveConcepts();
+            if (!concepts.empty()) {
+                for (const auto& concept : concepts) {
+                    if (concept.importance > 0.5f) {
+                        // Important concepts drive structural changes
+                        // Create new connections between regions related to concept
+                        pImpl->structuralPlasticity->conceptDrivenGrowth(
+                            this, concept.neuralPattern, concept.importance);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -543,6 +651,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
+            
+            // Apply replay to working memory for consolidation
+            // Replay strengthens memory traces and integrates them into working memory
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->rehearseEpisode(*episode);
+            }
         }
     }
     
@@ -550,7 +664,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects plasticity rates and cognitive capabilities
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -574,6 +688,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Development system updates cognitive capabilities
+        // As brain develops, prediction, planning, and concept formation improve
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->improve(pImpl->developmentalStage);
+        }
+        if (pImpl->planner) {
+            pImpl->planner->improve(pImpl->developmentalStage);
+        }
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->improve(pImpl->developmentalStage);
+        }
+        
+        // Development affects neuromodulation levels
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setLearningRate(
+                0.5f * (1.0f - plasticityMod)  // Lower learning rate in adult stage
+            );
+        }
+    }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development system updates cognitive capabilities
+        // As brain develops, prediction, planning, and concept formation improve
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->improve(pImpl->developmentalStage);
+        }
+        if (pImpl->planner) {
+            pImpl->planner->improve(pImpl->developmentalStage);
+        }
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->improve(pImpl->developmentalStage);
+        }
+        
+        // Development affects neuromodulation levels
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setLearningRate(
+                0.5f * (1.0f - plasticityMod)  // Lower learning rate in adult stage
+            );
+        }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -585,6 +742,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+        
+        // Check for important learning moments (prediction error peaks, memory consolidation)
+        if (pImpl->predictionError && pImpl->predictionError->getLevel() > 0.5f) {
+            // High prediction error indicates learning moment - save checkpoint
+            pImpl->checkpointManager->save("checkpoint_high_learning.bin");
+        }
     }
 }
 
@@ -609,9 +772,28 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Store in working memory for perception
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+        
+        // Encode sensory input in episodic memory as experience
+        if (pImpl->episodicMemory && normalizedValue > 1.0f) {
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.sensoryState.push_back(normalizedValue);
+            episode.action = ActionType::Wait;
+            episode.reward = 0.0f;
+            episode.energy = 0.0f;
+            episode.novelty = std::abs(normalizedValue);
+            
+            // Store this moment as an episode
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
+        
+        // Update prediction system with sensory input
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->updateInput(normalizedValue);
         }
     }
 }
