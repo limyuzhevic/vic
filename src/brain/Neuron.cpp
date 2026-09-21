@@ -18,13 +18,23 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
+    // Neuromodulation
+    MembranePotential dopamineLevel;    // Neuromodulator level (0.0 to 1.0)
+    MembranePotential serotoninLevel;   // Neuromodulator level (0.0 to 1.0)
+    MembranePotential thresholdV;       // Dynamic firing threshold
+    MembranePotential resetV;           // Post-spike reset potential
+    uint32_t refractoryPeriod;          // Refractory period in ms
+    float adaptationThreshold;          // Adaptation threshold for spike-frequency adaptation
+    
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             dopamineLevel(0.0f), serotoninLevel(0.0f),
+             thresholdV(-55.0f), resetV(-70.0f), refractoryPeriod(5), adaptationThreshold(1.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
