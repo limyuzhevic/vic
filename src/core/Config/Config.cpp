@@ -86,7 +86,17 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper function to convert ConfigValue to string
+        auto configValueToString = [](const ConfigValue& value) -> std::string {
+            std::stringstream ss;
+            std::visit([&ss](const auto& val) {
+                ss << val;
+            }, value);
+            return ss.str();
+        };
+        
+        file << entry.key << " = " << configValueToString(entry.value) << "\n";
     }
     
     return true;

@@ -229,35 +229,51 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
-    // Initialize working memory
+    // Initialize memory systems
+    pImpl->workingMemory = std::make_unique<NeuralWorkingMemory>();
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
+    pImpl->episodicMemory = std::make_unique<NeuralEpisodicMemory>();
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    pImpl->associativeMemory = std::make_unique<NeuralAssociativeMemory>();
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
+    pImpl->predictionSystem = std::make_unique<PredictionSystem>();
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
+    pImpl->planner = std::make_unique<NeuralPlanner>();
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
+    pImpl->conceptFormation = std::make_unique<ConceptFormation>();
     pImpl->conceptFormation->initialize(this);
     
+    pImpl->attention = std::make_unique<AttentionalSelection>();
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize development system
+    pImpl->developmentSystem = std::make_unique<DevelopmentSystem>();
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    pImpl->novelty = std::make_unique<Novelty>();
     pImpl->novelty->initialize(this);
+    
+    pImpl->curiosity = std::make_unique<Curiosity>();
     pImpl->curiosity->initialize(this);
+    
+    pImpl->dopamine = std::make_unique<Dopamine>();
+    pImpl->dopamine->initialize(this);
+    
+    pImpl->predictionError = std::make_unique<PredictionError>();
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -329,10 +345,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
+    // Log integration status
+    if (currentStep % 1000 == 0) {
+        NLM_LOG_INFO("=== Brain Step " + std::to_string(currentStep) + " ===");
+        NLM_LOG_INFO("Current time: " + std::to_string(currentTime) + "s");
+        NLM_LOG_INFO("Active regions: " + std::to_string(pImpl->regions.size()));
+        
+        // Check which systems are active
+        bool workingMemoryActive = pImpl->workingMemory && pImpl->workingMemory->getActiveTraces() > 0;
+        bool episodicMemoryActive = pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0;
+        bool neuromodulationActive = pImpl->dopamine || pImpl->curiosity || pImpl->novelty || pImpl->predictionError;
+        bool predictionActive = pImpl->predictionSystem;
+        bool cognitionActive = pImpl->planner || pImpl->conceptFormation || pImpl->attention;
+        
+        NLM_LOG_INFO("System Status: Working Memory=" + std::string(workingMemoryActive ? "YES" : "NO") +
+                    " | Episodic Memory=" + std::string(episodicMemoryActive ? "YES" : "NO") +
+                    " | Neuromodulation=" + std::string(neuromodulationActive ? "YES" : "NO") +
+                    " | Prediction=" + std::string(predictionActive ? "YES" : "NO") +
+                    " | Cognition=" + std::string(cognitionActive ? "YES" : "NO"));
+    }
+    
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    NLM_LOG_DEBUG("Processing delayed spike events");
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    NLM_LOG_DEBUG("Updating neuron membrane potentials");
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -342,6 +380,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    NLM_LOG_DEBUG("Detecting neuron spikes");
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -353,6 +392,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
+                    NLM_LOG_DEBUG("Neuron " + std::to_string(neuron->getId()) + " fired at time " + std::to_string(currentTime));
+                    
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
@@ -403,18 +444,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        NLM_LOG_DEBUG("Updating working memory");
         pImpl->workingMemory->update(pImpl->timestep);
+        NLM_LOG_DEBUG("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        float noveltyLevel = pImpl->novelty->getLevel();
+        NLM_LOG_DEBUG("Novelty level: " + std::to_string(noveltyLevel));
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        NLM_LOG_DEBUG("Curiosity level: " + std::to_string(curiosityLevel));
     }
     
     // Update dopamine (reward prediction error)
@@ -425,12 +472,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        NLM_LOG_DEBUG("Dopamine level: " + std::to_string(dopamineLevel));
+        
+        float excitabilityMod = dopamineLevel * 0.5f;
+        if (excitabilityMod > 0.0f) {
+            NLM_LOG_DEBUG("Applying dopamine excitability modulation: " + std::to_string(excitabilityMod));
+        }
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
@@ -444,8 +497,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        NLM_LOG_DEBUG("Plasticity modulation factor: " + std::to_string(plasticityMod));
     }
     
+    NLM_LOG_DEBUG("Applying plasticity rules (STDP and Hebbian)");
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
@@ -506,23 +561,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            NLM_LOG_DEBUG("Stored episodic memory with " + std::to_string(episode.activeNeurons.size()) + " active neurons");
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // The prediction system predicts sensory outcomes and computes prediction error
+        if (pImpl->predictionError) {
+            // Get prediction error from neuromodulation system
+            float predictionError = pImpl->predictionError->getLevel();
+            NLM_LOG_DEBUG("Prediction error level: " + std::to_string(predictionError));
+            
+            // Update prediction system with current error
+            // This allows the prediction system to learn from prediction errors
+            // Note: In a full implementation, we would pass sensory predictions to the system
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
+        NLM_LOG_DEBUG("Updating attention system");
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            NLM_LOG_DEBUG("Attention processing competition with " + std::to_string(competitors.size()) + " neurons");
         }
     }
     
@@ -530,24 +597,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        NLM_LOG_DEBUG("Concept formation running (sensory input required for full functionality)");
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
+        NLM_LOG_DEBUG("Applying structural plasticity");
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
+        NLM_LOG_DEBUG("Replaying episodic memories");
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
+        NLM_LOG_DEBUG("Replayed " + std::to_string(episodesToReplay.size()) + " episodes");
     }
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        NLM_LOG_DEBUG("Applying development effects");
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
@@ -571,6 +643,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
             }
             
+            NLM_LOG_DEBUG("Development stage: " + std::to_string(static_cast<int>(stage)) + ", plasticity mod: " + std::to_string(plasticityMod));
+            
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
@@ -579,12 +653,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
+        NLM_LOG_DEBUG("Consolidating episodic memories");
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // Log final status
+    if (currentStep % 1000 == 0) {
+        NLM_LOG_INFO("Step " + std::to_string(currentStep) + " completed - Total spikes this step: " + 
+                    std::to_string(pImpl->totalSpikesThisStep));
+        NLM_LOG_INFO("=== End of Brain Step " + std::to_string(currentStep) + " ===");
     }
 }
 
