@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -76,11 +75,30 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+**NOTE**: The Phase 6 integration demo has been enhanced with improved error handling and corrected world interaction methods. The demo now properly uses `getSensoryPercept()` instead of `observe()` and `applyMotorCommand()` instead of `applyAction()` to match the SimpleWorld API.
+
+### Phase 4 Demo (World Interaction)
+
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates brain-world interaction with sensory input, motor output, and learning.
+
+### Unit Tests
+
+```bash
+./nlm_test
+```
+
+Runs the complete unit test suite including tests for synapses, STDP, neurons, random generation, clocks, config, main brain functionality, and brain integration.
 
 ## Project Structure
 
