@@ -127,6 +127,15 @@ public:
 
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;
+    
+    // Check if concept has new instances since last check
+    bool hasNewConcept() const { return hasNewConcept_; }
+    
+    // Get neurons associated with concepts
+    std::vector<NeuronId> getConceptNeurons() const;
+    
+    // Set that a new concept has been formed
+    void setHasNewConcept(bool hasNew) { hasNewConcept_ = hasNew; }
 
     // Clear all concepts
     void clear();
@@ -147,11 +156,7 @@ private:
     // Update concept prototype using Hebbian averaging
     void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
 
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
-
     struct Impl;
-    std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
@@ -161,6 +166,10 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
+    
+    // State tracking
+    bool hasNewConcept_;
+    mutable std::vector<NeuronId> conceptNeurons_;
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience
