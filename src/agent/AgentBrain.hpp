@@ -1,117 +1,145 @@
 #pragma once
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../sensory/SensoryPercept.hpp"
+#include "../motor/Action.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+/**
+ * AgentBrain: Connects NLM brain to the world
+ * Handles sensory transduction and motor decoding
+ */
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
     
-    // Initialize with world
+    /**
+     * Initialize agent brain with world
+     */
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
+    /**
+     * Get expected sensory input size
+     */
     size_t getSensoryInputSize() const;
     
-    // Get motor output size expected
+    /**
+     * Get expected motor output size
+     */
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
+    /**
+     * Process sensory percept and inject into brain
+     */
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    /**
+     * Decode brain motor activity into motor command
+     */
     MotorCommand decodeMotorCommand();
     
-    // Apply neuromodulation based on reward
+    /**
+     * Apply reward-based neuromodulation
+     */
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
+    /**
+     * Update development system
+     */
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
+    /**
+     * Get current developmental stage
+     */
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
+    /**
+     * Get current neuromodulation level
+     */
     float getNeuromodulationLevel() const;
     
-    // Get curiosity level
+    /**
+     * Get curiosity level
+     */
     float getCuriosityLevel() const;
     
-    // Get novelty level
+    /**
+     * Get novelty level
+     */
     float getNoveltyLevel() const;
     
-    // Get prediction error
+    /**
+     * Get prediction error
+     */
     float getPredictionError() const;
     
-    // Reset agent for new episode
+    /**
+     * Reset agent brain for new episode
+     */
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    /**
+     * Get underlying brain
+     */
+    std::shared_ptr<Brain> getBrain() const;
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    /**
+     * Enable/disable reward modulation
+     */
+    void enableRewardModulation(bool enable);
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    /**
+     * Enable/disable structural plasticity
+     */
+    void enableStructuralPlasticity(bool enable);
     
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    /**
+     * Enable/disable development
+     */
+    void enableDevelopment(bool enable);
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    /**
+     * Enable/disable curiosity
+     */
+    void enableCuriosity(bool enable);
     
-    std::shared_ptr<Brain> brain_;
+    /**
+     * Check if reward modulation is enabled
+     */
+    bool isRewardModulationEnabled() const;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    /**
+     * Check if structural plasticity is enabled
+     */
+    bool isStructuralPlasticityEnabled() const;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    /**
+     * Check if development is enabled
+     */
+    bool isDevelopmentEnabled() const;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    /**
+     * Check if curiosity is enabled
+     */
+    bool isCuriosityEnabled() const;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    /**
+     * Log agent brain status
+     */
+    void logStatus() const;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Private implementation details
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

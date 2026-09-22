@@ -12,6 +12,10 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Advanced Usage Notes
+
+The Python API provides direct access to core NLM classes. For advanced users, you can also use the C++ API directly for better performance or integration with existing C++ code.
+
 ---
 
 ## The 3 Things You Need to Know
