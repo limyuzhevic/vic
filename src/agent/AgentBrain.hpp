@@ -6,11 +6,21 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
+#include <utility>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+
+enum class ExplorationStrategy {
+    Random,
+    Exploitation,
+    CuriosityDriven,
+    Balance
+};
+
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -112,6 +122,28 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced features and state
+    ExplorationStrategy explorationStrategy_;
+    float stressLevel_;
+    float energyLevel_;
+    bool metaLearningEnabled_;
+    bool selfMonitorEnabled_;
+    std::string targetBehavior_;
+    std::string currentStateName_;
+    std::string currentStateData_;
+    double stateTimestamp_;
+    double developmentalAge_;
+    
+    // Personality traits for advanced behavior
+    double personalityOpenness_;
+    double personalityConscientiousness_;
+    double personalityExtraversion_;
+    double personalityAgreeableness_;
+    double personalityNeuroticism_;
+    
+    // State transition history
+    std::vector<std::pair<std::string, std::string>> stateTransitionHistory_;
 };
 
 } // namespace nlm

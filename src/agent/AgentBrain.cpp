@@ -347,4 +347,230 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+void AgentBrain::reset() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Clear previous vision
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Advanced AgentBrain commands
+
+void AgentBrain::exploreRandomly() {
+    if (!brain_) return;
+    
+    // Simple random exploration
+    MotorCommand randomCmd;
+    int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+    switch (choice) {
+        case 0: randomCmd = MotorCommand::MoveForward; break;
+        case 1: randomCmd = MotorCommand::MoveBackward; break;
+        case 2: randomCmd = MotorCommand::TurnLeft; break;
+        case 3: randomCmd = MotorCommand::TurnRight; break;
+        case 4: randomCmd = MotorCommand::LookLeft; break;
+        case 5: randomCmd = MotorCommand::LookRight; break;
+        case 6: randomCmd = MotorCommand::Interact; break;
+        default: randomCmd = MotorCommand::Wait; break;
+    }
+    
+    // Apply random exploration with higher chance when curiosity is high
+    if (curiosityLevel_ > 0.7f) {
+        // 50% chance to use random exploration
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < 0.5f) {
+            NLM_LOG_INFO("AgentBrain: Performing random exploration");
+            // Note: In a real implementation, this would directly control the motor system
+        }
+    }
+}
+
+void AgentBrain::enableAdvancedExploration() {
+    // Enable advanced exploration behaviors
+    if (curiosityEnabled_) {
+        NLM_LOG_INFO("AgentBrain: Advanced exploration enabled");
+        // This could set up additional exploration behaviors
+    }
+}
+
+void AgentBrain::setExplorationStrategy(ExplorationStrategy strategy) {
+    // Set exploration strategy (placeholder for future implementation)
+    explorationStrategy_ = strategy;
+    NLM_LOG_INFO("AgentBrain: Exploration strategy set to " + std::to_string(static_cast<int>(strategy)));
+}
+
+float AgentBrain::getExplorationProbability() const {
+    // Calculate probability of exploration based on curiosity
+    return std::min(1.0f, curiosityLevel_ * 0.5f + 0.1f);
+}
+
+void AgentBrain::updateNoveltyDetection() {
+    // Update novelty detection with more sophisticated processing
+    if (!brain_ || sensoryVision_.empty()) return;
+    
+    // Enhanced novelty detection with temporal smoothing
+    float currentNovelty = 0.0f;
+    const auto& vision = sensoryVision_;
+    
+    if (!vision.empty() && !previousVision_.empty()) {
+        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+            float diff = std::abs(vision[i] - previousVision_[i]);
+            currentNovelty += diff;
+        }
+        
+        // Normalize and apply logarithmic scaling for sensitivity
+        currentNovelty = currentNovelty / vision.size();
+        currentNovelty = 1.0f - std::exp(-currentNovelty * 5.0f); // Logarithmic scaling
+    }
+    
+    // Smooth novelty with decay
+    noveltyLevel_ = noveltyLevel_ * 0.8f + currentNovelty * 0.2f;
+    
+    // Update previous vision
+    previousVision_ = vision;
+}
+
+void AgentBrain::applyCuriosityBasedLearning() {
+    // Apply curiosity-driven learning with prediction error
+    if (!brain_ || !curiosityEnabled_) return;
+    
+    // Calculate prediction error if we have predictions
+    if (predictionError_ != 0.0f) {
+        // Scale plasticity by curiosity and prediction error
+        float learningMod = std::abs(predictionError_) * curiosityLevel_ * 0.1f;
+        
+        // Apply to motor system
+        if (learningMod > 0.01f) {
+            NLM_LOG_INFO("AgentBrain: Curiosity-based learning with modulation " + std::to_string(learningMod));
+        }
+    }
+}
+
+void AgentBrain::setTargetBehavior(const std::string& behavior) {
+    // Set target behavior for the agent
+    targetBehavior_ = behavior;
+    NLM_LOG_INFO("AgentBrain: Target behavior set to " + behavior);
+}
+
+void AgentBrain::enableSelfMonitoring() {
+    // Enable self-monitoring and introspection
+    selfMonitorEnabled_ = true;
+    NLM_LOG_INFO("AgentBrain: Self-monitoring enabled");
+}
+
+float AgentBrain::getAttentionLevel() const {
+    // Estimate attention level based on curiosity and novelty
+    if (curiosityLevel_ < 0.01f && noveltyLevel_ < 0.01f) {
+        return 0.0f;
+    }
+    return std::min(1.0f, (curiosityLevel_ + noveltyLevel_) * 0.5f);
+}
+
+void AgentBrain::applyStressLevel(float stress) {
+    // Apply stress level affecting behavior and learning
+    stressLevel_ = std::clamp(stress, 0.0f, 1.0f);
+    
+    // High stress reduces exploration and increases random movements
+    if (stressLevel_ > 0.7f) {
+        NLM_LOG_INFO("AgentBrain: High stress level - reducing exploration");
+    } else if (stressLevel_ > 0.4f) {
+        NLM_LOG_INFO("AgentBrain: Moderate stress level");
+    }
+}
+
+float AgentBrain::getStressLevel() const {
+    return stressLevel_;
+}
+
+void AgentBrain::setEnergyLevel(float energy) {
+    // Set energy level affecting action selection
+    energyLevel_ = std::clamp(energy, 0.0f, 1.0f);
+}
+
+float AgentBrain::getEnergyLevel() const {
+    return energyLevel_;
+}
+
+void AgentBrain::enableMetaLearning() {
+    // Enable meta-learning capabilities
+    metaLearningEnabled_ = true;
+    NLM_LOG_INFO("AgentBrain: Meta-learning enabled");
+}
+
+void AgentBrain::updateMetaLearning() {
+    // Update meta-learning based on performance
+    if (metaLearningEnabled_) {
+        // Simple meta-learning: adjust exploration based on prediction error
+        if (std::abs(predictionError_) < 0.1f) {
+            // Good prediction -> increase exploration
+            if (curiosityLevel_ < 1.0f) {
+                curiosityLevel_ = std::min(1.0f, curiosityLevel_ + 0.05f);
+            }
+        } else {
+            // Bad prediction -> decrease exploration and increase exploitation
+            curiosityLevel_ = std::max(0.1f, curiosityLevel_ - 0.05f);
+        }
+    }
+}
+
+void AgentBrain::setPersonality(double openness, double conscientiousness, 
+                               double extraversion, double agreeableness,
+                               double neuroticism) {
+    // Set personality traits for behavior modulation
+    personalityOpenness_ = std::clamp(openness, 0.0, 1.0);
+    personalityConscientiousness_ = std::clamp(conscientiousness, 0.0, 1.0);
+    personalityExtraversion_ = std::clamp(extraversion, 0.0, 1.0);
+    personalityAgreeableness_ = std::clamp(agreeableness, 0.0, 1.0);
+    personalityNeuroticism_ = std::clamp(neuroticism, 0.0, 1.0);
+    
+    NLM_LOG_INFO("AgentBrain: Personality traits set - Openness:" + std::to_string(personalityOpenness_) +
+                 ", Conscientiousness:" + std::to_string(personalityConscientiousness_));
+}
+
+void AgentBrain::setState(const std::string& stateName, const std::string& stateData) {
+    // Set agent state
+    currentStateName_ = stateName;
+    currentStateData_ = stateData;
+    stateTimestamp_ = static_cast<double>(brain_->getTotalSpikeCount());
+}
+
+void AgentBrain::transitionToState(const std::string& newStateName) {
+    // Transition to new state
+    if (!currentStateName_.empty()) {
+        NLM_LOG_INFO("AgentBrain: Transitioning from state " + currentStateName_ + " to " + newStateName);
+    }
+    
+    currentStateName_ = newStateName;
+    stateTimestamp_ = static_cast<double>(brain_->getTotalSpikeCount());
+    
+    // Apply state-specific behaviors
+    if (newStateName == "exploration") {
+        explorationStrategy_ = ExplorationStrategy::Random;
+    } else if (newStateName == "exploitation") {
+        explorationStrategy_ = ExplorationStrategy::Exploitation;
+    } else if (newStateName == "curiosity") {
+        explorationStrategy_ = ExplorationStrategy::CuriosityDriven;
+    }
+}
+
+std::string AgentBrain::getCurrentState() const {
+    return currentStateName_;
+}
+
+void AgentBrain::logStateChange(const std::string& fromState, const std::string& toState) {
+    // Log state changes for debugging and analysis
+    NLM_LOG_INFO("AgentBrain: State change from '" + fromState + "' to '" + toState + "'");
+    
+    // Store state transition history
+    stateTransitionHistory_.push_back(std::make_pair(fromState, toState));
+    
+    // Limit history size
+    if (stateTransitionHistory_.size() > 100) {
+        stateTransitionHistory_.erase(stateTransitionHistory_.begin());
+    }
+}

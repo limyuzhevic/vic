@@ -93,6 +93,47 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration version
+    void setVersion(int version) { version_ = version; }
+    int getVersion() const { return version_; }
+    
+    // Feature flags
+    void setFeatureFlag(const std::string& feature, bool enabled) {
+        featureFlags_[feature] = enabled;
+    }
+    bool isFeatureEnabled(const std::string& feature) const {
+        auto it = featureFlags_.find(feature);
+        return it != featureFlags_.end() ? it->second : false;
+    }
+    
+    // Get all feature flags
+    std::map<std::string, bool> getFeatureFlags() const { return featureFlags_; }
+    
+    // Advanced options
+    void setAdvancedOption(const std::string& option, const std::string& value) {
+        advancedOptions_[option] = value;
+    }
+    std::string getAdvancedOption(const std::string& option) const {
+        auto it = advancedOptions_.find(option);
+        return it != advancedOptions_.end() ? it->second : "";
+    }
+    
+    // Get all advanced options
+    std::map<std::string, std::string> getAdvancedOptions() const { return advancedOptions_; }
+    
+    // Simulation settings
+    void setMaxSteps(size_t steps) { maxSimulationSteps_ = steps; }
+    size_t getMaxSteps() const { return maxSimulationSteps_; }
+    
+    void setTimeLimit(double time) { simulationTimeLimit_ = time; }
+    double getTimeLimit() const { return simulationTimeLimit_; }
+    
+    void setCheckpointInterval(size_t interval) { checkpointInterval_ = interval; }
+    size_t getCheckpointInterval() const { return checkpointInterval_; }
+    
+    void setMemoryCapacity(size_t capacity) { memoryCapacity_ = capacity; }
+    size_t getMemoryCapacity() const { return memoryCapacity_; }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +141,21 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Metadata
+    int version_;
+    
+    // Feature flags
+    std::map<std::string, bool> featureFlags_;
+    
+    // Advanced options
+    std::map<std::string, std::string> advancedOptions_;
+    
+    // Simulation settings
+    size_t maxSimulationSteps_;
+    double simulationTimeLimit_;
+    size_t checkpointInterval_;
+    size_t memoryCapacity_;
 };
 
 } // namespace nlm

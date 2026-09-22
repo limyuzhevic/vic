@@ -511,8 +511,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make prediction based on sensory input
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a simple prediction based on current neural activity
+            // This is a simplified placeholder - real implementation would use the prediction system
+            // to predict next states and update based on sensory input
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
