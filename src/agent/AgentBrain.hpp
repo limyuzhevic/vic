@@ -13,6 +13,13 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    static constexpr size_t MOTOR_COMMAND_COUNT = 6;
+    static constexpr size_t SENSORY_CHANNEL_COUNT = 4;
+    static constexpr float DEFAULT_NOVELTY_DECAY = 0.99f;
+    static constexpr float DEFAULT_EXPLORATION_THRESHOLD = 0.3f;
+    static constexpr float DEFAULT_MAX_CURIOUSITY = 1.0f;
+    static constexpr size_t MAX_ACTIVE_MOTOR_GROUPS = 6;
+    
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
@@ -69,6 +76,10 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Utility methods for advanced users
+    const std::vector<Neuron*>& getMotorGroup(MotorCommand cmd) const;
+    const std::vector<Neuron*>& getSensoryGroup(size_t index) const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +123,9 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Helper function to distribute neurons into groups
+    void distributeNeurons(const Brain& brain);
 };
 
 } // namespace nlm

@@ -1,10 +1,3 @@
-#include "SimpleWorld.hpp"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
-
-namespace nlm {
-
 // Simple linear congruential generator
 static uint64_t lcg(uint64_t& state) {
     state = state * 6364136223846793005ULL + 1442695040888963407ULL;

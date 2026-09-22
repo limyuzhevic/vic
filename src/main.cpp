@@ -164,8 +164,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    auto region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_WARNING("Region 1 not found for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -178,7 +181,8 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    size_t neuronsToStimulate = std::min(size_t(10), neurons.size());
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
