@@ -1,9 +1,3 @@
-#pragma once
-
-#include "PlasticityRule.hpp"
-
-namespace nlm {
-
 // Hebbian learning implementation
 class Hebbian : public PlasticityRule {
 public:
