@@ -13,9 +13,15 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
-
-DevelopmentSystem::~DevelopmentSystem() = default;
+void DevelopmentSystem::initialize(RandomGenerator& rng) {
+    // Initialize development system with given random generator
+    rng_ = std::make_shared<RandomGenerator>(rng);
+    
+    // Reset developmental state
+    setStage(DevelopmentalStage::Initial);
+    
+    NLM_LOG_INFO("DevelopmentSystem initialized with random generator");
+}
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;
@@ -61,18 +67,15 @@ const char* DevelopmentSystem::getStageName() const {
 }
 
 void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
-    ++pImpl->stepsInCurrentStage;
-    age_ += 0.001;  // Approximate timestep
-    pImpl->stageAge += 0.001;
-    
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
-        advanceStage();
+    // Delegate to the main update method with a default timestep
+    // This maintains backward compatibility while using the main implementation
+    double dt = 0.001; // Default timestep
+    if (rng_) {
+        update(*brain, *rng_, dt);
+    } else {
+        // Create a default RNG if none is initialized
+        RandomGenerator rng(42); // Default seed
+        update(*brain, rng, dt);
     }
 }
 

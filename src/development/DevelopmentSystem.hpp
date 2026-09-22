@@ -1,5 +1,3 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
 #include <functional>
@@ -17,6 +15,9 @@ public:
     DevelopmentSystem();
     ~DevelopmentSystem();
     
+    // Initialize with random generator
+    void initialize(RandomGenerator& rng);
+    
     // Get current developmental stage
     DevelopmentalStage getStage() const;
     void setStage(DevelopmentalStage stage);
@@ -26,9 +27,6 @@ public:
     
     // Get stage name
     const char* getStageName() const;
-    
-    // Update development (simple version)
-    void update(Brain* brain, SimulationStep currentStep);
     
     // Update development with full parameters
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
@@ -50,6 +48,7 @@ private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    std::shared_ptr<RandomGenerator> rng_;
 };
 
 } // namespace nlm

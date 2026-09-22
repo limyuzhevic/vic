@@ -261,7 +261,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Enhanced Python API: Add convenience methods for common use cases
+        .def("getVisionAsTensor", &SensoryPercept::getVision)
+        .def("getTouchAsArray", &SensoryPercept::getTouch)
+        .def("getInternalAsArray", &SensoryPercept::getInternal)
+        .def("getProprioceptionAsArray", &SensoryPercept::getProprioception)
+        .def("getAudioAsArray", &SensoryPercept::getAudio)
+        .def("isNovel", [](const SensoryPercept& self) {
+            // Convenience method to check if percept contains novel data
+            auto vision = self.getVision();
+            auto touch = self.getTouch();
+            
+            float novelty = 0.0f;
+            // Simple novelty detection based on intensity variance
+            for (float v : vision) {
+                if (v > 0.5f) novelty += v * 0.1f;
+            }
+            for (float t : touch) {
+                if (t > 0.5f) novelty += t * 0.2f;
+            }
+            
+            return novelty > 0.5f;
+        })
+        .def("toDict", [](const SensoryPercept& self) {
+            // Convert percept to Python dictionary for easy inspection
+            py::dict result;
+            result["vision"] = self.getVision();
+            result["touch"] = self.getTouch();
+            result["internal"] = self.getInternal();
+            result["proprioception"] = self.getProprioception();
+            result["audio"] = self.getAudio();
+            result["timestamp"] = self.getTimestamp();
+            return result;
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
