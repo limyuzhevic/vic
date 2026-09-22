@@ -31,8 +31,19 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty()) {
             continue;
+        }
+        
+        // Skip only comment characters at the beginning of the line
+        size_t commentPos = line.find_first_of("#/");
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            // Trim again after removing comment
+            line = trim(line);
+            if (line.empty()) {
+                continue;
+            }
         }
         
         // Parse simple key=value pairs
@@ -92,8 +103,6 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -104,9 +113,9 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Log or handle type conversion error
         return std::nullopt;
     }
-}
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
@@ -119,10 +128,21 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        // Update existing entry, preserve source priority (File > CommandLine > Default)
+        if (source == ConfigSource::File || it->source == ConfigSource::CommandLine) {
+            it->value = value;
+            it->source = source;
+        } else if (source == ConfigSource::CommandLine) {
+            // Don't overwrite File source with CommandLine source
+            it->value = value;
+            it->source = ConfigSource::CommandLine;
+        }
+        // If source is Default, don't overwrite existing values
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Only add new entry if it's not Default (or if Config is empty)
+        if (source != ConfigSource::Default || pImpl->entries.empty()) {
+            pImpl->entries.emplace_back(key, value, source);
+        }
     }
 }
 
@@ -195,7 +215,10 @@ std::string Config::trim(const std::string& str) {
 
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    for (char& c : result) {
+        // Use static_cast to ensure proper integer conversion for std::tolower
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
     return result;
 }
 

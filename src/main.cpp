@@ -114,8 +114,8 @@ struct LearningExperiment {
         // Compute weight changes
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        float initialMean = initialSum / static_cast<float>(initialWeights.size());
+        float finalMean = finalSum / static_cast<float>(finalWeights.size());
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
@@ -127,7 +127,9 @@ struct LearningExperiment {
         size_t weakened = 0;
         size_t unchanged = 0;
         
+        // Use minimum size to prevent bounds violations
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        // Iterate only up to the minimum size to avoid out-of-bounds access
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
             if (delta > 0.01f) ++strengthened;
@@ -349,7 +351,14 @@ int main(int argc, char** argv) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+                // --config=value format
+                size_t equals_pos = arg.find('=');
+                if (equals_pos < arg.length() - 1) {
+                    configFile = arg.substr(equals_pos + 1);
+                } else if (i + 1 < argc) {
+                    // --config value format
+                    configFile = argv[++i];
+                }
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
@@ -357,10 +366,43 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    std::filesystem::path configPath(configFile);
+    if (std::filesystem::exists(configPath)) {
+        // Validate configuration file format
+        bool validConfig = true;
+        std::ifstream file(configPath);
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(file, line) && validConfig) {
+            ++lineNum;
+            line = Config::trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            size_t pos = line.find('=');
+            if (pos == std::string::npos) {
+                NLM_LOG_ERROR("Invalid config format at line " + std::to_string(lineNum) + ": missing '='");
+                validConfig = false;
+            } else {
+                std::string key = Config::trim(line.substr(0, pos));
+                std::string value = Config::trim(line.substr(pos + 1));
+                if (key.empty() || value.empty()) {
+                    NLM_LOG_ERROR("Invalid config format at line " + std::to_string(lineNum) + ": empty key or value");
+                    validConfig = false;
+                }
+            }
+        }
+        
+        if (!validConfig) {
+            NLM_LOG_ERROR("Configuration file validation failed: " + configFile);
+            // Continue with defaults despite validation failure
+        } else {
+            if (config->loadFromFile(configFile)) {
+                NLM_LOG_INFO("Loaded configuration from: " + configFile);
+            }
+        }
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Config file not found, using default configuration.");
     }
     
     // Override with command line args

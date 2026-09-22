@@ -56,12 +56,34 @@ void STDP::update(Synapse* synapse,
         return;
     }
     
+    // Add bounds checking for spike history length to prevent overflow
+    const size_t MAX_SPIKE_HISTORY = 1000;
+    if (preSpikes.size() > MAX_SPIKE_HISTORY || postSpikes.size() > MAX_SPIKE_HISTORY) {
+        // Truncate spike histories to maximum size
+        std::vector<Timestamp> trimmedPreSpikes(preSpikes.begin(), 
+                                                preSpikes.begin() + std::min(preSpikes.size(), MAX_SPIKE_HISTORY));
+        std::vector<Timestamp> trimmedPostSpikes(postSpikes.begin(), 
+                                                 postSpikes.begin() + std::min(postSpikes.size(), MAX_SPIKE_HISTORY));
+        
+        if (trimmedPreSpikes.empty() || trimmedPostSpikes.empty()) {
+            return;
+        }
+        
+        preSpikes = trimmedPreSpikes;
+        postSpikes = trimmedPostSpikes;
+    }
+    
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            long long dt_ll = static_cast<long long>(postTime) - static_cast<long long>(preTime);
+            // Check for potential overflow before casting to float
+            if (dt_ll < -1000000 || dt_ll > 1000000) {
+                continue;  // Skip extreme timing differences
+            }
+            float dt = static_cast<float>(dt_ll);  // Δt in ms
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
@@ -82,6 +104,10 @@ void STDP::update(Synapse* synapse,
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
+        // Check efficacy bounds to prevent extreme weight changes
+        if (efficacy < 0.0f) efficacy = 0.0f;
+        else if (efficacy > 2.0f) efficacy = 2.0f;
+        
         totalDelta *= efficacy;
         
         // Apply weight change
@@ -89,7 +115,12 @@ void STDP::update(Synapse* synapse,
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        currentTrace += totalDelta;
+        // Cap eligibility trace to prevent overflow
+        if (std::abs(currentTrace) > 10.0f) {
+            currentTrace = (currentTrace > 0.0f) ? 10.0f : -10.0f;
+        }
+        synapse->setEligibilityTrace(currentTrace);
     }
 }
 

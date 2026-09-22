@@ -23,8 +23,19 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    Neuron::Impl::Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
+             totalCurrent(0.0f), synapticInput(0.0f) {
+    // Initialize state with biologically realistic defaults
+    state.membranePotential = state.restingPotential + random::uniformReal(-3.0f, 3.0f);
+    state.threshold = -55.0f + random::uniformReal(-2.0f, 2.0f);
+    state.restingPotential = -70.0f + random::uniformReal(-2.0f, 2.0f);
+    state.resetPotential = state.restingPotential + random::uniformReal(0.0f, 5.0f);
+    state.refractoryPeriod = static_cast<uint32_t>(random::uniformInt(2, 10));
+    state.firingState = FiringState::Resting;
+    state.refractoryRemaining = 0;
+    state.adaptationVariable = 0.0f;
+    state.lastSpikeTime = -1.0f;
+}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -37,9 +48,15 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept {
+        // Properly transfer ownership of pImpl
+        // Delete current pImpl before replacing to avoid memory leak
+        if (pImpl) {
+            delete pImpl;
+        }
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
@@ -197,7 +214,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // During refractory period, clear synaptic input but don't integrate
         pImpl->synapticInput = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+            pImpl->state.firingState = FiringState::Active;  // Ready to fire when potential reaches threshold
         }
         return false;
     }
@@ -226,12 +243,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Cap adaptation to prevent overflow (biological limit)
+        if (pImpl->state.adaptationVariable > 10.0f) {
+            pImpl->state.adaptationVariable = 10.0f;
+        }
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Add bounds checking: membrane potential must be within biologically plausible range (-100mV to 50mV)
+    const MembranePotential MIN_POTENTIAL = -100.0f;
+    const MembranePotential MAX_POTENTIAL = 50.0f;
+    V = std::clamp(V, MIN_POTENTIAL, MAX_POTENTIAL);
     
-    // Check for spike
+// Check for spike
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;

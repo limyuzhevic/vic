@@ -207,19 +207,32 @@ void Synapse::step(Timestamp currentTime) {
     
     // Decay short-term depression
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+        float timeSinceActivity;
+        if (pImpl->lastPostSpikeTime >= 0.0f && pImpl->lastPreSpikeTime >= 0.0f) {
+            // Both have spikes, use the most recent one
+            timeSinceActivity = std::max(
+                static_cast<float>(currentTime - pImpl->lastPostSpikeTime),
+                static_cast<float>(currentTime - pImpl->lastPreSpikeTime)
+            );
+        } else if (pImpl->lastPostSpikeTime >= 0.0f) {
+            // Only post spike
+            timeSinceActivity = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+        } else {
+            // Only pre spike
+            timeSinceActivity = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        }
+        
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Apply short-term depression if applicable (Tsodyks-Markram model)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float u = pImpl->shortTermDepression * pImpl->shortTermFacilitation;
+        if (u > Impl::STP_U_MAX) u = Impl::STP_U_MAX;
+        pImpl->efficacy *= (1.0f - u);
+        if (pImpl->efficacy < 0.1f) pImpl->efficacy = 0.1f;  // Prevent zero efficacy
+    }
 }
 
 void Synapse::reset() {
