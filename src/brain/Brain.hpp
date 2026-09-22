@@ -19,15 +19,23 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
+class InternalSignals;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -150,48 +158,68 @@ public:
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Self model for maintaining internal state
+    SelfModel* getSelfModel();
     
-    // ========== COGNITION SYSTEMS ==========
+    // Social learning system
+    SocialLearning* getSocialLearning();
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Internal signals processing
+    InternalSignals* getInternalSignals();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Additional memory systems
+    NeuralSemanticMemory* getSemanticMemory();
+    NeuralProceduralMemory* getProceduralMemory();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Complete neuromodulation system access
+    Serotonin* getSerotonin();
+    Norepinephrine* getNorepinephrine();
+    Acetylcholine* getAcetylcholine();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // ========== ADDITIONAL ACCESSORS ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Additional memory systems
+    NeuralSemanticMemory* getSemanticMemory();
+    NeuralProceduralMemory* getProceduralMemory();
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Complete neuromodulation system access
+    Serotonin* getSerotonin();
+    Norepinephrine* getNorepinephrine();
+    Acetylcholine* getAcetylcholine();
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // New brain systems for Phase 4+
+    SelfModel* getSelfModel();
+    SocialLearning* getSocialLearning();
+    InternalSignals* getInternalSignals();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Error handling
+    const std::string& getLastError() const;
+    bool hasError() const;
+    void clearError();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+    // Performance monitoring
+    double getAverageFiringRate() const;
+    size_t getTotalSpikeCount() const;
+    float getExcitationInhibitionRatio() const;
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Batch processing
+    bool runBatch(int numRuns, int stepsPerRun, float variance = 0.0f);
+    void setBatchMode(bool enabled);
+    bool isBatchMode() const;
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Advanced examples and utilities
+    static std::string getExampleCode(const std::string& exampleName);
+    static std::vector<std::string> getAvailableExamples();
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Development and debugging
+    void enableDebugMode(bool enabled);
+    bool isDebugMode() const;
+    void setLogLevel(LogLevel level);
+    LogLevel getLogLevel() const;
     
-    // Logging
-    void logStatus() const;
+    // System health and metrics
+    void collectMetrics();
+    std::string getMetricsSummary() const;
     
 private:
     struct Impl;
