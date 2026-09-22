@@ -9,26 +9,6 @@
 #include <memory>
 #include <string>
 
-namespace nlm {
-
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -139,14 +119,14 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Semantic memory - long-term knowledge
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -155,11 +135,17 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Self-model - bodily awareness and self-representation
+    SelfModel* getSelfModel();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Social learning - observation and imitation
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation - spatial relationships
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relations - before/after/sequence encoding
+    TemporalRelation* getTemporalRelation();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();

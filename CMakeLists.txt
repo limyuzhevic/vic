@@ -54,7 +54,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
+    # Memory (new neural implementations)
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
     src/memory/SemanticMemory.cpp
@@ -62,29 +62,34 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
+    src/memory/NeuralSemanticMemory.cpp
+    src/memory/NeuralProceduralMemory.cpp
+    # Cognition (complete set)
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
+    src/cognition/NeuralPlanner.cpp  # SelfModel, SocialLearning, SpatialRepresentation, TemporalRelation defined here
+    # Development
+    src/development/DevelopmentSystem.cpp
+    src/development/Synaptogenesis.cpp
+    src/development/Pruning.cpp
+    src/development/Maturation.cpp
+    # Neuromodulation
+    src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Reward.cpp
+    src/neuromodulation/PredictionError.cpp
+    src/neuromodulation/Novelty.cpp
+    src/neuromodulation/Curiosity.cpp
+    # Agent
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    # World
+    src/world/SimpleWorld.cpp
+    # Phase 3 experiments
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
