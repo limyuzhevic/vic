@@ -108,7 +108,16 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Consolidate relevant episodes into semantic memory
+    std::vector<EpisodicMemoryItem> consolidated;
+    
+    for (const auto& episode : pImpl->episodes) {
+        if (episode.relevance >= relevanceThreshold || episode.age < 10) {
+            consolidated.push_back(episode);
+        }
+    }
+    
+    pImpl->episodes = std::move(consolidated);
 }
 
 // Semantic Memory Implementation

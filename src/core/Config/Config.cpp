@@ -19,36 +19,93 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load configuration from various formats
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    // Read entire file into string
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                         std::istreambuf_iterator<char>());
+    
+    // Try to detect file format and parse accordingly
+    // First check if it's YAML (contains ':' followed by space and has indented structure)
+    bool isYaml = false;
+    size_t yamlColon = content.find(": ");
+    size_t yamlIndent = content.find('\n ');
+    if (yamlColon != std::string::npos && yamlIndent != std::string::npos) {
+        isYaml = true;
+    }
+    
+    if (isYaml) {
+        // Simple YAML parsing (supports key-value pairs with basic indentation)
+        size_t pos = 0;
+        while (pos < content.length()) {
+            // Find next line with key-value pair
+            size_t newlinePos = content.find('\n', pos);
+            if (newlinePos == std::string::npos) {
+                newlinePos = content.length();
             }
             
-            set(key, value, ConfigSource::File);
+            std::string line = content.substr(pos, newlinePos - pos);
+            pos = newlinePos + 1;
+            
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            
+            // Check for key-value pair with colon
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Remove quotes from value
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+    } else {
+        // Parse as key=value format (original format)
+        size_t pos = 0;
+        while (pos < content.length()) {
+            size_t newlinePos = content.find('\n', pos);
+            if (newlinePos == std::string::npos) {
+                newlinePos = content.length();
+            }
+            
+            std::string line = content.substr(pos, newlinePos - pos);
+            pos = newlinePos + 1;
+            
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse key=value pairs
+            size_t eqPos = line.find('=');
+            if (eqPos != std::string::npos) {
+                std::string key = trim(line.substr(0, eqPos));
+                std::string value = trim(line.substr(eqPos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -115,6 +172,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate configuration value based on key
+    if (!validateKeyValue(key, value)) {
+        throw std::runtime_error("Invalid configuration value for key: " + key);
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -140,6 +202,73 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+// Validation function
+bool Config::validateKeyValue(const std::string& key, const ConfigValue& value) {
+    // Normalize key for case-insensitive comparison
+    std::string normalizedKey = toLower(key);
+    
+    // Dispatch based on value type
+    return std::visit([](const auto& val) -> bool {
+        using T = std::decay_t<decltype(val)>;
+        return validateByType(normalizedKey, val);
+    }, value);
+}
+
+// Template specialization for validation
+bool Config::validateByType(const std::string& key, const std::string& value) {
+    // String values - generic check
+    return !value.empty() || key.find("description") != std::string::npos;
+}
+
+bool Config::validateByType(const std::string& key, int value) {
+    if (key == "random_seed") return true;  // Any seed is valid
+    if (key == "neuron_count" || key == "region_count" || 
+        key == "max_simulation_steps" || key == "environment_width" || key == "environment_height") {
+        return value > 0;
+    }
+    return true;  // Other int values accepted
+}
+
+bool Config::validateByType(const std::string& key, int64_t value) {
+    if (key == "neuron_count" || key == "region_count" || 
+        key == "max_simulation_steps") {
+        return value > 0;
+    }
+    return true;
+}
+
+bool Config::validateByType(const std::string& key, double value) {
+    if (key == "simulation_timestep") {
+        return value > 0.0;  // Timestep must be positive
+    }
+    if (key == "reward_discount_factor") {
+        return value >= 0.0 && value <= 1.0;  // Valid discount factor
+    }
+    if (key == "visualization_update_rate") {
+        return value > 0.0;  // Update rate must be positive
+    }
+    if (key == "simulation_time_limit") {
+        return value >= 0.0;  // Time limit can be 0 (unlimited)
+    }
+    return true;
+}
+
+bool Config::validateByType(const std::string& key, bool value) {
+    return true;  // All boolean values are valid
+}
+
+bool Config::validateByType(const std::string& key, const std::vector<int>& values) {
+    return !values.empty();
+}
+
+bool Config::validateByType(const std::string& key, const std::vector<double>& values) {
+    return !values.empty();
+}
+
+bool Config::validateByType(const std::string& key, const std::vector<std::string>& values) {
+    return !values.empty();
 }
 
 bool Config::has(const std::string& key) const {

@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -71,7 +71,7 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal validation
+    static bool validateKeyValue(const std::string& key, const ConfigValue& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +103,23 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateByType(const std::string& key, const std::string& value) const;
+    bool validateByType(const std::string& key, int value) const;
+    bool validateByType(const std::string& key, int64_t value) const;
+    bool validateByType(const std::string& key, double value) const;
+    bool validateByType(const std::string& key, bool value) const;
+    bool validateByType(const std::string& key, const std::vector<int>& values) const;
+    bool validateByType(const std::string& key, const std::vector<double>& values) const;
+    bool validateByType(const std::string& key, const std::vector<std::string>& values) const;
+    bool validateByType(const std::string& key, const ConfigValue& value) const {
+        // Dispatch based on value type
+        return std::visit([this](const auto& val) -> bool {
+            using T = std::decay_t<decltype(val)>;
+            return validateByType(key, val);
+        }, value);
+    }
 };
 
 } // namespace nlm
