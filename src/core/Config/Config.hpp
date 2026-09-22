@@ -43,23 +43,23 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
-    
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
+// Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Helper methods for format detection
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimple(const std::string& filepath);
+    
+    // Value parsing helpers
+    static bool parseSimpleValue(const std::string& str, ConfigValue& value);
+    static bool parseJSONValue(const std::string& str, ConfigValue& value);
+    static bool isInteger(const std::string& str);
+    static bool isDouble(const std::string& str);
+    static bool validate(const std::string& key, const ConfigValue& value) const;
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -101,5 +101,3 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm

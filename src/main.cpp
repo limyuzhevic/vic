@@ -48,6 +48,51 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << R"(
+NLM (Neural Learning Machine) - Phase 2: Real Neural Computation
+
+USAGE:
+    nlm [OPTIONS]
+    nlm --config <file> [OPTIONS]
+
+OPTIONS:
+    --help, -h                      Show this help message and exit
+    --version                       Show version information and exit
+    --verbose, -v                   Enable verbose logging
+    --quiet, -q                     Suppress non-error messages
+    --batch                         Run in batch mode without user interaction
+
+    --test-mode <mode>              Test mode selection (all|connectivity|plasticity|stdp)
+    --simulation-steps <steps>       Number of simulation steps (default: 1000)
+
+    --neuron-count <count>          Override neuron count
+    --region-count <count>           Override region count
+    --connection-prob <prob>        Override connection probability (0.0-1.0)
+    --stdp-ltp-weight <weight>       Override STDP LTP weight
+    --stdp-ltd-weight <weight>       Override STDP LTD weight
+    --simulation-timestep <time>      Override simulation timestep
+    --random-seed <seed>             Override random seed for reproducibility
+
+    --config <file>                  Configuration file path (default: configs/default.cfg)
+
+CONFIGURATION FILE:
+    Configuration files use simple key=value format (Phase 1 style) or can be JSON/YAML
+    in the future. See configs/default.cfg for examples.
+
+EXAMPLES:
+    nlm                                    # Run default tests
+    nlm --test-mode connectivity         # Run only connectivity test
+    nlm --test-mode plasticity            # Run only plasticity test
+    nlm --simulation-steps 5000          # Increase simulation steps
+    nlm --neuron-count 2000              # Use more neurons
+    nlm --config my_config.cfg           # Use custom config file
+    nlm -v -q                           # Verbose and quiet modes
+
+For more information: https://github.com/your-org/nlm
+    )" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
