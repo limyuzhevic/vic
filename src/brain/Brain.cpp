@@ -502,10 +502,76 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // NEW: Store concept information
+            if (pImpl->conceptFormation) {
+                auto concepts = pImpl->conceptFormation->getStableConcepts();
+                episode.concepts = concepts;
+                
+                // Get concept prototypes for this step
+                for (const auto& conceptId : concepts) {
+                    auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+                    if (concept) {
+                        auto prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                        episode.conceptPrototypes.push_back(prototype);
+                    }
+                }
+            }
+            
+            // NEW: Store attention focus information
+            if (pImpl->attention) {
+                auto attendedRegions = pImpl->attention->getAttendedRegions();
+                episode.attentionFocus = attendedRegions;
+                
+                // Get attention features
+                auto features = pImpl->attention->getAttendedFeatures();
+                episode.attentionFeatures.insert(episode.attentionFeatures.end(), features.begin(), features.end());
+            }
+            
+            // NEW: Store prediction system information
+            if (pImpl->predictionSystem) {
+                episode.predictionError = pImpl->predictionSystem->getPredictionError();
+                
+                // Store last prediction and actual values
+                auto lastPrediction = pImpl->predictionSystem->getLastPrediction();
+                auto lastActual = pImpl->predictionSystem->getLastActual();
+                episode.predictionValues.insert(episode.predictionValues.end(), lastPrediction.begin(), lastPrediction.end());
+                episode.actualValues.insert(episode.actualValues.end(), lastActual.begin(), lastActual.end());
+            }
+            
+            // NEW: Store self-model information
+            if (pImpl->selfModel) {
+                // Record self-model state
+                auto selfModelState = pImpl->selfModel->getState();
+                episode.selfModelState.insert(episode.selfModelState.end(), selfModelState.begin(), selfModelState.end());
+                
+                // Get preferred actions
+                auto preferredActions = pImpl->selfModel->getPreferredActions();
+                episode.preferredActions.insert(episode.preferredActions.end(), preferredActions.begin(), preferredActions.end());
+            }
+            
+            // NEW: Store development stage
+            episode.devStage = pImpl->developmentalStage;
+            
+            // NEW: Store neuromodulation levels
+            if (pImpl->dopamine) {
+                episode.dopamineLevel = pImpl->dopamine->getLevel();
+            }
+            if (pImpl->curiosity) {
+                episode.curiosityLevel = pImpl->curiosity->getLevel();
+            }
+            if (pImpl->novelty) {
+                episode.noveltyLevel = pImpl->novelty->getLevel();
+            }
+            if (pImpl->predictionError) {
+                episode.predictionError = pImpl->predictionError->getCurrentError();
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // NEW: Update development system with episode data
+            if (pImpl->developmentSystem) {
+                pImpl->developmentSystem->updateWithEpisode(this, *pImpl->rng, episode);
+            }
         }
     }
     
@@ -568,6 +634,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
                 case DevelopmentalStage::Adult:
                     plasticityMod = 0.2f;  // Stable
+                    break;
+                case DevelopmentalStage::Aging:
+                    plasticityMod = 0.1f;  // Very low plasticity
                     break;
             }
             

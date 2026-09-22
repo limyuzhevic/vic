@@ -147,6 +147,50 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // NEW: Connect to concept formation if brain has it
+    if (brain_ && brain_->getConceptFormation()) {
+        // Extract features from sensory input for concept formation
+        std::vector<float> visionPattern = percept.getVision();
+        std::vector<float> internalState = percept.getInternal();
+        std::vector<float> combinedPattern;
+        combinedPattern.reserve(visionPattern.size() + internalState.size());
+        combinedPattern.insert(combinedPattern.end(), visionPattern.begin(), visionPattern.end());
+        combinedPattern.insert(combinedPattern.end(), internalState.begin(), internalState.end());
+        
+        // Extract simple features
+        std::vector<float> features;
+        features.reserve(4);
+        float sum = std::accumulate(combinedPattern.begin(), combinedPattern.end(), 0.0f);
+        float mean = combinedPattern.empty() ? 0.0f : sum / combinedPattern.size();
+        features.push_back(mean); // Feature 1: mean value
+        
+        // Add concept to self-model and brain
+        size_t conceptId = brain_->getConceptFormation()->presentExperience(
+            combinedPattern,
+            features,
+            expectedReward_,
+            brain_->getCurrentStep()
+        );
+        
+        // If new concept formed, update self-model
+        if (conceptId > 0) {
+            // Learn from new concept in self-model
+            if (brain_->getSelfModel()) {
+                brain_->getSelfModel()->learnFromConcept(
+                    conceptId,
+                    brain_->getConceptFormation()->getConceptPrototype(conceptId)
+                );
+            }
+        }
+    }
+    
+    // NEW: Update planning with current state
+    if (brain_ && brain_->getPlanner() && !combinedPattern.empty()) {
+        // Extract state for planning
+        std::vector<float> state = extractStateForPlanning(*brain_, percept);
+        brain_->getPlanner()->updateCurrentState(state);
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -154,12 +198,109 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
+    // NEW: Use self-model to suggest preferred actions
+    if (brain_ && brain_->getSelfModel() && curiosityEnabled_) {
+        std::vector<float> currentState = extractStateForPlanning(*brain_);
+        MotorCommand selfSuggested = brain_->getSelfModel()->getPreferredAction(currentState);
+        
+        // Blend decoded command with self-model suggestion
+        if (selfSuggested != MotorCommand::Wait) {
+            float selfModelWeight = 0.3f; // Blend weight
+            decoded = blendCommands(decoded, selfSuggested, selfModelWeight);
+        }
+    }
+    
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
     }
     
     return decoded;
+}
+
+std::vector<float> AgentBrain::extractStateForPlanning(const Brain& brain, const SensoryPercept& percept) {
+    std::vector<float> state;
+    
+    // Extract vision features (downsample to manageable size)
+    const auto& vision = percept.getVision();
+    size_t originalSize = vision.size();
+    size_t targetSize = std::min<size_t>(64, originalSize);
+    
+    if (targetSize > 0) {
+        float scale = originalSize / static_cast<float>(targetSize);
+        state.reserve(targetSize);
+        
+        for (size_t i = 0; i < targetSize; ++i) {
+            size_t srcIndex = static_cast<size_t>(i * scale);
+            state.push_back(vision[srcIndex]);
+        }
+    }
+    
+    // Add agent position if available
+    if (brain.getRegionCount() > 0) {
+        auto* region = brain.getRegion(RegionId(0));
+        if (region) {
+            // Position (2), orientation (1), energy (1), age (1)
+            state.push_back(region->getPosition().x / 10.0f); // Normalize
+            state.push_back(region->getPosition().y / 10.0f);
+            state.push_back(region->getOrientation());
+            state.push_back(region->getEnergy());
+            state.push_back(region->getAge());
+        }
+    }
+    
+    // Add internal signals
+    auto internal = percept.getInternal();
+    state.insert(state.end(), internal.begin(), internal.end());
+    
+    return state;
+}
+
+void AgentBrain::updateSelfModel(const SelfModelUpdate& update) {
+    if (!brain_ || !brain_->getSelfModel()) return;
+    
+    // Record this experience in self-model
+    brain_->getSelfModel()->recordSelfAction(
+        update.action,
+        getPatternForState(update.position, update.orientation),
+        getPatternForExpectedOutcome(update.predictedOutcome)
+    );
+    
+    // Update prediction error based on prediction vs actual
+    float predictionError = update.actualOutcome - update.predictedOutcome;
+    if (brain_->getPredictionError()) {
+        brain_->getPredictionError()->computeError(update.predictedOutcome, update.actualOutcome);
+    }
+}
+
+std::vector<float> AgentBrain::getPatternForState(std::pair<float, float> position, float orientation) {
+    std::vector<float> pattern(3);
+    pattern[0] = position.first / 10.0f; // Normalized x
+    pattern[1] = position.second / 10.0f; // Normalized y
+    pattern[2] = orientation; // Orientation (0-2π)
+    return pattern;
+}
+
+std::vector<float> AgentBrain::getPatternForExpectedOutcome(float outcome) {
+    std::vector<float> pattern(1);
+    pattern[0] = outcome; // Raw outcome
+    return pattern;
+}
+
+MotorCommand AgentBrain::blendCommands(MotorCommand cmd1, MotorCommand cmd2, float weight) {
+    // Blend between two commands based on weight
+    // weight = 0.0 means cmd1, weight = 1.0 means cmd2
+    
+    // Simple blending: prefer cmd2 if weight is high enough
+    if (weight > 0.7f) {
+        return cmd2;
+    } else if (weight < 0.3f) {
+        return cmd1;
+    } else {
+        // Equal probability
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        return (r < 0.5f) ? cmd1 : cmd2;
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {

@@ -133,6 +133,23 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Interact", MotorCommand::Interact)
         .value("Wait", MotorCommand::Wait)
         .export_values();
+    
+    // ========== INTEGRATION HANDLER ==========
+    py::class_<IntegrationHandler>(m, "IntegrationHandler", 
+        R"pbdoc(Coordinates interaction between all brain systems for Phase 6 integration)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, std::reference_wrapper<AgentBrain>>(),
+             py::arg("brain"), py::arg("agent"),
+             "Create an IntegrationHandler to coordinate all brain systems")
+        .def("processSensoryInput", &IntegrationHandler::processSensoryInput,
+             py::arg("percept"), "Process sensory input through the complete integration chain")
+        .def("updateIntegrationStep", &IntegrationHandler::updateIntegrationStep,
+             "Update all systems for current step and handle integration")
+        .def("getSystemStatus", &IntegrationHandler::getSystemStatus,
+             "Get integration status of all brain systems")
+        .def("getIntegrationMetrics", &IntegrationHandler::getIntegrationMetrics,
+             "Get performance metrics for system integration")
+        .def("handleRestCycleUpdate", &IntegrationHandler::handleRestCycleUpdate,
+             "Handle sleep/rest cycle for memory consolidation")
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
@@ -415,6 +432,155 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // ========== ADVANCED BRAIN ACCESS ==========
+    
+    // Brain with advanced access to cognitive and memory systems
+    py::class_<Brain>(m, "AdvancedBrain", R"pbdoc(Extended Brain class with access to all integrated systems)pbdoc")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attention system")
+        .def("getSelfModel", &Brain::getSelfModel,
+             py::return_value_policy::reference_internal,
+             "Get self-model system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulation system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("enableIntegration", &Brain::enableIntegration,
+             py::arg("enable"), "Enable/disable system integration")
+        .def("isIntegrated", &Brain::isIntegrated,
+             "Check if all systems are properly integrated")
+        .def("getIntegrationGaps", &Brain::getIntegrationGaps,
+             "Get list of integration gaps")
+        .def("getSystemConnections", &Brain::getSystemConnections,
+             "Get all connections between systems");
+
+    // Agent with advanced self-model and concept access
+    py::class_<AgentBrain>(m, "AdvancedAgent", R"pbdoc(Extended AgentBrain with advanced cognitive capabilities)pbdoc")
+        .def("getPreferredAction", &AgentBrain::getPreferredAction,
+             py::arg("state"), "Get action preferred by agent's self-model")
+        .def("updateSelfModel", &AgentBrain::updateSelfModel,
+             py::arg("action"), py::arg("beforeState"), py::arg("afterState"),
+             "Update agent's self-model with action outcome")
+        .def("storeEpisodicMemory", &AgentBrain::storeEpisodicMemory,
+             py::arg("episode"), "Store episodic memory")
+        .def("recallMemory", &AgentBrain::recallMemory,
+             py::arg("query"), py::arg("maxResults") = 5,
+             "Recall similar memories from agent's experience")
+        .def("getIntegrationStatus", &AgentBrain::getIntegrationStatus,
+             "Get detailed integration status")
+        .def("getSystemHealth", &AgentBrain::getSystemHealth,
+             "Get health status of all integrated systems")
+        .def("learnFromExperience", &AgentBrain::learnFromExperience,
+             py::arg("experience"), "Learn from complex experience");
+
+    // SimpleWorld with enhanced sensory features
+    py::class_<SimpleWorld>(m, "AdvancedSimpleWorld", R"pbdoc(Extended SimpleWorld with enhanced sensory and learning capabilities)pbdoc")
+        .def("getAdvancedSensoryPercept", &SimpleWorld::getAdvancedSensoryPercept,
+             "Get enhanced sensory percept with relationship features")
+        .def("setSensoryEnhancement", &SimpleWorld::setSensoryEnhancement,
+             py::arg("enable"), "Enable/disable sensory enhancement")
+        .def("enableWorldLearning", &SimpleWorld::enableWorldLearning,
+             py::arg("enable"), "Enable/disable world learning and adaptation")
+        .def("getWorldModel", &SimpleWorld::getWorldModel,
+             py::return_value_policy::reference_internal,
+             "Get current world model")
+        .def("enableTimeFeatures", &SimpleWorld::enableTimeFeatures,
+             py::arg("enable"), "Enable/disable time-based features")
+        .def("setPhysicsParameters", &SimpleWorld::setPhysicsParameters,
+             py::arg("gravity"), py::arg("friction"), "Set physics parameters");
+
+    // ===== EXPERIMENT INTEGRATION =====
+    
+    // Create IntegrationHandler for Phase 6 experiments
+    m.def("createIntegrationHandler", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+        return IntegrationHandler(brain, *agent);
+    }, py::arg("brain"), py::arg("agent"),
+       "Create an IntegrationHandler to coordinate all brain systems for Phase 6 experiments");
+
+    // Phase 6 integrated experiment runner
+    m.def("runPhase6Integration", [](Phase6Config config) {
+        Phase6IntegratedExperiment experiment;
+        return experiment.run(config);
+    }, py::arg("config"), "Run Phase 6 integration experiment");
+
+    // Integration verification
+    m.def("verifyIntegration", []() {
+        Phase6IntegratedExperiment experiment;
+        return experiment.verifyIntegration();
+    }, "Verify that all systems are properly integrated");
+
+    // Helper functions for creating advanced configurations
+    m.def("createPhase6Config", []() -> Phase6Config {
+        return Phase6Config();
+    }, "Create default Phase 6 integration experiment configuration");
+
+    m.def("createPhase6ConfigWith", [](uint64_t maxSteps, size_t neuronCount) -> Phase6Config {
+        Phase6Config config;
+        config.maxSteps = maxSteps;
+        config.neuronCount = neuronCount;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        return config;
+    }, py::arg("maxSteps"), py::arg("neuronCount"), 
+       "Create Phase 6 configuration with custom parameters");
+
+    // ===== ADVANCED FUNCTIONALITY =====
+    
+    // Neural network training utilities
+    m.def("trainIntegrationNetwork", [](std::shared_ptr<Brain> brain, size_t epochs, float learningRate) {
+        // Train the integration between systems
+        Phase6Config config;
+        config.maxSteps = epochs;
+        config.neuronCount = brain->getTotalNeuronCount();
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        
+        Phase6IntegratedExperiment experiment;
+        return experiment.run(config);
+    }, py::arg("brain"), py::arg("epochs"), py::arg("learningRate"),
+       "Train the brain's integration between systems");
+
+    // Memory consolidation utilities
+    m.def("consolidateMemories", [](std::shared_ptr<Brain> brain, size_t numEpisodes) {
+        if (brain->getEpisodicMemory()) {
+            return brain->getEpisodicMemory()->consolidate(numEpisodes);
+        }
+        return false;
+    }, py::arg("brain"), py::arg("numEpisodes"),
+       "Consolidate memories in the brain's episodic memory");
+
+    // System analysis utilities
+    m.def("analyzeSystemIntegration", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+        IntegrationHandler handler(brain, *agent);
+        
+        std::unordered_map<std::string, bool> status = handler.getSystemStatus();
+        std::unordered_map<std::string, float> metrics = handler.getIntegrationMetrics();
+        
+        // Return integration analysis
+        return std::make_tuple(status, metrics);
+    }, py::arg("brain"), py::arg("agent"),
+       "Analyze integration status and performance metrics of all systems");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

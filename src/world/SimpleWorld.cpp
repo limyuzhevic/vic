@@ -388,16 +388,101 @@ void SimpleWorld::generateVision() {
     proprioception[5] = std::abs(agent_.angularVelocity) / 3.0f;  // Turn rate
     sensory_.setProprioception(proprioception);
     
-    // No audio for now
+    // NO AUDIO FOR NOW
     sensory_.setAudio({});
 }
 
-void SimpleWorld::checkCollisions() {
-    // Passive collision check (for damage when moving into objects)
-    WorldObject* obj = getObjectAt(agent_.x, agent_.y);
-    if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
-        agent_.health -= 0.01f;  // Passive damage
+void SimpleWorld::generateEnhancedVision() {
+    // Generate vision with enhanced features for integration
+    // This creates better sensory encoding for Phase 6 integration
+    
+    const int rayCount = 16;
+    const float fov = M_PI / 2.0f;  // 90 degree FOV
+    const float maxRange = 8.0f;
+    
+    std::vector<float> vision(rayCount, 1.0f);  // Default: far/empty
+    
+    for (int i = 0; i < rayCount; ++i) {
+        // Angle for this ray
+        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+        
+        // Cast ray
+        float dx = std::cos(angle);
+        float dy = std::sin(angle);
+        
+        float t = 0.0f;
+        while (t < maxRange) {
+            float px = agent_.x + dx * t;
+            float py = agent_.y + dy * t;
+            
+            // Check wall collision
+            if (!isValidPosition(px, py)) {
+                vision[i] = t / maxRange;
+                break;
+            }
+            
+            // Check object collision
+            WorldObject* obj = getObjectAt(px, py);
+            if (obj != nullptr) {
+                // Encode object type as intensity pattern
+                if (obj->type == WorldObjectType::Resource) {
+                    vision[i] = (maxRange - t) / maxRange * 0.8f;  // Bright
+                } else if (obj->type == WorldObjectType::Hazard) {
+                    vision[i] = (maxRange - t) / maxRange * 0.3f;  // Dark
+                } else {
+                    vision[i] = 0.5f;
+                }
+                break;
+            }
+            
+            t += 0.1f;
+        }
     }
+    
+    // Add time-based features
+    if (simTime_ > 0.0) {
+        float timeFeature = std::fmod(simTime_, 10.0f) / 10.0f;  // Time modulo 10
+        
+        // Inject time features into vision at specific positions
+        if (vision.size() > 0) {
+            vision[0] = timeFeature; // First pixel gets time feature
+        }
+    }
+    
+    // Add object relationship features
+    // For each vision ray, add relationship to nearby objects
+    // This creates spatial relationship patterns
+    for (int i = 0; i < std::min(rayCount, (int)vision.size()); ++i) {
+        float angle = agent_.orientation - fov / 2.0f + (fov * i / (rayCount - 1));
+        
+        // Look for nearby objects and add relational features
+        for (const auto& obj : objects_) {
+            if (!obj.active) continue;
+            
+            float dx = obj.x - agent_.x;
+            float dy = obj.y - agent_.y;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            
+            if (dist < 5.0f) {  // Within 5 units
+                float relDist = dist / 5.0f;
+                float relAngle = std::atan2(dy, dx) - angle;
+                if (relAngle > M_PI) relAngle -= 2.0f * M_PI;
+                if (relAngle < -M_PI) relAngle += 2.0f * M_PI;
+                relAngle = (relAngle + M_PI) / (2.0f * M_PI);  // Normalize
+                
+                // Add relational features to this ray
+                vision[i] *= (1.0f - relDist * 0.3f);  // Weaken signal for nearby objects
+            }
+        }
+    }
+    
+    // Add agent state features to vision
+    if (vision.size() > 1) {
+        vision[1] = agent_.orientation / M_PI * 2.0f;  // Orientation
+        vision[2] = std::min(1.0f, agent_.energy / maxEnergy_);  // Energy level
+        vision[3] = agent_.isMoving ? 0.8f : 0.2f;  // Movement state
+    }
+    
+    sensory_.setVision(vision);
+    sensory_.setTimestamp(simTime_);
 }
-
-} // namespace nlm

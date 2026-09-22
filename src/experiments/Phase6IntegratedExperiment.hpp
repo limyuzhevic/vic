@@ -22,6 +22,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <chrono>
 
 namespace nlm {
 
@@ -94,6 +95,74 @@ struct Phase6Config {
         , enableReplay(true)
         , enableDevelopment(true)
         , checkpointPath("./checkpoint_test.bin") {}
+};
+
+/**
+ * IntegrationHandler - Coordinates interaction between all brain systems
+ */
+class IntegrationHandler {
+public:
+    IntegrationHandler(std::shared_ptr<Brain> brain, AgentBrain& agent);
+    ~IntegrationHandler();
+    
+    // Process sensory input through the entire integration chain
+    void processSensoryInput(const SensoryPercept& percept);
+    
+    // Update all systems for current step
+    void updateIntegrationStep();
+    
+    // Get system integration status
+    std::unordered_map<std::string, bool> getSystemStatus() const;
+    
+    // Get integration metrics
+    std::unordered_map<std::string, float> getIntegrationMetrics() const;
+    
+    // Get last step time
+    double getLastStepTime() const { return lastStepTime_; }
+    
+    // Set last step time
+    void setLastStepTime(double time) { lastStepTime_ = time; }
+    
+private:
+    // Private helper methods for system coordination
+    void handleSensoryToWorkingMemory(const SensoryPercept& percept);
+    void handleSensoryToAttention(const SensoryPercept& percept);
+    void handleSensoryToConceptFormation(const SensoryPercept& percept);
+    void handleSensoryToPrediction(const SensoryPercept& percept);
+    void handleSensoryToSelfModel(const SensoryPercept& percept);
+    
+    void handleWorkingMemoryToAttention();
+    void handleAttentionToConceptFormation();
+    void handleConceptFormationToPlanning();
+    void handlePlanningToActionSelection();
+    void handleActionToSelfModel();
+    void handleSelfModelToEpisodicMemory();
+    void handleEpisodicMemoryToConsolidation();
+    void handleDevelopmentUpdate(double dt);
+    void handleNeuromodulationUpdate();
+    void handleRestCycleUpdate();
+    
+    void strengthenRelatedConnections(const EpisodicMemoryItem* episode);
+    
+    std::vector<float> extractPatternFromMemoryTrace(const WorkingMemoryTrace& trace);
+    float computeTraceRelevance(float value);
+    std::vector<float> extractRegionPattern(NeuralRegion* region);
+    std::vector<float> extractCompleteNeuralState(const Brain& brain);
+    std::vector<float> extractCompleteSensoryState(const Brain& brain);
+    std::vector<NeuronId> extractActiveNeurons(const Brain& brain);
+    std::vector<float> extractFeaturesFromPattern(const std::vector<float>& pattern);
+    std::vector<float> extractStateFromPercept(const SensoryPercept& percept);
+    float computeVisualSalience(const std::vector<float>& vision);
+    float computePredictionError(const std::vector<float>& predicted, const std::vector<float>& actual);
+    bool isEpisodeImportant(const EpisodicMemoryItem* episode, float threshold);
+    
+    float getCurrentReward() const;
+    float getCurrentEnergy() const;
+    float getActualActionOutcome() const;
+    
+    std::shared_ptr<Brain> brain_;
+    AgentBrain& agent_;
+    double lastStepTime_;
 };
 
 /**
