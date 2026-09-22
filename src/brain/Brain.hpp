@@ -1,5 +1,12 @@
 #pragma once
 
+#include "BrainInitialization.hpp"
+#include "BrainSimulationLoop.hpp"
+#include "BrainIntegration.hpp"
+#include "BrainPersistence.hpp"
+#include "BrainManagement.hpp"
+#include "BrainAccessors.hpp"
+
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
