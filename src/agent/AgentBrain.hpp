@@ -4,13 +4,26 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding, Phase 6: Integrated Artificial Brain
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,12 +82,33 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Integrated higher cognition systems
+    NeuralPlanner* getPlanner() const { return brain_->getPlanner(); }
+    ConceptFormation* getConceptFormation() const { return brain_->getConceptFormation(); }
+    AttentionalSelection* getAttention() const { return brain_->getAttention(); }
+    NeuralWorkingMemory* getWorkingMemory() const { return brain_->getWorkingMemory(); }
+    NeuralEpisodicMemory* getEpisodicMemory() const { return brain_->getEpisodicMemory(); }
+    PredictionSystem* getPredictionSystem() const { return brain_->getPredictionSystem(); }
+    Dopamine* getDopamine() const { return brain_->getDopamine(); }
+    Acetylcholine* getAcetylcholine() const { return brain_->getAcetylcholine(); }
+    Norepinephrine* getNorepinephrine() const { return brain_->getNorepinephrine(); }
+    Serotonin* getSerotonin() const { return brain_->getSerotonin(); }
+    Curiosity* getCuriosity() const { return brain_->getCuriosity(); }
+    Novelty* getNovelty() const { return brain_->getNovelty(); }
+    PredictionError* getPredictionErrorSystem() const { return brain_->getPredictionErrorSignal(); }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Enhanced motor decoding using NeuralPlanner
+    MotorCommand decodeWithPlanner();
+    
+    // Apply neuromodulation to decision making
+    void applyNeuromodulationToDecision(float& activationBias);
     
     std::shared_ptr<Brain> brain_;
     

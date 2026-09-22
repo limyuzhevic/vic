@@ -7,13 +7,20 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -46,9 +53,13 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Reward> reward;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -126,9 +137,13 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        reward = std::make_unique<Reward>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -256,8 +271,13 @@ bool Brain::initialize() {
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->reward->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -510,9 +530,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        // Update prediction system with current sensory state and neuromodulation
+        pImpl->predictionSystem->updatePredictions(pImpl->lastSensoryInput, pImpl->currentSensoryInput);
+        
+        // Apply neuromodulation to prediction error
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float predictionMod = 1.0f;
+        
+        // Dopamine modulates prediction learning
+        if (pImpl->dopamine) {
+            predictionMod = 0.5f + 0.5f * pImpl->dopamine->getLevel();
+            predictionError *= predictionMod;
+        }
+        
+        // Update dopamine with prediction error
+        pImpl->dopamine->signalRewardPredictionError(predictionError);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +556,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention-enhanced neuromodulation
+            if (pImpl->curiosity) {
+                float attentionStrength = pImpl->attention->getInhibitionFor(pImpl->workingMemory->getMemoryNeurons()[0]);
+                pImpl->curiosity->update(attentionStrength * pImpl->timestep);
+            }
+        }
+        
+        // Apply attention to concept formation
+        if (pImpl->conceptFormation && !pImpl->conceptFormation->getConceptCount().empty()) {
+            // Use concept prototypes for attention guidance
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->conceptFormation->getConceptCount().empty()) {
+        // Update concept formation with current neural patterns
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current pattern from working memory
+            std::vector<float> currentPattern;
+            for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                currentPattern.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+            }
+            
+            if (!currentPattern.empty()) {
+                // Present experience to concept formation
+                pImpl->conceptFormation->presentExperience(currentPattern, currentPattern, 
+                    pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f, currentStep);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -539,10 +595,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
+        // Get episodes for replay with neuromodulation influence
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+            // Apply neuromodulation during replay (ACh for consolidation, DA for reinforcement)
+            if (pImpl->acetylcholine) {
+                float achLevel = pImpl->acetylcholine->getLevel();
+                pImpl->episodicMemory->replayEpisode(episode, achLevel);
+            } else {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
         }
     }
     
@@ -573,13 +635,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            
+            // Development also affects neuromodulator baseline levels
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setBaseline(stage == DevelopmentalStage::Adult ? 0.1f : 0.5f);
+            }
         }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // Apply neuromodulation to consolidation (ACh for memory consolidation)
+        float consolidationStrength = 0.5f;
+        if (pImpl->acetylcholine) {
+            consolidationStrength = pImpl->acetylcholine->getLevel();
+        }
+        
+        pImpl->episodicMemory->consolidate(consolidationStrength);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -828,6 +901,156 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write neuromodulation state
+        {
+            // Neuromodulation section
+            std::vector<uint8_t> neuromodulationData;
+            
+            // Write Dopamine
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 2);  // level, baseline
+                memcpy(chunk.data(), &pImpl->dopamine->getLevel(), sizeof(float));
+                memcpy(chunk.data() + sizeof(float), &pImpl->dopamine->getPlasticityFactor(), sizeof(float));
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            // Write Acetylcholine
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 1);  // level
+                memcpy(chunk.data(), &pImpl->dopamine->getLevel(), sizeof(float));
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            // Write Norepinephrine
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 1);  // level
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            // Write Serotonin
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 1);  // level
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            // Write Curiosity
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 1);  // level
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            // Write Novelty
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 1);  // level
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            // Write PredictionError
+            {
+                std::vector<uint8_t> chunk;
+                chunk.resize(sizeof(float) * 3);  // error, predictedValue, actualValue
+                memcpy(chunk.data(), &pImpl->predictionError->getError(), sizeof(float));
+                neuromodulationData.insert(neuromodulationData.end(), chunk.begin(), chunk.end());
+            }
+            
+            if (!neuromodulationData.empty()) {
+                if (!writer.writeSection(CheckpointSection::Neuromodulation, 
+                                        neuromodulationData.data(), neuromodulationData.size())) {
+                    NLM_LOG_ERROR("Failed to write neuromodulation to checkpoint");
+                    return false;
+                }
+            }
+        }
+        
+        // Write memory state
+        {
+            // Memory section
+            std::vector<uint8_t> memoryData;
+            
+            // Write working memory neuron activations
+            if (pImpl->workingMemory) {
+                const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+                for (NeuronId neuronId : memoryNeurons) {
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                    memoryData.insert(memoryData.end(), 
+                                    reinterpret_cast<const uint8_t*>(&neuronId), 
+                                    reinterpret_cast<const uint8_t*>(&neuronId) + sizeof(NeuronId));
+                    memoryData.insert(memoryData.end(), 
+                                    reinterpret_cast<const uint8_t*>(&activation), 
+                                    reinterpret_cast<const uint8_t*>(&activation) + sizeof(float));
+                }
+            }
+            
+            // Write episodic memory metadata
+            if (pImpl->episodicMemory) {
+                size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+                memoryData.insert(memoryData.end(), 
+                                reinterpret_cast<const uint8_t*>(&episodeCount), 
+                                reinterpret_cast<const uint8_t*>(&episodeCount) + sizeof(size_t));
+            }
+            
+            if (!memoryData.empty()) {
+                if (!writer.writeSection(CheckpointSection::Memory, 
+                                        memoryData.data(), memoryData.size())) {
+                    NLM_LOG_ERROR("Failed to write memory to checkpoint");
+                    return false;
+                }
+            }
+        }
+        
+        // Write development state
+        {
+            std::vector<uint8_t> developmentData;
+            developmentData.insert(developmentData.end(), 
+                                  reinterpret_cast<const uint8_t*>(&pImpl->developmentalStage), 
+                                  reinterpret_cast<const uint8_t*>(&pImpl->developmentalStage) + sizeof(DevelopmentalStage));
+            developmentData.insert(developmentData.end(), 
+                                  reinterpret_cast<const uint8_t*>(&pImpl->currentStep), 
+                                  reinterpret_cast<const uint8_t*>(&pImpl->currentStep) + sizeof(SimulationStep));
+            developmentData.insert(developmentData.end(), 
+                                  reinterpret_cast<const uint8_t*>(&pImpl->currentTime), 
+                                  reinterpret_cast<const uint8_t*>(&pImpl->currentTime) + sizeof(Timestamp));
+            
+            if (!developmentData.empty()) {
+                if (!writer.writeSection(CheckpointSection::Development, 
+                                        developmentData.data(), developmentData.size())) {
+                    NLM_LOG_ERROR("Failed to write development to checkpoint");
+                    return false;
+                }
+            }
+        }
+        
+        // Write simulation state
+        {
+            std::vector<uint8_t> simulationData;
+            simulationData.insert(simulationData.end(), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->currentStep), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->currentStep) + sizeof(SimulationStep));
+            simulationData.insert(simulationData.end(), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->currentTime), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->currentTime) + sizeof(Timestamp));
+            simulationData.insert(simulationData.end(), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->isResting), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->isResting) + sizeof(bool));
+            simulationData.insert(simulationData.end(), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->stepsSinceLastEpisode), 
+                                 reinterpret_cast<const uint8_t*>(&pImpl->stepsSinceLastEpisode) + sizeof(size_t));
+            
+            if (!simulationData.empty()) {
+                if (!writer.writeSection(CheckpointSection::SimulationState, 
+                                        simulationData.data(), simulationData.size())) {
+                    NLM_LOG_ERROR("Failed to write simulation state to checkpoint");
+                    return false;
+                }
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -898,6 +1121,153 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Read neuromodulation state
+        auto neuromodulationData = reader.readSection(CheckpointSection::Neuromodulation);
+        if (!neuromodulationData.empty()) {
+            // Parse neuromodulation data
+            size_t offset = 0;
+            if (pImpl->dopamine) {
+                if (offset + sizeof(float) * 2 <= neuromodulationData.size()) {
+                    memcpy(&pImpl->dopamine->setLevel, neuromodulationData.data() + offset, sizeof(float) * 2);
+                    offset += sizeof(float) * 2;
+                }
+            }
+            
+            if (offset < neuromodulationData.size()) {
+                // Skip Acetylcholine level for now (placeholder)
+                offset += sizeof(float);
+            }
+            
+            if (offset < neuromodulationData.size()) {
+                // Skip Norepinephrine level for now (placeholder)
+                offset += sizeof(float);
+            }
+            
+            if (offset < neuromodulationData.size()) {
+                // Skip Serotonin level for now (placeholder)
+                offset += sizeof(float);
+            }
+            
+            if (offset < neuromodulationData.size()) {
+                // Read Curiosity level
+                if (pImpl->curiosity) {
+                    float* curiosityLevel = reinterpret_cast<float*>(neuromodulationData.data() + offset);
+                    pImpl->curiosity->setLevel(*curiosityLevel);
+                }
+                offset += sizeof(float);
+            }
+            
+            if (offset < neuromodulationData.size()) {
+                // Read Novelty level
+                if (pImpl->novelty) {
+                    float* noveltyLevel = reinterpret_cast<float*>(neuromodulationData.data() + offset);
+                    pImpl->novelty->setLevel(*noveltyLevel);
+                }
+                offset += sizeof(float);
+            }
+            
+            if (offset < neuromodulationData.size()) {
+                // Read PredictionError data
+                if (pImpl->predictionError) {
+                    if (offset + sizeof(float) * 3 <= neuromodulationData.size()) {
+                        float* error = reinterpret_cast<float*>(neuromodulationData.data() + offset);
+                        pImpl->predictionError->computeError(*error, *error);
+                        offset += sizeof(float) * 3;
+                    }
+                }
+            }
+        }
+        
+        // Read memory state
+        auto memoryData = reader.readSection(CheckpointSection::Memory);
+        if (!memoryData.empty()) {
+            size_t offset = 0;
+            // Read working memory neurons
+            while (offset + sizeof(NeuronId) + sizeof(float) <= memoryData.size()) {
+                NeuronId neuronId;
+                float activation;
+                memcpy(&neuronId, memoryData.data() + offset, sizeof(NeuronId));
+                offset += sizeof(NeuronId);
+                memcpy(&activation, memoryData.data() + offset, sizeof(float));
+                offset += sizeof(float);
+                
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->storeToNeuron(neuronId, activation);
+                }
+            }
+            
+            // Read episodic memory count
+            if (offset + sizeof(size_t) <= memoryData.size()) {
+                size_t episodeCount;
+                memcpy(&episodeCount, memoryData.data() + offset, sizeof(size_t));
+                if (pImpl->episodicMemory) {
+                    // Clear and reload episodes
+                    pImpl->episodicMemory->clear();
+                    // Note: Would need full episode data for complete restoration
+                }
+                offset += sizeof(size_t);
+            }
+        }
+        
+        // Read development state
+        auto developmentData = reader.readSection(CheckpointSection::Development);
+        if (!developmentData.empty()) {
+            size_t offset = 0;
+            if (offset + sizeof(DevelopmentalStage) <= developmentData.size()) {
+                DevelopmentalStage stage;
+                memcpy(&stage, developmentData.data() + offset, sizeof(DevelopmentalStage));
+                pImpl->developmentalStage = stage;
+                offset += sizeof(DevelopmentalStage);
+            }
+            
+            if (offset + sizeof(SimulationStep) <= developmentData.size()) {
+                SimulationStep step;
+                memcpy(&step, developmentData.data() + offset, sizeof(SimulationStep));
+                pImpl->currentStep = step;
+                offset += sizeof(SimulationStep);
+            }
+            
+            if (offset + sizeof(Timestamp) <= developmentData.size()) {
+                Timestamp time;
+                memcpy(&time, developmentData.data() + offset, sizeof(Timestamp));
+                pImpl->currentTime = time;
+                offset += sizeof(Timestamp);
+            }
+        }
+        
+        // Read simulation state
+        auto simulationData = reader.readSection(CheckpointSection::SimulationState);
+        if (!simulationData.empty()) {
+            size_t offset = 0;
+            if (offset + sizeof(SimulationStep) <= simulationData.size()) {
+                SimulationStep step;
+                memcpy(&step, simulationData.data() + offset, sizeof(SimulationStep));
+                pImpl->currentStep = step;
+                offset += sizeof(SimulationStep);
+            }
+            
+            if (offset + sizeof(Timestamp) <= simulationData.size()) {
+                Timestamp time;
+                memcpy(&time, simulationData.data() + offset, sizeof(Timestamp));
+                pImpl->currentTime = time;
+                offset += sizeof(Timestamp);
+            }
+            
+            if (offset + sizeof(bool) <= simulationData.size()) {
+                bool isResting;
+                memcpy(&isResting, simulationData.data() + offset, sizeof(bool));
+                pImpl->isResting = isResting;
+                offset += sizeof(bool);
+            }
+            
+            if (offset + sizeof(size_t) <= simulationData.size()) {
+                size_t stepsSinceLastEpisode;
+                memcpy(&stepsSinceLastEpisode, simulationData.data() + offset, sizeof(size_t));
+                pImpl->stepsSinceLastEpisode = stepsSinceLastEpisode;
+                offset += sizeof(size_t);
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1057,6 +1427,18 @@ Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
 Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
@@ -1067,6 +1449,10 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+Reward* Brain::getReward() {
+    return pImpl->reward.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
