@@ -151,7 +151,7 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    };
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -511,8 +511,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // For now, integrate prediction error from neuromodulation
+        if (pImpl->dopamine) {
+            pImpl->predictionSystem->updatePredictions(
+                // Create a dummy prediction state (placeholder)
+                SensoryInput(), 
+                SensoryInput()  // Actual state not available yet
+            );
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
