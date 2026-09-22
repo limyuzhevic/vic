@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -57,12 +58,21 @@ public:
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
+    bool loadFromFileJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    void saveToFileJSON(const std::string& filepath) const;
+    
+    // Parse JSON string
+    bool parseJSON(const std::string& json, size_t& pos);
+    bool parseJSONString(const std::string& json, size_t& pos);
+    bool parseJSONValue(const std::string& json, size_t& pos);
+    bool parseJSONArray(const std::string& json, size_t& pos);
+    void skipWhitespace(const std::string& json, size_t& pos);
     
     // Get values
     template<typename T>

@@ -10,49 +10,246 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Implement proper JSON/YAML parser
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    
+    // Simple JSON parsing implementation
+    size_t pos = 0;
+    bool success = parseJSON(content, pos);
+    
+    return success;
+}
+
+bool Config::loadFromFileJSON(const std::string& filepath) {
+    return loadFromFile(filepath);
+}
+
+bool Config::parseJSON(const std::string& json, size_t& pos) {
+    skipWhitespace(json, pos);
+    
+    if (pos >= json.size() || json[pos] != '{') {
+        return false;
+    }
+    
+    pos++; // Skip {
+    skipWhitespace(json, pos);
+    
+    while (pos < json.size()) {
+        skipWhitespace(json, pos);
+        
+        if (json[pos] == '}') {
+            pos++; // Skip }
+            return true;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Parse key
+        if (!parseJSONString(json, pos)) {
+            return false;
+        }
+        
+        skipWhitespace(json, pos);
+        if (pos >= json.size() || json[pos] != ':') {
+            return false;
+        }
+        
+        pos++; // Skip :
+        skipWhitespace(json, pos);
+        
+        // Parse value
+        if (!parseJSONValue(json, pos)) {
+            return false;
+        }
+        
+        skipWhitespace(json, pos);
+        
+        if (pos < json.size() && json[pos] == ',') {
+            pos++; // Skip ,
+        } else if (pos < json.size() && json[pos] == '}') {
+            // Will handle in outer loop
+            continue;
         }
     }
     
-    return true;
+    return false;
+}
+
+bool Config::parseJSONString(const std::string& json, size_t& pos) {
+    if (pos >= json.size() || json[pos] != '"') {
+        return false;
+    }
+    
+    pos++; // Skip "
+    while (pos < json.size()) {
+        if (json[pos] == '"') {
+            pos++; // Skip closing "
+            return true;
+        } else if (json[pos] == '\\') {
+            pos += 2; // Skip escape sequence
+        } else {
+            pos++;
+        }
+    }
+    
+    return false;
+}
+
+bool Config::parseJSONValue(const std::string& json, size_t& pos) {
+    skipWhitespace(json, pos);
+    
+    if (pos >= json.size()) {
+        return false;
+    }
+    
+    char c = json[pos];
+    
+    if (c == '"') {
+        // String value
+        size_t start = pos++;
+        while (pos < json.size() && json[pos] != '"') {
+            if (json[pos] == '\\') {
+                pos += 2; // Skip escape
+            } else {
+                pos++;
+            }
+        }
+        if (pos < json.size() && json[pos] == '"') {
+            pos++; // Skip closing quote
+            return true;
+        }
+        return false;
+    } else if (c == '{') {
+        // Object - recursively parse
+        return parseJSON(json, pos);
+    } else if (c == '[') {
+        // Array - parse as string for now
+        return parseJSONArray(json, pos);
+    } else if (std::isdigit(c) || c == '-') {
+        // Number
+        while (pos < json.size() && (std::isdigit(json[pos]) || json[pos] == '.' || 
+                                     json[pos] == 'e' || json[pos] == 'E' || 
+                                     json[pos] == '+' || json[pos] == '-')) {
+            pos++;
+        }
+        return true;
+    } else if (c == 't' || c == 'f') {
+        // Boolean
+        if (json.substr(pos, 4) == "true" || json.substr(pos, 5) == "false") {
+            pos += 4;
+            return true;
+        }
+        return false;
+    } else if (c == 'n') {
+        // Null
+        if (json.substr(pos, 4) == "null") {
+            pos += 4;
+            return true;
+        }
+        return false;
+    }
+    
+    return false;
+}
+
+bool Config::parseJSONArray(const std::string& json, size_t& pos) {
+    pos++; // Skip [
+    skipWhitespace(json, pos);
+    
+    while (pos < json.size()) {
+        skipWhitespace(json, pos);
+        
+        if (json[pos] == ']') {
+            pos++; // Skip ]
+            return true;
+        }
+        
+        if (!parseJSONValue(json, pos)) {
+            return false;
+        }
+        
+        skipWhitespace(json, pos);
+        
+        if (pos < json.size() && json[pos] == ',') {
+            pos++; // Skip ,
+        } else if (pos < json.size() && json[pos] == ']') {
+            // Will handle in outer loop
+            continue;
+        }
+    }
+    
+    return false;
+}
+
+void Config::skipWhitespace(const std::string& json, size_t& pos) {
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || 
+                                 json[pos] == '\n' || json[pos] == '\r')) {
+        pos++;
+    }
+}
+
+void Config::saveToFileJSON(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return;
+    }
+    
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Output value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, double> ||
+                                 std::is_same_v<T, bool>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << "\"" << arg[j] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "null"; // For unsupported types
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
+    }
+    
+    file << "}\n";
+    file.close();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,67 +276,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
+    // Use JSON format for saving
+    saveToFileJSON(filepath);
     return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {

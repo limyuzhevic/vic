@@ -22,12 +22,15 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
+        for (const auto& regionPtr : brain_->getRegions()) {
+            if (!regionPtr) continue;
+            for (const auto& popPtr : regionPtr->getPopulations()) {
+                if (!popPtr) continue;
+                NeuronType type = popPtr->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (const auto& n : popPtr->getNeurons()) {
+                        if (!n) continue;  // Skip null neurons
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -43,7 +46,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (const auto& n : popPtr->getNeurons()) {
+                        if (!n) continue;  // Skip null neurons
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -168,6 +172,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            if (!n) continue;  // Skip null neurons
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
@@ -256,12 +261,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+    // Apply reward-modulated weight change
+    if (syn) {
+        float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+        syn->addToWeight(delta);
+        
+        // Decay eligibility trace
+        syn->decayEligibilityTrace(0.1f);
+    }
             }
         }
     }
