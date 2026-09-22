@@ -356,14 +356,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
-
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
@@ -412,9 +404,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity (exploration drive)
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    // Update prediction error signal
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -528,8 +525,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation from current neural activity
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Apply concept-based attention (if conceptFormation provides this method)
+        auto concepts = pImpl->conceptFormation->getActiveConcepts();
+        if (!concepts.empty() && pImpl->attention) {
+            // Note: applyConceptBias is a placeholder - would need implementation
+            // pImpl->attention->applyConceptBias(concepts);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
