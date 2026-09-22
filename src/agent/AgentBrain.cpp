@@ -23,11 +23,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
+            if (!region) continue;
             for (auto& pop : region->getPopulations()) {
+                if (!pop) continue;
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue;
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +47,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) continue;
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -64,7 +68,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    if (world.getVisionWidth() > 0 && world.getVisionHeight() > 0) {
+        previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    }
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -85,7 +91,7 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_ || !brain_->getRandomGenerator()) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -125,15 +131,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        size_t maxSize = std::min(vision.size(), previousVision_.size());
+        for (size_t i = 0; i < maxSize; ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / std::max<size_t>(maxSize, 1);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -168,8 +175,9 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (!n) continue;  // Safety check
+            const auto& state = n->getState();
+            sum += std::abs(state.membranePotential - state.restingPotential);
         }
         return sum / neurons.size();
     };
@@ -211,7 +219,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityLevel_ > 0.5f && brain_) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
@@ -252,7 +260,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
+        if (!region) continue;
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
