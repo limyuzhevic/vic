@@ -10,7 +10,9 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+NLM uses **real spiking neural computation** with Leaky Integrate-and-Fire (LIF) neurons and event-driven dynamics to simulate actual brain-like behavior.
+
+That's it! NLM simulates all of this with state-of-the-art neural computation.
 
 ---
 

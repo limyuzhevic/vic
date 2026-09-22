@@ -286,6 +286,23 @@ bool Brain::initialize() {
         }
     });
     
+    // Initialize neuromodulation systems
+    pImpl->dopamine->initialize(this);
+    pImpl->curiosity->initialize(this);
+    pImpl->novelty->initialize(this);
+    
+    // Connect neuromodulation to plasticity
+    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+        ++pImpl->totalSpikesThisStep;
+        ++pImpl->totalSpikesTotal;
+        
+        // Apply dopamine modulation to STDP based on reward prediction error
+        if (pImpl->predictionError) {
+            float dpe = pImpl->predictionError->getPredictionError();
+            pImpl->stdp->setDopamineModulation(1.0f + dpe);  // Scale STDP by DPE
+        }
+    });
+    
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
@@ -991,7 +1008,16 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    // Return the number of neurons firing this step
+    size_t firingCount = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto* neuron : region->getAllNeurons()) {
+            if (neuron->isFiring()) {
+                firingCount++;
+            }
+        }
+    }
+    return firingCount;
 }
 
 float Brain::getAverageFiringRate() const {
@@ -1078,8 +1104,6 @@ RandomGenerator* Brain::getRandomGenerator() {
 }
 
 void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));

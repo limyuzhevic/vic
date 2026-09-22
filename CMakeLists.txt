@@ -127,17 +127,11 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+# Phase 6 Integration Test executable
+add_executable(nlm_phase6_integration_test
+    src/experiments/test_brain_integration.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase6_integration_test PUBLIC nlm_core nlm_agent nlm_world)
 
 # Testing
 enable_testing()

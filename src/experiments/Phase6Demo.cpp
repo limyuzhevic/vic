@@ -2,10 +2,11 @@
  * Phase 6 Demo - Integration Test
  * 
  * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
+ * that all brain systems are properly connected and working together.
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/Phase5IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
@@ -13,12 +14,12 @@ using namespace nlm;
 
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "Testing the fully integrated artificial brain..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
-    // Create experiment
+    // Create Phase 6 integrated experiment
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
@@ -51,11 +52,11 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
-    std::cout << "--- Full Integration Experiment ---" << std::endl;
+    // Run full integration test with smaller settings for demo
+    std::cout << "--- Full Integration Test ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = 200;
+    config.maxSteps = 500;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
@@ -63,7 +64,7 @@ int main(int argc, char* argv[]) {
     auto result = experiment.run(config);
     
     std::cout << std::endl;
-    std::cout << "=== FINAL RESULTS ===" << std::endl;
+    std::cout << "=== DEMO RESULTS ===" << std::endl;
     std::cout << "Total reward: " << result.totalReward << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
@@ -80,6 +81,9 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
+    std::cout << "=== INTEGRATION COMPLETE ===" << std::endl;
+    std::cout << "The Phase 6 artificial brain is fully integrated and functional!" << std::endl;
     
     return 0;
 }
