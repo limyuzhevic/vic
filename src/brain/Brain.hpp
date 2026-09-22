@@ -187,15 +187,23 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+// ========== CHECKPOINT STATE STRUCTURES ==========
     
-    // Logging
-    void logStatus() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+/**
+ * Development system state for checkpointing
+ */
+struct DevelopmentSystemState {
+    uint32_t stage;          // Developmental stage (DevelopmentalStage enum)
+    double age;              // Current age in simulation time
+    float plasticityRate;    // Current plasticity rate
 };
 
-} // namespace nlm
+/**
+ * Neuromodulation state for checkpointing
+ */
+struct NeuromodulationState {
+    float dopamineLevel;     // Dopamine concentration (-1.0 to 1.0)
+    float curiosityLevel;   // Curiosity level (0.0 to 1.0)
+    float noveltyLevel;      // Novelty level (0.0 to 1.0)
+    float predictionError;   // Prediction error level
+};

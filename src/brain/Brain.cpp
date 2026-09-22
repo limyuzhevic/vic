@@ -828,6 +828,37 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Write development system state
+        DevelopmentSystemState devState;
+        if (pImpl->developmentSystem) {
+            // Extract developmental stage and parameters
+            devState.stage = static_cast<uint8_t>(pImpl->developmentalStage);
+            devState.age = pImpl->developmentSystem->getAge();
+            devState.plasticityRate = pImpl->developmentSystem->getPlasticityRate();
+        }
+        
+        if (!writer.writeSection(CheckpointSection::Development, &devState, sizeof(DevelopmentSystemState))) {
+            NLM_LOG_ERROR("Failed to write development system to checkpoint");
+            return false;
+        }
+        
+        // Write neuromodulation states
+        NeuromodulationState neuromodState;
+        if (pImpl->dopamine) {
+            neuromodState.dopamineLevel = pImpl->dopamine->getLevel();
+        }
+        if (pImpl->curiosity) {
+            neuromodState.curiosityLevel = pImpl->curiosity->getLevel();
+        }
+        if (pImpl->novelty) {
+            neuromodState.noveltyLevel = pImpl->novelty->getLevel();
+        }
+        
+        if (!writer.writeSection(CheckpointSection::Neuromodulation, &neuromState, sizeof(NeuromodulationState))) {
+            NLM_LOG_ERROR("Failed to write neuromodulation to checkpoint");
+            return false;
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");

@@ -159,19 +159,22 @@ struct NeuronCheckpointData {
 };
 
 /**
- * Synapse state for checkpointing
+ * Development system state for checkpointing
  */
-struct SynapseCheckpointData {
-    std::vector<uint64_t> sourceNeuron;
-    std::vector<uint64_t> destinationNeuron;
-    std::vector<float> weight;
-    std::vector<uint32_t> delay;
-    std::vector<uint8_t> synapseType;
-    std::vector<uint8_t> plasticityFlags;
-    std::vector<float> eligibilityTrace;
-    std::vector<float> efficacy;
-    std::vector<float> shortTermDepression;
-    std::vector<float> shortTermFacilitation;
+struct DevelopmentSystemState {
+    uint32_t stage;          // Developmental stage (DevelopmentalStage enum)
+    double age;              // Current age in simulation time
+    float plasticityRate;    // Current plasticity rate
+};
+
+/**
+ * Neuromodulation state for checkpointing
+ */
+struct NeuromodulationState {
+    float dopamineLevel;     // Dopamine concentration (-1.0 to 1.0)
+    float curiosityLevel;   // Curiosity level (0.0 to 1.0)
+    float noveltyLevel;      // Novelty level (0.0 to 1.0)
+    float predictionError;   // Prediction error level
 };
 
 /**
