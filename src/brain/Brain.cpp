@@ -1017,6 +1017,20 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
+bool Brain::save(const std::string& filepath) const {
+    if (!pImpl->checkpointManager) {
+        return false;
+    }
+    return pImpl->checkpointManager->saveBrain(filepath);
+}
+
+bool Brain::load(const std::string& filepath) {
+    if (!pImpl->checkpointManager) {
+        return false;
+    }
+    return pImpl->checkpointManager->loadBrain(filepath);
+}
+
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {

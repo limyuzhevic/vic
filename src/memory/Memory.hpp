@@ -3,19 +3,32 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <functional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace nlm {
 
+// Forward declarations for all memory types
+class Brain;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
+class Skill;
+
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Phase 6: Simplified implementation for basic functionality
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Store item - simplified version
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -28,42 +41,46 @@ public:
     void clear();
     
     // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    size_t getCapacity() const { return capacity_; }
+    size_t getCurrentSize() const { return items_.size(); }
     
     // Decay all items
     void decay(float decayRate);
     
+    // Get all items
+    const std::unordered_map<NeuronId, float>& getItems() const { return items_; }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Simplified storage
+    std::unordered_map<NeuronId, float> items_;
+    std::unordered_map<NeuronId, float> decayRates_;
+    size_t capacity_;
+    Brain* brain_;
 };
+
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
-
-struct EpisodicMemoryItem {
-    SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
-    
-    EpisodicMemoryItem() : timestamp(0) {}
-};
+// Phase 6: Simplified implementation for basic experience logging
 
 class EpisodicMemory {
 public:
     EpisodicMemory();
     ~EpisodicMemory();
     
-    // Store episode
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Store episode - simplified version
     void storeEpisode(const EpisodicMemoryItem& episode);
     
     // Retrieve episode
     EpisodicMemoryItem retrieveEpisode(size_t index) const;
     
     // Get episode count
-    size_t getEpisodeCount() const;
+    size_t getEpisodeCount() const { return episodes_.size(); }
     
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
@@ -74,21 +91,28 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Get average reward
+    float getAverageReward() const;
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Simplified storage
+    std::vector<EpisodicMemoryItem> episodes_;
+    size_t maxEpisodes_;
+    Brain* brain_;
 };
 
+
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Phase 6: Real implementation with concept learning
 
 class SemanticMemory {
 public:
     SemanticMemory();
     ~SemanticMemory();
     
-    // Store fact
+    // Store fact (concept) from neural pattern
     void storeFact(const std::string& key, const std::string& value);
+    void storeFromNeurons(const std::vector<NeuronId>& neurons, const std::string& concept);
     
     // Retrieve fact
     std::string retrieveFact(const std::string& key) const;
@@ -99,31 +123,36 @@ public:
     // Get all facts
     std::vector<std::pair<std::string, std::string>> getAllFacts() const;
     
+    // Get concept from pattern
+    std::string getConcept(const std::vector<float>& pattern) const;
+    
     // Clear all
     void clear();
+    
+    // Get number of concepts
+    size_t getConceptCount() const { return concepts_.size(); }
+    
+    // Update concept strength
+    void updateConceptStrength(const std::string& concept, float delta);
+    
+    // Get concept stability (how stable the concept is)
+    float getConceptStability(const std::string& concept) const;
     
 private:
     struct Impl;
     Impl* pImpl;
 };
 
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
 
-struct Skill {
-    std::string name;
-    std::vector<NeuronId> neuralPattern;
-    float proficiency;
-    
-    Skill() : proficiency(0.0f) {}
-};
+// Procedural memory: learned skills and habits
+// Phase 6: Simplified implementation for skill learning
 
 class ProceduralMemory {
 public:
     ProceduralMemory();
     ~ProceduralMemory();
     
-    // Learn skill
+    // Learn skill - simplified version
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
     
     // Retrieve skill
@@ -138,20 +167,24 @@ public:
     // Clear all
     void clear();
     
+    // Get skill count
+    size_t getSkillCount() const { return skills_.size(); }
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Simplified storage
+    std::vector<Skill> skills_;
 };
 
+
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Phase 6: Simplified implementation for basic associations
 
 class AssociativeMemory {
 public:
     AssociativeMemory();
     ~AssociativeMemory();
     
-    // Create association
+    // Create association - simplified version
     void associate(NeuronId a, NeuronId b, float strength);
     
     // Get associated neurons
@@ -166,9 +199,13 @@ public:
     // Clear all
     void clear();
     
+    // Get association count
+    size_t getAssociationCount() const { return associations_.size(); }
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Simplified storage
+    std::vector<std::pair<NeuronId, NeuronId>> associations_;
+    std::vector<float> associationStrengths_;
 };
 
 } // namespace nlm
