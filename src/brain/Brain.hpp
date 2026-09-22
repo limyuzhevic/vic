@@ -1,33 +1,47 @@
 #pragma once
 
+// NLM Brain.hpp - Improved version with better forward declarations and reduced coupling
+// Phase 6: Integrated Artificial Brain with memory, neuromodulation, and development systems
+
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for core types
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
+// Forward declarations for brain components
+class NeuralRegion;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Forward declarations for memory systems
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+
+// Forward declarations for cognition systems
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
-class DevelopmentSystem;
+
+// Forward declarations for neuromodulation
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Forward declarations for other systems
+class PredictionSystem;
+class DevelopmentSystem;
+class CheckpointManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -62,7 +76,7 @@ public:
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration
-    bool initialize();
+    bool initialize() noexcept(false);
     
     // Main simulation step
     void step(SimulationStep currentStep);
@@ -192,6 +206,14 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Error handling
+    class BrainError : public std::runtime_error {
+    public:
+        explicit BrainError(const std::string& msg) : std::runtime_error(msg) {}
+    };
+    
+    static bool validateBrainState(const Brain& brain) noexcept;
     
 private:
     struct Impl;
