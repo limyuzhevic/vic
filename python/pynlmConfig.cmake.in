@@ -1,0 +1,25 @@
+include(CMakeFindDependencyMacro)
+find_dependency(pybind11 CONFIG)
+
+# Import the pybind11 module target
+include("${CMAKE_CURRENT_LIST_DIR}/pynlmTargets.cmake")
+
+# Provide a convenience variable for Python module loading
+set(PYNLM_MODULE_TARGET pynlm)
+
+# Helper function to add Python bindings to projects
+function(add_nlm_python_bindings)
+    # This function can be used by downstream projects to easily add NLM Python bindings
+    if(NOT TARGET pynlm)
+        message(FATAL_ERROR "NLM Python bindings not found. Ensure they are built first.")
+    endif()
+    
+    # Make the module available
+    get_target_property(pybind11_module_location pynlm LOCATION)
+    set(PYNLM_MODULE_PATH ${pybind11_module_location} PARENT_SCOPE)
+endfunction()
+
+# Provide version information
+function(get_pynlm_version out_var)
+    set(${out_var} "0.1.0" PARENT_SCOPE)
+endfunction()
