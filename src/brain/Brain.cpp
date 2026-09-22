@@ -758,6 +758,11 @@ void Brain::reset() {
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
     
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->setLevel(pImpl->dopamine->getBaseline());
+    if (pImpl->curiosity) pImpl->curiosity->setLevel(0.0f);
+    if (pImpl->novelty) pImpl->novelty->setLevel(0.0f);
+    
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 

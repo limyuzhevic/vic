@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,20 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load from JSON file (Phase 2+ implementation)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    try {
+        nlohmann::json j;
+        file >> j;
+        return parseJson(j, ConfigSource::File);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error reading JSON config file: ") + e.what());
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +65,10 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
+    nlohmann::json j = toJson();
+    
+    // Pretty print with indentation
+    file << j.dump(4);
     
     return true;
 }
@@ -199,17 +180,125 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Convert JSON value to ConfigValue
+ConfigValue Config::fromJson(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int>();
+    } else if (j.is_number_unsigned()) {
+        return j.get<uint64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // Determine array type by checking first element
+        if (j.empty()) {
+            return std::vector<int>();
+        }
+        
+        const auto& first = j[0];
+        if (first.is_number_integer()) {
+            std::vector<int> result;
+            result.reserve(j.size());
+            for (const auto& item : j) {
+                result.push_back(item.get<int>());
+            }
+            return result;
+        } else if (first.is_number_float()) {
+            std::vector<double> result;
+            result.reserve(j.size());
+            for (const auto& item : j) {
+                result.push_back(item.get<double>());
+            }
+            return result;
+        } else if (first.is_string()) {
+            std::vector<std::string> result;
+            result.reserve(j.size());
+            for (const auto& item : j) {
+                result.push_back(item.get<std::string>());
+            }
+            return result;
+        }
+        // Default to int array
+        std::vector<int> result;
+        result.reserve(j.size());
+        for (const auto& item : j) {
+            result.push_back(item.get<int>());
+        }
+        return result;
+    }
+    // Default to empty string
+    return std::string();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Convert ConfigValue to JSON
+nlohmann::json Config::toJson(const ConfigValue& value) {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            return static_cast<uint64_t>(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return arg;
+        }
+        return nlohmann::json();
+    }, value);
+}
+
+// Parse JSON configuration
+bool Config::parseJson(const nlohmann::json& j, ConfigSource source) {
+    try {
+        if (!j.is_object()) {
+            NLM_LOG_ERROR("JSON configuration must be an object");
+            return false;
+        }
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse all key-value pairs
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            const std::string& key = it.key();
+            ConfigValue value = fromJson(*it);
+            
+            // Add entry with description from JSON (if available)
+            std::string description = "";
+            if (it->contains("_description")) {
+                description = it->value("_description", "");
+            }
+            
+            pImpl->entries.emplace_back(key, value, source, description);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error parsing JSON configuration: ") + e.what());
+        return false;
+    }
+}
+
+// Convert current config to JSON
+nlohmann::json Config::toJson() const {
+    nlohmann::json j = nlohmann::json::object();
+    
+    for (const auto& entry : pImpl->entries) {
+        j[entry.key] = toJson(entry.value);
+    }
+    
+    return j;
+}
 
 } // namespace nlm

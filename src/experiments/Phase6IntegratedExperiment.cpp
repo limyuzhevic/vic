@@ -13,10 +13,6 @@ Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
-Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
-    Phase6IntegrationResult result;
-    result.startTime = time(nullptr);
-    
     auto startWall = std::chrono::high_resolution_clock::now();
     
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
