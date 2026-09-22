@@ -6,9 +6,6 @@
 
 namespace nlm {
 
-// Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
-
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
@@ -21,18 +18,26 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Connect to attention system for modulation of attentional focus
+    virtual void updateAttention(float currentLevel, float &attentionWeight) = 0;
+    
+    // Connect to working memory for modulation of memory maintenance
+    virtual void updateWorkingMemory(float currentLevel, float &memoryStability) = 0;
+    
+    // Connect to developmental plasticity for ontogenetic changes
+    virtual void updateDevelopmentalPlasticity(float currentLevel, float &developmentalFactor) = 0;
     
 protected:
     Neuromodulator() = default;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Enhanced with real biological dynamics and systems integration
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -44,9 +49,34 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
+    // Real dopamine dynamics
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    void processRewardContext(const std::string& context);
+    
+    // Get dopamine history for prediction error computation
+    const std::vector<float>& getRecentActivity() const;
+    
+    // Get phasic response magnitude
+    float getPhasicResponse() const;
+    
+    // Get tonic level
+    float getTonicLevel() const;
+    
+    // Configure dopamine parameters
+    void setBaseline(float baseline);
+    void setPhasicGain(float gain);
+    void setTemporalFilter(float tau);
+    void setAttentionCoupling(float coupling);
+    
+    // Connection to attention and memory
+    void updateAttentionWeight(float weight);
+    void updateMemoryIntegration(float integration);
+    
+    // Neuromodulator interface implementations
+    void updateAttention(float currentLevel, float &attentionWeight) override;
+    void updateWorkingMemory(float currentLevel, float &memoryStability) override;
+    void updateDevelopmentalPlasticity(float currentLevel, float &developmentalFactor) override;
     
 private:
     struct Impl;

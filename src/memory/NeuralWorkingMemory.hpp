@@ -4,8 +4,8 @@
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
+#include <deque>
 #include <functional>
-#include <unordered_map>
 
 namespace nlm {
 
