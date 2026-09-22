@@ -19,9 +19,39 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <limits>
+#include <mutex>
+#include <atomic>
 
 namespace nlm {
 
+// Configuration validation constants
+constexpr size_t MIN_NEURON_COUNT = 10;
+constexpr size_t MAX_NEURON_COUNT = 100000;
+constexpr size_t MIN_REGION_COUNT = 1;
+constexpr size_t MAX_REGION_COUNT = 100;
+constexpr float MIN_CONNECTION_PROBABILITY = 0.0f;
+constexpr float MAX_CONNECTION_PROBABILITY = 1.0f;
+constexpr float MIN_NEURON_ACTIVATION_THRESHOLD = 1.0f;
+constexpr float MAX_NEURON_ACTIVATION_THRESHOLD = 100.0f;
+constexpr float MIN_TIMESTEP_DURATION = 0.0001f;
+constexpr float MAX_TIMESTEP_DURATION = 1.0f;
+constexpr size_t MIN_REPLAY_INTERVAL = 1;
+constexpr size_t MAX_REPLAY_INTERVAL = 10000;
+constexpr size_t MIN_CONSOLIDATION_INTERVAL = 1;
+constexpr size_t MAX_CONSOLIDATION_INTERVAL = 100000;
+constexpr size_t MIN_MAX_EPISODES = 10;
+constexpr size_t MAX_MAX_EPISODES = 100000;
+constexpr float MIN_STDP_LTP_WEIGHT = 0.0f;
+constexpr float MAX_STDP_LTP_WEIGHT = 1.0f;
+constexpr float MIN_STDP_LTD_WEIGHT = -1.0f;
+constexpr float MAX_STDP_LTD_WEIGHT = 0.0f;
+constexpr float MIN_STDP_TAU = 1.0f;
+constexpr float MAX_STDP_TAU = 1000.0f;
+constexpr float MIN_SYNAPT_GENESIS_RATE = 0.0f;
+constexpr float MAX_SYNAPT_GENESIS_RATE = 0.1f;
+constexpr float MIN_PRUNING_RATE = 0.0f;
+constexpr float MAX_PRUNING_RATE = 0.1f;
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
@@ -65,9 +95,9 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Sensory neurons for input injection (using weak_ptr to avoid ownership cycles)
+    std::vector<std::weak_ptr<Neuron>> sensoryNeurons;
+    std::vector<std::weak_ptr<Neuron>> motorNeurons;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -131,14 +161,19 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        constexpr float DEFAULT_LTP_WEIGHT = 0.01f;
+        constexpr float DEFAULT_LTD_WEIGHT = 0.012f;
+        constexpr float DEFAULT_STDP_TAU = 20.0f;
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", DEFAULT_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", DEFAULT_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", DEFAULT_STDP_TAU);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        constexpr float DEFAULT_SYNAPT_GENESIS_RATE = 0.0001f;
+        constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", DEFAULT_SYNAPT_GENESIS_RATE);
+        float pruningRate = config->getOr<float>("pruning_rate", DEFAULT_PRUNING_RATE);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
@@ -205,12 +240,12 @@ bool Brain::initialize() {
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                    pImpl->sensoryNeurons.push_back(neuron->shared_from_this());
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                    pImpl->motorNeurons.push_back(neuron->shared_from_this());
                 }
             }
             
@@ -349,7 +384,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 fabsf(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -391,7 +426,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                            fabsf(state.membranePotential - state.restingPotential) / 10.0f);
                     }
                 }
             }
@@ -493,17 +528,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            fabsf(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                                fabsf(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
                         }
                     }
                 }
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -607,11 +639,14 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        auto sensoryNeuron = pImpl->sensoryNeurons[i].lock();
+        if (sensoryNeuron) {
+            sensoryNeuron->injectCurrent(normalizedValue);
+            
+            // Also store in working memory
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(sensoryNeuron->getId(), normalizedValue / 10.0f);
+            }
         }
     }
 }
@@ -670,7 +705,7 @@ float Brain::getExcitationInhibitionRatio() const {
             if (weight > 0) {
                 totalExcitatory += weight;
             } else {
-                totalInhibitory += std::abs(weight);
+                totalInhibitory += fabsf(weight);
             }
         }
     }
@@ -699,8 +734,9 @@ std::unique_ptr<class Action> Brain::produceAction() {
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
+    for (const auto& weakNeuron : pImpl->motorNeurons) {
+        auto neuron = weakNeuron.lock();
+        if (neuron && neuron->isFiring()) {
             ++firingMotor;
         }
     }
@@ -725,10 +761,7 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     pImpl->stdp->setLTDWeight(0.012f * modulation);
 }
 
-void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
-}
+
 
 void Brain::develop() {
     // Development updates structural plasticity
@@ -888,19 +921,19 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
-        }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+            // Apply synapse states - this is complex because we need to find matching synapses
+            // For now, just log the count
+            NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+            
+            // TODO: Implement complete synapse loading
+            // Need to:
+            // 1. Find matching source and destination neurons for each synapse
+            // 2. Find existing synapses or create new ones
+            // 3. Apply weight, delay, type, and eligibility trace values
+            // 4. Handle plasticity flags and other synapse properties
+            
+            NLM_LOG_INFO("Brain state loaded successfully");
+            return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());

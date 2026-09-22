@@ -100,9 +100,6 @@ public:
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
-    
     // Apply developmental changes (called automatically in step)
     void develop();
     

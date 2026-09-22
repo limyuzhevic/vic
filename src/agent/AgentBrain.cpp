@@ -1,7 +1,15 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <limits>
+#include <numeric>
+#include <unordered_map>
+#include <chrono>
+#include <functional>
+#include <deque>
 
 namespace nlm {
 
