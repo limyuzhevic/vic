@@ -1,53 +1,54 @@
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
-#include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
 struct PredictionError::Impl {
-    class Brain* brain;
-    float error;
-    float predictedValue;
-    float actualValue;
-    std::vector<float> history;
+    float level;
+    float baseline;
+    float decayRate;
+    float learningRate;
+    float predictionErrorSignal;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : level(0.0f), baseline(0.0f), decayRate(0.05f), learningRate(0.1f), predictionErrorSignal(0.0f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
 
-void PredictionError::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    NLM_LOG_INFO("PredictionError system initialized");
+const char* PredictionError::getName() const {
+    return "PredictionError";
 }
 
-float PredictionError::getError() const {
-    return pImpl->error;
+float PredictionError::getLevel() const {
+    return pImpl->level;
 }
 
-void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
-    pImpl->error = actual - predicted;
-    pImpl->history.push_back(pImpl->error);
+void PredictionError::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
+float PredictionError::getPlasticityFactor() const {
+    // Prediction error directly modulates plasticity
+    return 1.0f + pImpl->level * 0.5f;
 }
 
-const std::vector<float>& PredictionError::getHistory() const {
-    return pImpl->history;
+void PredictionError::update(TimestepDuration dt) {
+    // Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-void PredictionError::clearHistory() {
-    pImpl->history.clear();
+void PredictionError::computePredictionError(float reward, float predictedReward) {
+    // Prediction error = actual reward - expected reward
+    float error = reward - predictedReward;
+    pImpl->predictionErrorSignal = error;
+    pImpl->level = std::max(0.0f, std::min(1.0f, std::abs(error) * pImpl->learningRate));
 }
 
-float PredictionError::getMagnitude() const {
-    return std::abs(pImpl->error);
+float PredictionError::getPredictionErrorSignal() const {
+    return pImpl->predictionErrorSignal;
 }
 
 } // namespace nlm
