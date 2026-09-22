@@ -363,41 +363,132 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Try to load from file if provided
+    std::string configFile = "configs/default.cfg";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Enhanced command line argument parsing
+    int experimentMode = 0;  // 0=full, 1=connectivity, 2=plasticity, 3=stdp, 4=quick_test
+    int simulationSteps = 2000;  // Increased for more realistic behavior
+    double timestep = 0.001;
+    bool enableVerbose = false;
+    bool pauseOnError = false;
+    bool enableDebug = false;
+    std::string outputFile = "";  // Output results to file
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
+                
+                // Handle specific command line options
+                if (key == "mode" || key == "experiment") {
+                    experimentMode = std::stoi(value);
+                } else if (key == "steps") {
+                    simulationSteps = std::stoi(value);
+                } else if (key == "timestep") {
+                    timestep = std::stod(value);
+                } else if (key == "verbose") {
+                    enableVerbose = (value == "true" || value == "1" || value == "yes");
+                } else if (key == "debug") {
+                    enableDebug = (value == "true" || value == "1" || value == "yes");
+                } else if (key == "output") {
+                    outputFile = value;
+                }
+            } else {
+                // Handle boolean flags
+                if (arg == "--verbose" || arg == "-v") {
+                    enableVerbose = true;
+                } else if (arg == "--debug" || arg == "-d") {
+                    enableDebug = true;
+                } else if (arg == "--pause-on-error") {
+                    pauseOnError = true;
+                }
+            }
+        } else if (arg[0] == '-') {
+            std::string key = arg.substr(1);
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                std::string value = argv[++i];
+                config->set(key, value, ConfigSource::CommandLine);
+                
+                if (key == "mode" || key == "experiment") {
+                    experimentMode = std::stoi(value);
+                } else if (key == "steps") {
+                    simulationSteps = std::stoi(value);
+                }
+            }
+        }
+    }
+    
+    // Configure logging level based on verbosity
+    auto& globalLogger = Logger::getGlobal();
+    if (enableDebug) {
+        globalLogger.setLevel(LogLevel::Debug);
+        NLM_LOG_DEBUG("Debug logging enabled");
+    } else if (enableVerbose) {
+        globalLogger.setLevel(LogLevel::Info);
+        NLM_LOG_INFO("Verbose logging enabled");
+    }
+    
+    // Enable file output if specified
+    if (!outputFile.empty()) {
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        consoleLogger->setOutputFile(outputFile);
+        globalLogger.clearLoggers();
+        globalLogger.addLogger(consoleLogger);
+        NLM_LOG_INFO("Log output will be saved to: " + outputFile);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", timestep)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Log additional neuron parameters if configured
+    if (config->has("lif_resting_potential")) {
+        NLM_LOG_INFO("  lif_resting_potential: " + std::to_string(config->getOr<float>("lif_resting_potential", -70.0f)) + "mV");
+    }
+    if (config->has("lif_threshold")) {
+        NLM_LOG_INFO("  lif_threshold: " + std::to_string(config->getOr<float>("lif_threshold", -55.0f)) + "mV");
+    }
+    if (config->has("lif_time_constant")) {
+        NLM_LOG_INFO("  lif_time_constant: " + std::to_string(config->getOr<float>("lif_time_constant", 20.0f)) + "ms");
+    }
+    
     NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
+    NLM_LOG_INFO("Command Line Options:");
+    NLM_LOG_INFO("  experiment_mode: " + std::to_string(experimentMode));
+    NLM_LOG_INFO("  simulation_steps: " + std::to_string(simulationSteps));
+    NLM_LOG_INFO("  verbose: " + std::string(enableVerbose ? "true" : "false"));
+    NLM_LOG_INFO("  debug: " + std::string(enableDebug ? "true" : "false"));
+    if (!outputFile.empty()) {
+        NLM_LOG_INFO("  output_file: " + outputFile);
+    }
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);

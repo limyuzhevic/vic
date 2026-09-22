@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
 
 namespace nlm {
 
@@ -42,6 +43,9 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Validation function type
+using ConfigValidator = std::function<bool(const ConfigValue&)>;
 
 // Main configuration class
 class Config {
@@ -93,6 +97,13 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    void printParameterValidationReport() const;
+    
+    // Parameter documentation
+    static std::string getParameterDocumentation();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +111,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateConfiguration() const;
+    void applyDefaultParameters();
+    bool validateParameterConsistency() const;
 };
 
 } // namespace nlm

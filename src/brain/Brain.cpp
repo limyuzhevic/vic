@@ -78,35 +78,11 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
@@ -124,34 +100,77 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Configure development stage based on config
+        std::string devStageStr = config->getOr<std::string>("developmental_stage", "Initial");
+        if (devStageStr == "CriticalPeriod") {
+            developmentalStage = DevelopmentalStage::CriticalPeriod;
+        } else if (devStageStr == "Maturation") {
+            developmentalStage = DevelopmentalStage::Maturation;
+        } else if (devStageStr == "Adult") {
+            developmentalStage = DevelopmentalStage::Adult;
+        } else if (devStageStr == "Aging") {
+            developmentalStage = DevelopmentalStage::Aging;
+        } else {
+            developmentalStage = DevelopmentalStage::Initial;
+        }
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        // Configure neuromodulation levels
+        float dopamineLevel = config->getOr<float>("dopamine_level", 1.0f);
+        float curiosityLevel = config->getOr<float>("curiosity_level", 1.0f);
+        float noveltyLevel = config->getOr<float>("novelty_level", 1.0f);
+        float predictionErrorLevel = config->getOr<float>("prediction_error_level", 1.0f);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        // Configure system-level parameters
+        config->set("max_neurons", 10000, ConfigSource::Default);
+        config->set("max_synapses", 100000, ConfigSource::Default);
+        config->set("memory_capacity", 1000, ConfigSource::Default);
+        config->set("episode_history", 1000, ConfigSource::Default);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Configure checkpoint system
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        if (!checkpointDir.empty()) {
+            config->set("checkpoint_enabled", true, ConfigSource::Default);
+            config->set("checkpoint_interval", 1000, ConfigSource::Default);
+            config->set("checkpoint_max_files", 5, ConfigSource::Default);
+        }
         
-        // Get integration intervals from config
+        // Configure replay and consolidation intervals
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
+        // Configure development effects
+        config->set("plasticity_decay_rate", 0.95f, ConfigSource::Default);
+        config->set("development_plasticity_multiplier", 2.0f, ConfigSource::Default);
+        config->set("critical_period_end", 1000, ConfigSource::Default);
+        
+        // Configure learning rates
+        config->set("learning_rate", 0.001, ConfigSource::Default);
+        config->set("hebbian_learning_rate", 0.01f, ConfigSource::Default);
+        config->set("STDP_learning_rate", 0.01f, ConfigSource::Default);
+        
+        // Configure attention system
+        config->set("attention_inhibition_strength", 0.5f, ConfigSource::Default);
+        config->set("attention_excitation_strength", 1.5f, ConfigSource::Default);
+        config->set("attention_window_size", 50, ConfigSource::Default);
+        
+        // Configure prediction system
+        config->set("prediction_horizon", 10, ConfigSource::Default);
+        config->set("prediction_confidence_threshold", 0.5f, ConfigSource::Default);
+        
+        // Configure concept formation
+        config->set("concept_threshold", 0.7f, ConfigSource::Default);
+        config->set("concept_decay_rate", 0.98f, ConfigSource::Default);
+        
+        // Configure working memory
+        config->set("working_memory_capacity", 100, ConfigSource::Default);
+        config->set("working_memory_decay_rate", 0.9f, ConfigSource::Default);
+        
+        // Configure episodic memory
+        config->set("episode_max_length", 100, ConfigSource::Default);
+        config->set("episode_similarity_threshold", 0.8f, ConfigSource::Default);
+        
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
-    }
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;

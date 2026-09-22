@@ -23,8 +23,11 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Configuration reference
+    std::shared_ptr<Config> config;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), config(nullptr) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -224,12 +227,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * pImpl->config->getOr<float>("lif_adaptation_strength", 0.1f) * 0.01f;
+        pImpl->state.adaptationVariable *= pImpl->config->getOr<float>("lif_adaptation_decay", 0.95f);  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    float clampMin = pImpl->config->getOr<float>("lif_voltage_clamp_min", -100.0f);
+    float clampMax = pImpl->config->getOr<float>("lif_voltage_clamp_max", 50.0f);
+    V = std::clamp(V, clampMin, clampMax);
     
     // Check for spike
     if (V >= threshold) {
@@ -244,7 +249,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         V = V_reset;
         
         // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.refractoryRemaining = pImpl->config->getOr<uint32_t>("lif_refractory_period", 5);
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
