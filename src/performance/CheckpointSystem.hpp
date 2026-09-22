@@ -159,19 +159,43 @@ struct NeuronCheckpointData {
 };
 
 /**
- * Synapse state for checkpointing
+ * Working memory state for checkpointing
  */
-struct SynapseCheckpointData {
-    std::vector<uint64_t> sourceNeuron;
-    std::vector<uint64_t> destinationNeuron;
-    std::vector<float> weight;
-    std::vector<uint32_t> delay;
-    std::vector<uint8_t> synapseType;
-    std::vector<uint8_t> plasticityFlags;
-    std::vector<float> eligibilityTrace;
-    std::vector<float> efficacy;
-    std::vector<float> shortTermDepression;
-    std::vector<float> shortTermFacilitation;
+struct WorkingMemoryCheckpointData {
+    std::vector<uint64_t> neuronId;
+    std::vector<float> activation;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    std::vector<nlm::EpisodicMemoryItem> episodes;
+};
+
+/**
+ * Semantic memory state for checkpointing
+ */
+struct SemanticMemoryCheckpointData {
+    std::vector<uint64_t> factKeyHash;  // Hash of fact keys for efficiency
+    std::vector<uint64_t> factValueHash; // Hash of fact values for efficiency
+};
+
+/**
+ * Procedural memory state for checkpointing
+ */
+struct ProceduralMemoryCheckpointData {
+    std::vector<uint64_t> skillHash;      // Hash of skill names for efficiency
+    std::vector<float> proficiency;        // Skill proficiency levels
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionSystemCheckpointData {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
 };
 
 /**
@@ -212,6 +236,15 @@ public:
      */
     bool readNeurons(NeuronCheckpointData& data);
     bool readSynapses(SynapseCheckpointData& data);
+    
+    /**
+     * Read cognitive systems checkpoint data
+     */
+    bool readWorkingMemory(WorkingMemoryCheckpointData& data);
+    bool readEpisodicMemory(EpisodicMemoryCheckpointData& data);
+    bool readSemanticMemory(SemanticMemoryCheckpointData& data);
+    bool readProceduralMemory(ProceduralMemoryCheckpointData& data);
+    bool readPredictionSystem(PredictionSystemCheckpointData& data);
     
     /**
      * Read raw section data
@@ -284,6 +317,15 @@ public:
     bool writeSynapses(const SynapseCheckpointData& data);
     
     /**
+     * Write cognitive systems checkpoint data
+     */
+    bool writeWorkingMemory(const WorkingMemoryCheckpointData& data);
+    bool writeEpisodicMemory(const EpisodicMemoryCheckpointData& data);
+    bool writeSemanticMemory(const SemanticMemoryCheckpointData& data);
+    bool writeProceduralMemory(const ProceduralMemoryCheckpointData& data);
+    bool writePredictionSystem(const PredictionSystemCheckpointData& data);
+    
+    /**
      * Write raw section data
      */
     bool writeSection(CheckpointSection sectionType, const void* data, size_t size);
@@ -343,6 +385,26 @@ public:
     
     void setSynapseProvider(std::function<bool(SynapseCheckpointData&)> provider) {
         synapseProvider_ = provider;
+    }
+    
+    void setWorkingMemoryProvider(std::function<bool(WorkingMemoryCheckpointData&)> provider) {
+        workingMemoryProvider_ = provider;
+    }
+    
+    void setEpisodicMemoryProvider(std::function<bool(EpisodicMemoryCheckpointData&)> provider) {
+        episodicMemoryProvider_ = provider;
+    }
+    
+    void setSemanticMemoryProvider(std::function<bool(SemanticMemoryCheckpointData&)> provider) {
+        semanticMemoryProvider_ = provider;
+    }
+    
+    void setProceduralMemoryProvider(std::function<bool(ProceduralMemoryCheckpointData&)> provider) {
+        proceduralMemoryProvider_ = provider;
+    }
+    
+    void setPredictionSystemProvider(std::function<bool(PredictionSystemCheckpointData&)> provider) {
+        predictionSystemProvider_ = provider;
     }
     
     /**
@@ -405,6 +467,11 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::function<bool(WorkingMemoryCheckpointData&)> workingMemoryProvider_;
+    std::function<bool(EpisodicMemoryCheckpointData&)> episodicMemoryProvider_;
+    std::function<bool(SemanticMemoryCheckpointData&)> semanticMemoryProvider_;
+    std::function<bool(ProceduralMemoryCheckpointData&)> proceduralMemoryProvider_;
+    std::function<bool(PredictionSystemCheckpointData&)> predictionSystemProvider_;
 };
 
 // Checksum implementation
