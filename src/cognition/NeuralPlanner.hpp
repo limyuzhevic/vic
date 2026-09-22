@@ -2,23 +2,12 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
-#include <vector>
 #include <memory>
-#include <functional>
+#include <vector>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
-
-// PlanningCandidate: A possible action sequence considered during planning
-struct PlanningCandidate {
-    std::vector<ActionType> actions;
-    std::vector<std::vector<float>> predictedStates;
-    float expectedReward;
-    float confidence;
-    size_t depth;
-    
-    PlanningCandidate() 
-        : expectedReward(0), confidence(0), depth(0) {}
-};
 
 // NeuralPlanner: Uses learned predictions to plan multi-step actions
 // NOT a search engine - planning emerges from predictive neural dynamics
@@ -81,19 +70,32 @@ private:
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
+    // Generate action sequences using neural patterns
+    std::vector<std::vector<ActionType>> generateNeuralActionSequences(size_t depth);
+
+    // Evaluate action sequence using associative memory predictions
+    PlanningCandidate evaluateActionSequenceNeural(const std::vector<ActionType>& actions,
+                                                  const std::vector<float>& startState);
+
+    // Use prediction system for forward dynamics
+    std::vector<float> predictState(ActionType action, const std::vector<float>& state);
+
+    // Neural pattern completion for action selection
+    ActionType selectActionFromPattern(const std::vector<float>& statePattern);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
-    
+
     // Current goal state
     std::vector<float> currentGoal_;
-    
+
     // Action quality from experience
     std::vector<float> actionQuality_;
-    
+
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
 };
@@ -129,7 +131,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -164,7 +166,7 @@ private:
 
     Brain* brain_;
     float capabilityLevel_;
-    
+
     // Action -> (beforeState -> afterState) mappings
     struct ActionEffect {
         std::vector<float> beforeState;
@@ -172,7 +174,7 @@ private:
         float confidence;
         size_t observationCount;
     };
-    
+
     std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
 };
 
@@ -207,7 +209,7 @@ public:
     // Learn simple communication signal from another agent
     // Signal is a neural pattern that predicts reward from other agent
     void learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                  float signalReward);
+                                 float signalReward);
 
     // Detect if another agent is signaling
     bool detectSignal(const std::vector<float>& neuralPattern) const;
@@ -236,16 +238,16 @@ private:
 
     Brain* brain_;
     size_t observationCount_;
-    
+
     // Observed action effects (other agent's actions)
     struct ObservedEffect {
         std::vector<float> state;
         std::vector<float> resultingState;
         float reward;
     };
-    
+
     std::vector<std::pair<ActionType, ObservedEffect>> observedActions_;
-    
+
     // Communication signal
     std::vector<float> signalPattern_;
     float signalMeaning_;
