@@ -1,49 +1,54 @@
+// Config.hpp
 #pragma once
 
 #include <string>
-#include <memory>
 #include <vector>
-#include <variant>
+#include <unordered_map>
+#include <mutex>
 #include <optional>
+#include <variant>
+#include <chrono>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
 enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Programmatic
 };
 
-// Configuration entry
+enum class ValidationResult {
+    Success,
+    InvalidType,
+    InvalidValue,
+    OutOfRange,
+    MissingRequired
+};
+
+struct ValidationError {
+    std::string key;
+    std::string message;
+    ValidationResult result;
+};
+
+using ConfigValue = std::variant<int64_t, double, bool, std::string>;
+
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    // Validation metadata
+    std::optional<ConfigValue> minValue;
+    std::optional<ConfigValue> maxValue;
+    bool required;
+    
+    // Type information
+    std::string typeName;
 };
 
-// Main configuration class
 class Config {
 public:
     Config();
@@ -55,51 +60,117 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Configuration loading
     bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    bool loadFromJson(const std::string& jsonContent);
+    bool loadFromYaml(const std::string& yamlContent);
     
-    // Save to file
+    // Configuration saving
     bool saveToFile(const std::string& filepath) const;
+    std::string exportToJson() const;
+    std::string exportToYaml() const;
+    std::string summary() const;
     
-    // Get values
+    // Get configuration values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Set configuration values
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Programmatic);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Programmatic);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Programmatic);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Programmatic);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Programmatic);
     
-    // Check existence
+    // Configuration management
     bool has(const std::string& key) const;
-    
-    // Remove key
     void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
     void clear();
+    std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    ConfigSource getSource(const std::string& key) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validation and error handling
+    std::vector<ValidationError> validate() const;
+    bool validateKey(const std::string& key, std::vector<ValidationError>& errors) const;
+    bool isValid() const;
     
-private:
+    // Configuration metadata
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    
+    void setTypeValidation(const std::string& key, const std::string& typeName);
+    std::string getTypeName(const std::string& key) const;
+    
+    void setRangeValidation(const std::string& key, const ConfigValue& minValue, const ConfigValue& maxValue);
+    bool isWithinRange(const std::string& key, const ConfigValue& value) const;
+    
+    void markRequired(const std::string& key, bool required = true);
+    bool isRequired(const std::string& key) const;
+    
+    // Configuration merging and presets
+    void merge(const Config& other, ConfigSource source = ConfigSource::File);
+    void applyPreset(const std::string& presetName);
+    bool hasPreset(const std::string& presetName) const;
+    
+    // Thread safety
+    void lock() const;
+    void unlock() const;
+    bool tryLock() const;
+    
+    // Configuration serialization
+    std::string toString(const std::string& key) const;
+    static std::string configValueToString(const ConfigValue& value);
+    static std::optional<ConfigValue> stringToConfigValue(const std::string& str, const std::string& typeName);
+    
+    // Performance optimization
+    size_t getEntryCount() const;
+    void reserve(size_t capacity);
+    
+    // Statistics
+    size_t getLoadCount() const;
+    double getAverageLoadTime() const;
+    
+protected:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
-} // namespace nlm
+// Helper functions
+inline bool operator==(const ConfigValue& lhs, const ConfigValue& rhs) {
+    return std::visit([&](const auto& lhsVal) -> bool {
+        return std::visit([&](const auto& rhsVal) -> bool {
+            return lhsVal == rhsVal;
+        }, rhs);
+    }, lhs);
+}
+
+inline bool operator!=(const ConfigValue& lhs, const ConfigValue& rhs) {
+    return !(lhs == rhs);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ConfigValue& value) {
+    return os << Config::configValueToString(value);
+}
+
+inline std::istream& operator>>(std::istream& is, ConfigValue& value) {
+    std::string str;
+    is >> str;
+    value = ConfigValue{}; // This will be set by stringToConfigValue
+    return is;
+}
+
+// Explicit template instantiations
+extern template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+extern template std::optional<double> Config::get<double>(const std::string&) const;
+extern template std::optional<bool> Config::get<bool>(const std::string&) const;
+extern template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+extern template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+extern template double Config::getOr<double>(const std::string&, const double&) const;
+extern template bool Config::getOr<bool>(const std::string&, const bool&) const;
+extern template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;

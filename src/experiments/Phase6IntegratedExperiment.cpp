@@ -249,42 +249,59 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
-    
-    // Get memory systems
-    auto* wm = brain->getWorkingMemory();
-    auto* em = brain->getEpisodicMemory();
-    
-    if (!wm || !em) {
-        NLM_LOG_ERROR("Memory systems not available");
+    auto brain = createTestBrain(100);
+    if (!brain || !brain->initialize()) {
+        NLM_LOG_ERROR("Failed to create test brain");
         return false;
     }
     
-    // Run some steps
-    for (int i = 0; i < 100; ++i) {
-        brain->step(i, i * 0.001);
-    }
+    runSimulationSteps(brain, 100);
     
-    // Check if working memory has traces
-    if (wm->getActiveTraces() > 0) {
-        NLM_LOG_INFO("[PASS] Working memory has active traces: " + std::to_string(wm->getActiveTraces()));
-    } else {
-        NLM_LOG_INFO("[INFO] Working memory has no active traces (may be normal for simple simulation)");
-    }
+    auto* wm = brain->getWorkingMemory();
+    auto* em = brain->getEpisodicMemory();
     
-    // Check if episodic memory has episodes
-    if (em->getEpisodeCount() > 0) {
-        NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
-    } else {
-        NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
-    }
+    checkWorkingMemoryTraces(wm);
+    checkEpisodicMemoryEpisodes(em);
     
     return true;
 }
+
+std::shared_ptr<Brain> Phase6IntegratedExperiment::createTestBrain(size_t neuronCount) {
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", neuronCount);
+    cfg->set("region_count", 1);
+    return std::make_shared<Brain>(cfg);
+}
+
+void Phase6IntegratedExperiment::runSimulationSteps(std::shared_ptr<Brain> brain, size_t steps) {
+    for (size_t i = 0; i < steps; ++i) {
+        brain->step(i, i * 0.001);
+    }
+}
+
+void Phase6IntegratedExperiment::checkWorkingMemoryTraces(NeuralWorkingMemory* wm) {
+    if (!wm) return;
+    
+    size_t traces = wm->getActiveTraces();
+    if (traces > 0) {
+        NLM_LOG_INFO("[PASS] Working memory has active traces: " + std::to_string(traces));
+    } else {
+        NLM_LOG_INFO("[INFO] Working memory has no active traces (may be normal for simple simulation)");
+    }
+}
+
+void Phase6IntegratedExperiment::checkEpisodicMemoryEpisodes(NeuralEpisodicMemory* em) {
+    if (!em) return;
+    
+    size_t episodes = em->getEpisodeCount();
+    if (episodes > 0) {
+        NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(episodes));
+    } else {
+        NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
+    }
+}
+
+// Move testNeuromodulationIntegration after testMemoryIntegration
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");

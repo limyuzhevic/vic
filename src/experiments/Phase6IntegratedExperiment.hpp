@@ -22,6 +22,9 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 
 namespace nlm {
 
@@ -120,6 +123,26 @@ public:
     bool testMemoryIntegration();
     
     /**
+     * Create a test brain with specified neuron count
+     */
+    std::shared_ptr<Brain> createTestBrain(size_t neuronCount);
+    
+    /**
+     * Run simulation steps for a given number of steps
+     */
+    void runSimulationSteps(std::shared_ptr<Brain> brain, size_t steps);
+    
+    /**
+     * Check and log working memory traces
+     */
+    void checkWorkingMemoryTraces(NeuralWorkingMemory* wm);
+    
+    /**
+     * Check and log episodic memory episodes
+     */
+    void checkEpisodicMemoryEpisodes(NeuralEpisodicMemory* em);
+    
+    /**
      * Test neuromodulation integration
      */
     bool testNeuromodulationIntegration();
@@ -133,6 +156,11 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    /**
+     * Update development effects
+     */
+    void updateDevelopmentEffects();
 };
 
 } // namespace nlm
