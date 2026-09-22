@@ -382,6 +382,14 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Memory system parameters
+    config->set("replay_interval", 100, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
+    
+    // Structural and development update frequencies
+    config->set("structural_plasticity_interval", 100, ConfigSource::Default);
+    config->set("development_interval", 1000, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
