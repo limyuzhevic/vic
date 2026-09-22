@@ -415,6 +415,76 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Development stage management functions
+    m.def("getDevelopmentalStageName", [](const std::string& stageStr) {
+        // Simple helper to convert stage enum to string
+        if (stageStr == "Initial") return "Initial";
+        if (stageStr == "CriticalPeriod") return "CriticalPeriod";
+        if (stageStr == "Maturation") return "Maturation";
+        if (stageStr == "Adult") return "Adult";
+        if (stageStr == "Aging") return "Aging";
+        return "Initial";
+    }, "Get developmental stage name from string");
+    
+    // Spike system statistics
+    m.def("getSpikeStats", [](const SpikeSystem& spikeSystem) {
+        py::dict stats;
+        stats["pending_spikes"] = spikeSystem.getPendingSpikeCount();
+        stats["pending_delayed"] = spikeSystem.getPendingDelayedCount();
+        stats["total_spikes"] = spikeSystem.getTotalSpikes();
+        return stats;
+    }, "Get spike system statistics");
+    
+    // Neuron helper functions
+    m.def("isNeuronFiring", [](const Neuron* neuron) {
+        if (!neuron) return false;
+        return neuron->isFiring();
+    }, "Check if neuron is currently firing");
+    
+    // Region helper functions
+    m.def("getSynapseCount", [](const NeuralRegion* region) {
+        if (!region) return 0;
+        return region->getSynapseCount();
+    }, "Get total synapses in a region");
+    
+    // Population helper functions
+    m.def("getNeuronCount", [](const NeuralPopulation* population) {
+        if (!population) return 0;
+        return population->getNeuronCount();
+    }, "Get neuron count in a population");
+    
+    // Population type helper
+    m.def("isSensory", [](const NeuralPopulation* population) {
+        if (!population) return false;
+        return population->getNeuronType() == NeuronType::Sensory;
+    }, "Check if population is sensory");
+    
+    m.def("isMotor", [](const NeuralPopulation* population) {
+        if (!population) return false;
+        return population->getNeuronType() == NeuronType::Motor;
+    }, "Check if population is motor");
+    
+    // Configuration helper
+    m.def("configGetInt", [](const Config& config, const std::string& key, int defaultValue) {
+        auto value = config.get<int>(key);
+        return value ? *value : defaultValue;
+    }, "Get integer from config with default");
+    
+    m.def("configGetFloat", [](const Config& config, const std::string& key, float defaultValue) {
+        auto value = config.get<float>(key);
+        return value ? *value : defaultValue;
+    }, "Get float from config with default");
+    
+    m.def("configGetBool", [](const Config& config, const std::string& key, bool defaultValue) {
+        auto value = config.get<bool>(key);
+        return value ? *value : defaultValue;
+    }, "Get bool from config with default");
+    
+    m.def("configGetString", [](const Config& config, const std::string& key, const std::string& defaultValue) {
+        auto value = config.get<std::string>(key);
+        return value ? *value : defaultValue;
+    }, "Get string from config with default");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
