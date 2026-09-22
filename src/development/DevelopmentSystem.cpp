@@ -2,7 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 
-namespace nlm {
+namespace nlm;
 
 struct DevelopmentSystem::Impl {
     DevelopmentalStage stage;
@@ -57,22 +57,6 @@ const char* DevelopmentSystem::getStageName() const {
         case DevelopmentalStage::Adult: return "Adult";
         case DevelopmentalStage::Aging: return "Aging";
         default: return "Unknown";
-    }
-}
-
-void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
-    ++pImpl->stepsInCurrentStage;
-    age_ += 0.001;  // Approximate timestep
-    pImpl->stageAge += 0.001;
-    
-    // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
-        advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
-        advanceStage();
     }
 }
 
