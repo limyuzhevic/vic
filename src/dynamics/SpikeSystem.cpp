@@ -102,6 +102,24 @@ void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
     pImpl->delayedHandlers.push_back(handler);
 }
 
+void SpikeSystem::initializeDelayedDelivery() {
+    // Initialize delayed spike delivery pipeline
+    // This would typically set up callbacks or prepare for synaptic delivery
+    
+    // For now, register a default handler that demonstrates the delivery mechanism
+    registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+        // This is a placeholder for actual synaptic delivery logic
+        // In a complete implementation, this would:
+        // 1. Find the target synapse
+        // 2. Check if it's ready to receive based on delay
+        // 3. Deliver the synaptic input to the postsynaptic neuron
+        // 4. Update synaptic variables (short-term plasticity)
+        
+        // For now, just log that we would deliver
+        // NLM_LOG_INFO("Delayed spike delivered to neuron " + std::to_string(event.target_neuron.value));
+    });
+}
+
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
     return pImpl->spikeHistory;
 }

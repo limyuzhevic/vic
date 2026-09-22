@@ -15,9 +15,11 @@ struct Synapse::Impl {
     // Synapse type
     SynapseType type;
     
-    // Spike history for STDP
+    // Spike history for STDP - Use circular buffer for O(1) operations
     std::vector<Timestamp> preSpikeHistory;
     std::vector<Timestamp> postSpikeHistory;
+    size_t preSpikeHistoryHead = 0;  // Index of oldest valid spike
+    size_t postSpikeHistoryHead = 0;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -60,6 +62,8 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->preSpikeHistoryHead = 0;
+    pImpl->postSpikeHistoryHead = 0;
 }
 
 Synapse::~Synapse() = default;
@@ -128,17 +132,23 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    if (pImpl->preSpikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->preSpikeHistory.push_back(timestamp);
+    } else {
+        pImpl->preSpikeHistory[pImpl->preSpikeHistoryHead] = timestamp;
     }
+    // Reset head for circular buffer to indicate new spike was recorded
+    pImpl->preSpikeHistoryHead = pImpl->preSpikeHistory.size();
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    if (pImpl->postSpikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->postSpikeHistory.push_back(timestamp);
+    } else {
+        pImpl->postSpikeHistory[pImpl->postSpikeHistoryHead] = timestamp;
     }
+    // Reset head for circular buffer to indicate new spike was recorded
+    pImpl->postSpikeHistoryHead = pImpl->postSpikeHistory.size();
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
@@ -228,6 +238,8 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->preSpikeHistoryHead = 0;
+    pImpl->postSpikeHistoryHead = 0;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
