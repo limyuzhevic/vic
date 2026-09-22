@@ -46,11 +46,16 @@ public:
     // Get curiosity level
     float getCuriosityLevel() const;
     
-    // Get novelty level
-    float getNoveltyLevel() const;
-    
     // Get prediction error
     float getPredictionError() const;
+    
+    // Get development status
+    std::string getDevelopmentStatus() const;
+    
+    // Configuration helper methods
+    void configureForExploration();
+    void configureForExploitation();
+    void configureForDevelopment();
     
     // Reset agent for new episode
     void reset();
