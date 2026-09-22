@@ -347,11 +347,30 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
+    .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Additional convenience methods for easier usage
+        .def("getNeuronsPerMillion", [](const Brain& brain) {
+            return brain.getTotalNeuronCount() / 1000000.0f;
+        }, "Get neuron count in millions")
+        .def("getSynapsesPerNeuron", [](const Brain& brain) {
+            auto neurons = brain.getTotalNeuronCount();
+            auto synapses = brain.getTotalSynapseCount();
+            return neurons > 0 ? synapses / static_cast<float>(neurons) : 0.0f;
+        }, "Get average synapses per neuron")
+        .def("isHealthy", [](const Brain& brain) {
+            // A brain is considered healthy if it has reasonable neuron and synapse counts
+            // and firing rate is within expected bounds
+            auto neurons = brain.getTotalNeuronCount();
+            auto firing = brain.getFiringNeuronCount();
+            auto rate = brain.getAverageFiringRate();
+            
+            return neurons > 10 && neurons < 1000000 &&
+                   rate > 0.0f && rate < 100.0f;
+        }, "Check if brain is in healthy state");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,21 +419,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createAgentBrainFromFile", [](std::shared_ptr<Brain> brain, const std::string& checkpointPath) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        // Create a temporary world for initialization (will be replaced later)
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 16, 16);
+        world->reset();
+        agent->initialize(*world);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("checkpointPath"), "Create and load agent brain from checkpoint");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
