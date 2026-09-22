@@ -27,7 +27,15 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Custom exception classes for better error handling
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+
+    // NLM-specific exceptions
+    py::register_exception<std::runtime_error>(m, "NLMError", PyExc_RuntimeError);
+    py::register_exception<std::runtime_error>(m, "InvalidConfiguration", PyExc_ValueError);
+    py::register_exception<std::runtime_error>(m, "InvalidArgument", PyExc_TypeError);
+    py::register_exception<std::runtime_error>(m, "FileOperationError", PyExc_IOError);
+    py::register_exception<std::runtime_error>(m, "MemoryError", PyExc_MemoryError);
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -141,6 +149,166 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    // ===== NEURAL COMPONENTS =====
+    
+    // Neuron class bindings
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Neuron class representing a single neuron)
+        
+        A single spiking neuron implementing Leaky Integrate-and-Fire (LIF) dynamics.
+        
+        Features:
+        - Membrane potential dynamics with leak
+        - Firing threshold detection
+        - Refractory period after spikes
+        - Synaptic integration
+        - Plasticity support (STDP, Hebbian)
+    )pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"))
+        .def("getId", &Neuron::getId, "Get the neuron's unique ID")
+        .def("getType", &Neuron::getType, "Get the neuron type")
+        .def("setType", &Neuron::setType, py::arg("type"), "Set the neuron type")
+        .def("getMembranePotential", &Neuron::getMembranePotential, "Get current membrane potential")
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("potential"), "Set membrane potential")
+        .def("addToMembranePotential", &Neuron::addToMembranePotential, py::arg("delta"), "Add to membrane potential")
+        .def("getThreshold", &Neuron::getThreshold, "Get firing threshold")
+        .def("setThreshold", &Neuron::setThreshold, py::arg("threshold"), "Set firing threshold")
+        .def("isFiring", &Neuron::isFiring, "Check if neuron is firing")
+        .def("isRefractory", &Neuron::isRefractory, "Check if neuron is in refractory period")
+        .def("setFiringState", &Neuron::setFiringState, py::arg("state"), "Set firing state")
+        .def("setRefractoryPeriod", &Neuron::setRefractoryPeriod, py::arg("steps"), "Set refractory period in steps")
+        .def("decrementRefractory", &Neuron::decrementRefractory, "Decrement refractory period")
+        .def("getFiringRate", &Neuron::getFiringRate, "Get firing rate in Hz")
+        .def("setFiringRate", &Neuron::setFiringRate, py::arg("rate"), "Set firing rate")
+        .def("setLeakConductance", &Neuron::setLeakConductance, py::arg("conductance"), "Set leak conductance")
+        .def("getLeakConductance", &Neuron::getLeakConductance, "Get leak conductance")
+        .def("getRefractoryPeriod", &Neuron::getRefractoryPeriod, "Get refractory period in steps")
+        .def("setRestingPotential", &Neuron::setRestingPotential, py::arg("potential"), "Set resting potential")
+        .def("getRestingPotential", &Neuron::getRestingPotential, "Get resting potential")
+        .def("setResetPotential", &Neuron::setResetPotential, py::arg("potential"), "Set reset potential")
+        .def("checkThreshold", &Neuron::checkThreshold, "Check if neuron has reached firing threshold")
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime, "Get timestamp of last spike")
+        .def("stepLIF", &Neuron::stepLIF, py::arg("currentTime"), py::arg("dt"), "Step LIF neuron dynamics, returns true if fired")
+        .def("receiveExcitatoryInput", &Neuron::receiveExcitatoryInput, py::arg("amplitude"), "Receive excitatory input")
+        .def("receiveInhibitoryInput", &Neuron::receiveInhibitoryInput, py::arg("amplitude"), "Receive inhibitory input")
+        .def("receiveModulatoryInput", &Neuron::receiveModulatoryInput, py::arg("amplitude"), "Receive modulatory input")
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"), "Inject external current")
+        .def("getTotalCurrent", &Neuron::getTotalCurrent, "Get total injected current")
+        .def("clearTotalCurrent", &Neuron::clearTotalCurrent, "Clear injected current")
+        .def("recordSpike", &Neuron::recordSpike, py::arg("timestamp"), "Record a spike at given timestamp")
+        .def("getSpikeHistory", &Neuron::getSpikeHistory, "Get spike history timestamps")
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory, "Clear spike history")
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("handle"), "Add incoming synapse")
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("handle"), "Add outgoing synapse")
+        .def("getIncomingSynapses", &Neuron::getIncomingSynapses, "Get incoming synapse handles")
+        .def("getOutgoingSynapses", &Neuron::getOutgoingSynapses, "Get outgoing synapse handles")
+        .def("getPlasticityFlags", &Neuron::getPlasticityFlags, "Get plasticity flags")
+        .def("enablePlasticity", &Neuron::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"), "Enable plasticity rules")
+        .def("setRegionId", &Neuron::setRegionId, py::arg("regionId"), "Set region ID")
+        .def("getRegionId", &Neuron::getRegionId, "Get region ID")
+        .def("setPopulationId", &Neuron::setPopulationId, py::arg("populationId"), "Set population ID")
+        .def("getPopulationId", &Neuron::getPopulationId, "Get population ID")
+        .def("reset", &Neuron::reset, "Reset neuron to initial state")
+        .def("logState", [](const Neuron& self) {
+            auto& state = self.getState();
+            return std::string("Neuron ID: " + std::to_string(self.getId().index()) +
+                             " | Type: " + std::to_string(static_cast<int>(self.getType())) +
+                             " | V: " + std::to_string(state.membranePotential) +
+                             "mV | Firing: " + std::to_string(self.isFiring()) +
+                             " | Refractory: " + std::to_string(self.isRefractory()));
+        }, "Get string representation of neuron state");
+    
+    // NeuralPopulation class bindings
+    py::class_<NeuralPopulation>(m, "NeuralPopulation", R"pbdoc(Neural population representing a group of neurons)
+        
+        A population of neurons with shared properties. Useful for representing
+        different neuron types or functional groups within a brain region.
+    )pbdoc")
+        .def(py::init<PopulationId, size_t>(), py::arg("id"), py::arg("size"))
+        .def("getId", &NeuralPopulation::getId, "Get population ID")
+        .def("getSize", &NeuralPopulation::getSize, "Get population size")
+        .def("isEmpty", &NeuralPopulation::isEmpty, "Check if population is empty")
+        .def("getNeuron", &NeuralPopulation::getNeuron, py::arg("index"), "Get neuron at index")
+        .def("addNeuron", &NeuralPopulation::addNeuron, py::arg("neuron"), "Add neuron to population")
+        .def("getNeurons", &NeuralPopulation::getNeurons, "Get all neurons in population")
+        .def("getNeuronType", &NeuralPopulation::getNeuronType, "Get neuron type for this population")
+        .def("setNeuronType", &NeuralPopulation::setNeuronType, py::arg("type"), "Set neuron type for this population")
+        .def("getActiveCount", &NeuralPopulation::getActiveCount, "Get count of active neurons")
+        .def("getFiringCount", &NeuralPopulation::getFiringCount, "Get count of firing neurons")
+        .def("getAverageFiringRate", &NeuralPopulation::getAverageFiringRate, "Get average firing rate")
+        .def("getActivityLevel", &NeuralPopulation::getActivityLevel, "Get activity level (0-1)")
+        .def("reset", &NeuralPopulation::reset, "Reset all neurons in population")
+        .def("getNeuronIds", &NeuralPopulation::getNeuronIds, "Get all neuron IDs in population");
+    
+    // NeuralRegion class bindings
+    py::class_<NeuralRegion>(m, "NeuralRegion", R"pbdoc(Neural region containing multiple populations and local connectivity)
+        
+        A brain region that contains neuron populations and implements local connectivity.
+        Regions are hierarchical components of the brain architecture.
+    )pbdoc")
+        .def(py::init<RegionId>(), py::arg("id"))
+        .def(py::init<RegionId, std::string>(), py::arg("id"), py::arg("name"))
+        .def("getId", &NeuralRegion::getId, "Get region ID")
+        .def("getName", &NeuralRegion::getName, "Get region name")
+        .def("setName", &NeuralRegion::setName, py::arg("name"), "Set region name")
+        .def("addPopulation", &NeuralRegion::addPopulation, py::arg("size"), py::arg("type") = NeuronType::Internal, "Add new population")
+        .def("getPopulation", &NeuralRegion::getPopulation, py::arg("id"), "Get population by ID")
+        .def("getPopulationCount", &NeuralRegion::getPopulationCount, "Get number of populations")
+        .def("getAllPopulations", &NeuralRegion::getAllPopulations, "Get all populations")
+        .def("addSynapse", &NeuralRegion::addSynapse, py::arg("source"), py::arg("destination"), py::arg("weight") = 0.0f, py::arg("delay") = 1, "Add synapse between neurons")
+        .def("getSynapse", &NeuralRegion::getSynapse, py::arg("id"), "Get synapse by ID")
+        .def("getSynapseCount", &NeuralRegion::getSynapseCount, "Get number of synapses")
+        .def("getAllNeurons", &NeuralRegion::getAllNeurons, "Get all neurons in region")
+        .def("getTotalNeuronCount", &NeuralRegion::getTotalNeuronCount, "Get total neuron count")
+        .def("getActiveNeuronCount", &NeuralRegion::getActiveNeuronCount, "Get active neuron count")
+        .def("getFiringNeuronCount", &NeuralRegion::getFiringNeuronCount, "Get firing neuron count")
+        .def("getAverageFiringRate", &NeuralRegion::getAverageFiringRate, "Get average firing rate")
+        .def("getAverageSynapticWeight", &NeuralRegion::getAverageSynapticWeight, "Get average synaptic weight")
+        .def("getSynapticDensity", &NeuralRegion::getSynapticDensity, "Get synaptic density (0-1)")
+        .def("reset", &NeuralRegion::reset, "Reset all neurons and synapses")
+        .def("getSynapsesFrom", &NeuralRegion::getSynapsesFrom, py::arg("neuron"), "Get synapses originating from neuron")
+    // ===== BRAIN SYSTEM ACCESSORS =====
+    
+    // SpikeSystem accessors
+    py::class_<SpikeSystem>(m, "SpikeSystem", R"pbdoc(Spike processing system)
+        
+        Event-driven neural computation system that handles spike generation
+        and propagation with delays. Essential for real-time neural simulation.
+    )pbdoc")
+        .def("getSpikeCount", &SpikeSystem::getSpikeCount, "Get total spike count")
+        .def("getPendingSpikeCount", &SpikeSystem::getPendingSpikeCount, "Get count of pending spike events")
+        .def("getPendingDelayedCount", &SpikeSystem::getPendingDelayedCount, "Get count of pending delayed events")
+        .def("getAverageSpikeRate", &SpikeSystem::getAverageSpikeRate, "Get average spike rate")
+        .def("getMostActiveNeurons", &SpikeSystem::getMostActiveNeurons, py::arg("count"), "Get most active neuron IDs")
+        .def("reset", &SpikeSystem::reset, "Reset spike statistics");
+    
+    // Plasticity system accessors
+    py::class_<STDP>(m, "STDP", R"pbdoc(Spike-Timing-Dependent Plasticity)
+        
+        STDP implementation that strengthens synapses when pre-synaptic spikes
+        precede post-synaptic spikes (LTP), and weakens them when order is reversed (LTD).
+    )pbdoc")
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"), "Configure STDP parameters")
+        .def("getLTPWeight", &STDP::getLTPWeight, "Get LTP weight")
+        .def("getLTDWeight", &STDP::getLTDWeight, "Get LTD weight")
+        .def("getTau", &STDP::getTau, "Get time constant");
+    
+    py::class_<Hebbian>(m, "Hebbian", R"pbdoc(Hebbian learning)
+        
+        Simple Hebbian plasticity: synapses are strengthened when pre and post
+        neurons fire together, implementing "fire together, wire together".
+    )pbdoc")
+        .def("update", &Hebbian::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"), "Update synapse using Hebbian rule");
+    
+    py::class_<StructuralPlasticity>(m, "StructuralPlasticity", R"pbdoc(Structural plasticity)
+        
+        Dynamic changes to brain structure including synaptogenesis (creation of new
+        connections) and pruning (removal of weak connections). Essential for
+        development and learning.
+    )pbdoc")
+        .def("update", &StructuralPlasticity::update, py::arg("brain"), py::arg("rng"), "Update structural plasticity")
+        .def("setSynaptogenesisRate", &StructuralPlasticity::setSynaptogenesisRate, py::arg("rate"), "Set synaptogenesis rate")
+        .def("setPruningRate", &StructuralPlasticity::setPruningRate, py::arg("rate"), "Set pruning rate");
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
