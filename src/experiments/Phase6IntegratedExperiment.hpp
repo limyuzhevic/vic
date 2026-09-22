@@ -52,6 +52,55 @@ struct Phase6IntegrationResult {
     time_t endTime;
     double totalWallClockTime;
     
+    // ===== COMPREHENSIVE STATISTICS TRACKING =====
+    
+    // Memory system performance metrics
+    float memoryWorkingMemoryTraceCount;
+    float memoryWorkingMemoryCapacity;
+    float memoryWorkingMemoryUtilization;
+    
+    float memoryEpisodicMaxCapacity;
+    float memoryEpisodicCurrentCapacity;
+    float memoryEpisodicUtilization;
+    
+    float memoryAssociativeEntryCount;
+    float memoryAssociativeCapacity;
+    float memoryAssociativeUtilization;
+    
+    // Neuromodulation system metrics
+    float neuromodulationDopamineLevel;
+    float neuromodulationDopaminePlasticityFactor;
+    float neuromodulationCuriosityLevel;
+    float neuromodulationNoveltyLevel;
+    float neuromodulationPredictionErrorLevel;
+    
+    // Prediction system metrics
+    float predictionPredictionAccuracy;
+    float predictionPredictionError;
+    float predictionPredictionConfidences;
+    
+    // Cognition system metrics
+    float cognitionPlannerComplexity;
+    float cognitionPlannerDepth;
+    float cognitionPlannerNodeCount;
+    
+    float cognitionConceptCount;
+    float cognitionConceptCohesion;
+    
+    float cognitionAttentionSpan;
+    float cognitionInhibitionStrength;
+    float cognitionExcitationStrength;
+    
+    // Development system metrics
+    int developmentCurrentStage;
+    double developmentDevelopmentalAge;
+    float developmentPlasticityFactor;
+    
+    // Structural plasticity metrics
+    float plasticitySynaptogenesisRate;
+    float plasticityPruningRate;
+    float plasticityConnectionDensity;
+    
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
         , memoryEpisodicMemoryIntegrated(false)
@@ -69,7 +118,45 @@ struct Phase6IntegrationResult {
         , dopamineLevel(0.0f)
         , startTime(0)
         , endTime(0)
-        , totalWallClockTime(0.0) {}
+        , totalWallClockTime(0.0)
+        // ===== COMPREHENSIVE STATISTICS TRACKING INITIALIZATION =====
+        // Memory system
+        , memoryWorkingMemoryTraceCount(0.0f)
+        , memoryWorkingMemoryCapacity(0.0f)
+        , memoryWorkingMemoryUtilization(0.0f)
+        , memoryEpisodicMaxCapacity(0.0f)
+        , memoryEpisodicCurrentCapacity(0.0f)
+        , memoryEpisodicUtilization(0.0f)
+        , memoryAssociativeEntryCount(0.0f)
+        , memoryAssociativeCapacity(0.0f)
+        , memoryAssociativeUtilization(0.0f)
+        // Neuromodulation
+        , neuromodulationDopamineLevel(0.0f)
+        , neuromodulationDopaminePlasticityFactor(0.0f)
+        , neuromodulationCuriosityLevel(0.0f)
+        , neuromodulationNoveltyLevel(0.0f)
+        , neuromodulationPredictionErrorLevel(0.0f)
+        // Prediction system
+        , predictionPredictionAccuracy(0.0f)
+        , predictionPredictionError(0.0f)
+        , predictionPredictionConfidences(0.0f)
+        // Cognition system
+        , cognitionPlannerComplexity(0.0f)
+        , cognitionPlannerDepth(0)
+        , cognitionPlannerNodeCount(0)
+        , cognitionConceptCount(0.0f)
+        , cognitionConceptCohesion(0.0f)
+        , cognitionAttentionSpan(0.0f)
+        , cognitionInhibitionStrength(0.0f)
+        , cognitionExcitationStrength(0.0f)
+        // Development system
+        , developmentCurrentStage(0)
+        , developmentDevelopmentalAge(0.0)
+        , developmentPlasticityFactor(0.0f)
+        // Structural plasticity
+        , plasticitySynaptogenesisRate(0.0f)
+        , plasticityPruningRate(0.0f)
+        , plasticityConnectionDensity(0.0f) {}
 };
 
 /**

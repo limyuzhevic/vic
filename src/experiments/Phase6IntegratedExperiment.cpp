@@ -102,7 +102,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
-    // Collect final metrics
+    // Collect comprehensive metrics for Phase 6 demo
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
@@ -111,19 +111,157 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    // ===== ENHANCED STATISTICS TRACKING =====
     
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    // Memory system performance metrics
+    auto* workingMemory = brain->getWorkingMemory();
+    if (workingMemory) {
+        result.memoryWorkingMemoryTraceCount = workingMemory->getActiveTraces();
+        result.memoryWorkingMemoryCapacity = workingMemory->getCapacity();
+        result.memoryWorkingMemoryUtilization = 
+            static_cast<float>(workingMemory->getActiveTraces()) / 
+            static_cast<float>(workingMemory->getCapacity());
+    }
+    
+    auto* episodicMemory = brain->getEpisodicMemory();
+    if (episodicMemory) {
+        result.memoryEpisodicMaxCapacity = episodicMemory->getMaxEpisodes();
+        result.memoryEpisodicCurrentCapacity = episodicMemory->getEpisodeCount();
+        result.memoryEpisodicUtilization = 
+            static_cast<float>(episodicMemory->getEpisodeCount()) / 
+            static_cast<float>(episodicMemory->getMaxEpisodes());
+    }
+    
+    auto* associativeMemory = brain->getAssociativeMemory();
+    if (associativeMemory) {
+        result.memoryAssociativeEntryCount = associativeMemory->getEntryCount();
+        result.memoryAssociativeCapacity = associativeMemory->getCapacity();
+        result.memoryAssociativeUtilization = 
+            static_cast<float>(associativeMemory->getEntryCount()) / 
+            static_cast<float>(associativeMemory->getCapacity());
+    }
+    
+    // Neuromodulation system metrics
+    auto* dopamine = brain->getDopamine();
+    if (dopamine) {
+        result.neuromodulationDopamineLevel = dopamine->getLevel();
+        result.neuromodulationDopaminePlasticityFactor = dopamine->getPlasticityFactor();
+    }
+    
+    auto* curiosity = brain->getCuriosity();
+    if (curiosity) {
+        result.neuromodulationCuriosityLevel = curiosity->getLevel();
+    }
+    
+    auto* novelty = brain->getNovelty();
+    if (novelty) {
+        result.neuromodulationNoveltyLevel = novelty->getLevel();
+    }
+    
+    auto* predictionError = brain->getPredictionErrorSignal();
+    if (predictionError) {
+        result.neuromodulationPredictionErrorLevel = predictionError->getLevel();
+    }
+    
+    // Prediction system metrics
+    auto* predictionSystem = brain->getPredictionSystem();
+    if (predictionSystem) {
+        result.predictionPredictionAccuracy = predictionSystem->getAccuracy();
+        result.predictionPredictionError = predictionSystem->getError();
+        result.predictionPredictionConfidences = predictionSystem->getConfidence();
+    }
+    
+    // Cognition system metrics
+    auto* planner = brain->getPlanner();
+    if (planner) {
+        result.cognitionPlannerComplexity = planner->getComplexity();
+        result.cognitionPlannerDepth = planner->getPlanningDepth();
+        result.cognitionPlannerNodeCount = planner->getNodeCount();
+    }
+    
+    auto* conceptFormation = brain->getConceptFormation();
+    if (conceptFormation) {
+        result.cognitionConceptCount = conceptFormation->getConceptCount();
+        result.cognitionConceptCohesion = conceptFormation->getCohesion();
+    }
+    
+    auto* attention = brain->getAttention();
+    if (attention) {
+        result.cognitionAttentionSpan = attention->getAttentionSpan();
+        result.cognitionInhibitionStrength = attention->getInhibitionStrength();
+        result.cognitionExcitationStrength = attention->getExcitationStrength();
+    }
+    
+    // Development system metrics
+    auto* developmentSystem = brain->getDevelopmentSystem();
+    if (developmentSystem) {
+        result.developmentCurrentStage = static_cast<int>(developmentSystem->getCurrentStage());
+        result.developmentDevelopmentalAge = developmentSystem->getDevelopmentalAge();
+        result.developmentPlasticityFactor = developmentSystem->getPlasticityFactor();
+    }
+    
+    // Structural plasticity metrics
+    auto* structuralPlasticity = brain->getStructuralPlasticity();
+    if (structuralPlasticity) {
+        result.plasticitySynaptogenesisRate = structuralPlasticity->getSynaptogenesisRate();
+        result.plasticityPruningRate = structuralPlasticity->getPruningRate();
+        result.plasticityConnectionDensity = structuralPlasticity->getConnectionDensity();
+    }
+    
+    // ===== ADD NEW RESULT STRUCT FIELDS TO HEADER =====
+    
+    // Memory system results
+    result.memoryWorkingMemoryTraceCount = workingMemory ? workingMemory->getActiveTraces() : 0;
+    result.memoryWorkingMemoryCapacity = workingMemory ? workingMemory->getCapacity() : 0;
+    result.memoryWorkingMemoryUtilization = workingMemory ? 
+        static_cast<float>(workingMemory->getActiveTraces()) / 
+        static_cast<float>(workingMemory->getCapacity()) : 0.0f;
+    
+    result.memoryEpisodicMaxCapacity = episodicMemory ? episodicMemory->getMaxEpisodes() : 0;
+    result.memoryEpisodicCurrentCapacity = episodicMemory ? episodicMemory->getEpisodeCount() : 0;
+    result.memoryEpisodicUtilization = episodicMemory ? 
+        static_cast<float>(episodicMemory->getEpisodeCount()) / 
+        static_cast<float>(episodicMemory->getMaxEpisodes()) : 0.0f;
+    
+    result.memoryAssociativeEntryCount = associativeMemory ? associativeMemory->getEntryCount() : 0;
+    result.memoryAssociativeCapacity = associativeMemory ? associativeMemory->getCapacity() : 0;
+    result.memoryAssociativeUtilization = associativeMemory ? 
+        static_cast<float>(associativeMemory->getEntryCount()) / 
+        static_cast<float>(associativeMemory->getCapacity()) : 0.0f;
+    
+    // Neuromodulation results
+    result.neuromodulationDopamineLevel = dopamine ? dopamine->getLevel() : 0.0f;
+    result.neuromodulationDopaminePlasticityFactor = dopamine ? dopamine->getPlasticityFactor() : 0.0f;
+    result.neuromodulationCuriosityLevel = curiosity ? curiosity->getLevel() : 0.0f;
+    result.neuromodulationNoveltyLevel = novelty ? novelty->getLevel() : 0.0f;
+    result.neuromodulationPredictionErrorLevel = predictionError ? predictionError->getLevel() : 0.0f;
+    
+    // Prediction system results
+    result.predictionPredictionAccuracy = predictionSystem ? predictionSystem->getAccuracy() : 0.0f;
+    result.predictionPredictionError = predictionSystem ? predictionSystem->getError() : 0.0f;
+    result.predictionPredictionConfidences = predictionSystem ? predictionSystem->getConfidence() : 0.0f;
+    
+    // Cognition system results
+    result.cognitionPlannerComplexity = planner ? planner->getComplexity() : 0.0f;
+    result.cognitionPlannerDepth = planner ? planner->getPlanningDepth() : 0;
+    result.cognitionPlannerNodeCount = planner ? planner->getNodeCount() : 0;
+    
+    result.cognitionConceptCount = conceptFormation ? conceptFormation->getConceptCount() : 0;
+    result.cognitionConceptCohesion = conceptFormation ? conceptFormation->getCohesion() : 0.0f;
+    
+    result.cognitionAttentionSpan = attention ? attention->getAttentionSpan() : 0.0f;
+    result.cognitionInhibitionStrength = attention ? attention->getInhibitionStrength() : 0.0f;
+    result.cognitionExcitationStrength = attention ? attention->getExcitationStrength() : 0.0f;
+    
+    // Development system results
+    result.developmentCurrentStage = developmentSystem ? static_cast<int>(developmentSystem->getCurrentStage()) : 0;
+    result.developmentDevelopmentalAge = developmentSystem ? developmentSystem->getDevelopmentalAge() : 0.0;
+    result.developmentPlasticityFactor = developmentSystem ? developmentSystem->getPlasticityFactor() : 0.0f;
+    
+    // Structural plasticity results
+    result.plasticitySynaptogenesisRate = structuralPlasticity ? structuralPlasticity->getSynaptogenesisRate() : 0.0f;
+    result.plasticityPruningRate = structuralPlasticity ? structuralPlasticity->getPruningRate() : 0.0f;
+    result.plasticityConnectionDensity = structuralPlasticity ? structuralPlasticity->getConnectionDensity() : 0.0f;
     
     // Test checkpointing
     if (config.enableCheckpointing) {

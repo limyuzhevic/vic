@@ -22,41 +22,73 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
+        // First gather all motor and sensory neurons by type
+        std::vector<Neuron*> allMotorNeurons;
+        std::vector<Neuron*> allSensoryNeurons;
+        
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
+                        allMotorNeurons.push_back(n);
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
+                        allSensoryNeurons.push_back(n);
                     }
                 }
             }
+        }
+        
+        // Distribute motor neurons using optimized round-robin for better load balancing
+        // Improved distribution: ensure more even distribution across all motor groups
+        if (!allMotorNeurons.empty()) {
+            // Calculate ideal distribution
+            size_t neuronsPerGroup = allMotorNeurons.size() / 6;
+            size_t remainder = allMotorNeurons.size() % 6;
+            
+            // Distribute remainder neurons to first groups for balanced representation
+            size_t motorIndex = 0;
+            size_t groupIndex = 0;
+            for (Neuron* n : allMotorNeurons) {
+                // Determine which group this neuron belongs to
+                if (groupIndex < remainder) {
+                    // Groups with one extra neuron
+                    switch (groupIndex) {
+                        case 0: motorForward_.push_back(n); break;
+                        case 1: motorBackward_.push_back(n); break;
+                        case 2: motorTurnLeft_.push_back(n); break;
+                        case 3: motorTurnRight_.push_back(n); break;
+                        case 4: motorInteract_.push_back(n); break;
+                        case 5: motorWait_.push_back(n); break;
+                    }
+                } else {
+                    // Groups with base number of neurons
+                    switch (groupIndex - remainder) {
+                        case 0: motorForward_.push_back(n); break;
+                        case 1: motorBackward_.push_back(n); break;
+                        case 2: motorTurnLeft_.push_back(n); break;
+                        case 3: motorTurnRight_.push_back(n); break;
+                        case 4: motorInteract_.push_back(n); break;
+                        case 5: motorWait_.push_back(n); break;
+                    }
+                }
+                groupIndex++;
+            }
+        }
+        
+        // Distribute sensory neurons using round-robin
+        size_t sensoryIndex = 0;
+        for (Neuron* n : allSensoryNeurons) {
+            switch (sensoryIndex % 4) {
+                case 0: sensoryVision_.push_back(n); break;
+                case 1: sensoryTouch_.push_back(n); break;
+                case 2: sensoryInternal_.push_back(n); break;
+                case 3: sensoryProprioception_.push_back(n); break;
+            }
+            sensoryIndex++;
         }
     }
 }
