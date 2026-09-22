@@ -82,6 +82,15 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Other Demos
+
+| Executable | Description |
+|------------|-------------|
+| `./nlm` | Main simulation executable (Phase 2 neural computation) |
+| `./nlm_phase3_demo` | Phase 3 demonstration (world interaction) |
+| `./nlm_phase4_demo` | Phase 4 demonstration (cognition and memory) |
+| `./nlm_phase6_demo` | Phase 6 integration test (all systems) |
+
 ## Project Structure
 
 ```

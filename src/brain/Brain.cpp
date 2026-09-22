@@ -902,11 +902,9 @@ bool Brain::load(const std::string& filepath) {
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+    NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
         return false;
     }
-}
 
 RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
