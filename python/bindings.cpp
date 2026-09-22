@@ -400,13 +400,113 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("runSimpleBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run simple simulation
+        for (SimulationStep step = 0; step < 1000; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getTotalSpikeCount()
+        );
+    }, "Run a simple brain simulation and return statistics");
+    
+    m.def("runCompleteAgentSimulation", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.15f);
+        config->set("simulation_timestep", 0.01);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0, 10.0);
+        agent->initialize(*world);
+        
+        // Enable learning
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        // Run simulation
+        size_t numSteps = 500;
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto motorCmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motorCmd, world->getSimulationTime());
+            
+            // Simple reward based on position
+            float reward = 0.0f;
+            if (world->getAgentBody().x > 5.0 && world->getAgentBody().x < 15.0 &&
+                world->getAgentBody().y > 5.0 && world->getAgentBody().y < 15.0) {
+                reward = 1.0f;
+            }
+            
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1);
+        }
+        
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            agent->getCuriosityLevel(),
+            agent->getNeuromodulationLevel()
+        );
+    }, "Run a complete agent simulation with world interaction");
+    
+    m.def("createExperimentConfig", [](const std::string& experimentType) {
+        auto config = std::make_shared<Config>();
+        
+        if (experimentType == "minimal") {
+            config->set("neuron_count", 100);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.05f);
+        } else if (experimentType == "learning") {
+            config->set("neuron_count", 500);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.15f);
+            config->set("stdp_ltp_weight", 0.02f);
+            config->set("stdp_ltd_weight", 0.018f);
+        } else if (experimentType == "full") {
+            config->set("neuron_count", 1000);
+            config->set("region_count", 3);
+            config->set("connection_probability", 0.2f);
+            config->set("stdp_ltp_weight", 0.03f);
+            config->set("stdp_ltd_weight", 0.025f);
+            config->set("synaptogenesis_rate", 0.0002f);
+            config->set("pruning_rate", 0.00002f);
+        }
+        
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("replay_interval", 100);
+        config->set("consolidation_interval", 1000);
+        
+        return config;
+    }, "Create a pre-configured experiment setup", py::arg("experimentType"));
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();

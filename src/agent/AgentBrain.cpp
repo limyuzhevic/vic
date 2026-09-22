@@ -277,6 +277,11 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // Update brain development based on reward learning
+    if (developmentEnabled_) {
+        updateDevelopment(0.1);  // Small development update per reward
+    }
 }
 
 void AgentBrain::updateDevelopment(double timestep) {

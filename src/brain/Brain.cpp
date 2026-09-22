@@ -404,6 +404,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Store current firing neurons in working memory
+        // This connects neural activity to memory
+        std::vector<NeuronId> firingNeurons;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        firingNeurons.push_back(neuron->getId());
+                    }
+                }
+            }
+        }
+        
+        if (!firingNeurons.empty()) {
+            // Encode neural firing as working memory trace
+            pImpl->workingMemory->storeToNeuron(firingNeurons[0], 1.0f);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -488,7 +506,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons and their activity levels
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -511,8 +529,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // This is a basic implementation - can be enhanced
+        static_cast<void>(currentStep);  // Avoid unused parameter warning
+        static_cast<void>(currentTime);  // Avoid unused parameter warning
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -530,20 +550,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+        static_cast<void>(currentStep);  // Avoid unused parameter warning
+        static_cast<void>(currentTime);  // Avoid unused parameter warning
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
     }
     
     // ========== STEP 13: Apply development effects ==========
@@ -801,6 +814,11 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    
+                    // Add additional fields if present in the struct
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    neuronData.regionId.push_back(static_cast<uint64_t>(neuron->getRegionId().index()));
+                    neuronData.populationId.push_back(static_cast<uint64_t>(neuron->getPopulationId().index()));
                 }
             }
         }
@@ -819,13 +837,24 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(syn->getPlasticityFlags().to_ulong());
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                // Note: shortTermDepression and shortTermFacilitation not available in Synapse API
             }
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+        
+        // Write inter-region connections
+        if (!pImpl->interRegionConnections.empty()) {
+            std::vector<InterRegionConnection> connections = pImpl->interRegionConnections;
+            if (!writer.writeSection(CheckpointSection::Connectivity, connections.data(), connections.size() * sizeof(InterRegionConnection))) {
+                NLM_LOG_ERROR("Failed to write inter-region connections");
+            }
         }
         
         // Finalize
