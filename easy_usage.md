@@ -294,4 +294,25 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## What's New in NLM (Phase 6)
+
+NLM Phase 6 now includes:
+
+### Enhanced Python API
+- Full module metadata (`pynlm.__version__`, `__author__`, `__description__`)
+- Improved configuration system with better validation
+- Enhanced brain statistics and monitoring
+- Convenience methods for common patterns
+
+### New Features
+- Complete memory system integration (working memory, episodic memory, associative memory)
+- Advanced neuromodulation (dopamine, curiosity, novelty detection)
+- Prediction system with forward models
+- Enhanced cognitive functions (planning, concept formation, attention)
+- Developmental system with stage-based plasticity
+- Checkpoint saving and loading
+- Memory replay and consolidation
+
+That's it! You're now ready to use NLM - Phase 6, the fully integrated artificial brain system.
+
+For more advanced usage, check out the comprehensive documentation in the `docs/` directory.

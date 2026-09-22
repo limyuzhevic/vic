@@ -104,13 +104,18 @@ pip install dist/*.whl
 ```python
 import pynlm
 
-# Check version
-print(pynlm.__version__)
+# Check version and module info
+print(f"Version: {pynlm.__version__}")
+print(f"Author: {pynlm.__author__}")
+print(f"Description: {pynlm.__description__}")
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+
+# Show module metadata
+print(f"Module doc: {pynlm.__doc__}")
 ```
 
 ---
