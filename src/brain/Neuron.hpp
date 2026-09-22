@@ -41,7 +41,24 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with spike-frequency adaptation,
+// refractory periods, and synaptic integration
+// 
+// LIF Dynamics:
+// - Membrane potential integrates input currents with exponential decay
+// - When threshold is reached, neuron emits a spike and resets
+// - Refractory period prevents immediate re-firing
+// - Adaptation variable modulates firing rate over time
+// 
+// Memory Management:
+// - Uses Pimpl idiom for implementation hiding
+// - Thread-safe operations for concurrent access
+// - Exception-safe resource management
+// 
+// Integration with Brain Systems:
+// - Connected to SpikeSystem for event-driven dynamics
+// - Integrated with Plasticity systems for synaptic modification
+// - Coordinates with neuromodulation for dynamic behavior
 class Neuron {
 public:
     // Create neuron with ID

@@ -11,6 +11,18 @@ namespace nlm {
 
 // NeuralRegion: A brain region containing multiple populations and local connectivity
 // PLACEHOLDER - Phase 2 will implement region-level dynamics
+// 
+// Regional Architecture:
+// - Manages multiple neural populations within a specific brain region
+// - Maintains local connectivity patterns and distance-dependent connectivity
+// - Coordinates development and plasticity across populations
+// - Facilitates inter-regional communication via inter-region connections
+// 
+// Regional Functions:
+// - Population lifecycle management (creation, deletion, access)
+// - Local synapse establishment and maintenance
+// - Regional statistics and monitoring
+// - Developmental trajectory tracking for the region
 
 class NeuralRegion {
 public:

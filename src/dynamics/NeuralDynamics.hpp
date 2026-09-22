@@ -8,6 +8,18 @@ namespace nlm {
 
 // Abstract base class for neural dynamics
 // PLACEHOLDER - Phase 2 will implement various dynamics models
+// 
+// Neural Dynamics Framework:
+// - Abstract interface for neuron and synapse state evolution
+// - Supports multiple computational models (I&F, HH, FHN, etc.)
+// - Event-driven spike processing and synaptic transmission
+// - Extensible architecture for new dynamics implementations
+// 
+// Dynamics Implementation Strategies:
+// - Integrate-and-Fire: Minimal computational model with threshold spiking
+// - Hodgkin-Huxley: Detailed biophysical model with ion channel dynamics
+// - FitzHugh-Nagumo: Simplified excitable system with recovery variable
+// - Custom: User-defined dynamics for specific research needs
 
 class NeuralDynamics {
 public:

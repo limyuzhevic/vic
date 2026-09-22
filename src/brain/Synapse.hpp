@@ -9,6 +9,22 @@ class Neuron;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
+// 
+// Synaptic Dynamics:
+// - Transmitter release probability modulated by presynaptic spike history
+// - Short-term plasticity (STP) for dynamic synaptic efficacy
+// - Delay-based transmission for temporal coordination
+// - Compatibility with multiple plasticity rules (STDP, Hebbian, reward-modulated)
+// 
+// STP Mechanisms:
+// - Facilitation: increased release probability after recent spikes
+// - Depression: decreased release probability with high activity
+// - Recovering dynamics between activity epochs
+// 
+// Integration:
+// - Forward model for predictive coding
+// - Eligibility traces for reward-modulated plasticity
+// - Connected to neuromodulation systems for dynamic regulation
 
 class Synapse {
 public:
