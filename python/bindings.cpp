@@ -22,7 +22,7 @@ namespace nlm {
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        -----------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
@@ -88,6 +88,16 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Modulatory", SynapseType::Modulatory)
         .value("Electrical", SynapseType::Electrical)
         .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<NeuromodulatorType>(m, "NeuromodulatorType", R"pbdoc(Neuromodulator type enumeration)pbdoc")
+        .value("Dopamine", NeuromodulatorType::Dopamine)
+        .value("Novelty", NeuromodulatorType::Novelty)
+        .value("Curiosity", NeuromodulatorType::Curiosity)
+        .value("PredictionError", NeuromodulatorType::PredictionError)
+        .value("Acetylcholine", NeuromodulatorType::Acetylcholine)
+        .value("Norepinephrine", NeuromodulatorType::Norepinephrine)
+        .value("Serotonin", NeuromodulatorType::Serotonin)
         .export_values();
 
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")

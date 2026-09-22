@@ -50,6 +50,11 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
+    // ========== ADVANCED NEUROMODULATORS (currently placeholders) ==========
+    std::unique_ptr<Neuromodulator> acetylcholine;
+    std::unique_ptr<Neuromodulator> norepinephrine;
+    std::unique_ptr<Neuromodulator> serotonin;
+    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -401,9 +406,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    // ========== STEP 4: Update working memory with attention ==========
+    if (pImpl->workingMemory && pImpl->attention) {
+        // Get sensory input patterns to store in working memory
+        // This simulates the flow from perception to memory
+        std::vector<float> sensoryPattern;
+        
+        // Collect activity from sensory neurons
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 256; ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                float activation = std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - 
+                                         pImpl->sensoryNeurons[i]->getState().restingPotential) / 20.0f;
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Store in working memory
+            pImpl->workingMemory->store(sensoryPattern, 1.0f);
+            
+            // Get working memory content and feed to attention
+            std::vector<float> wmContent = pImpl->workingMemory->retrieve();
+            
+            // Convert working memory content to neuron IDs for attention processing
+            if (!wmContent.empty()) {
+                std::vector<NeuronId> wmNeurons;
+                size_t numPatterns = std::min(wmContent.size(), pImpl->workingMemory->getMemoryNeurons().size());
+                for (size_t i = 0; i < numPatterns; ++i) {
+                    if (wmContent[i] > 0.1f) {
+                        wmNeurons.push_back(pImpl->workingMemory->getMemoryNeurons()[i]);
+                    }
+                }
+                
+                // Feed to attention system for competitive selection
+                if (!wmNeurons.empty()) {
+                    pImpl->attention->processCompetition(wmNeurons);
+                }
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -547,39 +587,133 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+    // Update development system (call every step for more responsive development)
+    pImpl->developmentSystem->update(this, pImpl->timestep);
+    
+    // Get developmental stage and plasticity modifier
+    DevelopmentalStage stage = pImpl->developmentSystem->getDevelopmentalStage();
+    float plasticityMod = pImpl->developmentSystem->getPlasticityModifier();
+    
+    // Apply development effects across multiple brain systems
+    
+    // 1. Dopamine effects on reward learning
+    if (pImpl->dopamine) {
+        // Higher developmental stage = more sophisticated reward processing
+        float stageMod = std::min(1.0f, static_cast<float>(stage) / 4.0f);
+        pImpl->dopamine->setPlasticityFactor(0.5f + stageMod * 0.5f);
+    }
+    
+    // 2. Development affects STDP rates based on stage
+    if (pImpl->stdp) {
+        // More STDP in early development, less in mature brain
+        float ltpMod = 0.5f + stageMod * 0.5f;
+        float ltdMod = 0.5f - stageMod * 0.3f;
+        pImpl->stdp->configure(
+            pImpl->stdp->getLTPWeight() * ltpMod,
+            pImpl->stdp->getLTDWeight() * ltdMod,
+            pImpl->stdp->getTau() * (1.0f - stageMod * 0.3f)
+        );
+    }
+    
+    // 3. Development affects working memory capacity
+    if (pImpl->workingMemory) {
+        // Increase working memory capacity as brain develops
+        size_t baseCapacity = neuronCount / 20;  // Start with small capacity
+        size_t maxCapacity = neuronCount / 10;   // End with larger capacity
+        size_t targetCapacity = static_cast<size_t>(baseCapacity + 
+                                                   stageMod * (maxCapacity - baseCapacity));
+        pImpl->workingMemory->setCapacity(targetCapacity);
+    }
+    
+    // 4. Development affects attention mechanisms
+    if (pImpl->attention) {
+        // Attention becomes more selective with development
+        if (stage == DevelopmentalStage::Initial) {
+            pImpl->attention->setExcitationStrength(1.2f);
+            pImpl->attention->setInhibitionStrength(0.6f);
+        } else if (stage >= DevelopmentalStage::Adult) {
+            pImpl->attention->setExcitationStrength(1.5f);
+            pImpl->attention->setInhibitionStrength(0.5f);
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // 5. Development affects neuromodulation levels
+    if (pImpl->curiosity && stage == DevelopmentalStage::CriticalPeriod) {
+        // High curiosity during critical period
+        pImpl->curiosity->setExplorationBias(1.2f);
+    }
+    
+    // 6. Development affects development rate itself (auto-regulates)
+    if (stage == DevelopmentalStage::Maturation && pImpl->developmentSystem->getAge() > 200.0) {
+        // Slow down development as reaching maturity
+        pImpl->developmentSystem->setStage(DevelopmentalStage::Adult);
+    }
+    
+    // 7. Development affects memory consolidation strength
+    if (pImpl->episodicMemory) {
+        float consolidationMod = 0.3f + stageMod * 0.6f;  // Stronger consolidation in mature brain
+        pImpl->episodicMemory->setConsolidationStrength(consolidationMod);
+    }
+    
+    // 8. Development affects synaptic competition
+    if (pImpl->hebbian) {
+        // Hebbian learning adapts with development
+        float hebbianMod = 0.7f + stageMod * 0.3f;
+        // Note: This would require a configure method on Hebbian
+        // For now, just log the developmental effect
+        NLM_LOG_INFO(std::string("Development stage ") + getStageName() + 
+                    std::string(" - Hebbian learning modifier: ") + 
+                    std::to_string(hebbianMod));
+    }
+}
+    
+    // ========== STEP 14: Sleep/rest cycle and memory consolidation ==========
+    // Implement sleep/rest cycle for memory consolidation
+    pImpl->stepsSinceLastEpisode++;
+    
+    // Enter resting state after a while
+    if (!pImpl->isResting && pImpl->stepsSinceLastEpisode > pImpl->consolidationInterval) {
+        pImpl->isResting = true;
+        NLM_LOG_INFO("Brain entering resting state for memory consolidation");
+        
+        // Store final episode before rest
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryItem finalEpisode;
+            finalEpisode.timestamp = currentStep;
+            finalEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Capture current brain state as final episode
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            finalEpisode.activeNeurons.push_back(neuron->getId());
+                            finalEpisode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            pImpl->episodicMemory->storeEpisode(finalEpisode);
+            pImpl->stepsSinceLastEpisode = 0;
+        }
+    }
+    
+    // Process memory consolidation during rest
+    if (pImpl->isResting && pImpl->episodicMemory) {
+        pImpl->episodicMemory->consolidate(0.5f);  // Stronger consolidation during rest
+        
+        // Perform memory replay
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+        
+        // Exit rest after consolidation
+        pImpl->isResting = false;
+        NLM_LOG_INFO("Memory consolidation complete, brain active");
     }
     
     // ========== STEP 15: Checkpoint management ==========
