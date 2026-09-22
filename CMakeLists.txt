@@ -143,6 +143,19 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
+# Production unit tests (separate executable for production testing)
+add_executable(nlm_production_unit_tests
+    tests/run_production_tests.cpp
+    tests/NLMTestFramework.cpp
+    tests/test_config_production.cpp
+)
+
+target_link_libraries(nlm_production_unit_tests PRIVATE nlm_core)
+target_compile_features(nlm_production_unit_tests PRIVATE cxx_std_20)
+
+# Add production unit tests to CTest
+add_test(NAME nlm_production_unit_tests COMMAND nlm_production_unit_tests)
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib

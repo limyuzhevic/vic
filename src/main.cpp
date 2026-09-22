@@ -6,6 +6,14 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// This main executable demonstrates NLM's core functionality through three comprehensive tests:
+// 1. Basic neural connectivity test
+// 2. Plasticity learning experiment
+// 3. STDP verification experiment
+//
+// The main function orchestrates the entire test suite, demonstrating how NLM
+// integrates neural computation, learning, and memory systems.
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -159,30 +167,36 @@ struct LearningExperiment {
     }
 };
 
+// Basic Connectivity Test - Demonstrates fundamental neural communication
+// This test verifies that neurons can receive input, reach threshold, and fire spikes
+// that propagate through synaptic connections to other neurons
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found - cannot run connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("No neurons found - cannot run connectivity test");
         return;
     }
     
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
+    // Inject strong current into first 10 neurons (simulating sensory input)
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
-    // Run a few steps
+    // Run a few steps of simulation
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
     }
@@ -202,10 +216,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Plasticity Learning Experiment - Demonstrates activity-dependent synaptic change
+// This experiment shows how repeated patterns of activity lead to lasting changes
+// in synaptic weights through STDP and Hebbian mechanisms
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
+    // Create a learning experiment to track synaptic changes
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
@@ -245,17 +263,23 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
+// STDP Verification Experiment - Tests spike-timing dependent plasticity
+// This experiment specifically verifies that STDP correctly implements
+// spike-timing dependent learning rules (pre-before-post for LTP, post-before-pre for LTD)
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found - cannot run STDP verification");
+        return;
+    }
     
-    // Get first few synapses
+    // Get first few synapses for testing
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+        NLM_LOG_ERROR("Not enough synapses for STDP test (need at least 5)");
         return;
     }
     
@@ -326,7 +350,7 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger for debugging and monitoring
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
@@ -340,10 +364,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load and parse configuration from file and command line
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Try to load from file if provided (supports JSON, YAML, and simple formats)
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -366,7 +390,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 neural computation
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -397,7 +421,7 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with integrated neural systems
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
