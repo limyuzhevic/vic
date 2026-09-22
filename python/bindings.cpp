@@ -400,26 +400,93 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Neuromodulation systems
+    py::class_<Novelty, std::shared_ptr<Novelty>>(m, "Novelty", R"pbdoc(Neuromodulation novelty system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Novelty::initialize, py::arg("brain"),
+             "Initialize novelty system with brain")
+        .def("update", &Novelty::update, py::arg("timestep"),
+             "Update novelty system")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level");
+    
+    py::class_<PredictionError, std::shared_ptr<PredictionError>>(m, "PredictionError", R"pbdoc(Neuromodulation prediction error system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &PredictionError::initialize, py::arg("brain"),
+             "Initialize prediction error system with brain")
+        .def("update", &PredictionError::update, py::arg("timestep"),
+             "Update prediction error system")
+        .def("getLevel", &PredictionError::getLevel,
+             "Get current prediction error level");
+    
+    py::class_<Dopamine, std::shared_ptr<Dopamine>>(m, "Dopamine", R"pbdoc(Neuromodulation dopamine system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Dopamine::initialize, py::arg("brain"),
+             "Initialize dopamine system with brain")
+        .def("update", &Dopamine::update, py::arg("timestep"),
+             "Update dopamine system")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get current dopamine level")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get dopamine plasticity factor");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Real neural computation systems
+    py::class_<SpikeSystem, std::shared_ptr<SpikeSystem>>(m, "SpikeSystem", R"pbdoc(Event-driven spike system for neural computation)pbdoc")
+        .def(py::init<>())
+        .def("registerHandler", &SpikeSystem::registerHandler,
+             py::arg("handler"), "Register spike event handler")
+        .def("registerDelayedHandler", &SpikeSystem::registerDelayedHandler,
+             py::arg("handler"), "Register delayed spike event handler")
+        .def("queueSpike", &SpikeSystem::queueSpike,
+             py::arg("event"), "Queue immediate spike event")
+        .def("queueDelayedSpike", &SpikeSystem::queueDelayedSpike,
+             py::arg("event"), "Queue delayed spike event")
+        .def("processSpikes", &SpikeSystem::processSpikes,
+             py::arg("currentStep"), "Process immediate spikes")
+        .def("processDelayedSpikes", &SpikeSystem::processDelayedSpikes,
+             py::arg("currentStep"), py::arg("currentTime"), "Process delayed spikes")
+        .def("getPendingSpikeCount", &SpikeSystem::getPendingSpikeCount,
+             "Get number of pending spike events")
+        .def("getPendingDelayedCount", &SpikeSystem::getPendingDelayedCount,
+             "Get number of pending delayed spike events")
+        .def("reset", &SpikeSystem::reset,
+             "Reset spike system");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    py::class_<STDP, std::shared_ptr<STDP>>(m, "STDP", R"pbdoc(Spike-Timing-Dependent Plasticity)pbdoc")
+        .def(py::init<>())
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"),
+             "Configure STDP parameters")
+        .def("update", &STDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("timestep"),
+             "Update synapse using STDP rule")
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"),
+             "Set LTP weight")
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"),
+             "Set LTD weight");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    py::class_<Hebbian, std::shared_ptr<Hebbian>>(m, "Hebbian", R"pbdoc(Hebbian learning rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("timestep"),
+             "Update synapse using Hebbian rule");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    py::class_<StructuralPlasticity, std::shared_ptr<StructuralPlasticity>>(m, "StructuralPlasticity", R"pbdoc(Structural plasticity system for synaptogenesis and pruning)pbdoc")
+        .def(py::init<>())
+        .def("update", &StructuralPlasticity::update, py::arg("brain"), py::arg("rng"),
+             "Update structural plasticity (add/remove neurons/synapses)")
+        .def("setSynaptogenesisRate", &StructuralPlasticity::setSynaptogenesisRate, py::arg("rate"),
+             "Set synaptogenesis rate")
+        .def("setPruningRate", &StructuralPlasticity::setPruningRate, py::arg("rate"),
+             "Set pruning rate");
+
+    // Neural associative memory
+    py::class_<NeuralAssociativeMemory, std::shared_ptr<NeuralAssociativeMemory>>(m, "NeuralAssociativeMemory", R"pbdoc(Associative memory system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralAssociativeMemory::initialize, py::arg("brain"),
+             "Initialize associative memory with brain")
+        .def("store", &NeuralAssociativeMemory::store, py::arg("key"), py::arg("value"),
+             "Store a pattern association")
+        .def("recall", &NeuralAssociativeMemory::recall, py::arg("key"),
+             "Recall pattern for given key")
+        .def("clear", &NeuralAssociativeMemory::clear,
+             "Clear all associations");
 
 } // namespace nlm
