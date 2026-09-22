@@ -70,11 +70,27 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Action selection: motor command types that exist in the system
+    enum MotorActionType {
+        ACTION_MOVE_FORWARD = 0,
+        ACTION_MOVE_BACKWARD = 1,
+        ACTION_TURN_LEFT = 2,
+        ACTION_TURN_RIGHT = 3,
+        ACTION_INTERACT = 4,
+        ACTION_WAIT = 5,
+        // Note: LookLeft and LookRight are not implemented motor commands
+        // These were previously used in random action selection
+    };
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper methods for neuron organization
+    void organizeMotorNeurons();
+    void organizeSensoryNeurons();
     
     std::shared_ptr<Brain> brain_;
     

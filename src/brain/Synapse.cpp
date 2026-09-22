@@ -176,11 +176,8 @@ void Synapse::setEligibilityTrace(float trace) {
     pImpl->eligibilityTrace = trace;
 }
 
-void Synapse::decayEligibilityTrace(float decayRate) {
-    pImpl->eligibilityTrace *= (1.0f - decayRate);
-    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
-        pImpl->eligibilityTrace = 0.0f;
-    }
+void Synapse::updateEligibilityTrace(float value) {
+    pImpl->eligibilityTrace += value;
 }
 
 float Synapse::getEfficacy() const {
