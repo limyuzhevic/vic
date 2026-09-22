@@ -1,8 +1,10 @@
 #pragma once
 
+#pragma once
+
 /**
  * Phase6IntegratedExperiment - Phase 6 final integration test
- * 
+ *
  * This experiment demonstrates that the integrated brain systems work together:
  * - Memory systems are connected to neural processing
  * - Neuromodulation affects plasticity and neural dynamics
@@ -10,7 +12,7 @@
  * - Prediction system is integrated
  * - Replay and consolidation are functional
  * - Checkpoint save/load works
- * 
+ *
  * The experiment runs a complete lifetime simulation and verifies
  * that all systems interact properly.
  */
@@ -73,7 +75,7 @@ struct Phase6IntegrationResult {
 };
 
 /**
- * Configuration for Phase 6 integration experiment
+ * Phase 6 configuration
  */
 struct Phase6Config {
     uint64_t maxSteps;

@@ -50,7 +50,7 @@ void NeuralRegion::setName(const std::string& name) {
 }
 
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
-    PopulationId popId(pImpl->populations.size() + 1);
+    PopulationId popId(pImpl->populations.size());
     auto population = std::make_unique<NeuralPopulation>(popId, size);
     population->setNeuronType(type);
     pImpl->populations.push_back(std::move(population));
@@ -58,17 +58,17 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() >= pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[id.index()].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (id.index() >= pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[id.index()].get();
 }
 
 size_t NeuralRegion::getPopulationCount() const {

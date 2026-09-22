@@ -347,7 +347,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
+                bool justFired = (state.firingState == FiringState::Spiking &&
                                  state.lastSpikeTime >= 0.0f &&
                                  std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
@@ -1009,7 +1009,15 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
 
+NeuralWorkingMemory* Brain::getWorkingMemory() const {
+    return pImpl->workingMemory.get();
+}
+
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
     return pImpl->episodicMemory.get();
 }
 
