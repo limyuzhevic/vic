@@ -237,6 +237,53 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
     }
 }
 
+void NeuralPlanner::updatePlanning(const std::vector<PlanningCandidate>& candidates,
+                                   float bestScore) {
+    // Update planning based on candidate evaluation
+    // This incorporates prediction system results, neuromodulation, and working memory
+    
+    // Update action quality based on candidate performance
+    for (const auto& candidate : candidates) {
+        size_t actionIdx = static_cast<size_t>(candidate.action);
+        if (actionIdx < actionQuality_.size()) {
+            // Update based on expected reward and confidence
+            float delta = (candidate.expectedReward - actionQuality_[actionIdx]) * 0.1f * candidate.confidence;
+            delta *= std::min(1.0f, bestScore / 1000.0f);  // Scale by overall performance
+            
+            actionQuality_[actionIdx] = std::clamp(
+                actionQuality_[actionIdx] + delta, -1.0f, 1.0f);
+        }
+    }
+    
+    // Record recent plan success
+    bool recentSuccess = (bestScore > 0.0f && !candidates.empty());
+    recentPlanSuccess_.push_back(recentSuccess);
+    if (recentPlanSuccess_.size() > 10) {
+        recentPlanSuccess_.pop_front();
+    }
+    
+    // Update planning confidence based on consistency of candidate evaluations
+    if (!candidates.empty()) {
+        float avgScore = 0.0f;
+        float avgConfidence = 0.0f;
+        for (const auto& candidate : candidates) {
+            avgScore += candidate.expectedReward;
+            avgConfidence += candidate.confidence;
+        }
+        avgScore /= candidates.size();
+        avgConfidence /= candidates.size();
+        
+        // Confidence increases with score consistency
+        float consistency = 0.0f;
+        for (const auto& candidate : candidates) {
+            consistency += std::abs(candidate.expectedReward - avgScore);
+        }
+        consistency /= candidates.size();
+        
+        planningConfidence_ = 0.5f + (1.0f - consistency) * 0.5f;
+    }
+}
+
 void NeuralPlanner::clearCache() {
     // Clear any planning cache
 }

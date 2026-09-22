@@ -59,6 +59,10 @@ public:
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
 
+    // Update planner with candidate actions and their scores
+    void updatePlanning(const std::vector<PlanningCandidate>& candidates,
+                       float bestScore);
+
     // Clear planning cache
     void clearCache();
 
