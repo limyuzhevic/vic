@@ -19,6 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , previousVision_()
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {

@@ -69,6 +69,9 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
+    // Lookup table for O(1) neuron ID access (performance optimization)
+    std::unordered_map<NeuronId, std::pair<NeuralRegion*, Neuron*>> neuronLookup;
+    
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
@@ -267,21 +270,16 @@ bool Brain::initialize() {
     });
     
     // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+    pImpl->spikeSystem->registerDelayedHandler([this, neuronLookup = std::move(neuronLookup)](const DelayedSpikeEvent& event) {
+        // Direct O(1) neuron lookup
+        auto it = neuronLookup.find(event.destination_neuron);
+        if (it != neuronLookup.end()) {
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                it->second.second->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                it->second.second->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
@@ -617,14 +615,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
+    // Use O(1) lookup instead of O(n²) search through all regions/neurons
+    auto it = pImpl->neuronLookup.find(neuron);
+    if (it != pImpl->neuronLookup.end()) {
+        it->second.second->injectCurrent(current);
     }
 }
 
@@ -757,6 +751,9 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset neuron lookup table
+    pImpl->neuronLookup.clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
