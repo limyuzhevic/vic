@@ -113,10 +113,9 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
+        // Note: PredictionSystem integration needs to be fixed in Brain::step()
+    // The PredictionSystem is created but never used in the step loop
+    // See Phase 6 requirement #3: Integrate prediction into brain loop
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
@@ -509,11 +508,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
+// ========== STEP 8: Update prediction system ==========
+     if (pImpl->predictionSystem) {
+         // The prediction system would be updated with sensory observations
+         // For now, just track prediction error history
+         // TODO PHASE 6: Fully integrate prediction system with sensory input and learning
+         pImpl->predictionSystem->update(pImpl->timestep);
+         
+         // Update prediction error signal based on prediction system
+         if (auto* predictionError = pImpl->predictionError.get()) {
+             predictionError->update(pImpl->timestep);
+         }
+     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
