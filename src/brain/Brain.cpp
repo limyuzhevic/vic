@@ -78,6 +78,18 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Performance monitoring
+    bool performanceMonitoringEnabled;
+    float elapsedTime;
+    std::chrono::high_resolution_clock::time_point startTime;
+    
+    // Advanced simulation control
+    bool advancedSimulationEnabled;
+    float simulationSpeed;
+    
+    // Configuration validation
+    std::string validationErrors;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,6 +104,33 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , performanceMonitoringEnabled(false)
+        , elapsedTime(0.0f)
+        , advancedSimulationEnabled(false)
+        , simulationSpeed(1.0f)
+    {
+        , totalSpikesTotal(0)
+        , isResting(false)
+        , stepsSinceLastEpisode(0)
+        , replayInterval(100)      // Replay every 100 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        : config(cfg)
+        , rng(nullptr)
+        , developmentalStage(DevelopmentalStage::Initial)
+        , nextRegionId(1)
+        , timestep(0.001)
+        , currentStep(0)
+        , currentTime(0.0)
+        , totalSpikesThisStep(0)
+        , totalSpikesTotal(0)
+        , isResting(false)
+        , stepsSinceLastEpisode(0)
+        , replayInterval(100)      // Replay every 100 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , performanceMonitoringEnabled(false)
+        , elapsedTime(0.0f)
+        , advancedSimulationEnabled(false)
+        , simulationSpeed(1.0f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -152,9 +191,6 @@ struct Brain::Impl {
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -232,15 +268,27 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize working memory - null pointer");
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize episodic memory - null pointer");
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize associative memory - null pointer");
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -746,17 +794,27 @@ void Brain::reset() {
     pImpl->stepsSinceLastEpisode = 0;
     
     for (auto& region : pImpl->regions) {
-        region->reset();
+        if (region) {
+            region->reset();
+        }
     }
     
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Reset memory systems with proper null checks
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->clear();
+    }
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -899,6 +957,10 @@ bool Brain::load(const std::string& filepath) {
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
+        // TODO: Implement proper synapse state restoration
+        // This requires mapping checkpoint synapses to existing synapses in the brain
+        // based on source and destination neuron IDs, which is a non-trivial task
+        
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
@@ -906,13 +968,6 @@ bool Brain::load(const std::string& filepath) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
         return false;
     }
-}
-
-RegionId Brain::addRegion(const std::string& name) {
-    RegionId id(pImpl->nextRegionId++);
-    auto region = std::make_unique<NeuralRegion>(id, name);
-    pImpl->regions.push_back(std::move(region));
-    return id;
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {

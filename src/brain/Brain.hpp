@@ -193,6 +193,34 @@ public:
     // Logging
     void logStatus() const;
     
+// Batch operations
+    void processMultipleSteps(SimulationStep startStep, size_t numSteps);
+    void getBatchStats(size_t steps, SimulationStep startStep = 0) const;
+    
+    // Convenience methods
+    void resetBrain();
+    bool saveSnapshot(const std::string& filepath) const;
+    bool loadSnapshot(const std::string& filepath);
+    
+    // Performance monitoring
+    void startPerformanceMonitoring();
+    void stopPerformanceMonitoring();
+    std::string getPerformanceStats() const;
+    
+    // Advanced simulation control
+    void enableAdvancedSimulation(bool enable);
+    void setSimulationSpeed(float speed);
+    float getSimulationSpeed() const;
+    
+    // Configuration validation
+    bool validateConfiguration() const;
+    std::string getValidationErrors() const;
+    
+    // Batch neuron operations
+    void batchInjectCurrent(const std::vector<NeuronId>& neurons, 
+                           const std::vector<MembranePotential>& currents);
+    void batchSetNeuronType(NeuronType type, const std::vector<RegionId>& regions);
+    
 private:
     struct Impl;
     Impl* pImpl;
