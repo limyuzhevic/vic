@@ -509,10 +509,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // Step 8: Integrate prediction with working memory and attention systems
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Connect prediction system to working memory for predictive coding
+        if (pImpl->workingMemory) {
+            // The prediction system can update working memory based on prediction errors
+            // Store prediction in working memory for future comparison
+            pImpl->predictionSystem->storePrediction(pImpl->workingMemory->retrieve());
+        }
+        
+        // Use prediction to guide attention - apply bias based on confidence
+        if (pImpl->attention) {
+            // Prediction can influence which features are attended to
+            // Use a valid neuron ID for the bias
+            NeuronId biasNeuron(0);
+            pImpl->attention->applyTopDownBias(biasNeuron, pImpl->predictionSystem->getConfidence() * 2.0f - 1.0f);
+        }
+        
+        // Update prediction system with current sensory input
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Create a sensory observation from current activity
+            std::vector<float> currentObservation;
+            for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+                float activation = pImpl->sensoryNeurons[i]->getMembranePotential() > 0.5f ? 1.0f : 0.0f;
+                currentObservation.push_back(activation);
+            }
+            
+            // Get predicted state and update prediction error
+            auto predictedState = pImpl->predictionSystem->predictNextState(currentObservation);
+            pImpl->predictionSystem->updatePredictions(predictedState, currentObservation);
+            
+            // Store prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (pImpl->dopamine) {
+                pImpl->dopamine->update(predictionError * 0.1f);
+            }
+        }
+    }
+    
+    // STEP 8.5: ENHANCED INTEGRATION - Connect working memory to attention with bidirectional feedback
+    // This is the critical integration that was missing - working memory influences attention, and attention selects which working memory traces to strengthen
+    if (pImpl->workingMemory && pImpl->attention) {
+        // Working memory selects what attention should focus on
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        if (!memoryNeurons.empty()) {
+            // Apply working memory content to attention system as top-down bias
+            // This allows memory content to guide what features are attended to
+            for (size_t i = 0; i < std::min(size_t(5), memoryNeurons.size()); ++i) {
+                NeuronId memoryNeuron = memoryNeurons[i];
+                float activation = pImpl->workingMemory->getNeuronActivation(memoryNeuron);
+                if (activation > 0.5f) {
+                    // Convert activation to bias strength
+                    float biasStrength = (activation - 0.5f) * 2.0f;  // Range 0 to 1
+                    pImpl->attention->applyTopDownBias(memoryNeuron, biasStrength * 1.5f);
+                }
+            }
+            
+            // Use working memory to guide attention's competition
+            // This connects working memory storage with attention selection
+            pImpl->attention->processCompetition(memoryNeurons);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -828,6 +885,55 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Save inter-region connections
+        writer.writeCustom("interRegionConnections", pImpl->interRegionConnections);
+        
+        // Save working memory state
+        if (pImpl->workingMemory) {
+            writer.writeCustom("workingMemoryState", pImpl->workingMemory->getMemoryNeurons());
+            writer.writeCustom("workingMemoryActivations", pImpl->workingMemory->getMemoryActivations());
+        }
+        
+        // Save episodic memory state (store limited number of recent episodes)
+        if (pImpl->episodicMemory) {
+            auto episodes = pImpl->episodicMemory->getRecentEpisodes(100);
+            std::vector<EpisodicMemoryItem> episodeData;
+            for (const auto* episode : episodes) {
+                episodeData.push_back(*episode);
+            }
+            writer.writeCustom("episodicMemory", episodeData);
+        }
+        
+        // Save prediction system state
+        if (pImpl->predictionSystem) {
+            writer.writeCustom("predictionError", pImpl->predictionSystem->getPredictionError());
+            writer.writeCustom("predictionConfidence", pImpl->predictionSystem->getConfidence());
+            writer.writeCustom("predictionErrorHistory", pImpl->predictionSystem->getErrorHistory());
+        }
+        
+        // Save neuromodulation states
+        if (pImpl->dopamine) {
+            writer.writeCustom("dopamineLevel", pImpl->dopamine->getLevel());
+        }
+        if (pImpl->curiosity) {
+            writer.writeCustom("curiosityLevel", pImpl->curiosity->getLevel());
+        }
+        if (pImpl->novelty) {
+            writer.writeCustom("noveltyLevel", pImpl->novelty->getLevel());
+        }
+        if (pImpl->predictionError) {
+            writer.writeCustom("predictionErrorSignal", pImpl->predictionError->getLevel());
+        }
+        
+        // Save development stage
+        writer.writeCustom("developmentalStage", static_cast<int>(pImpl->developmentalStage));
+        
+        // Save simulation state
+        writer.writeCustom("simulationStep", pImpl->currentStep);
+        writer.writeCustom("simulationTime", pImpl->currentTime);
+        writer.writeCustom("totalSpikesTotal", pImpl->totalSpikesTotal);
+        writer.writeCustom("spikeSystemState", "initialized");
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -858,7 +964,7 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Read neurons
+// Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
@@ -880,7 +986,13 @@ bool Brain::load(const std::string& filepath) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
+                            neuron->setRefractoryPeriod(neuronData.refractoryRemaining[idx]);
+                        }
+                        if (idx < neuronData.refractoryPeriod.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                        }
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
                         }
                     }
                     idx++;
@@ -895,9 +1007,128 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states
+        if (!synapseData.weight.empty()) {
+            size_t idx = 0;
+            for (const auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    if (idx < synapseData.weight.size()) {
+                        syn->setWeight(synapseData.weight[idx]);
+                        if (idx < synapseData.delay.size()) {
+                            syn->setDelay(synapseData.delay[idx]);
+                        }
+                        if (idx < synapseData.synapseType.size()) {
+                            syn->setType(static_cast<SynapseType>(synapseData.synapseType[idx]));
+                        }
+                        if (idx < synapseData.eligibilityTrace.size()) {
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[idx]);
+                        }
+                        idx++;
+                    }
+                }
+            }
+        }
+        
+        // Load inter-region connections
+        std::vector<InterRegionConnection> interRegionConnections;
+        if (reader.readCustom("interRegionConnections", interRegionConnections)) {
+            pImpl->interRegionConnections = interRegionConnections;
+        }
+        
+        // Load working memory state
+        std::vector<NeuronId> workingMemoryNeurons;
+        std::vector<float> workingMemoryActivations;
+        if (reader.readCustom("workingMemoryState", workingMemoryNeurons)) {
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->clear();
+                for (size_t i = 0; i < workingMemoryNeurons.size() && i < workingMemoryActivations.size(); ++i) {
+                    pImpl->workingMemory->storeToNeuron(workingMemoryNeurons[i], workingMemoryActivations[i]);
+                }
+            }
+        }
+        if (reader.readCustom("workingMemoryActivations", workingMemoryActivations)) {
+            // Already read above
+        }
+        
+        // Load episodic memory state
+        if (pImpl->episodicMemory) {
+            std::vector<EpisodicMemoryItem> episodeData;
+            if (reader.readCustom("episodicMemory", episodeData)) {
+                pImpl->episodicMemory->clear();
+                for (const auto& item : episodeData) {
+                    pImpl->episodicMemory->storeEpisode(item);
+                }
+            }
+        }
+        
+        // Load prediction system state
+        if (pImpl->predictionSystem) {
+            float predictionError;
+            float predictionConfidence;
+            std::vector<float> predictionErrorHistory;
+            
+            if (reader.readCustom("predictionError", predictionError)) {
+                // Cannot set predictionError directly as it's a read-only property
+            }
+            if (reader.readCustom("predictionConfidence", predictionConfidence)) {
+                // Cannot set confidence directly as it's a read-only property
+            }
+            if (reader.readCustom("predictionErrorHistory", predictionErrorHistory)) {
+                // Clear and rebuild history
+                pImpl->predictionSystem->clearHistory();
+                for (float error : predictionErrorHistory) {
+                    pImpl->predictionSystem->getErrorHistory().push_back(error);
+                }
+            }
+        }
+        
+        // Load neuromodulation states
+        if (pImpl->dopamine) {
+            float dopamineLevel;
+            if (reader.readCustom("dopamineLevel", dopamineLevel)) {
+                // Cannot set dopamine level directly as it's computed
+            }
+        }
+        if (pImpl->curiosity) {
+            float curiosityLevel;
+            if (reader.readCustom("curiosityLevel", curiosityLevel)) {
+                // Cannot set curiosity level directly as it's computed
+            }
+        }
+        if (pImpl->novelty) {
+            float noveltyLevel;
+            if (reader.readCustom("noveltyLevel", noveltyLevel)) {
+                // Cannot set novelty level directly as it's computed
+            }
+        }
+        if (pImpl->predictionError) {
+            float predictionErrorSignal;
+            if (reader.readCustom("predictionErrorSignal", predictionErrorSignal)) {
+                // Cannot set prediction error signal directly as it's computed
+            }
+        }
+        
+        // Load development stage
+        int developmentalStageInt;
+        if (reader.readCustom("developmentalStage", developmentalStageInt)) {
+            pImpl->developmentalStage = static_cast<DevelopmentalStage>(developmentalStageInt);
+        }
+        
+        // Load simulation state
+        SimulationStep simulationStep;
+        Timestamp simulationTime;
+        size_t totalSpikesTotal;
+        
+        if (reader.readCustom("simulationStep", simulationStep)) {
+            pImpl->currentStep = simulationStep;
+        }
+        if (reader.readCustom("simulationTime", simulationTime)) {
+            pImpl->currentTime = simulationTime;
+        }
+        if (reader.readCustom("totalSpikesTotal", totalSpikesTotal)) {
+            pImpl->totalSpikesTotal = totalSpikesTotal;
+        }
+        pImpl->totalSpikesThisStep = 0;
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1006,14 +1237,18 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    // The memory systems were initialized in the constructor and must be available
+    // This method returns the actual working memory system for integration with other components
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    // The episodic memory system stores experiences and enables learning from history
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    // The associative memory connects patterns and enables relational thinking
     return pImpl->associativeMemory.get();
 }
 
