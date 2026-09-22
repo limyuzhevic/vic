@@ -511,8 +511,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // The prediction system predicts next sensory states based on current activity
+        auto currentSensory = predictNextSensoryState();
+        pImpl->predictionSystem->updatePredictions(currentSensory, getCurrentSensoryInput());
+        
+        // Use prediction error to drive neuromodulation and learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setLevel(std::abs(predictionError));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,65 +534,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 10.5: Connect prediction to action selection ==========
+    // Use prediction system to guide action selection
+    if (pImpl->predictionSystem && pImpl->attention) {
+        // Get prediction error
+        float predictionError = pImpl->predictionSystem->getPredictionError();
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+        // Prediction error affects attention selection
+        // High prediction error = more exploration
+        if (predictionError > 0.1f) {
+            // Apply curiosity-based exploration
+            // Attentional selection becomes more exploratory
+            std::vector<NeuronId> allNeurons;
+            for (auto& region : pImpl->regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    allNeurons.push_back(neuron->getId());
+                }
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            if (!allNeurons.empty()) {
+                pImpl->attention->processCompetition(allNeurons, 0.3f);  // Lower inhibition threshold for exploration
+            }
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // Connect prediction to motor planning
+    if (pImpl->predictionSystem && pImpl->planner) {
+        // Predict possible outcomes of actions
+        std::vector<NeuronId> motorNeurons;
+        for (auto* neuron : pImpl->motorNeurons) {
+            motorNeurons.push_back(neuron->getId());
+        }
+        
+        // Update planner with prediction-based expectations
+        auto prediction = pImpl->predictionSystem->predictNextState();
+        if (prediction) {
+            // In a full implementation, this would feed into neural planner
+            // for outcome prediction and action selection
+        }
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 9: Update attention system ==========
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory winners
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
     }
 }
 
