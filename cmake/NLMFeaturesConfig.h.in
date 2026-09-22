@@ -1,0 +1,283 @@
+#pragma once
+
+# NLM Feature Detection and Configuration
+# This file provides compile-time feature detection for NLM
+
+# Version
+set(NLM_FEATURE_VERSION "1.0.0")
+
+# Core feature flags
+#define NLM_FEATURE_CORE 1
+#define NLM_FEATURE_NEURAL_COMPUTATION 1
+#define NLM_FEATURE_SPiking 1
+#define NLM_FEATURE_SYNAPTIC_DYNAMICS 1
+#define NLM_FEATURE_PLASTICITY 1
+#define NLM_FEATURE_DEVELOPMENT 1
+#define NLM_FEATURE_NEUROTRANSMISSION 1
+#define NLM_FEATURE_MEMORY 1
+#define NLM_FEATURE_COGNITION 1
+#define NLM_FEATURE_PREDICTION 1
+
+# Optional feature flags (defined based on configuration)
+# These are defined in the main CMakeLists.txt and passed to the compiler
+
+// Configuration for build type
+#ifdef NDEBUG
+#define NLM_BUILD_TYPE_RELEASE 1
+#define NLM_BUILD_TYPE_DEBUG 0
+#elif defined(DEBUG)
+#define NLM_BUILD_TYPE_RELEASE 0
+#define NLM_BUILD_TYPE_DEBUG 1
+#else
+#define NLM_BUILD_TYPE_RELEASE 0
+#define NLM_BUILD_TYPE_DEBUG 0
+#endif
+
+// Performance optimization flags
+#if defined(__x86_64__) || defined(_M_X64)
+#define NLM_ARCH_X86_64 1
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#define NLM_ARCH_ARM64 1
+#else
+#define NLM_ARCH_GENERIC 1
+#endif
+
+// SIMD support detection
+#if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#define NLM_SUPPORT_SSE2 1
+#endif
+
+#if defined(__AVX__) || (defined(_M_AMD64) && !defined(__AVX__))
+#define NLM_SUPPORT_AVX 1
+#endif
+
+#if defined(__AVX2__)
+#define NLM_SUPPORT_AVX2 1
+#endif
+
+// Memory pool configuration
+#ifndef NLM_MEMORY_POOL_SIZE
+#define NLM_MEMORY_POOL_SIZE 1048576  // 1MB default
+#endif
+
+#ifndef NLM_EVENT_QUEUE_SIZE
+#define NLM_EVENT_QUEUE_SIZE 65536   // 64K events default
+#endif
+
+// Performance optimization levels
+#if NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS
+#define NLM_PERFORMANCE_LEVEL 3
+#elif NLM_BUILD_TYPE_RELEASE
+#define NLM_PERFORMANCE_LEVEL 2
+#else
+#define NLM_PERFORMANCE_LEVEL 1
+#endif
+
+// Checkpoint configuration
+#ifndef NLM_CHECKPOINT_VERSION
+#define NLM_CHECKPOINT_VERSION "1.0"
+#endif
+
+#ifndef NLM_CHECKPOINT_MAX_SIZE
+#define NLM_CHECKPOINT_MAX_SIZE 1073741824  // 1GB max
+#endif
+
+// Replay configuration
+#ifndef NLM_REPLAY_MAX_EPISODES
+#define NLM_REPLAY_MAX_EPISODES 1000
+#endif
+
+#ifndef NLM_REPLAY_CONSOLIDATION_INTERVAL
+#define NLM_REPLAY_CONSOLIDATION_INTERVAL 1000
+#endif
+
+// Development configuration
+#ifndef NLM_DEVELOPMENT_INITIAL_STAGE
+#define NLM_DEVELOPMENT_INITIAL_STAGE "Initial"
+#endif
+
+#ifndef NLM_DEVELOPMENT_CRITICAL_PERIOD_STEPS
+#define NLM_DEVELOPMENT_CRITICAL_PERIOD_STEPS 1000
+#endif
+
+// Neuromodulation configuration
+#ifndef NLM_NEUROMODULATION_UPDATE_INTERVAL
+#define NLM_NEUROMODULATION_UPDATE_INTERVAL 10
+#endif
+
+#ifndef NLM_DOPAMINE_DECAY_RATE
+#define NLM_DOPAMINE_DECAY_RATE 0.95
+#endif
+
+// Curiosity and novelty configuration
+#ifndef NLM_NOVELTY_THRESHOLD
+#define NLM_NOVELTY_THRESHOLD 0.5
+#endif
+
+#ifndef NLM_CURIOUSITY_DECAY_RATE
+#define NLM_CURIOUSITY_DECAY_RATE 0.9
+#endif
+
+// Prediction error configuration
+#ifndef NLM_PREDICTION_ERROR_DECAY
+#define NLM_PREDICTION_ERROR_DECAY 0.8
+#endif
+
+#ifndef NLM_PREDICTION_ERROR_THRESHOLD
+#define NLM_PREDICTION_ERROR_THRESHOLD 0.1
+#endif
+
+// Compilation feature summary
+#ifdef __cplusplus
+static constexpr const char* NLM_FEATURE_STRING =
+    "NLM " NLM_VERSION " with "
+#if NLM_FEATURE_CORE
+    "Core "
+#endif
+#if NLM_FEATURE_NEURAL_COMPUTATION
+    "Neural Computation "
+#endif
+#if NLM_FEATURE_SPiking
+    "Spiking Dynamics "
+#endif
+#if NLM_FEATURE_SYNAPTIC_DYNAMICS
+    "Synaptic Dynamics "
+#endif
+#if NLM_FEATURE_PLASTICITY
+    "Plasticity "
+#endif
+#if NLM_FEATURE_DEVELOPMENT
+    "Development "
+#endif
+#if NLM_FEATURE_NEUROTRANSMISSION
+    "Neuromodulation "
+#endif
+#if NLM_FEATURE_MEMORY
+    "Memory "
+#endif
+#if NLM_FEATURE_COGNITION
+    "Cognition "
+#endif
+#if NLM_FEATURE_PREDICTION
+    "Prediction "
+#endif
+    "Enabled"
+;
+
+// Configuration version check
+#if NLM_FEATURE_VERSION_MAJOR != 1
+#error "NLM feature configuration version mismatch"
+#endif
+
+// Platform compatibility
+#if defined(_WIN32) || defined(_WIN64)
+#define NLM_PLATFORM_WINDOWS 1
+#elif defined(__linux__)
+#define NLM_PLATFORM_LINUX 1
+#elif defined(__APPLE__)
+#define NLM_PLATFORM_MACOS 1
+#else
+#define NLM_PLATFORM_UNKNOWN 1
+#endif
+
+// Compiler feature detection
+#if defined(__GNUC__) && !defined(__clang__)
+#define NLM_COMPILER_GCC 1
+#elif defined(__clang__)
+#define NLM_COMPILER_CLANG 1
+#elif defined(_MSC_VER)
+#define NLM_COMPILER_MSVC 1
+#endif
+
+// C++ standard features
+#if __cplusplus >= 202002L
+#define NLM_CXX20 1
+#elif __cplusplus >= 201703L
+#define NLM_CXX17 1
+#else
+#define NLM_CXX14 1
+#endif
+
+// Safety and debugging features
+option(NLM_ENABLE_BOUNDS_CHECKING "Enable bounds checking for safety" OFF)
+option(NLM_ENABLE_MEMORY_SANITIZATION "Enable memory sanitization" OFF)
+option(NLM_ENABLE_THREAD_SANITIZATION "Enable thread sanitization" OFF)
+option(NLM_ENABLE_UNDEFINED_BEHAVIOR_SANITIZATION "Enable UB sanitization" OFF)
+
+#if NLM_ENABLE_BOUNDS_CHECKING
+#define NLM_BOUNDS_CHECKED 1
+#endif
+
+#if NLM_ENABLE_MEMORY_SANITIZATION
+#define NLM_MEMORY_SANITIZED 1
+#endif
+
+#if NLM_ENABLE_THREAD_SANITIZATION
+#define NLM_THREAD_SANITIZED 1
+#endif
+
+#if NLM_ENABLE_UNDEFINED_BEHAVIOR_SANITIZATION
+#define NLM_UB_SANITIZED 1
+#endif
+
+// Performance profiling
+option(NLM_ENABLE_PROFILING "Enable performance profiling" OFF)
+option(NLM_ENABLE_PERF_COUNTERS "Enable performance counters" OFF)
+
+#if NLM_ENABLE_PROFILING
+#define NLM_PROFILING_ENABLED 1
+#endif
+
+#if NLM_ENABLE_PERF_COUNTERS
+#define NLM_PERF_COUNTERS_ENABLED 1
+#endif
+
+// Logging levels
+option(NLM_LOG_LEVEL "Logging verbosity level" "INFO")
+#define NLM_LOG_DEBUG_ENABLED 0
+#define NLM_LOG_INFO_ENABLED 1
+#define NLM_LOG_WARNING_ENABLED 1
+#define NLM_LOG_ERROR_ENABLED 1
+#define NLM_LOG_FATAL_ENABLED 1
+
+// Memory management
+option(NLM_MEMORY_POOL_ALIGNMENT "Memory pool alignment (bytes)" 16)
+option(NLM_MEMORY_POOL_CHUNK_SIZE "Memory pool chunk size" 256)
+option(NLM_MEMORY_POOL_MAX_CHUNKS "Maximum number of memory pool chunks" 4096)
+
+// Event system
+option(NLM_EVENT_QUEUE_MAX_SIZE "Maximum event queue size" 65536)
+option(NLM_EVENT_PROCESSING_BATCH_SIZE "Event processing batch size" 32)
+option(NLM_EVENT_PRIORITY_LEVELS "Number of event priority levels" 4)
+
+// Neural network configuration
+option(NLM_NEURON_TYPES_SUPPORTED "Number of neuron types supported" 7)
+option(NLM_SYNAPSE_TYPES_SUPPORTED "Number of synapse types supported" 5)
+option(NLM_REGION_TYPES_SUPPORTED "Number of region types supported" 3)
+option(NLM_POPULATION_TYPES_SUPPORTED "Number of population types supported" 4)
+
+// Simulation parameters
+option(NLM_MAX_SIMULATION_STEPS "Maximum simulation steps" 1000000)
+option(NLM_MAX_NEURONS_PER_REGION "Maximum neurons per region" 100000)
+option(NLM_MAX_SYNAPSES_PER_REGION "Maximum synapses per region" 1000000)
+
+// Serialization
+option(NLM_ENABLE_SERIALIZATION "Enable serialization support" ON)
+option(NLM_SERIALIZATION_FORMAT "Default serialization format" "binary")
+option(NLM_SERIALIZATION_COMPRESSION "Enable serialization compression" ON)
+
+// Script and configuration
+option(NLM_CONFIG_FILE_FORMAT "Configuration file format" "json")
+option(NLM_SCRIPTING_ENABLED "Enable scripting support" OFF)
+option(NLM_WEB_INTERFACE_ENABLED "Enable web interface" OFF)
+
+// Final feature summary for debugging
+#ifdef NLM_FEATURE_SUMMARY
+#pragma message("NLM Feature Configuration:")
+#pragma message("  Version: " NLM_FEATURE_VERSION)
+#pragma message("  Platform: " NLM_PLATFORM_XXX)
+#pragma message("  Compiler: " NLM_COMPILER_XXX)
+#pragma message("  C++ Standard: " NLM_CXX_XXX)
+#pragma message("  Build Type: " NLM_BUILD_TYPE_XXX)
+#pragma message("  Performance Level: " NLM_PERFORMANCE_LEVEL)
+#endif

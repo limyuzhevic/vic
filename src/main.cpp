@@ -16,8 +16,6 @@
 #include "brain/Synapse.hpp"
 #include "sensory/SensoryInput.hpp"
 #include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +23,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <sstream>
 
 using namespace nlm;
 
@@ -165,7 +164,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("  No region 1 found for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -178,26 +180,58 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    const size_t neuronsToStimulate = std::min(size_t(10), neurons.size());
+    
+    // Store neuron states for diagnostics
+    std::vector<float> initialVoltages;
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
+        initialVoltages.push_back(neurons[i]->getMembranePotential());
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
-    // Run a few steps
+    // Run a few steps with improved logging
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
+        
+        // Log activity every 10 steps
+        if (step % 10 == 0) {
+            NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+        }
     }
     
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+    size_t totalSpikes = brain->getTotalSpikeCount();
+    size_t spikes = totalSpikes - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
     if (spikes > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        
+        // Log final activity statistics
+        NLM_LOG_INFO("  Final activity: " + std::to_string(totalSpikes) + " total spikes");
+        
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+        for (size_t i = 0; i < std::min(size_t(3), neuronsToStimulate); ++i) {
+            float finalVoltage = neurons[i]->getMembranePotential();
+            float voltageChange = finalVoltage - initialVoltages[i];
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                        " V_initial=" + std::to_string(initialVoltages[i]) +
+                        " V_final=" + std::to_string(finalVoltage) +
+                        " ΔV=" + std::to_string(voltageChange) +
                         " thresh=" + std::to_string(neurons[i]->getThreshold()));
+        }
+        
+        // Try to understand why no spikes occurred
+        NLM_LOG_INFO("  Investigation: Checking why neurons didn't spike...");
+        for (size_t i = 0; i < std::min(size_t(3), neuronsToStimulate); ++i) {
+            auto& state = neurons[i]->getState();
+            if (state.refractoryRemaining > 0) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + " is still refractory");
+            } else if (state.membranePotential < state.threshold) {
+                float margin = state.threshold - state.membranePotential;
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + " threshold margin: " + std::to_string(margin) + " mV");
+            }
         }
     }
 }
@@ -419,7 +453,10 @@ int main(int argc, char** argv) {
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
+    // Run Test 2: Plasticity learning experiment
+    runPlasticityExperiment(brain);
+    
+    // Reset and run Test 3: STDP verification  
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
