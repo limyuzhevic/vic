@@ -1,8 +1,14 @@
 #include "Config.hpp"
+#include "Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+
+// JSON/YAML parser support
+#if defined(HAS_JSON) && HAS_JSON
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
@@ -19,16 +25,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension to determine parser
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    // Try JSON parser first
+    if (ext == ".json") {
+#ifdef HAS_JSON
+        return loadFromJSON(filepath);
+#else
+        NLM_LOG_ERROR("JSON parser not available. Install nlohmann/json for JSON support.");
+        return false;
+#endif
+    }
+    // Default to simple key=value format for .cfg files
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    int parsedLines = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,10 +75,21 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            ++parsedLines;
+        } else {
+            NLM_LOG_WARNING("Invalid config line in " + filepath + ":" + 
+                           std::to_string(lineNumber) + ": " + line);
         }
     }
     
-    return true;
+    if (parsedLines > 0) {
+        NLM_LOG_INFO("Loaded " + std::to_string(parsedLines) + 
+                    " configuration entries from " + filepath);
+        return true;
+    } else {
+        NLM_LOG_WARNING("No valid configuration entries found in " + filepath);
+        return true; // Still return true even if no entries found
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -197,6 +234,75 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// JSON implementation
+bool Config::loadFromJSON(const std::string& filepath) {
+#ifdef HAS_JSON
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open JSON config file: " + filepath);
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON entries
+        for (const auto& [key, value] : jsonData.items()) {
+            ConfigValue configValue;
+            
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                configValue = value.get<int64_t>();
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Handle arrays
+                if (value.size() > 0 && value[0].is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : value) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    configValue = intArray;
+                } else if (value.size() > 0 && value[0].is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : value) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    configValue = doubleArray;
+                } else {
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : value) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    configValue = stringArray;
+                }
+            } else {
+                NLM_LOG_WARNING("Unsupported JSON type for key: " + key);
+                continue;
+            }
+            
+            set(key, configValue, ConfigSource::File);
+        }
+        
+        NLM_LOG_INFO("Loaded JSON configuration with " + std::to_string(jsonData.size()) + 
+                    " entries from " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error in " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+#else
+    return false;
+#endif
 }
 
 // Explicit template instantiations

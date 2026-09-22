@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma once
+
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include <memory>
