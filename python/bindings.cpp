@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON or YAML format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (key=value format)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,98 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced JSON serialization methods
+        .def("toJsonString", &Config::toJsonString,
+             "Export configuration as JSON string")
+        .def("fromJsonString", &Config::fromJsonString, py::arg("jsonStr"),
+             "Load configuration from JSON string")
+        .def("toYamlString", [](const Config& self) {
+            // Basic YAML export - could be enhanced with libyaml
+            std::ostringstream oss;
+            oss << "# NLM Configuration (YAML format)\n";
+            for (const auto& key : self.getKeys()) {
+                oss << key << ": " << self.getOr<std::string>(key, "") << "\n";
+            }
+            return oss.str();
+        }, "Export configuration as YAML string")
+        .def("fromYamlString", [](Config& self, const std::string& yamlStr) {
+            // Simple YAML parser for key: value format
+            std::istringstream stream(yamlStr);
+            std::string line;
+            while (std::getline(stream, line)) {
+                line = Config::trim(line);
+                if (line.empty() || line[0] == '#') continue;
+                
+                size_t colonPos = line.find(':');
+                if (colonPos != std::string::npos && colonPos > 0) {
+                    std::string key = Config::trim(line.substr(0, colonPos));
+                    std::string value = Config::trim(line.substr(colonPos + 1));
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    self.set(key, value);
+                }
+            }
+        }, py::arg("yamlStr"), "Load configuration from YAML string")
+        // Configuration manipulation methods
+        .def("merge", &Config::merge, py::arg("other"), py::arg("source") = ConfigSource::Runtime,
+             "Merge another configuration into this one")
+        .def("copy", [](const Config& self) {
+            auto copy = std::make_shared<Config>();
+            for (const auto& key : self.getKeys()) {
+                copy->set(key, self.getOr<std::string>(key, ""));
+            }
+            return copy;
+        }, "Create a copy of this configuration")
+        .def("validate", [](const Config& self) {
+            // Check if essential configuration keys exist
+            std::vector<std::string> errors;
+            
+            // Essential keys for basic operation
+            if (!self.has("simulation_timestep")) {
+                errors.push_back("Missing essential key: simulation_timestep");
+            }
+            
+            if (!self.has("neuron_count")) {
+                errors.push_back("Missing essential key: neuron_count");
+            }
+            
+            if (!self.has("connection_probability")) {
+                errors.push_back("Missing essential key: connection_probability");
+            }
+            
+            return errors;
+        }, "Validate configuration and return list of errors")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get value with string default")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get value with int default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get value with double default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get value with bool default")
+        // Factory methods for convenience
+        .def_static("createFromFile", [](const std::string& filepath) {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(filepath);
+            return config;
+        }, py::arg("filepath"), "Create configuration from file (JSON or YAML)")
+        .def_static("createFromJson", [](const std::string& jsonStr) {
+            auto config = std::make_shared<Config>();
+            config->fromJsonString(jsonStr);
+            return config;
+        }, py::arg("jsonStr"), "Create configuration from JSON string")
+        .def_static("createDefault", []() {
+            auto config = std::make_shared<Config>();
+            config->clear(); // Start with empty config for user to configure
+            return config;
+        }, "Create empty configuration (user must set values)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

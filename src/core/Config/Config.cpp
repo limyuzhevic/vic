@@ -19,23 +19,163 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read entire file to check if it's JSON/YAML format
+    std::string content((std::istreambuf_iterator<char>(file)),
+                       std::istreambuf_iterator<char>());
+    file.clear();
+    file.seekg(0);
+    
+    // Check for JSON format (starts with { or [)
+    bool isJson = false;
+    bool isYaml = false;
+    
+    // Simple JSON detection
+    if (!content.empty() && (content[0] == '{' || content[0] == '[')) {
+        isJson = true;
+    }
+    
+    // Simple YAML detection (basic check for key: value pattern)
+    // YAML often has indentation and colon separators
+    size_t colonPos = content.find(':');
+    if (colonPos != std::string::npos && colonPos < content.find('\n')) {
+        // Check if it looks like YAML key-value
+        size_t lineEnd = content.find('\n', 0);
+        if (lineEnd != std::string::npos && lineEnd > 10) {
+            std::string firstLine = content.substr(0, lineEnd);
+            if (firstLine.find(':') != std::string::npos) {
+                isYaml = true;
+            }
+        }
+    }
+    
+    try {
+        if (isJson) {
+            // Parse as JSON using nlohmann::json
+            auto json = nlohmann::json::parse(content);
+            clear(); // Clear existing entries
+            
+            for (auto it = json.begin(); it != json.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value;
+                
+                // Convert JSON value to ConfigValue
+                if (it.value().is_string()) {
+                    value = it.value().get<std::string>();
+                } else if (it.value().is_number_integer()) {
+                    value = it.value().get<int64_t>();
+                } else if (it.value().is_number_float()) {
+                    value = it.value().get<double>();
+                } else if (it.value().is_boolean()) {
+                    value = it.value().get<bool>();
+                } else if (it.value().is_array()) {
+                    // Handle arrays
+                    if (!it.value().empty() && it.value()[0].is_string()) {
+                        value = it.value().get<std::vector<std::string>>();
+                    } else if (!it.value().empty() && it.value()[0].is_number_integer()) {
+                        value = it.value().get<std::vector<int64_t>>();
+                    } else if (!it.value().empty() && it.value()[0].is_number_float()) {
+                        value = it.value().get<std::vector<double>>();
+                    }
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+            return true;
+        } else if (isYaml) {
+            // Simple YAML parser (basic key: value pairs)
+            clear(); // Clear existing entries
+            
+            std::istringstream stream(content);
+            std::string line;
+            
+            while (std::getline(stream, line)) {
+                // Trim whitespace
+                line = trim(line);
+                
+                // Skip empty lines and comments
+                if (line.empty() || line[0] == '#' || line[0] == '%') {
+                    continue;
+                }
+                
+                // Look for key: value pattern
+                size_t colonPos = line.find(':');
+                if (colonPos != std::string::npos && colonPos > 0) {
+                    std::string key = trim(line.substr(0, colonPos));
+                    std::string valueStr = trim(line.substr(colonPos + 1));
+                    
+                    // Remove quotes if present
+                    if (valueStr.size() >= 2 && 
+                        ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                         (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                        valueStr = valueStr.substr(1, valueStr.size() - 2);
+                    }
+                    
+                    // Try to parse value as different types
+                    bool parsed = false;
+                    ConfigValue value;
+                    
+                    // Try boolean
+                    if (valueStr == "true") {
+                        value = true;
+                        parsed = true;
+                    } else if (valueStr == "false") {
+                        value = false;
+                        parsed = true;
+                    }
+                    
+                    // Try integer
+                    if (!parsed) {
+                        try {
+                            size_t pos;
+                            int64_t intVal = std::stoll(valueStr, &pos);
+                            if (pos == valueStr.size()) {
+                                value = intVal;
+                                parsed = true;
+                            }
+                        } catch (...) {}
+                    }
+                    
+                    // Try double
+                    if (!parsed) {
+                        try {
+                            size_t pos;
+                            double doubleVal = std::stod(valueStr, &pos);
+                            if (pos == valueStr.size()) {
+                                value = doubleVal;
+                                parsed = true;
+                            }
+                        } catch (...) {}
+                    }
+                    
+                    // Use as string if not parsed as other type
+                    if (!parsed) {
+                        value = valueStr;
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
+            return true;
+        }
+    } catch (...) {
+        // If JSON parsing fails, fall back to simple parser
+    }
+    
+    // Simple key=value parser for backward compatibility
+    clear(); // Clear existing entries
+    
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));

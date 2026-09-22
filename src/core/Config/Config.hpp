@@ -93,6 +93,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON serialization
+    void toJson(const std::string& filepath) const;
+    void fromJson(const std::string& filepath);
+    std::string toJsonString() const;
+    void fromJsonString(const std::string& jsonStr);
+    
+    // Configuration merging
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
