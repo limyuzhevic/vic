@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Phase 2: Implement real neuromodulation effects
 
 class Neuromodulator {
 public:
@@ -21,11 +21,19 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Get neuromodulator impact on neural excitability
+    virtual float getExcitabilityImpact() const { return 1.0f; }
+    
+    // Get neuromodulator impact on memory
+    virtual float getMemoryImpact() const { return 1.0f; }
+    
+    // Get neuromodulator impact on attention
+    virtual float getAttentionImpact() const { return 1.0f; }
     
 protected:
     Neuromodulator() = default;
@@ -54,36 +62,81 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Phase 2: Implement real ACh effects on attention and memory
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Memory consolidation effects
+    void enhanceMemoryConsolidation(float strength);
+    
+    // Attention effects
+    void modulateAttention(float gain);
+    
+    // Learning effects
+    void enhanceHebbianLearning(float strength);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Phase 2: Implement real NE effects on arousal and learning
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal effects
+    void increaseAlertness(float level);
+    
+    // Learning effects
+    void enhanceSTDPLearning(float strength);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Phase 2: Implement real 5-HT effects on behavior
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Social behavior effects
+    void modulateSocialBehavior(float level);
+    
+    // Impulsivity control
+    void reduceImpulsivity(float strength);
+    
+    // Mood effects
+    void improveMood(float level);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

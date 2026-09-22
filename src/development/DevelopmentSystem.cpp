@@ -81,6 +81,9 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
     
+    // Apply developmental stage effects to brain systems
+    applyDevelopmentalEffects(brain, dt);
+    
     // Auto-advance stage based on developmental age
     // These thresholds are in simulation seconds
     if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
@@ -91,29 +94,132 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
         advanceStage();
     }
 }
+    if (!brain) return;
+    
+    // Get plasticity modifier for current developmental stage
+    float plasticityModifier = getPlasticityModifier();
+    
+    // Apply to structural plasticity rates
+    if (auto* structural = brain->getStructuralPlasticity()) {
+        // Synaptogenesis decreases with development (more stable)
+        float synaptogenesisRate = 0.0001f * plasticityModifier;
+        structural->setSynaptogenesisRate(synaptogenesisRate);
+        
+        // Pruning may increase with development (pruning old connections)
+        float pruningRate = 0.00001f * (2.0f - plasticityModifier);
+        structural->setPruningRate(pruningRate);
+    }
+    
+    // Apply developmental effects to neuromodulation
+    applyNeuromodulationDevelopmentEffects(brain, dt, plasticityModifier);
+    
+    // Apply developmental effects to memory systems
+    applyMemoryDevelopmentEffects(brain, dt, plasticityModifier);
+    
+    // Apply developmental effects to prediction system
+    applyPredictionDevelopmentEffects(brain, dt, plasticityModifier);
+    
+    // Apply developmental effects to cognition systems
+    applyCognitionDevelopmentEffects(brain, dt, plasticityModifier);
+}
 
-float DevelopmentSystem::getPlasticityModifier() const {
-    // Higher plasticity in early stages, lower in later stages
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial: return 1.0f;
-        case DevelopmentalStage::CriticalPeriod: return 0.8f;
-        case DevelopmentalStage::Maturation: return 0.5f;
-        case DevelopmentalStage::Adult: return 0.2f;
-        case DevelopmentalStage::Aging: return 0.1f;
-        default: return 0.5f;
+void DevelopmentSystem::applyNeuromodulationDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier) {
+    if (!brain) return;
+    
+    // Dopamine effects: increases with development (reward learning matures)
+    if (auto* dopamine = brain->getDopamine()) {
+        float dopamineLevel = dopamine->getLevel();
+        
+        // Modulate dopamine based on developmental stage
+        switch (getStage()) {
+            case DevelopmentalStage::Initial:
+                dopamineLevel *= 0.8f;  // Lower initial reward sensitivity
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                dopamineLevel *= 1.0f;  // Normal reward processing
+                break;
+            case DevelopmentalStage::Maturation:
+                dopamineLevel *= 1.2f;  // Increased reward learning
+                break;
+            case DevelopmentalStage::Adult:
+                dopamineLevel *= 1.0f;  // Stable reward processing
+                break;
+            case DevelopmentalStage::Aging:
+                dopamineLevel *= 0.8f;  // Reduced reward sensitivity
+                break;
+        }
+        
+        // Apply dopamine effects on neural excitability
+        for (size_t i = 0; i < 10 && i < brain->getTotalNeuronCount(); ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Internal, dopamineLevel * 0.01f);
+        }
+    }
+    
+    // Novelty detection may decrease with development (less exploration needed)
+    if (auto* novelty = brain->getNovelty()) {
+        float noveltyLevel = novelty->getLevel();
+        noveltyLevel *= (1.5f - plasticityModifier);  // Less novelty in mature brains
+        novelty->setLevel(std::max(0.0f, noveltyLevel));
     }
 }
 
-bool DevelopmentSystem::isCriticalPeriod() const {
-    return pImpl->stage == DevelopmentalStage::CriticalPeriod;
+void DevelopmentSystem::applyMemoryDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier) {
+    if (!brain) return;
+    
+    // Working memory capacity may increase with development
+    if (auto* workingMemory = brain->getWorkingMemory()) {
+        // Mature brains can hold more active traces
+        size_t baseCapacity = 100;
+        size_t capacityIncrease = static_cast<size_t>(baseCapacity * (1.0f - plasticityModifier));
+        workingMemory->setCapacity(baseCapacity + capacityIncrease);
+    }
+    
+    // Episodic memory consolidation may increase with development
+    if (auto* episodicMemory = brain->getEpisodicMemory()) {
+        // Older brains consolidate better
+        float consolidationStrength = 0.5f + (0.5f * (1.0f - plasticityModifier));
+        // Would need a method to set consolidation strength if available
+    }
+    
+    // Development affects attention to memory
+    if (auto* attention = brain->getAttention()) {
+        // Attention becomes more selective with development
+        float inhibitionStrength = 0.5f + (0.3f * (1.0f - plasticityModifier));
+        attention->setInhibitionStrength(inhibitionStrength);
+    }
 }
 
-float DevelopmentSystem::getCriticalPeriodProgress() const {
-    if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
-        return 0.0f;
+void DevelopmentSystem::applyPredictionDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier) {
+    if (!brain) return;
+    
+    // Prediction system accuracy improves with development
+    if (auto* predictionSystem = brain->getPredictionSystem()) {
+        // Would need prediction system state update based on development
+        // For now, we just note that prediction learning accelerates with age
+        float predictionLearningRate = 0.01f * (1.5f - plasticityModifier);
+        // Apply to prediction system if it has such a method
     }
-    // Progress through critical period (0 to 1)
-    return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+}
+
+void DevelopmentSystem::applyCognitionDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier) {
+    if (!brain) return;
+    
+    // Neural planner develops more sophisticated planning with age
+    if (auto* planner = brain->getPlanner()) {
+        // Would apply planning sophistication changes
+    }
+    
+    // Concept formation improves with development
+    if (auto* conceptFormation = brain->getConceptFormation()) {
+        // Would apply concept abstraction improvements
+    }
+    
+    // Development affects attention parameters
+    if (auto* attention = brain->getAttention()) {
+        // Attention becomes more stable and selective with development
+        float competitionThreshold = 0.3f + (0.4f * (1.0f - plasticityModifier));
+        attention->setCompetitionThreshold(competitionThreshold);
+    }
 }
 
 } // namespace nlm

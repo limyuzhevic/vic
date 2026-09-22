@@ -113,6 +113,9 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
+        // Connect working memory to brain
+        workingMemory->initialize(this);
+        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
@@ -120,6 +123,17 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Connect cognition systems to brain
+        if (auto* ptr = attention.get()) {
+            ptr->initialize(this);
+        }
+        if (auto* ptr = conceptFormation.get()) {
+            // Concept formation may need specific initialization if required
+        }
+        if (auto* ptr = planner.get()) {
+            // Neural planner may need specific initialization if required
+        }
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -129,6 +143,34 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Connect neuromodulation systems to brain
+        if (auto* ptr = curiosity.get()) {
+            ptr->initialize(this);
+        }
+        if (auto* ptr = novelty.get()) {
+            ptr->initialize(this);
+        }
+        if (auto* ptr = predictionError.get()) {
+            ptr->initialize(this);
+        }
+        
+        // Configure dopamine with config values
+        float dopamineWeight = config->getOr<float>("dopamine_weight", 1.0f);
+        if (dopamine) {
+            dopamine->setPlasticityFactor(dopamineWeight);
+        }
+        
+        // Configure curiosity with config values
+        if (auto* cur = curiosity.get()) {
+            cur->setNoveltyWeight(config->getOr<float>("curiosity_novelty_weight", 0.7f));
+            cur->setPredictionErrorWeight(config->getOr<float>("curiosity_pe_weight", 0.3f));
+        }
+        
+        // Configure novelty with config values
+        if (auto* nov = novelty.get()) {
+            nov->setLevel(config->getOr<float>("novelty_baseline", 0.5f));
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);

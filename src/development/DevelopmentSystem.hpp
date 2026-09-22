@@ -46,6 +46,21 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Apply developmental stage effects to brain systems
+    void applyDevelopmentalEffects(Brain* brain, TimestepDuration dt);
+    
+    // Apply developmental effects to neuromodulation
+    void applyNeuromodulationDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier);
+    
+    // Apply developmental effects to memory systems
+    void applyMemoryDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier);
+    
+    // Apply developmental effects to prediction system
+    void applyPredictionDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier);
+    
+    // Apply developmental effects to cognition systems
+    void applyCognitionDevelopmentEffects(Brain* brain, TimestepDuration dt, float plasticityModifier);
+    
 private:
     struct Impl;
     Impl* pImpl;
