@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <stack>
+#include <nlohmann/json.hpp>  // For proper JSON parsing
 
 namespace nlm {
 
@@ -17,43 +20,6 @@ Config::~Config() = default;
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -78,6 +44,262 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+/**
+ * @brief Loads configuration from a JSON file using the nlohmann::json library
+ * 
+ * This function reads a JSON file and parses it into the configuration system.
+ * It supports both object notation {"key": "value"} and array notation [{"key": "value"}]
+ * 
+ * @param filepath Path to the JSON configuration file
+ * @return true if file was successfully loaded and parsed, false otherwise
+ */
+bool Config::loadFromJsonFile(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open JSON configuration file: " + filepath);
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON object
+        if (jsonData.is_object()) {
+            for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value;
+                
+                // Convert JSON value to ConfigValue based on type
+                if (it->is_string()) {
+                    value = it->get<std::string>();
+                } else if (it->is_number_integer()) {
+                    value = it->get<int64_t>();
+                } else if (it->is_number_unsigned()) {
+                    value = it->get<uint64_t>();
+                } else if (it->is_number_float()) {
+                    value = it->get<double>();
+                } else if (it->is_boolean()) {
+                    value = it->get<bool>();
+                } else if (it->is_array()) {
+                    // Handle arrays
+                    auto array = it->get<std::vector<nlohmann::json>>();
+                    if (!array.empty()) {
+                        if (array[0].is_string()) {
+                            std::vector<std::string> strArray;
+                            strArray.reserve(array.size());
+                            for (const auto& item : array) {
+                                strArray.push_back(item.get<std::string>());
+                            }
+                            value = strArray;
+                        } else if (array[0].is_number_integer()) {
+                            std::vector<int> intArray;
+                            intArray.reserve(array.size());
+                            for (const auto& item : array) {
+                                intArray.push_back(item.get<int>());
+                            }
+                            value = intArray;
+                        } else if (array[0].is_number_float()) {
+                            std::vector<double> doubleArray;
+                            doubleArray.reserve(array.size());
+                            for (const auto& item : array) {
+                                doubleArray.push_back(item.get<double>());
+                            }
+                            value = doubleArray;
+                        }
+                    }
+                }
+                
+                if (!value.valueless_by_exception()) {
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        } else if (jsonData.is_array()) {
+            // Handle array of objects
+            for (const auto& item : jsonData) {
+                if (item.is_object()) {
+                    // For array format, prefix keys with "item_" to avoid conflicts
+                    int index = 0;
+                    for (auto it = item.begin(); it != item.end(); ++it, ++index) {
+                        std::string key = "item_" + std::to_string(index) + "_" + it.key();
+                        ConfigValue value;
+                        
+                        // Convert JSON value to ConfigValue based on type
+                        if (it->is_string()) {
+                            value = it->get<std::string>();
+                        } else if (it->is_number_integer()) {
+                            value = it->get<int64_t>();
+                        } else if (it->is_number_unsigned()) {
+                            value = it->get<uint64_t>();
+                        } else if (it->is_number_float()) {
+                            value = it->get<double>();
+                        } else if (it->is_boolean()) {
+                            value = it->get<bool>();
+                        }
+                        
+                        if (!value.valueless_by_exception()) {
+                            set(key, value, ConfigSource::File);
+                        }
+                    }
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Successfully loaded JSON configuration from: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON configuration file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+/**
+ * @brief Attempts to detect if a file is JSON format by checking its content
+ * 
+ * @param filepath Path to the file to check
+ * @return true if file appears to be JSON, false otherwise
+ */
+bool Config::isJsonFile(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Read first 1KB to check for JSON characteristics
+        char buffer[1024];
+        file.read(buffer, sizeof(buffer) - 1);
+        buffer[file.gcount()] = '\0';
+        
+        std::string content(buffer);
+        
+        // Trim whitespace
+        size_t start = content.find_first_not_of(" \t\r\n");
+        size_t end = content.find_last_not_of(" \t\r\n");
+        if (start == std::string::npos || end == std::string::npos) {
+            return false;
+        }
+        
+        std::string trimmed = content.substr(start, end - start + 1);
+        
+        // Check for JSON characteristics
+        bool isJson = false;
+        
+        if (trimmed.empty()) {
+            return false;
+        }
+        
+        // JSON objects start with {
+        if (trimmed[0] == '{') {
+            isJson = true;
+            
+            // Check for matching braces (simplified)
+            int braceCount = 0;
+            for (char c : trimmed) {
+                if (c == '{') braceCount++;
+                else if (c == '}') braceCount--;
+            }
+            isJson = (braceCount == 0);
+        }
+        // JSON arrays start with [
+        else if (trimmed[0] == '[') {
+            isJson = true;
+            
+            // Check for matching brackets (simplified)
+            int bracketCount = 0;
+            for (char c : trimmed) {
+                if (c == '[') bracketCount++;
+                else if (c == ']') bracketCount--;
+            }
+            isJson = (bracketCount == 0);
+        }
+        
+        return isJson;
+        
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+/**
+ * @brief Attempts to detect if a file is YAML format by checking its content
+ * 
+ * @param filepath Path to the file to check
+ * @return true if file appears to be YAML, false otherwise
+ */
+bool Config::isYamlFile(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Read first 1KB to check for YAML characteristics
+        char buffer[1024];
+        file.read(buffer, sizeof(buffer) - 1);
+        buffer[file.gcount()] = '\0';
+        
+        std::string content(buffer);
+        
+        // Look for YAML characteristics
+        // YAML files often have:
+        // 1. Indentation with spaces
+        // 2. Key-value pairs with colons
+        // 3. Lists starting with dashes
+        bool hasIndentation = false;
+        bool hasColonPair = false;
+        bool hasDashList = false;
+        
+        size_t lineStart = 0;
+        size_t lineEnd;
+        while ((lineEnd = content.find('\n', lineStart)) != std::string::npos) {
+            std::string line = content.substr(lineStart, lineEnd - lineStart);
+            
+            // Check for indentation (lines starting with spaces)
+            if (!line.empty() && (line[0] == ' ' || line[0] == '\t')) {
+                hasIndentation = true;
+            }
+            
+            // Check for key-value pair with colon
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos && colonPos > 0) {
+                // Check if there's text before the colon (indicating a key)
+                std::string keyPart = line.substr(0, colonPos);
+                if (!keyPart.empty() && keyPart.find_first_not_of(" \t") != std::string::npos) {
+                    hasColonPair = true;
+                }
+            }
+            
+            // Check for dash list items
+            size_t firstNonSpace = line.find_first_not_of(" \t");
+            if (firstNonSpace != std::string::npos && line[firstNonSpace] == '-') {
+                hasDashList = true;
+            }
+            
+            lineStart = lineEnd + 1;
+        }
+        
+        // Also check for YAML document start marker
+        bool hasYamlStart = (content.find("---") != std::string::npos);
+        
+        // Consider it YAML if it has multiple YAML characteristics
+        int yamlIndicators = 0;
+        if (hasIndentation) yamlIndicators++;
+        if (hasColonPair) yamlIndicators++;
+        if (hasDashList) yamlIndicators++;
+        if (hasYamlStart) yamlIndicators++;
+        
+        return yamlIndicators >= 2;
+        
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -86,7 +308,48 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Helper function to convert ConfigValue to string
+        auto valueToString = [](const ConfigValue& val) {
+            std::ostringstream oss;
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    oss << (arg ? "true" : "false");
+                } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i > 0) oss << ", ";
+                        oss << "\"" << arg[i] << "\"";
+                    }
+                    oss << "]";
+                } else {
+                    oss << arg;
+                }
+            }, val.value);
+            return oss.str();
+        };
+        
+        file << valueToString(entry.value) << "\n\n";
     }
     
     return true;
@@ -114,14 +377,21 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Enhanced error handling and logging for config operations
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Log the update
+        NLM_LOG_DEBUG("Updating configuration key: " + key + " from source " + 
+                     std::to_string(static_cast<int>(it->source)) + " to source " +
+                     std::to_string(static_cast<int>(source)));
         it->value = value;
         it->source = source;
     } else {
+        // Log new entry
+        NLM_LOG_DEBUG("Adding new configuration key: " + key);
         pImpl->entries.emplace_back(key, value, source);
     }
 }
@@ -148,11 +418,18 @@ bool Config::has(const std::string& key) const {
 }
 
 void Config::remove(const std::string& key) {
+    auto originalSize = pImpl->entries.size();
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    
+    if (pImpl->entries.size() < originalSize) {
+        NLM_LOG_INFO("Removed configuration key: " + key);
+    } else {
+        NLM_LOG_WARNING("Attempted to remove non-existent configuration key: " + key);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -165,6 +442,7 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    NLM_LOG_INFO("Clearing all configuration entries");
     pImpl->entries.clear();
 }
 

@@ -23,8 +23,10 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    Impl() : id(), type(NeuronType::Internal), state(), regionId(), populationId(),
+             totalCurrent(0.0f), synapticInput(0.0f), spikeHistory(), incomingSynapses(),
+             outgoingSynapses(), plasticityFlags(), adaptationVariable(0.0f), 
+             lastSpikeTime(-1.0f), refractoryRemaining(0) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -231,6 +233,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
+    // Fix step latching logic
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -250,7 +253,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron should be resting when not firing, not active
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
