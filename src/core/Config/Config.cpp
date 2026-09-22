@@ -30,7 +30,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
-        line = trim(line);
+        line = Config::trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }

@@ -85,42 +85,53 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain: brain_ is null, cannot process sensory input");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        if (sensoryVision_[i] != nullptr) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * VisionScale::Input;
             sensoryVision_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null vision neuron at index " + std::to_string(i));
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+        if (sensoryTouch_[i] != nullptr) {
+            float current = touch[i] * TouchScale::Collision;
             sensoryTouch_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null touch neuron at index " + std::to_string(i));
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+        if (sensoryInternal_[i] != nullptr) {
+            float current = (intern[i] * InternalScale::Factor + InternalScale::Offset) * InternalScale::Input;
             sensoryInternal_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null internal neuron at index " + std::to_string(i));
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+        if (sensoryProprioception_[i] != nullptr) {
+            float current = (proprio[i] * ProprioScale::Factor + ProprioScale::Offset) * ProprioScale::Input;
             sensoryProprioception_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null proprioception neuron at index " + std::to_string(i));
         }
     }
     
@@ -144,7 +155,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = noveltyLevel_ * CuriosityScale::Factor + std::abs(predictionError_) * CuriosityScale::PredictionError;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -168,10 +179,13 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            // Check for null pointer before accessing neuron state
+            if (n != nullptr) {
+                // Use membrane potential deviation from rest as activity measure
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
         }
-        return sum / neurons.size();
+        return neurons.empty() ? 0.0f : sum / neurons.size();
     };
     
     float forwardAct = calcActivity(motorForward_);
