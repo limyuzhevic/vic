@@ -48,8 +48,14 @@ public:
     // Apply motor command to agent
     ActionResult applyMotorCommand(MotorCommand cmd, double currentTime);
     
+    // Apply action to agent (interface compatibility)
+    ActionResult applyAction(Brain* brain, MotorCommand cmd);
+    
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
+    
+    // Observe world for agent (interface compatibility)
+    SensoryPercept observe(Brain* brain);
     
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
@@ -82,6 +88,9 @@ public:
     // Seed for reproducibility
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
+    
+    // Compute reward for agent
+    float computeReward(Brain* brain) const;
     
 private:
     // Generate vision from current view
