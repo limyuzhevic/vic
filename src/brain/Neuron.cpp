@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include "../core/Types/constants.hpp"
 
 namespace nlm {
 
@@ -17,11 +18,6 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -149,35 +145,35 @@ void Neuron::clearTotalCurrent() {
 
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    
+    // Trim spike history if it exceeds maximum size
+    if (pImpl->spikeHistory.size() > constants::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
 }
 
-void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+void Neuron::setAdaptationVariable(float value) {
+    pImpl->state.adaptationVariable = value;
 }
 
-void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+float Neuron::getAdaptationVariable() const {
+    return pImpl->state.adaptationVariable;
 }
 
-void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
 }
 
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
+NeuronId Neuron::getId() const {
+    return pImpl->id;
 }
 
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+NeuronType Neuron::getType() const {
+    return pImpl->type;
 }
 
 void Neuron::setRegionId(RegionId region) {
@@ -188,7 +184,39 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+void Neuron::setMembraneCapacitance(float capacitance) {
+    pImpl->state.membraneCapacitance = capacitance;
+}
+
+void Neuron::setTimeConstant(float tau) {
+    pImpl->state.timeConstant = tau;
+}
+
+float Neuron::getMembraneCapacitance() const {
+    return pImpl->state.membraneCapacitance;
+}
+
+float Neuron::getTimeConstant() const {
+    return pImpl->state.timeConstant;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -210,8 +238,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = pImpl->state.timeConstant;  // ms
+    float C = pImpl->state.membraneCapacitance;  // nF
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -225,11 +253,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        pImpl->state.adaptationVariable *= constants::ADAPTATION_DECAY_RATE;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = std::clamp(V, constants::MIN_MEMBRANE_POTENTIAL, constants::MAX_MEMBRANE_POTENTIAL);
     
     // Check for spike
     if (V >= threshold) {
@@ -261,7 +289,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    TimestepDuration dt = constants::DEFAULT_TIMESTEP;
     stepLIF(currentTime, dt);
 }
 
@@ -277,10 +305,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = constants::DEFAULT_THRESHOLD + rng.uniformReal(-2.0f, 2.0f);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = constants::DEFAULT_RESTORING_POTENTIAL + rng.uniformReal(-2.0f, 2.0f);
     
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
@@ -297,6 +325,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Set membrane capacitance and time constant
+    pImpl->state.membraneCapacitance = constants::DEFAULT_MEMBRANE_CAPACITANCE;
+    pImpl->state.timeConstant = constants::DEFAULT_TIME_CONSTANT;
 }
 
 } // namespace nlm
