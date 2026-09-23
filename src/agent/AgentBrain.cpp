@@ -2,10 +2,16 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <sstream>
+#include <chrono>
+#include <numeric>
+#include <random>
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, 
+                      const std::unordered_map<std::string, float>& config)
     : brain_(brain)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
@@ -18,50 +24,147 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , sensoryPreprocessingEnabled_(false)
+    , curiosityThreshold_(0.3f)
+    , activityThreshold_(0.5f)
+    , learningRate_(0.05f)
+    , noveltySensitivity_(2.0f)
+    , errorWeight_(0.5f)
+    , noiseReduction_(0.9f)
     , sensoryNoveltyDecay_(0.99f)
+    , brainInitialized_(false)
+    , systemVerified_(false)
+    , statsDirty_(true)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+    // Initialize configuration from map
+    for (const auto& kv : config) {
+        if (kv.first == "curiosity_threshold") config_.curiosityThreshold = kv.second;
+        else if (kv.first == "activity_threshold") config_.activityThreshold = kv.second;
+        else if (kv.first == "learning_rate") config_.learningRate = kv.second;
+        else if (kv.first == "novelty_sensitivity") config_.noveltySensitivity = kv.second;
+        else if (kv.first == "error_weight") config_.errorWeight = kv.second;
+        else if (kv.first == "noise_reduction") config_.noiseReduction = kv.second;
     }
+    
+    // Initialize performance metrics
+    perfMetrics_ = PerformanceMetrics();
+    perfMetrics_.sensoryProcessingCount = 0;
+    perfMetrics_.motorDecodingCount = 0;
+    perfMetrics_.plasticityUpdates = 0;
+    perfMetrics_.errorCount = 0;
+    perfMetrics_.isHealthy = true;
+    lastPerfUpdate_ = 0.0;
+    
+    // Initialize motor and sensory neuron groups
+    initializeNeuronGroups();
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::AgentBrain(AgentBrain&& other) noexcept
+    : brain_(std::move(other.brain_))
+    , config_(std::move(other.config_))
+    , motorForward_(std::move(other.motorForward_))
+    , motorBackward_(std::move(other.motorBackward_))
+    , motorTurnLeft_(std::move(other.motorTurnLeft_))
+    , motorTurnRight_(std::move(other.motorTurnRight_))
+    , motorInteract_(std::move(other.motorInteract_))
+    , motorWait_(std::move(other.motorWait_))
+    , sensoryVision_(std::move(other.sensoryVision_))
+    , sensoryTouch_(std::move(other.sensoryTouch_))
+    , sensoryInternal_(std::move(other.sensoryInternal_))
+    , sensoryProprioception_(std::move(other.sensoryProprioception_))
+    , dopamineLevel_(other.dopamineLevel_)
+    , noveltyLevel_(other.noveltyLevel_)
+    , curiosityLevel_(other.curiosityLevel_)
+    , predictionError_(other.predictionError_)
+    , expectedReward_(other.expectedReward_)
+    , developmentalAge_(other.developmentalAge_)
+    , plasticityModifier_(other.plasticityModifier_)
+    , rewardModulationEnabled_(other.rewardModulationEnabled_)
+    , structuralPlasticityEnabled_(other.structuralPlasticityEnabled_)
+    , developmentEnabled_(other.developmentEnabled_)
+    , curiosityEnabled_(other.curiosityEnabled_)
+    , sensoryPreprocessingEnabled_(other.sensoryPreprocessingEnabled_)
+    , curiosityThreshold_(other.curiosityThreshold_)
+    , activityThreshold_(other.activityThreshold_)
+    , learningRate_(other.learningRate_)
+    , noveltySensitivity_(other.noveltySensitivity_)
+    , errorWeight_(other.errorWeight_)
+    , noiseReduction_(other.noiseReduction_)
+    , sensoryNoveltyDecay_(other.sensoryNoveltyDecay_)
+    , brainInitialized_(other.brainInitialized_)
+    , systemVerified_(other.systemVerified_)
+    , statsDirty_(other.statsDirty_)
+    , perfMetrics_(other.perfMetrics_)
+    , errors_(std::move(other.errors_))
+    , warnings_(std::move(other.warnings_))
+    , lastPerfUpdate_(other.lastPerfUpdate_)
+    , statCache_(std::move(other.statCache_))
+{
+    // Move other groups' pointers (shallow copy, brain owns neurons)
+    other.brain_ = nullptr;
+    other.brainInitialized_ = false;
+    other.systemVerified_ = false;
+}
+
+AgentBrain& AgentBrain::operator=(AgentBrain&& other) noexcept {
+    if (this != &other) {
+        // Clean up current state
+        reset();
+        
+        // Move data
+        brain_ = std::move(other.brain_);
+        config_ = std::move(other.config_);
+        motorForward_ = std::move(other.motorForward_);
+        motorBackward_ = std::move(other.motorBackward_);
+        motorTurnLeft_ = std::move(other.motorTurnLeft_);
+        motorTurnRight_ = std::move(other.motorTurnRight_);
+        motorInteract_ = std::move(other.motorInteract_);
+        motorWait_ = std::move(other.motorWait_);
+        sensoryVision_ = std::move(other.sensoryVision_);
+        sensoryTouch_ = std::move(other.sensoryTouch_);
+        sensoryInternal_ = std::move(other.sensoryInternal_);
+        sensoryProprioception_ = std::move(other.sensoryProprioception_);
+        
+        // Move other state
+        dopamineLevel_ = other.dopamineLevel_;
+        noveltyLevel_ = other.noveltyLevel_;
+        curiosityLevel_ = other.curiosityLevel_;
+        predictionError_ = other.predictionError_;
+        expectedReward_ = other.expectedReward_;
+        developmentalAge_ = other.developmentalAge_;
+        plasticityModifier_ = other.plasticityModifier_;
+        rewardModulationEnabled_ = other.rewardModulationEnabled_;
+        structuralPlasticityEnabled_ = other.structuralPlasticityEnabled_;
+        developmentEnabled_ = other.developmentEnabled_;
+        curiosityEnabled_ = other.curiosityEnabled_;
+        sensoryPreprocessingEnabled_ = other.sensoryPreprocessingEnabled_;
+        curiosityThreshold_ = other.curiosityThreshold_;
+        activityThreshold_ = other.activityThreshold_;
+        learningRate_ = other.learningRate_;
+        noveltySensitivity_ = other.noveltySensitivity_;
+        errorWeight_ = other.errorWeight_;
+        noiseReduction_ = other.noiseReduction_;
+        sensoryNoveltyDecay_ = other.sensoryNoveltyDecay_;
+        brainInitialized_ = other.brainInitialized_;
+        systemVerified_ = other.systemVerified_;
+        statsDirty_ = other.statsDirty_;
+        perfMetrics_ = other.perfMetrics_;
+        errors_ = std::move(other.errors_);
+        warnings_ = std::move(other.warnings_);
+        lastPerfUpdate_ = other.lastPerfUpdate_;
+        statCache_ = std::move(other.statCache_);
+        
+        // Mark other as cleaned up
+        other.brain_ = nullptr;
+        other.brainInitialized_ = false;
+        other.systemVerified_ = false;
+    }
+    return *this;
+}
+
+AgentBrain::~AgentBrain() {
+    reset();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
