@@ -1,8 +1,11 @@
+#include "Logger.hpp"
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
+#include <limits>
 
 namespace nlm {
 
@@ -19,40 +22,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO: Add YAML support in future phases
+    // Current implementation supports JSON format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Read entire file
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // Remove comments (simple JSON doesn't support comments, but we handle them for compatibility)
+        size_t commentPos = content.find("//");
+        while (commentPos != std::string::npos) {
+            size_t endLine = content.find('\n', commentPos);
+            if (endLine == std::string::npos) {
+                content.erase(commentPos);
+                break;
+            }
+            content.erase(commentPos, endLine - commentPos);
+            commentPos = content.find("//");
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        // Try to parse as JSON
+        return parseJSON(content);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading config file: " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,18 +82,26 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to save config file: " + filepath);
+            return false;
+        }
+        
+        // Generate JSON content
+        std::string jsonContent = serializeToJSON();
+        
+        // Write JSON to file
+        file << jsonContent;
+        
+        if (!file) {
+            NLM_LOG_ERROR("Failed to write config to file: " + filepath);
+            return false;
+        }
+        
+        NLM_LOG_INFO("Config saved to JSON file: " + filepath);
+        return true;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
