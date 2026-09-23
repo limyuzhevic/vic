@@ -6,6 +6,10 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <filesystem>
+#include <optional>
+#include <atomic>
+#include <shared_mutex>
 
 namespace nlm {
 
@@ -35,14 +39,23 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Virtual destructor for proper cleanup
+    virtual void close() {}
 };
 
 // Console logger implementation
 class ConsoleLogger : public ILogger {
 public:
-    ConsoleLogger();
+    ConsoleLogger() = default;
     explicit ConsoleLogger(LogLevel level);
     ~ConsoleLogger() override;
+    
+    // Disable copying, enable moving
+    ConsoleLogger(const ConsoleLogger&) = delete;
+    ConsoleLogger& operator=(const ConsoleLogger&) = delete;
+    ConsoleLogger(ConsoleLogger&&) noexcept;
+    ConsoleLogger& operator=(ConsoleLogger&&) noexcept;
     
     void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
@@ -56,12 +69,21 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Get current log count
+    size_t getLogCount() const;
+    
+    // Close all resources
+    void close() override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Internal helpers
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    std::string formatLogEntry(const LogEntry& entry) const;
+    static std::string extractFilename(const std::string& filepath);
 };
 
 // Main Logger class
@@ -74,6 +96,10 @@ public:
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
     
+    // Enable moving
+    Logger(Logger&&) noexcept;
+    Logger& operator=(Logger&&) noexcept;
+    
     // Add logger sink
     void addLogger(std::shared_ptr<ILogger> logger);
     
@@ -83,7 +109,7 @@ public:
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
     
-    // Global logging functions
+    // Log with source location information
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
@@ -98,18 +124,27 @@ public:
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
+    // Get total log count
+    size_t getTotalLogCount() const;
+    
+    // Get session ID
+    std::string getSessionId() const;
+    
     // Get global logger instance
     static Logger& getGlobal();
     
-    // Set global logger
+    // Set global logger (advanced usage)
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Close all resources
+    void closeAll();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
+// Convenience macros for easy logging
 #define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
@@ -128,6 +163,12 @@ public:
         return *this;
     }
     
+    // Allow chaining for better logging
+    LogStream& operator<<(const std::string& value) {
+        oss_ << value;
+        return *this;
+    }
+    
 private:
     LogLevel level_;
     std::ostringstream oss_;
@@ -137,5 +178,26 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Helper functions for common operations
+namespace LogHelpers {
+    // Convert log level to string
+    std::string levelToString(LogLevel level);
+    
+    // Convert log level to ANSI color code
+    std::string levelToColor(LogLevel level);
+    
+    // Extract filename from full path
+    std::string extractFilename(const std::string& filepath);
+    
+    // Check if file exists and is writable
+    bool isFileWritable(const std::string& filepath);
+    
+    // Generate unique session ID
+    std::string generateSessionId();
+    
+    // Get current thread ID as string
+    std::string getThreadId();
+}
 
 } // namespace nlm

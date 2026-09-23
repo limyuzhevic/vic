@@ -3,6 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
@@ -19,17 +24,77 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
+    // Try JSON format first (modern standard)
+#ifdef HAVE_NLOHMANN_JSON
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        clear();
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            std::string description = "Loaded from JSON";
+            
+            // Set appropriate type and value
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File, description);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File, description);
+            } else if (it->is_number_unsigned()) {
+                set(key, static_cast<int64_t>(it->get<uint64_t>()), ConfigSource::File, description);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File, description);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File, description);
+            } else if (it->is_array()) {
+                // Try to determine array element type
+                std::vector<std::string> stringArray;
+                std::vector<int> intArray;
+                std::vector<double> doubleArray;
+                
+                for (const auto& item : *it) {
+                    if (item.is_string()) stringArray.push_back(item.get<std::string>());
+                    else if (item.is_number_integer()) intArray.push_back(item.get<int>());
+                    else if (item.is_number_float()) doubleArray.push_back(item.get<double>());
+                    else {
+                        // For mixed or unknown types, use string representation
+                        stringArray.push_back(item.dump());
+                    }
+                }
+                
+                // Prefer most specific type
+                if (!stringArray.empty()) {
+                    set(key, stringArray, ConfigSource::File, description);
+                } else if (!intArray.empty()) {
+                    set(key, intArray, ConfigSource::File, description);
+                } else if (!doubleArray.empty()) {
+                    set(key, doubleArray, ConfigSource::File, description);
+                }
+            } else if (it->is_null()) {
+                set(key, std::string("null"), ConfigSource::File, description);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_WARN("Failed to parse JSON config, falling back to simple format: " + std::string(e.what()));
+        file.clear();
+        file.seekg(0);
+    }
+#endif
+    
+    // Fallback to simple key=value format
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNum;
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
@@ -48,10 +113,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, value, ConfigSource::File, "Loaded from config file line " + std::to_string(lineNum));
+        } else {
+            NLM_LOG_WARN("Invalid config line " + std::to_string(lineNum) + ": " + line);
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from simple config file: " + filepath);
     return true;
 }
 
@@ -78,17 +146,185 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <regex>
+
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Try JSON format first (modern standard)
+#ifdef HAVE_NLOHMANN_JSON
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        clear();
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            std::string description = "Loaded from JSON";
+            
+            // Set appropriate type and value
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File, description);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File, description);
+            } else if (it->is_number_unsigned()) {
+                set(key, static_cast<int64_t>(it->get<uint64_t>()), ConfigSource::File, description);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File, description);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File, description);
+            } else if (it->is_array()) {
+                // Try to determine array element type
+                std::vector<std::string> stringArray;
+                std::vector<int> intArray;
+                std::vector<double> doubleArray;
+                
+                for (const auto& item : *it) {
+                    if (item.is_string()) stringArray.push_back(item.get<std::string>());
+                    else if (item.is_number_integer()) intArray.push_back(item.get<int>());
+                    else if (item.is_number_float()) doubleArray.push_back(item.get<double>());
+                    else {
+                        // For mixed or unknown types, use string representation
+                        stringArray.push_back(item.dump());
+                    }
+                }
+                
+                // Prefer most specific type
+                if (!stringArray.empty()) {
+                    set(key, stringArray, ConfigSource::File, description);
+                } else if (!intArray.empty()) {
+                    set(key, intArray, ConfigSource::File, description);
+                } else if (!doubleArray.empty()) {
+                    set(key, doubleArray, ConfigSource::File, description);
+                }
+            } else if (it->is_null()) {
+                set(key, std::string("null"), ConfigSource::File, description);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_WARN("Failed to parse JSON config, falling back to simple format: " + std::string(e.what()));
+        file.clear();
+        file.seekg(0);
+    }
+#endif
+    
+    // Fallback to simple key=value format
+    std::string line;
+    size_t lineNum = 0;
+    while (std::getline(file, line)) {
+        ++lineNum;
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File, "Loaded from config file line " + std::to_string(lineNum));
+        } else {
+            NLM_LOG_WARN("Invalid config line " + std::to_string(lineNum) + ": " + line);
+        }
     }
     
+    NLM_LOG_INFO("Loaded configuration from simple config file: " + filepath);
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot save config to file: " + filepath);
+        return false;
+    }
+    
+    // Try JSON format first
+#ifdef HAVE_NLOHMANN_JSON
+    try {
+        nlohmann::json jsonData;
+        
+        for (const auto& entry : pImpl->entries) {
+            std::visit([&jsonData, &entry](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, int64_t> || 
+                                   std::is_same_v<T, int> ||
+                                   std::is_same_v<T, uint64_t> ||
+                                   std::is_same_v<T, uint32_t>) {
+                    jsonData[entry.key] = static_cast<int64_t>(arg);
+                } else if constexpr (std::is_same_v<T, double> ||
+                                   std::is_same_v<T, float>) {
+                    jsonData[entry.key] = static_cast<double>(arg);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonData[entry.key] = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    std::vector<int64_t> temp(arg.begin(), arg.end());
+                    jsonData[entry.key] = temp;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    std::vector<double> temp(arg.begin(), arg.end());
+                    jsonData[entry.key] = temp;
+                }
+            }, entry.value);
+        }
+        
+        file << jsonData.dump(2); // Pretty print with 2-space indentation
+        NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_WARN("Failed to save JSON config, falling back to simple format: " + std::string(e.what()));
+    }
+#endif
+    
+    // Fallback to simple key=value format
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << "PLACEHOLDER_VALUE\n\n";
+    }
+    
+    NLM_LOG_INFO("Saved configuration to simple config file: " + filepath);
     return true;
 }
 
