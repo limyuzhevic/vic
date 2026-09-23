@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,14 +21,57 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to detect file format
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Check if it's JSON (starts with { or [)
+    bool isJson = !firstLine.empty() && (firstLine.find('{') == 0 || firstLine.find('[') == 0);
+    
+    if (isJson) {
+        return loadFromJson(file);
+    } else {
+        return loadFromSimpleFormat(file);
+    }
+}
+
+bool Config::loadFromJson(std::ifstream& file) {
+    // TODO PHASE 2: Implement JSON parsing using nlohmann/json or similar
+    // For now, use simple parsing as placeholder
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs as fallback
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -51,7 +96,6 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
-    
     return true;
 }
 
@@ -84,9 +128,53 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Format: key = value\n";
+    file << "# Source: " << static_cast<int>(ConfigSource::File) << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert ConfigValue to string
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "unknown_type";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
