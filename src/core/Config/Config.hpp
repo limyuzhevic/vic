@@ -93,6 +93,25 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::string validateAndGetErrors() const;
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    // Configuration schema
+    bool hasSchema() const;
+    void setSchema(const std::vector<ConfigEntry>& schema);
+    std::vector<ConfigEntry> getSchema() const;
+    
+    // Configuration constraints
+    void addConstraint(const std::string& key, std::function<bool(const ConfigValue&)> constraint);
+    bool checkConstraints(const std::string& key, const ConfigValue& value) const;
+    
+    // File format support
+    static bool supportsFormat(const std::string& ext);
+    static std::vector<std::string> getSupportedFormats();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +119,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Format-specific loading methods
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    ConfigValue parseJSONArray(const std::string& arrayContent);
+    size_t findMatchingBracket(const std::string& str, size_t start, char bracket);
+    char getClosingBracket(char bracket);
 };
 
 } // namespace nlm

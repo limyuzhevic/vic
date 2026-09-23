@@ -139,6 +139,11 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Python bindings (Phase 5+)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/python/CMakeLists.txt)
+    add_subdirectory(python)
+endif()
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
