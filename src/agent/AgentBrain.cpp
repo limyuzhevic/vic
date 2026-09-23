@@ -152,6 +152,35 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Get the brain's planned action using neural planner
+    std::unique_ptr<Action> brainAction = brain_->produceAction();n    
+    // Convert brain action to motor command
+    if (brainAction) {
+        // Use the brain action directly as motor command
+        // In a real implementation, this would be a more sophisticated mapping
+        MotorCommand cmd;
+        
+        switch (brainAction->getType()) {
+            case ActionType::MoveForward: cmd = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: cmd = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: cmd = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: cmd = MotorCommand::TurnRight; break;
+            case ActionType::Interact: cmd = MotorCommand::Interact; break;
+            case ActionType::Wait: cmd = MotorCommand::Wait; break;
+            case ActionType::LookLeft: cmd = MotorCommand::LookLeft; break;
+            case ActionType::LookRight: cmd = MotorCommand::LookRight; break;
+            default: cmd = MotorCommand::Wait; break;
+        }
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            cmd = selectWithCuriosity(cmd);
+        }
+        
+        return cmd;
+    }
+    
+    // Fallback to neural decoding if no brain action
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration

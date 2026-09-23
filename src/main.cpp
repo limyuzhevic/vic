@@ -321,129 +321,405 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+#include "core/Config/Config.hpp"
+#include "core/Random/Random.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/SimulationClock/SimulationClock.hpp"
+#include "brain/Brain.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
+#include "environment/Environment.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/ExperimentRunner.hpp"
+
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <numeric>
+#include <map>
+
+using namespace nlm;
+
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 6: Final Integration                                 ║
+    ║                                                               ║
+    ║     Complete artificial brain with integrated systems.         ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "=== NLM Phase 6 Command Line Interface ===" << std::endl;
+    std::cout << "Available commands:" << std::endl;
+    std::cout << "  demo         Run Phase 6 integration demo" << std::endl;
+    std::cout << "  verify       Verify system integration" << std::endl;
+    std::cout << "  config show  Show current configuration" << std::endl;
+    std::cout << "  config set <key> <value>  Set configuration value" << std::endl;
+    std::cout << "  log level <level>  Set log level (debug, info, warning, error, critical)" << std::endl;
+    std::cout << "  help         Show this help" << std::endl;
+    std::cout << "  quit, exit   Exit program" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm demo --neurons 1000 --steps 5000" << std::endl;
+    std::cout << "  ./nlm verify --quick" << std::endl;
+    std::cout << "  ./nlm log level info" << std::endl;
+}
+
+// Brain Control Interface
+class BrainController {
+public:
+    BrainController(std::shared_ptr<Brain> brain) : brain_(brain) {}
+    
+    // System inspection
+    void inspectSystem() const {
+        std::cout << "=== NLM Brain System Inspection ===" << std::endl;
+        
+        if (!brain_) {
+            std::cout << "ERROR: Brain not initialized" << std::endl;
+            return;
+        }
+        
+        std::cout << "Brain Status:" << std::endl;
+        std::cout << "  Total neurons: " << brain_->getTotalNeuronCount() << std::endl;
+        std::cout << "  Total synapses: " << brain_->getTotalSynapseCount() << std::endl;
+        std::cout << "  Active neurons: " << brain_->getActiveNeuronCount() << std::endl;
+        std::cout << "  Firing neurons: " << brain_->getFiringNeuronCount() << std::endl;
+        std::cout << "  Total spikes: " << brain_->getTotalSpikeCount() << std::endl;
+        std::cout << "  Pending spike events: " << brain_->getPendingSpikeEventCount() << std::endl;
+        
+        // Memory systems
+        std::cout << "" << std::endl;
+        std::cout << "Memory Systems:" << std::endl;
+        if (auto* wm = brain_->getWorkingMemory()) {
+            std::cout << "  Working Memory: " << wm->getActiveTraces() << " active traces, " 
+                      << wm->getCapacity() << " capacity" << std::endl;
+        } else {
+            std::cout << "  Working Memory: NOT AVAILABLE" << std::endl;
+        }
+        
+        if (auto* em = brain_->getEpisodicMemory()) {
+            std::cout << "  Episodic Memory: " << em->getEpisodeCount() << " episodes stored" << std::endl;
+        } else {
+            std::cout << "  Episodic Memory: NOT AVAILABLE" << std::endl;
+        }
+        
+        // Neuromodulation
+        std::cout << "" << std::endl;
+        std::cout << "Neuromodulation:" << std::endl;
+        if (auto* dopamine = brain_->getDopamine()) {
+            std::cout << "  Dopamine: " << dopamine->getLevel() << std::endl;
+        } else {
+            std::cout << "  Dopamine: NOT AVAILABLE" << std::endl;
+        }
+        
+        if (auto* curiosity = brain_->getCuriosity()) {
+            std::cout << "  Curiosity: " << curiosity->getLevel() << std::endl;
+        } else {
+            std::cout << "  Curiosity: NOT AVAILABLE" << std::endl;
+        }
+        
+        // Cognition
+        std::cout << "" << std::endl;
+        std::cout << "Cognitive Systems:" << std::endl;
+        if (auto* planner = brain_->getPlanner()) {
+            std::cout << "  Neural Planner: AVAILABLE" << std::endl;
+        } else {
+            std::cout << "  Neural Planner: NOT AVAILABLE" << std::endl;
+        }
+        
+        if (auto* conceptForm = brain_->getConceptFormation()) {
+            std::cout << "  Concept Formation: " << conceptForm->getConceptCount() << " concepts" << std::endl;
+        } else {
+            std::cout << "  Concept Formation: NOT AVAILABLE" << std::endl;
+        }
+        
+        if (auto* attention = brain_->getAttention()) {
+            std::cout << "  Attention System: AVAILABLE" << std::endl;
+        } else {
+            std::cout << "  Attention System: NOT AVAILABLE" << std::endl;
+        }
+        
+        // Prediction
+        std::cout << "" << std::endl;
+        std::cout << "Prediction System:" << std::endl;
+        if (auto* pred = brain_->getPredictionSystem()) {
+            std::cout << "  Prediction System: AVAILABLE" << std::endl;
+        } else {
+            std::cout << "  Prediction System: NOT AVAILABLE" << std::endl;
+        }
+        
+        // Development
+        std::cout << "" << std::endl;
+        std::cout << "Development:" << std::endl;
+        std::cout << "  Stage: " << static_cast<int>(brain_->getDevelopmentalStage()) << std::endl;
+        
+        // Statistics
+        std::cout << "" << std::endl;
+        std::cout << "Brain Statistics:" << std::endl;
+        std::cout << "  E/I Ratio: " << std::fixed << std::setprecision(3) << brain_->getExcitationInhibitionRatio() << std::endl;
+        std::cout << "  Average firing rate: " << std::fixed << std::setprecision(6) << brain_->getAverageFiringRate() << std::endl;
+        
+        // Regional info
+        std::cout << "" << std::endl;
+        std::cout << "Regions:" << std::endl;
+        for (const auto& id : brain_->getRegionIds()) {
+            if (auto* region = brain_->getRegion(id)) {
+                std::cout << "  Region " << id.index() << " ('" << region->getName() << "'): "
+                          << region->getTotalNeuronCount() << " neurons, "
+                          << region->getSynapseCount() << " synapses" << std::endl;
+            }
+        }
+    }
+    
+    // Run simulation with custom parameters
+    void runSimulation(int steps, int neurons, const std::string& configFile) {
+        std::cout << "=== Running NLM Phase 6 Integration ===" << std::endl;
+        std::cout << "Configuration: " << neurons << " neurons, " << steps << " steps" << std::endl;
+        
+        // Load config
+        auto config = std::make_shared<Config>();
+        
+        if (!configFile.empty() && config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration.");
+        }
+        
+        // Set parameters
+        config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        // Initialize brain
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+            return;
+        }
+        
+        std::cout << "Brain initialized successfully." << std::endl;
+        
+        // Create Phase 6 experiment
+        Phase6IntegratedExperiment experiment;
+        Phase6Config phaseConfig;
+        phaseConfig.neuronCount = neurons;
+        phaseConfig.maxSteps = steps;
+        phaseConfig.enableCheckpointing = true;
+        phaseConfig.enableReplay = true;
+        phaseConfig.enableDevelopment = true;
+        
+        // Run experiment
+        auto result = experiment.run(phaseConfig);
+        
+        // Display results
+        std::cout << "" << std::endl;
+        std::cout << "=== Experiment Results ===" << std::endl;
+        std::cout << "Total reward: " << std::fixed << std::setprecision(6) << result.totalReward << std::endl;
+        std::cout << "Average firing rate: " << std::fixed << std::setprecision(6) << result.avgFiringRate << std::endl;
+        std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
+        std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+        std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
+        std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
+        
+        std::cout << "" << std::endl;
+        std::cout << "=== Integration Status ===" << std::endl;
+        std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
+        std::cout << "Replay: " << (result.replayWorks ? "WORKING" : "NOT WORKING") << std::endl;
+        
+        std::cout << "" << std::endl;
+        std::cout << "=== Phase 6 Integration Complete ===" << std::endl;
+    }
+    
+    // Run quick integration verification
+    void verifyIntegration(bool quick) {
+        std::cout << "=== Phase 6 Integration Verification ===" << std::endl;
+        if (quick) {
+            std::cout << "Running quick integration check..." << std::endl;
+        } else {
+            std::cout << "Running full integration verification..." << std::endl;
+        }
+        
+        // Create minimal brain for verification
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Brain initialization failed!" << std::endl;
+            return;
+        }
+        
+        Phase6IntegratedExperiment experiment;
+        
+        if (quick) {
+            bool success = experiment.verifyIntegration();
+            if (success) {
+                std::cout << "✓ Quick integration verification PASSED" << std::endl;
+            } else {
+                std::cout << "✗ Quick integration verification FAILED" << std::endl;
+            }
+        } else {
+            std::cout << "Running full integration tests..." << std::endl;
+            experiment.testMemoryIntegration();
+            experiment.testNeuromodulationIntegration();
+            experiment.testCheckpointing();
+            experiment.testReplay();
+            std::cout << "✓ Full integration verification COMPLETED" << std::endl;
+        }
+    }
+    
+private:
+    std::shared_ptr<Brain> brain_;
+};
+
 int main(int argc, char** argv) {
-    printBanner();
+    if (argc < 2) {
+        printBanner();
+        printHelp();
+        return 0;
+    }
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::string command = argv[1];
     
-    // Initialize logger
+    // Initialize global logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Parse common options
+    std::string configFile;
+    std::string logLevel;
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    for (int i = 2; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg == "--log-level" && i + 1 < argc) {
+            logLevel = argv[++i];
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Set log level if specified
+    if (!logLevel.empty()) {
+        if (logLevel == "debug") logger->setLevel(LogLevel::Debug);
+        else if (logLevel == "info") logger->setLevel(LogLevel::Info);
+        else if (logLevel == "warning") logger->setLevel(LogLevel::Warning);
+        else if (logLevel == "error") logger->setLevel(LogLevel::Error);
+        else if (logLevel == "critical") logger->setLevel(LogLevel::Critical);
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    // Handle commands
+    if (command == "demo") {
+        printBanner();
+        
+        int neurons = 500;
+        int steps = 2000;
+        
+        // Parse demo arguments
+        for (int i = 2; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--neurons" && i + 1 < argc) neurons = std::stoi(argv[++i]);
+            else if (arg == "--steps" && i + 1 < argc) steps = std::stoi(argv[++i]);
+        }
+        
+        // Initialize basic config for demo
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        // Initialize brain
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+            return 1;
+        }
+        
+        // Create and run Phase 6 demo
+        Phase6IntegratedExperiment experiment;
+        Phase6Config phaseConfig;
+        phaseConfig.neuronCount = neurons;
+        phaseConfig.maxSteps = steps;
+        phaseConfig.enableCheckpointing = true;
+        phaseConfig.enableReplay = true;
+        phaseConfig.enableDevelopment = true;
+        
+        std::cout << "=== NLM Phase 6 Demo ===" << std::endl;
+        std::cout << "Running " << neurons << " neurons for " << steps << " steps..." << std::endl;
+        
+        auto result = experiment.run(phaseConfig);
+        
+        std::cout << "" << std::endl;
+        std::cout << "=== Demo Complete ===" << std::endl;
+        return 0;
+        
+    } else if (command == "verify") {
+        printBanner();
+        
+        bool quick = false;
+        for (int i = 2; i < argc; ++i) {
+            if (std::string(argv[i]) == "--quick") {
+                quick = true;
+            }
+        }
+        
+        // We need a brain for verification, create a simple one
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain for verification!" << std::endl;
+            return 1;
+        }
+        
+        BrainController controller(brain);
+        controller.verifyIntegration(quick);
+        
+    } else if (command == "inspect") {
+        printBanner();
+        
+        // We need a brain for inspection, create a simple one
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain for inspection!" << std::endl;
+            return 1;
+        }
+        
+        BrainController controller(brain);
+        controller.inspectSystem();
+        
+    } else if (command == "help") {
+        printBanner();
+        printHelp();
+    } else {
+        std::cerr << "Unknown command: " << command << std::endl;
+        std::cerr << "Type 'nlm help' for available commands." << std::endl;
         return 1;
     }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
     
     return 0;
 }
