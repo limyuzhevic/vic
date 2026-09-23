@@ -28,28 +28,6 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
-    
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
@@ -78,6 +56,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Brain managers
+    BrainManagers brainManagers;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -105,52 +86,6 @@ struct Brain::Impl {
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -176,6 +111,12 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    // Validate configuration before proceeding
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed during Brain initialization");
+        return false;
+    }
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
@@ -215,8 +156,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -231,33 +172,30 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
+    // Initialize brain managers
+    pImpl->brainManagers.initialize(this);
+    
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->brainManagers.getMemoryManager()) {
+        pImpl->brainManagers.getMemoryManager()->setWorkingMemoryCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->brainManagers.getMemoryManager()) {
+        pImpl->brainManagers.getMemoryManager()->setMaxEpisodes(1000);
+    }
     
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize neuromodulation systems
+    if (pImpl->brainManagers.getNeuromodulationManager()) {
+        // Configure dopamine levels based on config
+        auto dopamineLevel = pImpl->config->getOr<float>("dopamine_level", 1.0f);
+        auto curiosityLevel = pImpl->config->getOr<float>("curiosity_level", 0.5f);
+        auto predictionErrorLevel = pImpl->config->getOr<float>("prediction_error_level", 0.3f);
+        auto noveltyLevel = pImpl->config->getOr<float>("novelty_level", 0.7f);
+        
+        pImpl->brainManagers.getNeuromodulationManager()->setLevels(
+            dopamineLevel, curiosityLevel, predictionErrorLevel, noveltyLevel);
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -329,10 +267,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    // Step 1: Process pending delayed spikes (deliver synaptic input)
+    step1ProcessDelayedSpikes(currentStep, currentTime);
     
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Step 2: Update all neurons (LIF dynamics)
+    step2UpdateNeurons(currentTime);
+    
+    // Step 3: Detect spikes and schedule spike events
+    step3DetectAndScheduleSpikes(currentStep, currentTime);
+    
+    // Step 4: Update working memory
+    step4UpdateWorkingMemory();
+    
+    // Step 5: Apply neuromodulation effects
+    step5ApplyNeuromodulation(currentTime);
+    
+    // Step 6: Apply plasticity rules (STDP and Hebbian)
+    step6ApplyPlasticityRules(currentTime);
+    
+    // Step 7: Update episodic memory
+    step7UpdateEpisodicMemory(currentStep, currentTime);
+    
+    // Step 8: Update prediction system
+    step8UpdatePredictionSystem();
+    
+    // Step 9: Update attention system
+    step9UpdateAttention();
+    
+    // Step 10: Update concept formation
+    step10UpdateConceptFormation();
+    
+    // Step 11: Apply structural plasticity
+    step11ApplyStructuralPlasticity(currentStep);
+    
+    // Step 12: Replay memories
+    step12ReplayMemories(currentStep);
+    
+    // Step 13: Apply development effects
+    step13ApplyDevelopment(currentStep);
+    
+    // Step 14: Collect statistics
+    step14CollectStatistics();
+}
+
+// ========== STEP IMPLEMENTATIONS ==========
+
+void Brain::step1ProcessDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
+    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+}
+
+void Brain::step2UpdateNeurons(Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -340,8 +324,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+}
+
+void Brain::step3DetectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -389,61 +374,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                    if (pImpl->brainManagers.getMemoryManager()) {
+                        pImpl->brainManagers.getMemoryManager()->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
                 }
             }
         }
     }
-    
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-    
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+}
+
+void Brain::step4UpdateWorkingMemory() {
+    if (pImpl->brainManagers.getMemoryManager()) {
+        pImpl->brainManagers.getMemoryManager()->update(pImpl->timestep);
     }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+}
+
+void Brain::step5ApplyNeuromodulation(Timestamp currentTime) {
+    // Update neuromodulators
+    if (pImpl->brainManagers.getNeuromodulationManager()) {
+        pImpl->brainManagers.getNeuromodulationManager()->update(pImpl->timestep);
+        
+        // Apply neuromodulation to neurons
+        pImpl->brainManagers.getNeuromodulationManager()->applyToNeurons(pImpl->regions);
         
         // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        float dopamineLevel = pImpl->brainManagers.getNeuromodulationManager()->getDopamineLevel();
+        if (dopamineLevel > 0.0f) {
+            float excitabilityMod = dopamineLevel * 0.5f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
             }
         }
     }
-    
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+}
+
+void Brain::step6ApplyPlasticityRules(Timestamp currentTime) {
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    if (pImpl->brainManagers.getNeuromodulationManager()) {
+        plasticityMod = pImpl->brainManagers.getNeuromodulationManager()->getPlasticityFactor();
     }
     
     for (auto& region : pImpl->regions) {
@@ -476,17 +450,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             syn->step(currentTime);
         }
     }
-    
-    // ========== STEP 7: Update episodic memory ==========
+}
+
+void Brain::step7UpdateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
-        if (pImpl->episodicMemory) {
+        if (pImpl->brainManagers.getMemoryManager()) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.reward = pImpl->brainManagers.getNeuromodulationManager() ? 
+                pImpl->brainManagers.getNeuromodulationManager()->getDopamineLevel() : 0.0f;
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
@@ -495,7 +471,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
+                            episode.values.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
                         }
                     }
@@ -503,90 +479,129 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
             
             // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.reward = pImpl->brainManagers.getNeuromodulationManager() ? 
+                pImpl->brainManagers.getNeuromodulationManager()->getDopamineLevel() : 0.0f;
             
-            pImpl->episodicMemory->storeEpisode(episode);
+            pImpl->brainManagers.getMemoryManager()->storeEpisode(episode);
         }
     }
-    
-    // ========== STEP 8: Update prediction system ==========
+}
+
+void Brain::step8UpdatePredictionSystem() {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
-        
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
-        }
+}
+
+void Brain::step9UpdateAttention() {
+    if (pImpl->brainManagers.getDevelopmentManager()) {
+        pImpl->brainManagers.getDevelopmentManager()->update(this, *pImpl->rng, pImpl->timestep);
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->brainManagers.getNeuromodulationManager()) {
+        pImpl->brainManagers.getNeuromodulationManager()->update(pImpl->timestep);
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    if (pImpl->brainManagers.getMemoryManager()) {
+        pImpl->brainManagers.getMemoryManager()->update(pImpl->timestep);
+    }
+}
+
+void Brain::step10UpdateConceptFormation() {
+    // Concept formation is handled through the memory manager
+    if (pImpl->brainManagers.getMemoryManager()) {
+        pImpl->brainManagers.getMemoryManager()->update(pImpl->timestep);
+    }
+}
+
+void Brain::step11ApplyStructuralPlasticity(SimulationStep currentStep) {
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+}
+
+void Brain::step12ReplayMemories(SimulationStep currentStep) {
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->brainManagers.getMemoryManager()) {
         // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+        auto episodesToReplay = pImpl->brainManagers.getMemoryManager()->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            if (pImpl->brainManagers.getMemoryManager()) {
+                pImpl->brainManagers.getMemoryManager()->replayEpisode(episode);
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
-    }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
     }
 }
+
+void Brain::step13ApplyDevelopment(SimulationStep currentStep) {
+    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        if (pImpl->brainManagers.getDevelopmentManager()) {
+            pImpl->brainManagers.getDevelopmentManager()->update(this, *pImpl->rng, pImpl->timestep * 1000);
+            
+            // Development affects plasticity rates
+            auto plasticityMod = pImpl->brainManagers.getDevelopmentManager()->getStatus().plasticityModifier;
+            
+            pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * plasticityMod);
+            pImpl->structuralPlasticity->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+}
+
+void Brain::step14CollectStatistics() {
+    // Collect statistics - called automatically at the end of each step
+}
+
+bool Brain::validateConfiguration() {
+    NLM_LOG_INFO("Validating Brain configuration...");
+    
+    bool success = true;
+    
+    // Validate configuration parameters
+    auto neuronCountOpt = pImpl->config->get<size_t>("neuron_count");
+    auto regionCountOpt = pImpl->config->get<size_t>("region_count");
+    auto timestepOpt = pImpl->config->get<double>("simulation_timestep");
+    
+    if (!neuronCountOpt || *neuronCountOpt == 0) {
+        NLM_LOG_ERROR("Invalid neuron count in configuration");
+        success = false;
+    }
+    
+    if (!regionCountOpt || *regionCountOpt == 0) {
+        NLM_LOG_ERROR("Invalid region count in configuration");
+        success = false;
+    }
+    
+    if (!timestepOpt || *timestepOpt <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep in configuration");
+        success = false;
+    }
+    
+    // Validate through managers
+    if (pImpl->brainManagers.validateConfiguration(pImpl->config)) {
+        NLM_LOG_INFO("Configuration validation successful");
+    } else {
+        NLM_LOG_ERROR("Configuration validation failed");
+        success = false;
+    }
+    
+    return success;
+}
+
+// ========== BRAIN ACCESSORS ==========
+
+MemoryManager* Brain::getMemoryManager() {
+    return pImpl->brainManagers.getMemoryManager();
+}
+
+NeuromodulationManager* Brain::getNeuromodulationManager() {
+    return pImpl->brainManagers.getNeuromodulationManager();
+}
+
+DevelopmentManager* Brain::getDevelopmentManager() {
+    return pImpl->brainManagers.getDevelopmentManager();
+}
+
+// ========== REST OF BRAIN FUNCTIONS ==========
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
@@ -610,8 +625,8 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        if (pImpl->brainManagers.getMemoryManager() && normalizedValue > 0.5f) {
+            pImpl->brainManagers.getMemoryManager()->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
 }
@@ -753,10 +768,12 @@ void Brain::reset() {
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    if (pImpl->brainManagers.getMemoryManager()) {
+        pImpl->brainManagers.getMemoryManager()->clear();
+    }
+    if (pImpl->brainManagers.getNeuromodulationManager()) {
+        pImpl->brainManagers.getNeuromodulationManager()->setLevels(0.0f, 0.0f, 0.0f, 0.0f);
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1006,15 +1023,18 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return pImpl->brainManagers.getMemoryManager() ? 
+        pImpl->brainManagers.getMemoryManager()->getWorkingMemory() : nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return pImpl->brainManagers.getMemoryManager() ? 
+        pImpl->brainManagers.getMemoryManager()->getEpisodicMemory() : nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl->brainManagers.getMemoryManager() ? 
+        pImpl->brainManagers.getMemoryManager()->getAssociativeMemory() : nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
@@ -1026,21 +1046,25 @@ PredictionSystem* Brain::getPredictionSystem() {
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    return pImpl->brainManagers.getDevelopmentManager() ? 
+        pImpl->brainManagers.getDevelopmentManager()->getDevelopmentSystem() : nullptr;
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    return pImpl->brainManagers.getDevelopmentManager() ? 
+        pImpl->brainManagers.getDevelopmentManager()->getDevelopmentSystem() : nullptr;
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    return pImpl->brainManagers.getDevelopmentManager() ? 
+        pImpl->brainManagers.getDevelopmentManager()->getDevelopmentSystem() : nullptr;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    return pImpl->brainManagers.getDevelopmentManager() ? 
+        pImpl->brainManagers.getDevelopmentManager()->getDevelopmentSystem() : nullptr;
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -1054,19 +1078,23 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    return pImpl->brainManagers.getNeuromodulationManager() ? 
+        pImpl->brainManagers.getNeuromodulationManager()->getDopamine() : nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return pImpl->brainManagers.getNeuromodulationManager() ? 
+        pImpl->brainManagers.getNeuromodulationManager()->getCuriosity() : nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    return pImpl->brainManagers.getNeuromodulationManager() ? 
+        pImpl->brainManagers.getNeuromodulationManager()->getNovelty() : nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    return pImpl->brainManagers.getNeuromodulationManager() ? 
+        pImpl->brainManagers.getNeuromodulationManager()->getPredictionError() : nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
@@ -1090,16 +1118,17 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
     // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    if (pImpl->brainManagers.getMemoryManager()) {
+        auto status = pImpl->brainManagers.getMemoryManager()->getStatus();
+        NLM_LOG_INFO("Working memory traces: " + std::to_string(status.workingMemoryTraces));
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(status.episodicMemoryEpisodes));
+        NLM_LOG_INFO("Associative memory associations: " + std::to_string(status.associativeMemoryAssociations));
     }
     
     // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    if (pImpl->brainManagers.getNeuromodulationManager()) {
+        auto status = pImpl->brainManagers.getNeuromodulationManager()->getStatus();
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(status.dopamineLevel));
     }
     
     // Development status
@@ -1107,10 +1136,10 @@ void Brain::logStatus() const {
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                     " (" + region->getName() + "): " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                     std::to_string(region->getSynapseCount()) + " synapses, " +
+                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
 }
 

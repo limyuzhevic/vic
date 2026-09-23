@@ -1,11 +1,13 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../brain/MemoryManager.hpp"
+#include "../brain/NeuromodulationManager.hpp"
+#include "../brain/DevelopmentManager.hpp"
+#include "../brain/BrainManagers.hpp"
 #include <memory>
 #include <string>
 
@@ -190,7 +192,18 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
+    // ========== MANAGER ACCESS ==========
+    
+    // Get memory manager
+    MemoryManager* getMemoryManager();
+    
+    // Get neuromodulation manager
+    NeuromodulationManager* getNeuromodulationManager();
+    
+    // Get development manager
+    DevelopmentManager* getDevelopmentManager();
+    
+// Logging
     void logStatus() const;
     
 private:
@@ -199,3 +212,5 @@ private:
 };
 
 } // namespace nlm
+
+

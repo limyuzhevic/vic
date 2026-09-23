@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Find required packages
+find_package(nlohmann_json REQUIRED)
+
 # Test configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
@@ -16,7 +19,7 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
+target_link_libraries(nlm_test PRIVATE nlm_core nlohmann_json::nlohmann_json)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing
