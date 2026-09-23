@@ -1,20 +1,6 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
+#include <chrono>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -400,26 +386,73 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Advanced convenience methods for power users
+    m.def("createAdvancedConfig", [](const std::string& configFile) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!configFile.empty()) {
+            config->loadFromFile(configFile);
+        }
+        // Set advanced defaults
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.00005f, ConfigSource::Default);
+        config->set("pruning_rate", 0.000005f, ConfigSource::Default);
+        config->set("replay_interval", 50, ConfigSource::Default);
+        config->set("consolidation_interval", 500, ConfigSource::Default);
+        config->set("visualization_enabled", true, ConfigSource::Default);
+        return config;
+    }, py::arg("configFile") = "", "Create an advanced configuration with optimized settings");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createQuickConfig", [](size_t neuronCount, size_t regionCount) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", 42, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 2, "Create a quick configuration for rapid prototyping");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("runPhase6Demo", []() -> std::unique_ptr<Phase6IntegratedExperiment> {
+        return std::make_unique<Phase6IntegratedExperiment>();
+    }, "Create a Phase 6 integrated experiment for advanced testing");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Utility functions
+    m.def("quickSimulate", [](std::shared_ptr<Brain> brain, size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), "Quick simulation function");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("simulateWithWorld", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent, size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        return std::make_tuple(brain->getTotalSpikeCount(), 
+                              world->getAgentBody().energy);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), 
+       "Complete simulation with world interaction");
 
-} // namespace nlm
+    m.def("benchmark", [](std::shared_ptr<Brain> brain, size_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start);
+        return std::make_tuple(brain->getTotalSpikeCount(), duration.count());
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance");
+
+    // Constants and utilities
+    m.attr("PHASE2_DEMO_STEPS") = 1000;
+    m.attr("PHASE6_DEMO_STEPS") = 2000;
+    m.attr("DEFAULT_SIMULATION_TIMESTEP") = 0.001;
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
