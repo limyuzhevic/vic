@@ -55,3 +55,17 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[project.scripts]
+# Command-line interface for NLM
+nlm = "pynlm.cli:main"
+
+[tool.kilo.agents]
+# Agent configuration for NLM workflow
+explore = "explore"
+
+[tool.kilo.agents.explore]
+description = "Codebase exploration agent for NLM"
+system_prompt = "You are a specialized agent for exploring the NLM codebase. Your task is to help understand the structure, find files, and answer questions about the codebase."
