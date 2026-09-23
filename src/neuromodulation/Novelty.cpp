@@ -1,4 +1,5 @@
 #include "Novelty.hpp"
+#include "../environment/Observation.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>

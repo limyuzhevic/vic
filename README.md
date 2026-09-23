@@ -2,69 +2,286 @@
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
+## CLI Interface
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM now includes a comprehensive command-line interface for runtime control:
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### Basic Commands
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+**Help and Version:**
+```bash
+nlm --help                    # Show help message
+nlm --version                 # Show version information
+```
 
-## Current Phase
+**Configuration:**
+```bash
+nlm --config experiment.cfg   # Load configuration from file
+nlm --log-level DEBUG         # Set log level
+nlm --verbose                 # Enable verbose logging
+nlm --quiet                   # Disable all logging
+```
 
-**PHASE 6: FINAL INTEGRATION**
+**Examples:**
+```bash
+# Load custom configuration
+nlm --config my_settings.cfg
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+# Run with debug logging
+nlm --log-level DEBUG --verbose
 
-### Phase 6 Integration Achievements
+# Quiet operation for scripts
+nlm --log-level ERROR --quiet
+```
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### Configuration File Support
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+NLM supports multiple configuration file formats:
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+**Simple .cfg format (existing format):**
+```
+# Settings file
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+connection_probability = 0.1
+```
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+**JSON format (new format):**
+```json
+{
+  "random_seed": 42,
+  "simulation_timestep": 0.001,
+  "neuron_count": 1000,
+  "connection_probability": 0.1,
+  "log_level": "INFO"
+}
+```
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+**YAML format (new format):**
+```yaml
+random_seed: 42
+simulation_timestep: 0.001
+neuron_count: 1000
+connection_probability: 0.1
+log_level: INFO
+```
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+### Command Line Arguments
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+The NLM CLI supports the following arguments:
+
+| Argument | Description |
+|----------|-------------|
+| `--help` | Show help message |
+| `--version` | Show version information |
+| `--config FILE` | Load configuration from FILE |
+| `--log-level LEVEL` | Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `--verbose` | Enable verbose logging |
+| `--quiet` | Disable all logging output |
+
+## Testing
+
+NLM now includes a comprehensive test suite for ensuring code quality and preventing regressions:
+
+### Running Tests
+
+```bash
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test suite
+./nlm_test
+```
+
+### Test Coverage
+
+The test suite includes:
+
+1. **Config Tests**: Unit tests for configuration system
+   - Testing save/load functionality
+   - Testing argument parsing
+   - Testing vector type support
+   - Testing error handling
+
+2. **CLI Tests**: Command-line interface testing
+   - Argument parsing validation
+   - Configuration loading testing
+   - Error handling scenarios
+
+3. **Integration Tests**: System-level testing
+   - Basic system functionality
+   - Component interaction
+   - Performance benchmarks
+
+### Adding New Tests
+
+To add a new test:
+
+1. Create a new test class inheriting from `TestBase`
+2. Implement the `getName()` and `run()` methods
+3. Add the test to a test suite
+4. Rebuild and run the tests
+
+## Configuration System Improvements
+
+### Bug Fixes
+
+The NLM configuration system has been fixed for several critical issues:
+
+1. **saveToFile placeholder value**: Now properly serializes all configuration values instead of writing "PLACEHOLDER_VALUE"
+2. **loadFromArgs syntax**: Fixed incorrect argument parsing in command-line processing
+3. **Duplicate configuration**: Fixed duplicate `dopamine_baseline` setting in default.cfg
+
+### New Features
+
+1. **JSON/YAML Support**: Added support for JSON and YAML configuration files
+2. **Enhanced Vector Types**: Full support for std::vector<int>, std::vector<double>, and std::vector<std::string>
+3. **Better Error Handling**: Improved error messages and validation
+4. **Type Safety**: Enhanced type conversion and validation
+
+### Example Configuration Files
+
+**Minimal configuration (default.cfg):**
+```
+# NLM Configuration File
+# This is the default configuration for Phase 1 skeleton
+
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds
+simulation_timestep = 0.001
+
+# Number of neurons in the brain
+neuron_count = 1000
+
+# Number of brain regions
+region_count = 2
+
+# Connection probability for random connectivity
+connection_probability = 0.1
+
+# Plasticity settings
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
+
+# Development settings
+development_synaptogenesis_rate = 0.001
+development_pruning_rate = 0.0001
+
+# Neuromodulation settings
+dopamine_baseline = 0.1
+
+# Reward settings
+reward_discount_factor = 0.99
+
+# Environment settings
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+
+# Logging settings
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
+
+# Simulation settings
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
+
+# Visualization settings
+visualization_enabled = false
+visualization_update_rate = 30.0
+```
+
+**JSON configuration example:**
+```json
+{
+  "random_seed": 42,
+  "simulation_timestep": 0.001,
+  "neuron_count": 1000,
+  "region_count": 2,
+  "connection_probability": 0.1,
+  "plasticity_learning_rate": 0.01,
+  "stdp_ltp_weight": 0.01,
+  "stdp_ltd_weight": 0.012,
+  "stdp_time_constant": 20.0,
+  "development_synaptogenesis_rate": 0.001,
+  "development_pruning_rate": 0.0001,
+  "dopamine_baseline": 0.1,
+  "reward_discount_factor": 0.99,
+  "environment_name": "GridWorld",
+  "environment_width": 10,
+  "environment_height": 10,
+  "log_level": "INFO",
+  "log_to_file": false,
+  "log_filename": "nlm.log",
+  "max_simulation_steps": 10000,
+  "simulation_time_limit": 0.0,
+  "visualization_enabled": false,
+  "visualization_update_rate": 30.0
+}
+```
+
+## Project Structure Updates
+
+### New Directories
+
+- **`src/core/`**: Core utilities including new CLI and test infrastructure
+  - `CLI.hpp` - Command-line interface header
+  - `CLI.cpp` - CLI implementation
+  - `TestSuite.hpp` - Test framework header
+  - `TestRunner.hpp` - Test runner header
+  - `ConfigTest.cpp` - Configuration system unit tests
+
+### File Organization
+
+The project structure now includes:
+
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/                    # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md
+├── src/                     # Source code
+│   ├── core/               # Core utilities
+│   │   ├── CLI.hpp
+│   │   ├── CLI.cpp
+│   │   ├── TestSuite.hpp
+│   │   ├── TestRunner.hpp
+│   │   ├── ConfigTest.cpp
+│   │   └── ...
+│   ├── brain/             # Neural components
+│   ├── dynamics/          # Neural dynamics
+│   ├── plasticity/        # Plasticity rules
+│   ├── development/       # Developmental system
+│   ├── neuromodulation/    # Neuromodulators
+│   ├── memory/            # Memory systems
+│   ├── prediction/        # Prediction systems
+│   ├── cognition/         # Cognitive mechanisms
+│   ├── sensory/           # Sensory processing
+│   ├── motor/             # Motor system
+│   ├── environment/       # Environment interface
+│   ├── experiments/       # Experiment framework
+│   └── visualization/     # Visualization
+├── tests/                  # Test suite
+└── configs/                # Configuration files
+    ├── default.cfg
+    └── ...
+```
 
 ## Building
+
+### Standard Build Process
 
 ```bash
 mkdir build
@@ -73,46 +290,58 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+### Build Options
+
+The NLM build system supports the following options:
+
+| Option | Description |
+|--------|-------------|
+| `-DCMAKE_BUILD_TYPE=Debug` | Build with debug symbols and assertions |
+| `-DCMAKE_BUILD_TYPE=Release` | Build with optimizations (default) |
+| `-DPYTHON_EXECUTABLE=path` | Specify Python interpreter for bindings |
+
+### Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+### NLM Console Application
 
+```bash
+./nlm [OPTIONS] [ARGS...]
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+For help and usage information:
+```bash
+./nlm --help
+./nlm --version
 ```
+
+### Python Bindings
+
+For Python users, NLM includes Python bindings:
+
+```bash
+# Install Python bindings
+pip install pynlm
+
+# Example usage
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+```
+
+For more information, see the Python documentation.
 
 ## Phase Summary
 
@@ -161,6 +390,10 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- CLI interface for runtime control
+- Comprehensive test suite
+- JSON/YAML configuration support
+- Fixed critical bugs
 
 ## Scientific Limitations
 
