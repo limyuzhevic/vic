@@ -61,8 +61,19 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Load from file (auto-detect JSON/YAML based on extension)
+    bool loadFromFile(const std::string& filepath);
+    
+    // Load from explicit file formats
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Save to file (auto-detect JSON/YAML based on extension)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to explicit file formats
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,7 +104,30 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // New utility functions
+    bool validateConfig() const;
+    template<typename T>
+    std::optional<T> getConfigValue(const std::string& key) const;
+    template<typename T>
+    T getConfigValue(const std::string& key, const T& defaultValue) const;
+    bool mergeConfig(const nlm::Config& other, bool overrideExisting = false);
+    std::string getConfigAsString() const;
+    
+    // Internal helpers for file operations
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLFile(const std::string& filepath);
+    static bool isJSONFileExtension(const std::string& ext);
+    static bool isYAMLFileExtension(const std::string& ext);
+
 private:
+    // Internal methods
+    bool validateConfig() const;
+    void updatePlaceholders();
+    nlohmann::json configToJSON() const;
+    void jsonToConfig(const nlohmann::json& jsonObj);
+    void yamlToConfig(const YAML::Node& yamlNode);
+    std::string configToYAML() const;
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     

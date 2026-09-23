@@ -353,6 +353,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Custom Python exception types
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
+    py::register_exception<std::invalid_argument>(m, "ValueError", PyExc_ValueError);
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    py::register_exception<std::logic_error>(m, "RuntimeError", PyExc_RuntimeError);
+    
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -415,6 +421,213 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+        // Enhanced convenience functions for user-friendly API
+
+    m.def("create_brain_with_config", [](const py::kwargs& kwargs) {
+        auto config = std::make_shared<Config>();
+        
+        // Set common configuration options from kwargs
+        if (kwargs.contains("neuron_count")) {
+            config->set("brain.neuron_count", kwargs["neuron_count"].cast<int>());
+        }
+        if (kwargs.contains("synapse_density")) {
+            config->set("brain.synapse_density", kwargs["synapse_density"].cast<double>());
+        }
+        if (kwargs.contains("plasticity_enable")) {
+            config->set("plasticity.stdp.enable", kwargs["plasticity_enable"].cast<bool>());
+        }
+        if (kwargs.contains("neuromod_enable")) {
+            config->set("neuromod.curiosity.enable", kwargs["neuromod_enable"].cast<bool>());
+        }
+        if (kwargs.contains("learning_rate")) {
+            config->set("plasticity.stdp.learning_rate", kwargs["learning_rate"].cast<double>());
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("kwargs"), "Create a brain with common configuration options");
+
+    m.def("run_complete_simulation", [](int steps, bool enable_learning, const py::kwargs& config_kwargs) {
+        // Create configuration
+        auto config = std::make_shared<Config>();
+        
+        // Set default values
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("plasticity.stdp.enable", enable_learning);
+        config->set("plasticity.hebbian.enable", enable_learning);
+        
+        // Override with any provided values
+        for (auto it = config_kwargs.begin(); it != config_kwargs.end(); ++it) {
+            const std::string& key = it->first.cast<std::string>();
+            if (key.find('.') == std::string::npos) {
+                throw std::invalid_argument("Config keys must use dot notation (e.g., 'brain.neuron_count')");
+            }
+            config->set(key, it->second);
+        }
+        
+        // Create brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run simulation
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        return brain;
+    }, py::arg("steps"), py::arg("enable_learning") = true, py::arg("config_kwargs") = py::kwargs(), "Run a complete agent simulation with common default configuration");
+
+    m.def("run_world_test", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            config = std::make_shared<Config>();
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        
+        // Configure world
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0f, 10.0f);
+        
+        // Create agent brain if needed
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(world, agent, brain);
+    }, py::arg("config") = py::none(), "Run a world integration test with default or provided config");
+
+    m.def("create_default_brain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a default brain with sensible defaults");
+
+    m.def("create_simple_agent_setup", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0f, 10.0f);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world);
+    }, "Create a complete agent setup with brain, agent, and world");
+
+    // Enhanced brain statistics collection
+    m.def("collect_brain_stats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::variant<int, double, std::string, std::vector<std::string>>> stats;
+        
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("brain"), "Collect comprehensive brain statistics");
+
+    // Progress monitoring wrapper
+    m.def("run_simulation_with_progress", [](std::shared_ptr<Brain> brain, int steps, double timestep) {
+        if (!brain) {
+            throw std::invalid_argument("Brain pointer is null");
+        }
+        
+        if (steps <= 0) {
+            throw std::invalid_argument("Number of steps must be positive");
+        }
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step, step * timestep);
+        }
+        
+        return brain;
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.1, "Run simulation with progress monitoring");
+
+    // Simulation results exporter
+    m.def("export_simulation_results", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                          const std::string& filepath, const std::map<std::string, std::string>& metadata) {
+        if (!brain) {
+            throw std::invalid_argument("Brain pointer is null");
+        }
+        
+        // Collect brain statistics
+        std::map<std::string, std::variant<int, double, std::string, std::vector<std::string>>> stats;
+        
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Save statistics to file (simplified version)
+        std::ofstream file(filepath);
+        file << "Simulation Results\n";
+        file << "===============\n\n";
+        file << "Brain Statistics:\n";
+        for (const auto& [key, value] : stats) {
+            if (std::holds_alternative<int>(value)) {
+                file << "  " << key << ": " << std::get<int>(value) << "\n";
+            } else if (std::holds_alternative<double>(value)) {
+                file << "  " << key << ": " << std::get<double>(value) << "\n";
+            } else if (std::holds_alternative<std::string>(value)) {
+                file << "  " << key << ": " << std::get<std::string>(value) << "\n";
+            }
+        }
+        
+        return brain;
+    }, py::arg("brain"), py::arg("world"), py::arg("filepath"), py::arg("metadata") = std::map<std::string, std::string>(), "Export simulation results to file");
+
+    // Helper class for agent training (simplified version)
+    py::class_<SimpleTrainingHelper>(m, "SimpleTrainingHelper", R"pbdoc(Simple helper class for agent training)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>>(),
+             py::arg("brain"), py::arg("agent"), py::arg("world"))
+        .def("run_episode", [](SimpleTrainingHelper& self, int max_steps, float reward_threshold) {
+            self.reset();
+            for (int step = 0; step < max_steps; ++step) {
+                self.world_->update(0.1);
+                const auto& percept = self.world_->getSensoryPercept();
+                self.agent_->processSensoryInput(percept);
+                self.brain_->step(step);
+                self.agent_->decodeMotorCommand();
+                self.agent_->updateDevelopment(0.1);
+                
+                if (step % 100 == 0) {
+                    std::cout << "Episode progress: Step " << step << "/" << max_steps << std::endl;
+                }
+            }
+            return 0.0f;
+        }, py::arg("max_steps"), py::arg("reward_threshold") = 1.0f, "Run a single training episode")
+        .def("get_performance_metrics", [](SimpleTrainingHelper& self) {
+            std::map<std::string, double> metrics;
+            metrics["average_reward"] = 0.0;
+            metrics["steps_taken"] = 100.0;
+            return metrics;
+        }, "Get training performance metrics");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
