@@ -36,32 +36,41 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
+        // Find neurons to encode this pattern
+        size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // Need to access brain regions properly to find neurons
+        // This is a more robust approach than the original
+        if (!memoryNeurons_.empty()) {
+            // Use first neuron's region to get the brain
+            NeuronId firstNeuron = memoryNeurons_[0];
+            RegionId regionId(firstNeuron.index() / 1000);  // Convert neuron ID to region ID
+            if (auto* region = brain_->getRegion(regionId)) {
+                for (size_t i = 0; i < neuronsNeeded; ++i) {
+                    NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+                    float activation = pattern[i % pattern.size()] * strength;
+                    
+                    // Find the neuron in the region's populations
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* nn : pop->getNeurons()) {
+                            if (nn->getId() == neuron) {
+                                nn->injectCurrent(activation * 5.0f);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Update stored activation
+                    if (i < memoryActivations_.size()) {
+                        memoryActivations_[i] = activation;
+                    } else {
+                        memoryActivations_.push_back(activation);
+                        memoryTimestamps_.push_back(0);
+                        memoryNeurons_.push_back(neuron);
+                    }
                 }
             }
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
-    }
     
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {

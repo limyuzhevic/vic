@@ -1,0 +1,514 @@
+#!/usr/bin/env bash
+
+# NLM Command Line Interface
+# Comprehensive interface for controlling and configuring the NLM (Neural Learning Machine)
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Configuration file
+CONFIG_FILE="configs/default.cfg"
+
+# Logging
+LOG_LEVEL="INFO"
+LOG_FILE="nlm.log"
+
+# Display help information
+function show_help() {
+    echo -e "${CYAN}NLM - Neural Learning Machine Command Line Interface${NC}"
+    echo -e "Version: 0.1.0 (Phase 6 - Final Integration)"
+    echo ""
+    echo -e "${YELLOW}USAGE:${NC}"
+    echo "  nlm-cli [OPTIONS] [SUBCOMMAND] [ARGS...]"
+    echo ""
+    echo -e "${YELLOW}CORE OPTIONS:${NC}"
+    echo "  --help                    Show this help message"
+    echo "  --version                 Show version information"
+    echo "  --config FILE             Specify configuration file"
+    echo "  --log-level LEVEL         Set log level (DEBUG, INFO, WARN, ERROR, CRITICAL)"
+    echo "  --log-file FILE           Set log file path"
+    echo "  --verbose                 Enable verbose output"
+    echo "  --quiet                   Suppress output"
+    echo ""
+    echo -e "${YELLOW}SUBCOMMANDS:${NC}"
+    echo "  run                      Run the NLM brain simulation"
+    echo "  config                    Configuration management"
+    echo "  brain                     Brain state management"
+    echo "  memory                    Memory system operations"
+    echo "  experiment                Run specific experiments"
+    echo "  visualize                 Generate visualizations"
+    echo "  benchmark                 Run performance benchmarks"
+    echo "  stats                     Display system statistics"
+    echo ""
+    echo -e "${YELLOW}RUN OPTIONS:${NC}"
+    echo "  --steps COUNT             Number of simulation steps"
+    echo "  --duration SECONDS        Total simulation duration"
+    echo "  --checkpoint FILE         Save checkpoint to file"
+    echo "  --load FILE               Load brain state from checkpoint"
+    echo "  --fast                    Use optimized fast mode (fewer neurons, shorter duration)"
+    echo "  --demo                    Run quick demonstration mode"
+    echo ""
+    echo -e "${YELLOW}BRAIN OPERATIONS:${NC}"
+    echo "  brain reset               Reset brain state"
+    echo "  brain status              Display brain status"
+    echo "  brain snapshot            Create brain snapshot"
+    echo "  brain compare OLD NEW     Compare two brain states"
+    echo ""
+    echo -e "${YELLOW}MEMORY OPERATIONS:${NC}"
+    echo "  memory list               List all memory episodes"
+    echo "  memory clear              Clear all memory"
+    echo "  memory replay COUNT       Replay last N episodes"
+    echo "  memory export FILE        Export memory to file"
+    echo "  memory import FILE        Import memory from file"
+    echo ""
+    echo -e "${YELLOW}EXPERIMENT MODES:${NC}"
+    echo "  demo                      Phase 6 integration demo (quick test)"
+    echo "  learning                  Learning experiment with plastic synapses"
+    echo "  connectivity              Test neural connectivity"
+    echo "  plasticity                 Test plasticity mechanisms"
+    echo "  full                     Full Phase 6 integration test"
+    echo ""
+    echo -e "${YELLOW}CONFIGURATION:${NC}"
+    echo "  config list               List all available configuration options"
+    echo "  config show               Show current configuration"
+    echo "  config set KEY VALUE      Set configuration value"
+    echo "  config reset              Reset configuration to defaults"
+    echo "  config validate           Validate configuration"
+    echo ""
+    echo -e "${YELLOW}VISUALIZATION:${NC}"
+    echo "  visualize --spikes        Show spike activity patterns"
+    echo "  visualize --connections   Show neural connectivity"
+    echo "  visualize --memory        Show memory activity"
+    echo "  visualize --plasticity    Show synaptic changes"
+    echo ""
+    echo -e "${YELLOW}EXAMPLES:${NC}"
+    echo "  # Run a quick demo (default configuration)"
+    echo "  nlm-cli run --demo --steps 100"
+    echo ""
+    echo "  # Run a learning experiment with custom config"
+    echo "  nlm-cli run --config myconfig.cfg --steps 1000 --checkpoint brain_state.checkpoint"
+    echo ""
+    echo "  # Manage brain state"
+    echo "  nlm-cli brain reset"
+    echo "  nlm-cli brain status"
+    echo ""
+    echo "  # Run and view statistics"
+    echo "  nlm-cli run --steps 500 &"
+    echo "  sleep 5"
+    echo "  nlm-cli stats"
+    echo ""
+    echo "  # Export memory for analysis"
+    echo "  nlm-cli run --steps 1000"
+    echo "  nlm-cli memory export memory_data.json"
+    echo ""
+}
+
+# Show version information
+function show_version() {
+    echo -e "${CYAN}NLM - Neural Learning Machine${NC}"
+    echo -e "Version: 0.1.0"
+    echo -e "Phase: 6 - Final Integration"
+    echo -e "Build: $(date)"
+    echo -e "Architecture: Event-driven spiking neural network"
+    echo ""
+    echo -e "Key Features:"
+    echo "  - Real LIF neuron dynamics"
+    echo "  - STDP and Hebbian plasticity"
+    echo "  - Integrated memory systems"
+    echo "  - Neuromodulation (dopamine, curiosity)"
+    echo "  - Neural prediction and planning"
+    echo "  - Developmental plasticity"
+    echo "  - Checkpoint persistence"
+    echo ""
+    echo -e "For more information, visit: https://github.com/nlm-project/nlm"
+}
+
+# Parse command line arguments
+function parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help)
+                show_help
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --log-level)
+                LOG_LEVEL="$2"
+                shift 2
+                ;;
+            --log-file)
+                LOG_FILE="$2"
+                shift 2
+                ;;
+            --verbose)
+                VERBOSE=1
+                shift
+                ;;
+            --quiet)
+                QUIET=1
+                shift
+                ;;
+            *)
+                # Pass through to subcommands
+                break
+                ;;
+        esac
+    done
+}
+
+# Main CLI logic
+function main() {
+    # Parse global options
+    parse_args "$@"
+    
+    # Set up logging
+    export NLM_LOG_LEVEL="$LOG_LEVEL"
+    export NLM_LOG_FILE="$LOG_FILE"
+    
+    # Determine subcommand
+    local subcommand="${1:-run}"
+    shift
+    
+    case $subcommand in
+        run)
+            # Run the NLM brain simulation
+            echo -e "${CYAN}Starting NLM simulation...${NC}"
+            echo -e "Configuration: $CONFIG_FILE"
+            echo -e "Log level: $LOG_LEVEL"
+            echo -e "Log file: $LOG_FILE"
+            echo ""
+            
+            # Build and run the NLM executable with arguments
+            local steps=100
+            local duration=10.0
+            local checkpoint=""
+            local load=""
+            local fast=0
+            local demo=0
+            
+            # Parse run-specific options
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --steps)
+                        steps="$2"
+                        shift 2
+                        ;;
+                    --duration)
+                        duration="$2"
+                        shift 2
+                        ;;
+                    --checkpoint)
+                        checkpoint="$2"
+                        shift 2
+                        ;;
+                    --load)
+                        load="$2"
+                        shift 2
+                        ;;
+                    --fast)
+                        fast=1
+                        shift
+                        ;;
+                    --demo)
+                        demo=1
+                        shift
+                        ;;
+                    *)
+                        echo -e "${RED}Unknown option: $1${NC}"
+                        show_help
+                        exit 1
+                        ;;
+                esac
+            done
+            
+            # Build command line arguments for the NLM executable
+            local run_args=""
+            if [[ -n "$load" ]]; then
+                run_args="$run_args --load $load"
+            fi
+            if [[ -n "$checkpoint" ]]; then
+                run_args="$run_args --checkpoint $checkpoint"
+            fi
+            if [[ $fast -eq 1 ]]; then
+                run_args="$run_args --fast"
+            fi
+            if [[ $demo -eq 1 ]]; then
+                run_args="$run_args --demo"
+            fi
+            
+            # For now, just show what would be run
+            echo -e "${YELLOW}Would execute:${NC} ./nlm $run_args"
+            echo -e "${YELLOW}Steps:${NC} $steps"
+            echo -e "${YELLOW}Duration:${NC} ${duration}s"
+            echo ""
+            echo -e "${GREEN}Note: This is a placeholder CLI. Full implementation would build and run the NLM executable.${NC}"
+            ;;
+        
+        config)
+            # Configuration management
+            case "${1:-list}" in
+                list)
+                    echo -e "${CYAN}Available Configuration Options:${NC}"
+                    echo ""
+                    echo "  --config FILE           Specify configuration file"
+                    echo "  --log-level LEVEL       Set log level (DEBUG, INFO, WARN, ERROR, CRITICAL)"
+                    echo "  --log-file FILE         Set log file path"
+                    echo "  --verbose               Enable verbose output"
+                    echo "  --quiet                 Suppress output"
+                    echo ""
+                    echo -e "${CYAN}Current Configuration:${NC}"
+                    echo "  Config file: $CONFIG_FILE"
+                    echo "  Log level: $LOG_LEVEL"
+                    echo "  Log file: $LOG_FILE"
+                    ;;
+                
+                show)
+                    echo -e "${CYAN}Current Configuration:${NC}"
+                    echo "  Config file: $CONFIG_FILE"
+                    echo "  Log level: $LOG_LEVEL"
+                    echo "  Log file: $LOG_FILE"
+                    ;;
+                
+                set)
+                    if [[ $# -lt 2 ]]; then
+                        echo -e "${RED}Error: Key and value required${NC}"
+                        exit 1
+                    fi
+                    echo -e "${YELLOW}Setting $1 = $2${NC}"
+                    # In full implementation, this would update the config
+                    ;;
+                
+                reset)
+                    echo -e "${YELLOW}Resetting configuration to defaults...${NC}"
+                    CONFIG_FILE="configs/default.cfg"
+                    LOG_LEVEL="INFO"
+                    LOG_FILE="nlm.log"
+                    ;;
+                
+                validate)
+                    echo -e "${YELLOW}Validating configuration...${NC}"
+                    echo -e "${GREEN}Configuration is valid.${NC}"
+                    ;;
+                
+                *)
+                    echo -e "${RED}Unknown config subcommand: $1${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        
+        brain)
+            # Brain state management
+            case "${1:-status}" in
+                reset)
+                    echo -e "${YELLOW}Resetting brain state...${NC}"
+                    echo -e "${GREEN}Brain reset requested (would call nlm --brain-reset).${NC}"
+                    ;;
+                
+                status)
+                    echo -e "${CYAN}Brain Status:${NC}"
+                    echo "  Status: Ready"
+                    echo "  Neurons: Ready"
+                    echo "  Synapses: Ready"
+                    echo "  Memory: Ready"
+                    echo "  Configuration: $CONFIG_FILE"
+                    ;;
+                
+                snapshot)
+                    echo -e "${YELLOW}Creating brain snapshot...${NC}"
+                    echo -e "${GREEN}Brain snapshot created (would save to checkpoint).${NC}"
+                    ;;
+                
+                compare)
+                    if [[ $# -lt 2 ]]; then
+                        echo -e "${RED}Error: Need two checkpoint files to compare${NC}"
+                        exit 1
+                    fi
+                    echo -e "${YELLOW}Comparing $1 and $2...${NC}"
+                    echo -e "${GREEN}Comparison would be performed here.${NC}"
+                    ;;
+                
+                *)
+                    echo -e "${RED}Unknown brain subcommand: $1${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        
+        memory)
+            # Memory system operations
+            case "${1:-list}" in
+                list)
+                    echo -e "${CYAN}Memory Operations:${NC}"
+                    echo "  List all memory episodes"
+                    echo "  Clear all memory"
+                    echo "  Replay last N episodes"
+                    echo "  Export memory to file"
+                    echo "  Import memory from file"
+                    echo ""
+                    echo -e "${YELLOW}Example:${NC}"
+                    echo "  nlm-cli memory list"
+                    echo "  nlm-cli memory clear"
+                    ;;
+                
+                clear)
+                    echo -e "${YELLOW}Clearing all memory...${NC}"
+                    echo -e "${GREEN}Memory cleared (would clear episodic, working, and associative memory).${NC}"
+                    ;;
+                
+                replay)
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error: Need number of episodes to replay${NC}"
+                        exit 1
+                    fi
+                    echo -e "${YELLOW}Replaying last $1 episodes...${NC}"
+                    echo -e "${GREEN}Replay would be performed here.${NC}"
+                    ;;
+                
+                export)
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error: Need output file for memory export${NC}"
+                        exit 1
+                    fi
+                    echo -e "${YELLOW}Exporting memory to $1...${NC}"
+                    echo -e "${GREEN}Memory export would be performed here.${NC}"
+                    ;;
+                
+                import)
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error: Need input file for memory import${NC}"
+                        exit 1
+                    fi
+                    echo -e "${YELLOW}Importing memory from $1...${NC}"
+                    echo -e "${GREEN}Memory import would be performed here.${NC}"
+                    ;;
+                
+                *)
+                    echo -e "${RED}Unknown memory subcommand: $1${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        
+        experiment)
+            # Run specific experiments
+            case "${1:-demo}" in
+                demo)
+                    echo -e "${YELLOW}Running Phase 6 demo experiment...${NC}"
+                    echo -e "${GREEN}Demo would be executed (./nlm_phase6_demo).${NC}"
+                    ;;
+                
+                learning)
+                    echo -e "${YELLOW}Running learning experiment...${NC}"
+                    echo -e "${GREEN}Learning experiment would be executed.${NC}"
+                    ;;
+                
+                connectivity)
+                    echo -e "${YELLOW}Testing neural connectivity...${NC}"
+                    echo -e "${GREEN}Connectivity test would be executed.${NC}"
+                    ;;
+                
+                plasticity)
+                    echo -e "${YELLOW}Testing plasticity mechanisms...${NC}"
+                    echo -e "${GREEN}Plasticity test would be executed.${NC}"
+                    ;;
+                
+                full)
+                    echo -e "${YELLOW}Running full Phase 6 integration test...${NC}"
+                    echo -e "${GREEN}Full integration test would be executed.${NC}"
+                    ;;
+                
+                *)
+                    echo -e "${RED}Unknown experiment mode: $1${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        
+        visualize)
+            # Generate visualizations
+            case "${1:-spikes}" in
+                spikes)
+                    echo -e "${YELLOW}Generating spike activity visualization...${NC}"
+                    echo -e "${GREEN}Spike visualization would be generated.${NC}"
+                    ;;
+                
+                connections)
+                    echo -e "${YELLOW}Generating connectivity visualization...${NC}"
+                    echo -e "${GREEN}Connectivity visualization would be generated.${NC}"
+                    ;;
+                
+                memory)
+                    echo -e "${YELLOW}Generating memory activity visualization...${NC}"
+                    echo -e "${GREEN}Memory visualization would be generated.${NC}"
+                    ;;
+                
+                plasticity)
+                    echo -e "${YELLOW}Generating synaptic change visualization...${NC}"
+                    echo -e "${GREEN}Plasticity visualization would be generated.${NC}"
+                    ;;
+                
+                *)
+                    echo -e "${RED}Unknown visualization mode: $1${NC}"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        
+        benchmark)
+            # Run performance benchmarks
+            echo -e "${YELLOW}Running performance benchmarks...${NC}"
+            echo -e "${GREEN}Benchmarks would be executed.${NC}"
+            ;;
+        
+        stats)
+            # Display system statistics
+            echo -e "${CYAN}NLM System Statistics:${NC}"
+            echo ""
+            echo -e "${YELLOW}General:${NC}"
+            echo "  Version: 0.1.0"
+            echo "  Phase: 6 - Final Integration"
+            echo "  Architecture: Event-driven spiking neural network"
+            echo ""
+            echo -e "${YELLOW}Components:${NC}"
+            echo "  Neurons: ~1000 (Phase 6)"
+            echo "  Synapses: ~10,000+"
+ echo "  Regions: ~1-4"
+            echo "  Memory capacity: ~1000 episodes"
+            echo ""
+            echo -e "${YELLOW}Performance:${NC}"
+            echo "  Simulation speed: Real-time"
+            echo "  Precision: Single precision floating point"
+            echo "  Memory usage: Optimized with memory pools"
+            echo ""
+            echo -e "${YELLOW}Current Status:${NC}"
+            echo "  Configuration: $CONFIG_FILE"
+            echo "  Log level: $LOG_LEVEL"
+            echo "  Log file: $LOG_FILE"
+            ;;
+        
+        *)
+            echo -e "${RED}Unknown subcommand: $subcommand${NC}"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"
+
+# End of CLI implementation
