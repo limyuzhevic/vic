@@ -1,533 +1,347 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM User Guide - Phase 6 Integration
+
+Welcome to NLM (熙然) - an experimental artificial developmental brain project.
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM is a computational brain project that investigates whether:
+- Memory systems can integrate with neural dynamics
+- Neuromodulation can affect plasticity in a coordinated way  
+- Prediction can become a central organizing principle
+- Developmental stages can modulate learning
+- Replay can reinforce memory consolidation
+- The complete brain loop functions coherently
 
-This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+## Getting Started
 
----
+### Quick Start
 
-## Part 1: Building the C++ Project from Source
+1. **Build the project:**
+   ```bash
+   mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j4
+   ```
 
-### Prerequisites
+2. **Run the Phase 6 integration demo:**
+   ```bash
+   ./nlm_phase6_demo
+   ```
 
-- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
-- **CMake**: Version 3.16 or higher
-- **Python**: 3.8+ (for Python bindings)
-- **pybind11**: Version 2.11.0+ (for Python bindings)
+3. **Use the enhanced CLI utility:**
+   ```bash
+   nlm-cli demo --quick                    # Quick demo (50 neurons, 100 steps)
+   nlm-cli demo --full                     # Full demo (500 neurons, 2000 steps)
+   nlm-cli run --neurons=1000 --steps=5000  # Custom configuration
+   ```
 
-### Build Steps
+### Alternative Interface Options
+
+The NLM project provides multiple ways to interact with the system:
+
+1. **Command Line:** Direct execution of binaries
+2. **Enhanced CLI:** `nlm-cli` utility for user-friendly workflows
+3. **Configuration Files:** Pre-defined settings for different use cases
+4. **Configuration Management:** Create and manage custom configs
+
+## NLM CLI Utility
+
+The `nlm-cli` script provides an enhanced command-line interface with:
+
+### Commands
+
+**`nlm-cli run [OPTIONS]`** - Run NLM simulation
+- `--neurons=<count>` - Number of neurons (default: 500)
+- `--steps=<count>` - Number of simulation steps (default: 2000)
+- `--checkpoint=<path>` - Path for checkpoint operations
+- `--load=<path>` - Load brain state from checkpoint
+- `--demo-mode` - Run in demo mode (faster, fewer neurons)
+- `--integration-only` - Only test integration, no learning/experiment
+- `--performance-test` - Run performance benchmark
+- `--verbose` - Enable verbose logging
+
+**`nlm-cli demo [OPTIONS]`** - Run Phase 6 integration demo
+- `--quick` - Quick demo (50 neurons, 100 steps)
+- `--full` - Full demo (500 neurons, 2000 steps)
+- `--verbose` - Enable verbose logging
+
+**`nlm-cli config [SUBCOMMAND]`** - Manage configuration files
+- `list` - List available configuration files
+- `show <file>` - Show configuration file contents
+- `create <file>` - Create new configuration file
+
+**`nlm-cli info`** - Show system information and version
+
+### Examples
 
 ```bash
-# Navigate to the project directory
-cd /path/to/nlm
+# Run quick demo
+nlm-cli demo --quick
 
-# Create a build directory
-mkdir -p build
-cd build
+# Run full demo with custom settings
+nlm-cli demo --full
 
-# Configure with CMake (Release build for best performance)
-cmake .. -DCMAKE_BUILD_TYPE=Release
+# Run performance benchmark
+nlm-cli run --performance-test
 
-# Build all targets
+# Load saved brain state
+nlm-cli run --load=./my_checkpoint --demo-mode
+
+# Test checkpoint functionality
+nlm-cli run --checkpoint=./test_checkpoint
+
+# List available configs
+nlm-cli config list
+
+# Show default config
+nlm-cli config show default.cfg
+
+# Create custom config
+nlm-cli config create myconfig.cfg
+```
+
+## Configuration Files
+
+### Available Configurations
+
+The project includes several configuration files for different use cases:
+
+1. **default.cfg** - Optimized for Phase 6 integration
+2. **expert.cfg** - Optimized for performance testing
+3. **beginner.cfg** - Optimized for learning and exploration
+4. **performance.cfg** - Optimized for benchmarking
+
+### Configuration File Format
+
+Configuration files use simple `key = value` format:
+
+```
+# Example configuration
+neuron_count = 1000
+simulation_timestep = 0.001
+enable_development = true
+enable_checkpointing = true
+log_level = INFO
+```
+
+### Using Configuration Files
+
+To use a specific configuration file:
+
+```bash
+# Run with expert configuration
+./nlm_phase6_demo --config=configs/expert.cfg
+
+# Run with custom configuration
+./nlm_phase6_demo --config=./myconfig.cfg
+
+# Create and use custom configuration
+nlm-cli config create myconfig.cfg
+./nlm_phase6_demo --config=configs/myconfig.cfg
+```
+
+## Advanced Usage
+
+### Running with Checkpoints
+
+Checkpoints allow you to save and load brain state:
+
+```bash
+# Save checkpoint after simulation
+./nlm_phase6_demo --checkpoint=./my_checkpoint
+
+# Load saved brain state
+./nlm_phase6_demo --load=./my_checkpoint
+
+# Using CLI for checkpoint management
+nlm-cli run --checkpoint=./my_checkpoint
+nlm-cli run --load=./my_checkpoint
+```
+
+### Performance Testing
+
+To benchmark system performance:
+
+```bash
+# Run performance benchmark
+./nlm_phase6_demo --performance-test
+
+# Or using CLI
+nlm-cli run --performance-test
+
+# With custom settings
+./nlm_phase6_demo --performance-test --neurons=2000 --steps=5000
+```
+
+### Integration Testing
+
+To verify all brain systems are connected:
+
+```bash
+# Run integration-only test
+./nlm_phase6_demo --integration-only
+
+# Or using CLI
+nlm-cli run --integration-only
+```
+
+## System Architecture
+
+### Brain Systems Integration
+
+NLM integrates the following systems:
+
+1. **Memory Systems**
+   - Working Memory: Stores current task information
+   - Episodic Memory: Stores experience episodes
+   - Semantic Memory: Stores knowledge concepts
+   - Procedural Memory: Stores learned skills
+   - Associative Memory: Stores pattern associations
+
+2. **Neuromodulation**
+   - Dopamine: Reward prediction error signaling
+   - Curiosity: Exploration drive
+   - Novelty: Change detection
+   - Prediction Error: Learning signal
+
+3. **Cognition Systems**
+   - Neural Planner: Action sequence evaluation
+   - Concept Formation: Pattern abstraction
+   - Attention: Competitive selection dynamics
+
+4. **Prediction System**
+   - Prediction Error: Learning from surprises
+   - Confidence Tracking: Uncertainty quantification
+   - Forward Models: Anticipating future states
+
+5. **Development System**
+   - Synaptogenesis: Formation of new connections
+   - Pruning: Elimination of unused connections
+   - Maturation: Improvement of connection quality
+
+### Integration Flow
+
+```
+WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE
+    ↓                     ↓                 ↓
+MEMORY / PREDICTION ← MOTIVATION / NEUROMODULATION → ACTION SELECTION
+    ↓                     ↑                 ↓
+   PLASTICITY ← REWARD / SURPRISE / ERROR ← MOTOR OUTPUT
+    ↓                     ↑                 ↓
+   MEMORY / DEVELOPMENT ← WORLD CONSEQUENCE ← CHANGED BRAIN
+    ↓                     ↑                 ↓
+   CHANGED FUTURE BEHAVIOR ← CHANGED ENVIRONMENT ← WORLD
+```
+
+## Common Issues and Solutions
+
+### Issue: Project Build Fails
+
+**Solution:**
+```bash
+# Clean build
+rm -rf build && mkdir build && cd build
+
+# Configure with proper options
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20
+
+# Build with parallel jobs
+make -j$(nproc)
+```
+
+### Issue: NLM Demo Not Found
+
+**Solution:**
+```bash
+# Check if Phase 6 demo was built
+ls -la build/
+
+# Re-build if necessary
 make -j$(nproc)
 
-# Run tests (if built)
-ctest --output-on-failure
+# Check CMakeLists.txt for Phase 6 integration
 ```
 
-### Build Outputs
+### Issue: Configuration File Not Found
 
-After successful compilation, you will have:
-
-| Target | Type | Description |
-|--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
-| `nlm_core` | Static Library | Core brain components |
-| `nlm_agent` | Static Library | Agent system |
-| `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
-
-### Build Options
-
+**Solution:**
 ```bash
-# Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+# Check available configuration files
+nlm-cli config list
 
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+# Create new configuration
+nlm-cli config create myconfig.cfg
 
-# Install to custom prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
+# Use default configuration
+./nlm_phase6_demo
 ```
 
----
+### Issue: Performance Too Slow
 
-## Part 2: Installing the Python Library
-
-### From Source (Recommended for Development)
-
+**Solution:**
 ```bash
-# Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
+# Use fewer neurons for faster testing
+./nlm_phase6_demo --neurons=100 --steps=500
 
-# Build and install
-pip install .
+# Run in demo mode
+./nlm_phase6_demo --demo-mode
 
-# Or install in development mode
-pip install -e .
+# Disable development (faster)
+./nlm_phase6_demo --config=configs/performance.cfg
 ```
-
-### Using pyproject.toml (Modern Python Packaging)
-
-```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
-
-# Build only (without installing)
-pip install build
-python -m build
-
-# Install specific build from wheel
-pip install dist/*.whl
-```
-
-### Verifying Installation
-
-```python
-import pynlm
-
-# Check version
-print(pynlm.__version__)
-
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
-```
-
----
-
-## Part 3: Using the Python Library
-
-### Basic Usage
-
-#### Creating a Brain
-
-```python
-import pynlm
-
-# Create a default configuration
-config = pynlm.createDefaultConfig()
-
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
-```
-
-#### Running a Simulation
-
-```python
-import pynlm
-
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
-```
-
-#### Creating a Simple World
-
-```python
-import pynlm
-
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
-
-# Reset world to initial state
-world.reset()
-
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
-```
-
-### Complete Agent Example
-
-```python
-import pynlm
-
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
-```
-
-### Key Classes and Methods
-
-#### Brain Class
-
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
-
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
-```
-
----
-
-## Part 4: Configuration Options
-
-### Brain Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
-
-```python
-import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
-```
-
-### Environment Interaction
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
-
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
-```
-
----
 
 ## Troubleshooting
 
-### Build Issues
+### Error Messages
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
-```
+**"Integration verification failed!"**
+- Check that all required libraries and dependencies are installed
+- Verify that the build process completed successfully
+- Try running with `--integration-only` flag
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+**"Failed to load checkpoint!"**
+- Ensure the checkpoint file exists and is not corrupted
+- Check file permissions
+- Try saving a new checkpoint first
 
-### Runtime Issues
+**"Configuration file not found!"**
+- Verify the configuration file path is correct
+- Check if the file exists using `ls configs/`
+- Create a new configuration file using `nlm-cli config create`
 
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
+### Getting Help
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+For additional help:
+
+1. **Check the README.md file** for detailed information
+2. **Run `nlm-cli help`** for command-line help
+3. **Visit the project documentation** at [project website]
+4. **Check the examples directory** for usage examples
+
+## Future Enhancements
+
+The NLM project continues to evolve. Future improvements may include:
+
+1. **Enhanced Visualization:** Better graphical representations of brain activity
+2. **Real-time Interaction:** Live monitoring and control of simulation
+3. **Advanced Learning:** More sophisticated learning algorithms
+4. **Multi-agent Systems:** Interaction between multiple brain instances
+5. **Hardware Acceleration:** GPU support for faster simulation
+6. **Cloud Deployment:** Cloud-based simulation capabilities
+7. **Extended Experiments:** More diverse experimental paradigms
+
+## Contact and Support
+
+For questions, issues, or suggestions:
+
+1. **Project Repository:** [GitHub Repository]
+2. **Issue Tracker:** [Issue Tracker Link]
+3. **Documentation:** [Documentation Link]
+4. **Discussion Forum:** [Forum Link]
+
+## License
+
+MIT License
 
 ---
 
-## Further Reading
-
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+*Last Updated: $(date +%Y-%m-%d)*
+*NLM Project - An experimental artificial developmental brain research project*

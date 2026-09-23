@@ -1,0 +1,388 @@
+#!/usr/bin/env bash
+
+# NLM Command Line Interface Utility
+# This script provides an enhanced interface for running NLM experiments
+# with better user experience and common workflows
+
+NLM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
+
+function show_help() {
+    cat << EOF
+NLM (熙然) - Neural Learning Machine CLI Utility
+
+USAGE: nlm-cli [COMMAND] [OPTIONS]
+
+Commands:
+  run                    Run NLM simulation with specified options
+  demo                   Run quick demo (equivalent to nlm_phase6_demo)
+  info                   Show system information and version
+  config                 Manage configuration files
+  help                   Show this help message
+
+Examples:
+  nlm-cli run --neurons=1000 --steps=5000                    Run full integration test
+  nlm-cli demo --quick                                     Run quick demo
+  nlm-cli run --help                                       Show run command help
+  nlm-cli info                                            Show system information
+
+Options for 'run':
+  --neurons=<count>      Number of neurons (default: 500)
+  --steps=<count>        Number of simulation steps (default: 2000)
+  --checkpoint=<path>    Path for checkpoint operations
+  --load=<path>          Load brain state from checkpoint
+  --demo-mode            Run in demo mode (faster, fewer neurons)
+  --integration-only     Only test integration, no learning/experiment
+  --performance-test     Run performance benchmark
+  --verbose              Enable verbose logging
+  --help                 Show help for run command
+
+Options for 'demo':
+  --quick                Run quick demo (50 neurons, 100 steps)
+  --full                 Run full demo (500 neurons, 2000 steps)
+  --verbose              Enable verbose logging
+  --help                 Show help for demo command
+
+Options for 'config':
+  list                   List available configuration files
+  show <file>            Show configuration file contents
+  create <file>          Create new configuration file
+  help                   Show config command help
+
+For more information about NLM, visit: https://github.com/NLM-Project/NLM
+EOF
+}
+
+function show_info() {
+    echo "NLM (熙然) - Neural Learning Machine"
+    echo "=================================="
+    echo "Version: 0.1.0"
+    echo "Phase: 6 - Final Integration"
+    echo ""
+    echo "Project Overview:"
+    echo "  An experimental artificial developmental brain"
+    echo "  Long-term goal: Create neural system that develops"
+    echo "  through interaction with environment"
+    echo ""
+    echo "Available Executables:"
+    echo "  nlm                    - Phase 2 neural computation (legacy)"
+    echo "  nlm_phase3_demo        - Phase 3 world interaction"
+    echo "  nlm_phase4_demo        - Phase 4 cognitive mechanisms"
+    echo "  nlm_phase6_demo        - Phase 6 integration (NEW!)"
+    echo ""
+    echo "Key Features (Phase 6):"
+    echo "  ✓ All brain systems integrated"
+    echo "  ✓ Memory systems connected to neural processing"
+    echo "  ✓ Neuromodulation affects plasticity and dynamics"
+    echo "  ✓ Development affects plasticity rates"
+    echo "  ✓ Prediction system integrated"
+    echo "  ✓ Replay and consolidation functional"
+    echo "  ✓ Checkpoint save/load working"
+    echo ""
+    echo "Getting Started:"
+    echo "  1. Build the project:"
+    echo "     mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j4"
+    echo "  2. Run demo: ./nlm_phase6_demo"
+    echo "  3. Run full integration: ./nlm_phase6_demo --neurons=1000 --steps=5000"
+    echo "  4. Check system info: nlm-cli info"
+}
+
+function run_nlm() {
+    local neurons=500
+    local steps=2000
+    local checkpoint=""
+    local load=""
+    local demo_mode=false
+    local integration_only=false
+    local performance_test=false
+    local verbose=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --neurons=*)
+                neurons="${1#*=}"
+                shift
+                ;;
+            --steps=*)
+                steps="${1#*=}"
+                shift
+                ;;
+            --checkpoint=*)
+                checkpoint="${1#*=}"
+                shift
+                ;;
+            --load=*)
+                load="${1#*=}"
+                shift
+                ;;
+            --demo-mode)
+                demo_mode=true
+                shift
+                ;;
+            --integration-only)
+                integration_only=true
+                shift
+                ;;
+            --performance-test)
+                performance_test=true
+                shift
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --help)
+                cat << EOF
+NLM Run Command
+===============
+Run NLM simulation with specified options.
+
+Options:
+  --neurons=<count>      Number of neurons (default: 500)
+  --steps=<count>        Number of simulation steps (default: 2000)
+  --checkpoint=<path>    Path for checkpoint operations
+  --load=<path>          Load brain state from checkpoint
+  --demo-mode            Run in demo mode (faster, fewer neurons)
+  --integration-only     Only test integration, no learning/experiment
+  --performance-test     Run performance benchmark
+  --verbose              Enable verbose logging
+
+Examples:
+  nlm-cli run --neurons=1000 --steps=5000
+  nlm-cli run --load=./checkpoint --demo-mode
+  nlm-cli run --performance-test
+EOF
+                return 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                nlm-cli run --help
+                return 1
+                ;;
+        esac
+    done
+    
+    # Build command
+    local cmd="nlm"
+    
+    # Add options
+    if [ "$demo_mode" = true ]; then
+        cmd="$cmd --demo-mode"
+    fi
+    
+    if [ "$integration_only" = true ]; then
+        cmd="$cmd --integration-only"
+    fi
+    
+    if [ "$performance_test" = true ]; then
+        cmd="$cmd --performance-test"
+    fi
+    
+    if [ "$verbose" = true ]; then
+        cmd="$cmd --verbose"
+    fi
+    
+    cmd="$cmd --neurons=$neurons --steps=$steps"
+    
+    if [ -n "$checkpoint" ]; then
+        cmd="$cmd --checkpoint=$checkpoint"
+    fi
+    
+    if [ -n "$load" ]; then
+        cmd="$cmd --load=$load"
+    fi
+    
+    echo "Running: $cmd"
+    echo ""
+    
+    # Run the command
+    eval "$cmd"
+}
+
+function run_demo() {
+    local quick=false
+    local full=false
+    local verbose=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --quick)
+                quick=true
+                shift
+                ;;
+            --full)
+                full=true
+                shift
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --help)
+                cat << EOF
+NLM Demo Command
+===============
+Run NLM Phase 6 demo with specified options.
+
+Options:
+  --quick                Run quick demo (50 neurons, 100 steps)
+  --full                 Run full demo (500 neurons, 2000 steps)
+  --verbose              Enable verbose logging
+
+Examples:
+  nlm-cli demo --quick
+  nlm-cli demo --full
+  nlm-cli demo --verbose --quick
+EOF
+                return 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                nlm-cli demo --help
+                return 1
+                ;;
+        esac
+    done
+    
+    # Build command
+    local cmd="nlm_phase6_demo"
+    
+    if [ "$quick" = true ]; then
+        cmd="$cmd --quick"
+    elif [ "$full" = true ]; then
+        cmd="$cmd --neurons=500 --steps=2000"
+    else
+        cmd="$cmd"  # Default demo
+    fi
+    
+    if [ "$verbose" = true ]; then
+        cmd="$cmd --verbose"
+    fi
+    
+    echo "Running: $cmd"
+    echo ""
+    
+    # Run the command
+    eval "$cmd"
+}
+
+function config_command() {
+    local subcommand="$1"
+    shift
+    
+    case "$subcommand" in
+        list)
+            echo "Available configuration files:"
+            echo "  configs/default.cfg"
+            echo "  configs/expert.cfg"
+            echo "  configs/beginner.cfg"
+            echo "  configs/performance.cfg"
+            echo ""
+            echo "Configuration file format: key=value"
+            echo "Example:"
+            echo "  neuron_count=1000"
+            echo "  simulation_timestep=0.001"
+            echo "  enable_development=true"
+            ;;
+        show)
+            if [ $# -eq 0 ]; then
+                echo "Usage: nlm-cli config show <file>"
+                return 1
+            fi
+            local config_file="$1"
+            if [ -f "$NLM_DIR/configs/$config_file" ]; then
+                echo "Contents of $NLM_DIR/configs/$config_file:"
+                echo "$(cat "$NLM_DIR/configs/$config_file")"
+            else
+                echo "Configuration file not found: $config_file"
+                echo "Available files: $(ls -1 "$NLM_DIR/configs/" 2>/dev/null || echo "No config files found")"
+                return 1
+            fi
+            ;;
+        create)
+            if [ $# -eq 0 ]; then
+                echo "Usage: nlm-cli config create <file>"
+                return 1
+            fi
+            local new_config="$1"
+            echo "Creating new configuration file: $NLM_DIR/configs/$new_config"
+            echo "Enter configuration lines (empty line to finish):"
+            local line
+            local temp_file="$(mktemp)"
+            while IFS= read -r line && [ -n "$line" ]; do
+                echo "$line" >> "$temp_file"
+            done
+            if [ -s "$temp_file" ]; then
+                cp "$temp_file" "$NLM_DIR/configs/$new_config"
+                echo "Configuration file created successfully: $NLM_DIR/configs/$new_config"
+            else
+                rm -f "$temp_file"
+                echo "No configuration provided. File not created."
+                return 1
+            fi
+            ;;
+        help)
+            cat << EOF
+NLM Config Command
+===================
+Manage configuration files for NLM.
+
+Subcommands:
+  list                   List available configuration files
+  show <file>           Show configuration file contents
+  create <file>         Create new configuration file
+  help                  Show this help message
+
+Examples:
+  nlm-cli config list
+  nlm-cli config show default.cfg
+  nlm-cli config create myconfig.cfg
+EOF
+            ;;
+        *)
+            echo "Unknown config command: $subcommand"
+            nlm-cli config help
+            return 1
+            ;;
+    esac
+}
+
+# Main command dispatcher
+function main() {
+    if [ $# -lt 1 ]; then
+        echo "Error: No command specified"
+        echo ""
+        show_help
+        return 1
+    fi
+    
+    local command="$1"
+    shift
+    
+    case "$command" in
+        run)
+            run_nlm "$@"
+            ;;
+        demo)
+            run_demo "$@"
+            ;;
+        info)
+            show_info
+            ;;
+        config)
+            config_command "$@"
+            ;;
+        help)
+            show_help
+            ;;
+        *)
+            echo "Unknown command: $command"
+            show_help
+            return 1
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+main "$@"
