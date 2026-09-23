@@ -28,27 +28,24 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    // Store last sensory input for prediction system
+    std::unique_ptr<SensoryInput> lastSensoryInput;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    // Track prediction metrics
+    float totalPredictionAccuracy;
+    float predictionUpdateCount;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
+    // Action-conditioned predictions for predictive planning
+    std::unordered_map<std::string, std::vector<float>> actionPredictions;
     
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    // Recent sensory pattern history for prediction
+    std::vector<std::vector<float>> recentSensoryPatterns;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // Current action being planned/executed
+    ActionType currentAction;
+    
+    // Prediction-based curiosity score
+    float predictiveCuriosity;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -511,8 +508,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Store recent sensory state for prediction
+        if (pImpl->lastSensoryInput) {
+            pImpl->predictionSystem->updatePredictions(*pImpl->lastSensoryInput, *pImpl->lastSensoryInput);
+        }
+        
+        // Update prediction system with time
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Check prediction error and log if high
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError > 0.3f) {
+            NLM_LOG_WARNING("High prediction error: " + std::to_string(predictionError));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

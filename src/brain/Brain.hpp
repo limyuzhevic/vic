@@ -184,14 +184,86 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // ========== PREDICTION SYSTEM ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
     
-    // Logging
-    void logStatus() const;
+    // Update prediction system with current state
+    void updatePredictionSystem();
+    
+    // Get current prediction error
+    float getPredictionError() const;
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const;
+    
+    // ========== COGNITION SYSTEMS ==========
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Plan action based on current state
+    std::unique_ptr<Action> planAction(const std::vector<float>& currentState);
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Extract and form concepts from sensory patterns
+    std::vector<std::string> extractConcepts(const SensoryInput& input);
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // Focus attention on specific patterns
+    void focusAttention(const std::vector<float>& pattern);
+    
+    // ========== DEVELOPMENT SYSTEM ==========
+    
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // ========== NEUROMODULATION SYSTEMS ==========
+    
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
+    
+    // Get combined neuromodulation level
+    float getNeuromodulationLevel() const;
+    
+    // Get curiosity-driven exploration level
+    float getCuriosityLevel() const;
+    
+    // Get prediction accuracy metrics
+    float getPredictionAccuracy() const;
+    
+    // Get planning confidence
+    float getPlanningConfidence() const;
+    
+    // Get concept formation confidence
+    float getConceptFormationConfidence() const;
+    
+    // Get current action being planned
+    ActionType getCurrentAction() const;
+    
+    // Set current action
+    void setCurrentAction(ActionType action);
+    
+    // Get brain metrics
+    size_t getTotalNeuronCount() const;
+    size_t getTotalSynapseCount() const;
+    float getAverageFiringRate() const;
+    float getExcitationInhibitionRatio() const;
     
 private:
     struct Impl;
