@@ -35,6 +35,15 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainCore.cpp
+    src/brain/BrainMemory.cpp
+    src/brain/BrainCognition.cpp
+    src/brain/BrainNeuromodulation.cpp
+    src/brain/BrainDevelopment.cpp
+    src/brain/BrainPersistence.cpp
+    src/brain/BrainStatistics.cpp
+    src/brain/BrainSimulation.cpp
+    src/brain/BrainIntegration.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -96,6 +105,7 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/BrainAgentCore.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
