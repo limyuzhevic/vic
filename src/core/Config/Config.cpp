@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string lastError;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -86,7 +87,37 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Properly format the value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -212,4 +243,89 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+    return oss.str();
+}
+
+// Configuration validation
+bool Config::validate() const {
+    // TODO: Implement comprehensive validation
+    // Check for required parameters
+    // Validate parameter ranges
+    // Validate parameter types
+    // Check for conflicts between parameters
+    return true;
+}
+
+std::string Config::validate(const std::string& key) const {
+    if (!has(key)) {
+        return "Key \"" + key + "\" does not exist";
+    }
+    
+    // TODO: Implement parameter-specific validation
+    return "";
+}
+
+bool Config::isValid(const std::string& key) const {
+    return validate(key).empty();
+}
+
+// Error handling
+std::string Config::getLastError() const {
+    if (!pImpl->lastError.empty()) {
+        return pImpl->lastError;
+    }
+    return "";
+}
+
+void Config::clearLastError() {
+    pImpl->lastError.clear();
+}
+
+// Parameter validation (if validation rules exist)
+void Config::validateRanges() const {
+    // TODO: Implement range validation for numeric parameters
+    // Check if values are within acceptable bounds
+}
+
+void Config::validateTypes() const {
+    // TODO: Implement type validation
+    // Ensure parameters have correct types
+}
+
+// Get configuration statistics
+size_t Config::getEntryCount() const {
+    return pImpl->entries.size();
+}
+
+ConfigSource Config::getEntrySource(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        return it->source;
+    }
+    
+    return ConfigSource::Default;
+}
+
+// File I/O improvements
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // TODO: Implement proper JSON parsing
+    // For now, use the existing simple parser
+    return loadFromFile(filepath);
+}
+
+bool Config::saveToJSONFile(const std::string& filepath) const {
+    // TODO: Implement proper JSON serialization
+    // For now, use the existing simple format
+    return saveToFile(filepath);
+}
+
+// Error handling
+void Config::setError(const std::string& error) {
+    pImpl->lastError = error;
+}
+
+bool Config::hasError() const {
+    return !pImpl->lastError.empty();
+}

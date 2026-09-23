@@ -93,6 +93,42 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Check existence
+    bool has(const std::string& key) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
+    // Get all keys
+    std::vector<std::string> getKeys() const;
+    
+    // Clear all
+    void clear();
+    
+    // Get configuration summary
+    std::string summary() const;
+    
+    // Configuration validation
+    bool validate() const;
+    std::string validate(const std::string& key) const;
+    bool isValid(const std::string& key) const;
+    
+    // Error handling
+    std::string getLastError() const;
+    void clearLastError();
+    
+    // Parameter validation (if validation rules exist)
+    void validateRanges() const;
+    void validateTypes() const;
+    
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    ConfigSource getEntrySource(const std::string& key) const;
+    
+    // File I/O improvements
+    bool loadFromJSONFile(const std::string& filepath);
+    bool saveToJSONFile(const std::string& filepath) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +136,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    
+    // Error handling
+    void setError(const std::string& error);
+    bool hasError() const;

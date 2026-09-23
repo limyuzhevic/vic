@@ -6,15 +6,10 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/plasticity/AntiHebbianRule.hpp"
+#include "../src/plasticity/BCMRule.hpp"
+#include "../src/plasticity/RewardModulatedSTDP.hpp"
+#include "../src/plasticity/TripletSTDP.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -73,13 +68,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
+    py::enum_<PlasticityRuleType>(m, "PlasticityRuleType", R"pbdoc(Plasticity rule type enumeration)pbdoc")
+        .value("Hebbian", PlasticityRuleType::Hebbian)
+        .value("AntiHebbian", PlasticityRuleType::AntiHebbian)
+        .value("STDP", PlasticityRuleType::STDP)
+        .value("RewardModulatedSTDP", PlasticityRuleType::RewardModulatedSTDP)
+        .value("TripletSTDP", PlasticityRuleType::TripletSTDP)
+        .value("BCMRule", PlasticityRuleType::BCMRule)
         .export_values();
 
     py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
@@ -263,31 +258,65 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    py::class_<AntiHebbianRule>(m, "AntiHebbianRule", R"pbdoc(Anti-Hebbian plasticity rule)pbdoc")
         .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("update", &AntiHebbianRule::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"))
+        .def("applyWeightChange", &AntiHebbianRule::applyWeightChange, py::arg("synapse"), py::arg("delta"))
+        .def("getName", &AntiHebbianRule::getName)
+        .def("setLearningRate", &AntiHebbianRule::setLearningRate, py::arg("rate"))
+        .def("getLearningRate", &AntiHebbianRule::getLearningRate)
+        .def("setMinWeight", &AntiHebbianRule::setMinWeight, py::arg("weight"))
+        .def("getMinWeight", &AntiHebbianRule::getMinWeight)
+        .def("setMaxWeight", &AntiHebbianRule::setMaxWeight, py::arg("weight"))
+        .def("getMaxWeight", &AntiHebbianRule::getMaxWeight)
+        .def("setTargetWeight", &AntiHebbianRule::setTargetWeight, py::arg("weight"))
+        .def("getTargetWeight", &AntiHebbianRule::getTargetWeight);
+
+    py::class_<BCMRule>(m, "BCMRule", R"pbdoc(BCM - Bienenstock-Cooper-Munro plasticity rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &BCMRule::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"))
+        .def("applyWeightChange", &BCMRule::applyWeightChange, py::arg("synapse"), py::arg("delta"))
+        .def("getName", &BCMRule::getName)
+        .def("setLearningRate", &BCMRule::setLearningRate, py::arg("rate"))
+        .def("getLearningRate", &BCMRule::getLearningRate)
+        .def("setHebbianThreshold", &BCMRule::setHebbianThreshold, py::arg("threshold"))
+        .def("getHebbianThreshold", &BCMRule::getHebbianThreshold)
+        .def("setHomeostaticTarget", &BCMRule::setHomeostaticTarget, py::arg("target"))
+        .def("getHomeostaticTarget", &BCMRule::getHomeostaticTarget);
+
+    py::class_<RewardModulatedSTDP>(m, "RewardModulatedSTDP", R"pbdoc(Reward-modulated STDP plasticity rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &RewardModulatedSTDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"))
+        .def("applyWeightChange", &RewardModulatedSTDP::applyWeightChange, py::arg("synapse"), py::arg("delta"))
+        .def("getName", &RewardModulatedSTDP::getName)
+        .def("setLTPWeight", &RewardModulatedSTDP::setLTPWeight, py::arg("weight"))
+        .def("getLTPWeight", &RewardModulatedSTDP::getLTPWeight)
+        .def("setLTDWeight", &RewardModulatedSTDP::setLTDWeight, py::arg("weight"))
+        .def("getLTDWeight", &RewardModulatedSTDP::getLTDWeight)
+        .def("setTimeConstant", &RewardModulatedSTDP::setTimeConstant, py::arg("tau"))
+        .def("getTimeConstant", &RewardModulatedSTDP::getTimeConstant)
+        .def("setRewardScalar", &RewardModulatedSTDP::setRewardScalar, py::arg("scalar"))
+        .def("getRewardScalar", &RewardModulatedSTDP::getRewardScalar)
+        .def("setRecentReward", &RewardModulatedSTDP::setRecentReward, py::arg("reward"))
+        .def("getRecentReward", &RewardModulatedSTDP::getRecentReward)
+        .def("setBaselineLearningRate", &RewardModulatedSTDP::setBaselineLearningRate, py::arg("rate"))
+        .def("getBaselineLearningRate", &RewardModulatedSTDP::getBaselineLearningRate);
+
+    py::class_<TripletSTDP>(m, "TripletSTDP", R"pbdoc(Triplet STDP plasticity rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &TripletSTDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"))
+        .def("applyWeightChange", &TripletSTDP::applyWeightChange, py::arg("synapse"), py::arg("delta"))
+        .def("getName", &TripletSTDP::getName)
+        .def("setLTPWeightA", &TripletSTDP::setLTPWeightA, py::arg("weight"))
+        .def("getLTPWeightA", &TripletSTDP::getLTPWeightA)
+        .def("setLTDWeightA", &TripletSTDP::setLTDWeightA, py::arg("weight"))
+        .def("getLTDWeightA", &TripletSTDP::getLTDWeightA)
+        .def("setLTPWeightB", &TripletSTDP::setLTPWeightB, py::arg("weight"))
+        .def("getLTPWeightB", &TripletSTDP::getLTPWeightB)
+        .def("setLTDWeightB", &TripletSTDP::setLTDWeightB, py::arg("weight"))
+        .def("getLTDWeightB", &TripletSTDP::getLTDWeightB)
+        .def("setTimeConstant", &TripletSTDP::setTimeConstant, py::arg("tau"))
+        .def("getTimeConstant", &TripletSTDP::getTimeConstant);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -400,26 +429,59 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("createHebbianRule", []() -> std::shared_ptr<HebbianRule> {
+        return std::make_shared<HebbianRule>();
+    }, "Create a Hebbian plasticity rule");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createAntiHebbianRule", []() -> std::shared_ptr<AntiHebbianRule> {
+        return std::make_shared<AntiHebbianRule>();
+    }, "Create an Anti-Hebbian plasticity rule");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createBCMRule", []() -> std::shared_ptr<BCMRule> {
+        return std::make_shared<BCMRule>();
+    }, "Create a BCM (Bienenstock-Cooper-Munro) plasticity rule");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createSTDP", []() -> std::shared_ptr<STDP> {
+        return std::make_shared<STDP>();
+    }, "Create an STDP plasticity rule");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("createRewardModulatedSTDP", []() -> std::shared_ptr<RewardModulatedSTDP> {
+        return std::make_shared<RewardModulatedSTDP>();
+    }, "Create a Reward-Modulated STDP plasticity rule");
+
+    m.def("createTripletSTDP", []() -> std::shared_ptr<TripletSTDP> {
+        return std::make_shared<TripletSTDP>();
+    }, "Create a Triplet STDP plasticity rule");
+
+    m.def("createPlasticityRule", [](PlasticityRuleType type) -> std::shared_ptr<PlasticityRule> {
+        switch (type) {
+            case PlasticityRuleType::Hebbian:
+                return std::make_shared<HebbianRule>();
+            case PlasticityRuleType::AntiHebbian:
+                return std::make_shared<AntiHebbianRule>();
+            case PlasticityRuleType::BCMRule:
+                return std::make_shared<BCMRule>();
+            case PlasticityRuleType::STDP:
+                return std::make_shared<STDP>();
+            case PlasticityRuleType::RewardModulatedSTDP:
+                return std::make_shared<RewardModulatedSTDP>();
+            case PlasticityRuleType::TripletSTDP:
+                return std::make_shared<TripletSTDP>();
+            default:
+                throw std::invalid_argument("Unknown PlasticityRuleType");
+        }
+    }, py::arg("type"), "Create a plasticity rule of the specified type");
+
+    m.def("getPlasticityRuleNames", []() {
+        py::list names;
+        names.append("Hebbian");
+        names.append("AntiHebbian");
+        names.append("BCMRule");
+        names.append("STDP");
+        names.append("RewardModulatedSTDP");
+        names.append("TripletSTDP");
+        return names;
+    }, "Get list of available plasticity rule type names");
 }
 
 } // namespace nlm

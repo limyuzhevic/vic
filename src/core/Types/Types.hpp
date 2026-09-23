@@ -90,14 +90,14 @@ using FiringRate = float;
 // Connection delay in simulation steps
 using Delay = uint32_t;
 
-// Typed enums for neuron types
-enum class NeuronType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Sensory,
-    Motor,
-    Internal
+// Synaptic plasticity rule types
+enum class PlasticityRuleType : uint8_t {
+    Hebbian,
+    AntiHebbian,
+    STDP,
+    RewardModulatedSTDP,
+    TripletSTDP,
+    BCM
 };
 
 // Typed enums for synapse types
