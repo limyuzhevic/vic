@@ -82,6 +82,30 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### NLM CLI (Modern Command-Line Interface)
+```bash
+python3 nlm-cli.py demo
+```
+
+The NLM CLI provides advanced features for:
+- Running simulations with various configurations
+- Interactive brain exploration and inspection  
+- Performance benchmarking
+- Configuration management
+- Session saving and loading
+
+Key commands:
+- `nlm-cli.py demo` - Run Phase 6 integration demo
+- `nlm-cli.py benchmark` - Run performance benchmarks
+- `nlm-cli.py interactive` - Enter interactive brain exploration mode
+- `nlm-cli.py config create` - Create default configuration file
+- `nlm-cli.py sessions list` - List saved sessions
+
+For full help:
+```bash
+python3 nlm-cli.py --help
+```
+
 ## Project Structure
 
 ```
