@@ -80,6 +80,8 @@ public:
     bool isRefractory() const;
     void setFiringState(FiringState state);
     void setRefractoryPeriod(uint32_t steps);
+    void setRefractoryRemaining(uint32_t steps);
+    uint32_t getRefractoryRemaining() const;
     void decrementRefractory();
     
     // Firing rate (for rate-based computation)

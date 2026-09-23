@@ -1,0 +1,123 @@
+# Configuration file for NLM (熙然) - Phase 6 Final Integration
+# This file provides enhanced configuration options for the artificial developmental brain
+
+# === Core Simulation Parameters ===
+simulation_timestep = 0.001                    # Time step in milliseconds
+simulation_duration = 600000.0               # Total simulation time in milliseconds
+neuron_count = 1000                          # Total number of neurons
+region_count = 1                             # Number of neural regions
+connection_probability = 0.1                 # Probability of random connections
+
+# === Neuromodulation Configuration ===
+dopamine_enabled = true                       # Enable dopamine modulation
+curiosity_enabled = true                     # Enable curiosity-driven exploration
+novelty_enabled = true                        # Enable novelty detection
+prediction_error_enabled = true              # Enable prediction error computation
+reward_modulation_enabled = true             # Enable reward-modulated plasticity
+
+# === Memory System Configuration ===
+working_memory_capacity = 100                 # Working memory capacity (number of traces)
+episodic_memory_max_episodes = 1000          # Maximum number of episodic memories
+associative_memory_pattern_count = 5000       # Number of associations
+
+# === Development Configuration ===
+developmental_enabled = true                  # Enable developmental stages
+development_interval = 1000.0               # Development update interval (steps)
+plasticity_modifier_initial = 1.0            # Initial plasticity modifier
+plasticity_modifier_adult = 0.2              # Adult plasticity modifier
+
+# === Performance Configuration ===
+event_driven_enabled = true                   # Enable event-driven spike processing
+multithreading_enabled = true                # Enable parallel processing
+simd_enabled = true                          # Enable SIMD vectorization
+sparse_connectivity_enabled = true          # Enable sparse connectivity
+memory_pool_enabled = true                  # Enable memory pools
+
+# === Checkpoint Configuration ===
+checkpoint_interval = 100000                 # Save checkpoint every N steps
+checkpoint_dir = ./checkpoints              # Directory for checkpoint files
+max_checkpoints = 10                         # Maximum number of checkpoints to keep
+compress_checkpoints = true                 # Compress checkpoint files
+checkpoint_validation = true               # Validate checkpoints on load
+
+# === Visualization/Debugging Configuration ===
+visualization_enabled = false               # Enable visualization output
+debug_mode = false                           # Enable debug logging
+profile_performance = false                 # Enable performance profiling
+log_level = "INFO"                          # Logging level: DEBUG, INFO, WARN, ERROR
+
+# === Phase 6 Integration Parameters ===
+concept_formation_enabled = true             # Enable concept formation
+prediction_system_enabled = true            # Enable prediction system
+attention_enabled = true                    # Enable attentional selection
+planning_enabled = true                     # Enable action planning
+
+# === Advanced Configuration Options ===
+# These options provide fine-grained control over simulation behavior
+
+# Memory consolidation
+consolidation_interval = 5000.0             # Memory consolidation interval
+consolidation_threshold = 0.3              # Memory strength threshold for consolidation
+
+# Replay mechanisms
+replay_interval = 1000.0                   # Memory replay interval
+replay_episodes = 3                         # Number of episodes to replay
+replay_strength = 0.5                       # Replay effectiveness
+
+# Structural plasticity
+synaptogenesis_rate = 0.0001f              # Synaptogenesis rate
+synapse_pruning_rate = 0.00001f             # Synapse pruning rate
+
+# Novelty detection
+novelty_decay_rate = 0.99                  # Novelty decay per timestep
+novelty_threshold = 0.1                    # Novelty detection threshold
+
+# Curiosity
+ curiosity_sensitivity = 2.0               # Curiosity sensitivity to novelty
+curiosity_decay_rate = 0.98                # Curiosity decay per timestep
+
+# Prediction system
+prediction_accuracy = 0.8                   # Expected prediction accuracy
+prediction_error_weight = 0.5              # Weight of prediction error in learning
+
+# Attention
+attentional_strength = 0.5                  # Overall attentional strength
+inhibition_strength = 0.5                  # Inhibition strength
+excitation_strength = 1.5                  # Excitation strength
+
+# Planning
+planning_depth = 5                        # Planning horizon depth
+planning_confidence_threshold = 0.7        # Minimum confidence for action selection
+
+# === Research-Specific Configuration ===
+# Configuration options specific to NLM as a research project
+
+# Developmental psychology parameters
+developmental_stage_thresholds = [60.0, 300.0, 900.0]  # Age thresholds for developmental stages
+critical_period_enabled = true              # Enable critical period plasticity
+neural_maturation_enabled = true            # Enable neural maturation
+
+# Learning psychology parameters
+exploration_bonus = 0.1                   # Reward bonus for exploration
+exploitation_value = 1.0                   # Reward value for exploitation
+intrinsic_motivation = 0.2                  # Baseline intrinsic motivation
+
+# Memory research parameters
+hippocampal_pattern_completion = true        # Enable hippocampal pattern completion
+cortical_integration_strength = 0.8        # Strength of cortical integration
+
+# === System Limits ===
+max_neurons = 10000                          # Maximum number of neurons
+max_synapses = 50000                         # Maximum number of synapses
+max_regions = 10                            # Maximum number of regions
+max_actions = 32                            # Maximum number of action types
+
+# === Boundary Conditions ===
+neuron_potential_min = -100.0               # Minimum membrane potential
+neuron_potential_max = 50.0                # Maximum membrane potential
+neuron_refractory_period = 5.0              # Refractory period in steps
+
+# === Compatibility Options ===
+enable_backward_compatibility = true         # Enable backward compatibility mode
+validate_checkpoint_version = true          # Validate checkpoint versions
+ignore_unknown_config_options = false       # Whether to ignore unknown config options (true = tolerant)

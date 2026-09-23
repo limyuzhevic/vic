@@ -1,43 +1,41 @@
 #include "Config.hpp"
-#include <fstream>
-#include <sstream>
 #include <algorithm>
-#include <filesystem>
+#include <cctype>
+#include <sstream>
+#include <iostream>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// TOML parsing utilities
+static std::string trim(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return "";
+    size_t last = str.find_last_not_of(" \t\r\n");
+    return str.substr(first, last - first + 1);
+}
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+static std::string toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return result;
+}
 
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
+// TOML parser for simple key=value pairs
+static bool parseTOML(const std::string& content, std::vector<ConfigEntry>& entries) {
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#') {
             continue;
         }
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos && pos > 0) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
@@ -48,116 +46,116 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+            // Parse value based on type
+            ConfigValue configValue;
+            bool parsed = false;
+            
+            // Try different types in order of preference
+            try {
+                // Try boolean
+                if (value == "true" || value == "false") {
+                    configValue = (value == "true");
+                    parsed = true;
+                }
+                // Try integer
+                else {
+                    size_t posInt;
+                    int intValue = std::stoi(value, &posInt);
+                    if (posInt == value.size()) {
+                        configValue = intValue;
+                        parsed = true;
+                    }
+                }
+            } catch (...) {
+                // If parsing fails, try string
+                configValue = value;
+                parsed = true;
+            }
+            
+            if (parsed) {
+                ConfigEntry entry(key, configValue, ConfigSource::File);
+                // Add description based on key
+                if (key == "simulation_timestep") {
+                    entry.description = "Time step in milliseconds for simulation";
+                } else if (key == "neuron_count") {
+                    entry.description = "Total number of neurons in the simulation";
+                } else if (key == "enable_event_driven") {
+                    entry.description = "Enable event-driven spike processing";
+                } else if (key == "enable_multithreading") {
+                    entry.description = "Enable parallel processing";
+                } else {
+                    entry.description = "Configuration parameter";
+                }
+                entries.push_back(entry);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
     }
+    
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
+// Additional template implementations
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&key](const ConfigEntry& e) { return toLower(e.key) == toLower(key); });
     
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        if constexpr (std::is_same_v<T, int>) {
+            return std::get<int>(it->value);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return std::get<int64_t>(it->value);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::get<double>(it->value);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return std::get<bool>(it->value);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return std::get<std::string>(it->value);
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return std::get<std::vector<int>>(it->value);
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return std::get<std::vector<double>>(it->value);
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return std::get<std::vector<std::string>>(it->value);
+        }
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
+    
+    return std::nullopt;
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    auto value = get<T>(key);
+    if (value.has_value()) {
+        return *value;
     }
+    return defaultValue;
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
+// Implementation of other methods
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return toLower(e.key) == toLower(key); });
+    return it != pImpl->entries.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return toLower(e.key) == toLower(key); });
+    if (it != pImpl->entries.end()) {
+        pImpl->entries.erase(it);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
         keys.push_back(entry.key);
     }
@@ -169,47 +167,42 @@ void Config::clear() {
 }
 
 std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    std::stringstream ss;
+    ss << "Configuration Summary:" << std::endl;
+    ss << "Total parameters: " << pImpl->entries.size() << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+        ss << "  " << entry.key << " (source: ";
+        switch (entry.source) {
+            case ConfigSource::Default: ss << "Default" << std::endl; break;
+            case ConfigSource::File: ss << "File" << std::endl; break;
+            case ConfigSource::CommandLine: ss << "CommandLine" << std::endl; break;
+            case ConfigSource::Runtime: ss << "Runtime" << std::endl; break;
+        }
+        ss << ") = ";
+        
+        // Try to print the value
+        try {
+            if (std::holds_alternative<int>(entry.value)) {
+                ss << std::get<int>(entry.value);
+            } else if (std::holds_alternative<int64_t>(entry.value)) {
+                ss << std::get<int64_t>(entry.value);
+            } else if (std::holds_alternative<double>(entry.value)) {
+                ss << std::get<double>(entry.value);
+            } else if (std::holds_alternative<bool>(entry.value)) {
+                ss << (std::get<bool>(entry.value) ? "true" : "false");
+            } else if (std::holds_alternative<std::string>(entry.value)) {
+                ss << "\"" << std::get<std::string>(entry.value) << "\"";
             } else {
-                oss << arg;
+                ss << "[complex]";
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        } catch (const std::bad_variant_access&) {
+            ss << "[invalid]";
+        }
+        ss << std::endl;
     }
-    return oss.str();
+    
+    return ss.str();
 }
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

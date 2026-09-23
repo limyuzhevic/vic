@@ -1,0 +1,59 @@
+# Test configuration for NLM (熙然) - Enhanced Configuration Test
+# This file tests the new configuration options
+
+# === Core Simulation Parameters ===
+simulation_timestep = 0.001
+simulation_duration = 600000.0
+neuron_count = 500
+region_count = 2
+connection_probability = 0.15
+
+# === Neuromodulation Configuration ===
+dopamine_enabled = true
+curiosity_enabled = true
+novelty_enabled = true
+prediction_error_enabled = true
+reward_modulation_enabled = true
+
+# === Memory System Configuration ===
+working_memory_capacity = 150
+episodic_memory_max_episodes = 500
+associative_memory_pattern_count = 2000
+
+# === Development Configuration ===
+developmental_enabled = true
+development_interval = 500.0
+plasticity_modifier_initial = 1.0
+plasticity_modifier_adult = 0.2
+
+# === Performance Configuration ===
+event_driven_enabled = true
+multithreading_enabled = true
+simd_enabled = true
+sparse_connectivity_enabled = true
+memory_pool_enabled = true
+
+# === Checkpoint Configuration ===
+checkpoint_interval = 50000
+checkpoint_dir = ./checkpoints_test
+max_checkpoints = 5
+compress_checkpoints = true
+checkpoint_validation = true
+
+# === Advanced Configuration Options ===
+consolidation_interval = 2000.0
+consolidation_threshold = 0.3
+replay_interval = 500.0
+replay_episodes = 2
+replay_strength = 0.3
+
+# === Debug/Testing Configuration ===
+visualization_enabled = false
+debug_mode = true
+profile_performance = true
+log_level = "DEBUG"
+
+# === Research Configuration ===
+developmental_stage_thresholds = [40.0, 150.0, 400.0]
+critical_period_enabled = true
+neural_maturation_enabled = true
