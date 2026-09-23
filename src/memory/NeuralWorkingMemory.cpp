@@ -33,6 +33,23 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
+// Helper method to get neuron from brain by ID
+Neuron* getNeuronById(NeuronId neuron) {
+    if (!brain_) return nullptr;
+    
+    // Search through all regions to find the neuron
+    for (auto* region : brain_->getRegions()) {
+        for (auto* population : region->getAllPopulations()) {
+            for (auto* neuron : population->getNeurons()) {
+                if (neuron->getId() == neuron) {
+                    return neuron;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
@@ -43,17 +60,13 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
+        // Get neuron and set activation using helper
+        Neuron* targetNeuron = getNeuronById(neuron);
+        if (targetNeuron) {
+            targetNeuron->injectCurrent(activation * 5.0f);
         }
         
-        // Update stored activation
+        // Update stored activation (maintain parallel arrays)
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
