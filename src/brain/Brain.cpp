@@ -1,3 +1,5 @@
+// Brain.cpp - Restored original version
+
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
@@ -149,17 +151,47 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    // Clean up all subsystems
+    spikeSystem.reset();
+    stdp.reset();
+    hebbian.reset();
+    structuralPlasticity.reset();
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
+    // Clean up integrated systems
+    workingMemory.reset();
+    episodicMemory.reset();
+    associativeMemory.reset();
+    predictionSystem.reset();
+    planner.reset();
+    conceptFormation.reset();
+    attention.reset();
+    developmentSystem.reset();
+    
+    // Clean up neuromodulation systems
+    dopamine.reset();
+    curiosity.reset();
+    predictionError.reset();
+    novelty.reset();
+    
+    // Clean up checkpoint manager
+    checkpointManager.reset();
+    
+    // Clear neural vectors to prevent memory leaks
+    sensoryNeurons.clear();
+    motorNeurons.clear();
+    interRegionConnections.clear();
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    // Clean up sensory and motor neuron pointers to prevent memory leaks
+    if (pImpl) {
+        pImpl->sensoryNeurons.clear();
+        pImpl->motorNeurons.clear();
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -757,6 +789,10 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Clear sensory and motor neuron pointers to prevent memory leaks
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

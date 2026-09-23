@@ -88,68 +88,86 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
     // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
+    processVisionInput(percept.getVision());
     
     // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
+    processTouchInput(percept.getTouch());
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
+    processInternalSignalsInput(percept.getInternal());
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
+    processProprioceptionInput(percept.getProprioception());
     
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
+    computeNovelty(vision);
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        updateCuriosity();
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
+void AgentBrain::processVisionInput(const std::vector<float>& vision) {
+    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+        if (sensoryVision_[i]) {
+            float current = vision[i] * nlm::NeuralComputation::SENSORY_INPUT_SCALE_FACTOR;
+            sensoryVision_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processTouchInput(const std::vector<float>& touch) {
+    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+        if (sensoryTouch_[i]) {
+            float current = touch[i] * nlm::NeuralComputation::COLLISION_SIGNAL_SCALE_FACTOR;
+            sensoryTouch_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processInternalSignalsInput(const std::vector<float>& internal) {
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internal.size(); ++i) {
+        if (sensoryInternal_[i]) {
+            float current = (internal[i] * 2.0f - 1.0f) * nlm::NeuralComputation::SENSORY_INPUT_SCALE_FACTOR;
+            sensoryInternal_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::processProprioceptionInput(const std::vector<float>& proprioception) {
+    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprioception.size(); ++i) {
+        if (sensoryProprioception_[i]) {
+            float current = (proprioception[i] * 2.0f - 1.0f) * nlm::NeuralComputation::PROPRIOCEPTION_SCALE_FACTOR;
+            sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+}
+
+void AgentBrain::computeNovelty(const std::vector<float>& vision) {
+    if (vision.empty()) return;
+    
+    float totalDiff = 0.0f;
+    for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        float diff = std::abs(vision[i] - previousVision_[i]);
+        totalDiff += diff;
+    }
+    
+    // Normalize
+    noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+    
+    // Decay and update
+    noveltyLevel_ *= sensoryNoveltyDecay_;
+    
+    // Store for next time
+    previousVision_ = vision;
+}
+
+void AgentBrain::updateCuriosity() {
+    curiosityLevel_ = noveltyLevel_ * nlm::Neuromodulation::CURIOSITY_NOVELTY_WEIGHT + 
+                    std::abs(predictionError_) * nlm::Neuromodulation::PREDICTION_ERROR_CURIOUSITY_WEIGHT;
+    curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, nlm::Neuromodulation::CURIOSITY_MAX_LEVEL);
+}
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();

@@ -332,7 +332,7 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     for (const auto& e : effects) {
         totalConf += e.confidence;
     }
-    return totalConf / effects.size();
+    return totalConf / static_cast<float>(effects.size());
 }
 
 float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
