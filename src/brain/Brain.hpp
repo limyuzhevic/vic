@@ -6,6 +6,9 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <string>
 

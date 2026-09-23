@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "Synapse.hpp"
+#include "../core/Random/Random.hpp"
 #include <vector>
 #include <array>
 
