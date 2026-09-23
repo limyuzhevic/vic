@@ -71,7 +71,14 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                 std::to_string(sensoryProprioception_.size()) + " proprioceptive sensory neurons");
+    NLM_LOG_INFO("Motor groups: Forward=" + std::to_string(motorForward_.size()) +
+                " Backward=" + std::to_string(motorBackward_.size()) +
+                " TurnLeft=" + std::to_string(motorTurnLeft_.size()) +
+                " TurnRight=" + std::to_string(motorTurnRight_.size()) +
+                " Interact=" + std::to_string(motorInteract_.size()) +
+                " Wait=" + std::to_string(motorWait_.size()) + ")");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
