@@ -1,4 +1,5 @@
 #include "Brain.hpp"
+#include "../core/Types/Types.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"

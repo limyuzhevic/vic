@@ -1,9 +1,9 @@
 [build-system]
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
-
+ 
 [project]
-name = "pynlm"
+name = "nlm"
 version = "0.1.0"
 description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
 readme = "README.md"
@@ -26,14 +26,27 @@ classifiers = [
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-
-dependencies = []
+ 
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
 ]
+
+[project.urls]
+homepage = "https://github.com/nlm-project/nlm"
+documentation = "https://nlm.readthedocs.io"
+repository = "https://github.com/nlm-project/nlm.git"
+
+[project.scripts]
+nlm-cli = "pynlm.cli:main"
+
+[project.gui-scripts]
+nlm-gui = "pynlm.gui:main"
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
