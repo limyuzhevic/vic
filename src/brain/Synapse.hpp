@@ -71,7 +71,8 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // NOTE: Real synaptic dynamics with STDP implemented in step method
+    // step() provides backward compatibility and integrates with plasticity rules
     void step(Timestamp currentTime);
     
     // Reset to initial state

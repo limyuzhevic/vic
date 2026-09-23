@@ -42,7 +42,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (NEW - Using Python API)
 
 ```python
 import pynlm
@@ -69,6 +69,31 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Using the Command Line Interface (NEW)
+
+```bash
+# Install the CLI tool
+# (Make sure you're in the NLM project directory)
+
+# Run a simple simulation using the CLI
+./nlm-cli run --steps 100
+
+# Run a more complex simulation with custom config
+./nlm-cli run --config configs/default.cfg --steps 500 --neurons 2000
+
+# Save brain state
+./nlm-cli checkpoint save my_brain.bin
+
+# Display brain statistics
+./nlm-cli stats my_brain.bin
+
+# Run a specific experiment
+./nlm-cli experiment phase6 --steps 200
+
+# Show help information
+./nlm-cli help
 ```
 
 ---
@@ -133,7 +158,7 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Brain Stats (NEW)
 
 ```python
 # Just add these inside your loop:
@@ -143,7 +168,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (NEW)
 
 ```python
 # These are all optional:
@@ -221,7 +246,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (UPDATED)
 
 ```python
 import pynlm
@@ -271,6 +296,48 @@ print("Agent simulation complete!")
 
 ---
 
+## Command Line Interface (NEW)
+
+NLM now includes a powerful command-line interface to make common tasks easier:
+
+### Available Commands
+
+- **`./nlm-cli run`** - Run a simulation with custom options
+- **`./nlm-cli run-phase6`** - Run Phase 6 integration demo
+- **`./nlm-cli experiment <type> <steps>`** - Run specific experiments (phase2/phase3/phase4/phase5/phase6)
+- **`./nlm-cli checkpoint <save|load> <file>`** - Save or load brain state
+- **`./nlm-cli stats <file>`** - Display brain statistics
+- **`./nlm-cli help`** - Show detailed help information
+
+### Command Line Examples
+
+```bash
+# Run a simple 100-step simulation
+./nlm-cli run --steps 100
+
+# Run a simulation with custom configuration
+./nlm-cli run --config configs/default.cfg --steps 500
+
+# Save brain state to a file
+./nlm-cli checkpoint save my_brain_state.bin
+
+# Load a saved brain state
+./nlm-cli checkpoint load my_brain_state.bin
+
+# Display statistics about a saved brain
+./nlm-cli stats my_brain_state.bin
+
+# Run a complete Phase 6 integration experiment
+./nlm-cli experiment phase6 --steps 200
+
+# Get help with any command
+./nlm-cli help
+```
+
+The CLI tool provides a convenient way to interact with NLM without writing Python code, making it perfect for quick testing, running demos, and automation scripts.
+
+---
+
 ## Troubleshooting
 
 **"My brain isn't doing anything"**
@@ -290,8 +357,11 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+
+1. Read `HOW_TO_USE.md` for more detailed information about building and installing
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the new CLI tools for faster interaction
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with both Python API and command-line interface.
+

@@ -228,3 +228,49 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## New in Phase 6: Command Line Interface (CLI)
+
+NLM now includes a powerful command-line interface to make common tasks easier:
+
+### Installation
+
+After building the project, the CLI tool will be available:
+
+```bash
+# Make the CLI tool executable
+chmod +x nlm-cli
+
+# Show help
+./nlm-cli --help
+```
+
+### Quick Start with CLI
+
+```bash
+# Run a simple simulation
+./nlm-cli run --steps 100
+
+# Run Phase 6 integration experiment
+./nlm-cli experiment phase6 --steps 200
+
+# Save/load brain state
+./nlm-cli checkpoint save my_brain.bin
+./nlm-cli checkpoint load my_brain.bin
+
+# Get brain statistics
+./nlm-cli stats my_brain.bin
+```
+
+### Key Commands
+
+| Command | Description |
+|---------|-------------|
+| `nlm-cli run` | Run a simulation with custom options |
+| `nlm-cli experiment phase6` | Run Phase 6 integration demo |
+| `nlm-cli checkpoint save <file>` | Save brain state |
+| `nlm-cli checkpoint load <file>` | Load brain state |
+| `nlm-cli stats <file>` | Display brain statistics |
+
+The CLI tool provides an alternative to the Python API for users who prefer command-line interfaces or need to automate NLM workflows.
+
