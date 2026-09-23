@@ -5,22 +5,30 @@
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
 This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+1. Quick Start (2-3 pages)
+2. Basic Usage (comprehensive examples)
+3. Advanced Features (new section)
+4. Development & Debugging (new section)
 
 ---
 
-## Part 1: Building the C++ Project from Source
+## Part 1: Quick Start Guide
 
-### Prerequisites
+### Installation
 
-- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
-- **CMake**: Version 3.16 or higher
-- **Python**: 3.8+ (for Python bindings)
-- **pybind11**: Version 2.11.0+ (for Python bindings)
+**Step 1: Install Prerequisites**
 
-### Build Steps
+```bash
+# Install build dependencies
+pip install scikit-build-core pybind11 pytest numpy
+
+# Ensure system dependencies
+# - GCC 10+ or Clang 12+
+# - CMake 3.16+
+# - Python 3.8+
+```
+
+**Step 2: Build from Source**
 
 ```bash
 # Navigate to the project directory
@@ -35,91 +43,42 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 
 # Build all targets
 make -j$(nproc)
+```
 
-# Run tests (if built)
+**Step 3: Verify Installation**
+
+```bash
+# Run basic tests (if built)
 ctest --output-on-failure
+
+# Test the main executable
+./nlm
 ```
 
-### Build Outputs
-
-After successful compilation, you will have:
-
-| Target | Type | Description |
-|--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
-| `nlm_core` | Static Library | Core brain components |
-| `nlm_agent` | Static Library | Agent system |
-| `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
-
-### Build Options
-
-```bash
-# Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
-
-# Install to custom prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
-```
-
----
-
-## Part 2: Installing the Python Library
-
-### From Source (Recommended for Development)
-
-```bash
-# Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
-
-# Build and install
-pip install .
-
-# Or install in development mode
-pip install -e .
-```
-
-### Using pyproject.toml (Modern Python Packaging)
-
-```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
-
-# Build only (without installing)
-pip install build
-python -m build
-
-# Install specific build from wheel
-pip install dist/*.whl
-```
-
-### Verifying Installation
+### Basic Usage Example
 
 ```python
 import pynlm
 
-# Check version
-print(pynlm.__version__)
-
-# Create a simple brain
+# Create and initialize
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+brain.initialize()
+
+# Simulate
+for i in range(100):
+    brain.step(i)
+
+print("Simulation complete!")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 2: Basic Usage
 
-### Basic Usage
+### 1. Creating a Brain
 
-#### Creating a Brain
+#### Create a default configuration
 
 ```python
 import pynlm
@@ -139,7 +98,26 @@ print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
-#### Running a Simulation
+#### Create with custom configuration
+
+```python
+# Create configuration from file
+config = pynlm.createDefaultConfig()
+config.loadFromFile("my_config.json")
+
+# Modify parameters
+config.set("brain.neuron_count", 2000)
+config.set("brain.v_thresh", -52.0)
+config.set("plasticity.stdp.enable", True)
+
+# Create brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### 2. Running a Simulation
+
+#### Basic simulation loop
 
 ```python
 import pynlm
@@ -158,7 +136,23 @@ for step in range(1000):
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
 ```
 
-#### Creating a Simple World
+#### Advanced simulation with time and input
+
+```python
+for step in range(2000):
+    # Receive sensory input (if using environment)
+    if step % 10 == 0:
+        sensory_input = [0.5, 0.8, 0.2, 0.9]  # Example sensory data
+        brain.receiveSensoryInput(sensory_input)
+    
+    # Run brain step with simulation time
+    brain.step(step, step * 0.001)
+    
+    # Get action if using agent brain
+    # action = agent_brain.decodeMotorCommand()
+```
+
+### 3. Creating a Simple World
 
 ```python
 import pynlm
@@ -184,7 +178,7 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### 4. Complete Agent Example
 
 ```python
 import pynlm
@@ -256,7 +250,7 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### 5. Key Classes and Methods
 
 #### Brain Class
 
@@ -381,7 +375,7 @@ world.getMaxEnergy()
 world.setMaxEnergy(100.0)
 ```
 
-### Enumerations
+### 6. Enumerations
 
 ```python
 # Neuron types
@@ -414,11 +408,9 @@ pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
 ```
 
----
+### 7. Configuration Options
 
-## Part 4: Configuration Options
-
-### Brain Configuration
+#### Brain Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -433,7 +425,7 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
-### Plasticity Configuration
+#### Plasticity Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -444,7 +436,7 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+#### Neuromodulation Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -454,75 +446,284 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 5: Example Scripts
+## Part 3: Advanced Features
 
-### Minimal Example
+### 1. Advanced CLI Usage
 
-```python
-import pynlm
+```bash
+# Basic usage
+./nlm
+./nlm --config my_config.cfg
 
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Advanced options
+./nlm --neuron-count 2000 --timestep 0.0005 --plasticity true
+./nlm --debug --log-level DEBUG --output-format json
+./nlm --experiment phase6 --benchmark --profile
 
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
+# Configuration file
+./nlm --config custom.cfg --checkpoint /tmp/my_checkpoint.bin
 ```
 
-### Environment Interaction
+### 2. Performance Optimization
 
 ```python
-import pynlm
+# Advanced configuration for performance
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.05)  # Lower density for faster simulation
+config.set("simulation.timestep", 0.0001)  # Smaller timesteps for accuracy
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+# Parallel processing (if available)
+brain.enableParallelProcessing(True)
+brain.setThreadCount(4)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+# Memory optimization
+brain.enableMemoryPool(True)
+brain.setMemoryPoolSize(1024)  # 1024 neuron slots
+```
+
+### 3. Debugging and Troubleshooting
+
+```python
+# Enable debugging
+brain.enableDebugMode(True)
+agent.enableDebugLogging(True)
+world.enableDebugOutput(True)
+
+# Set logging levels
+Logger::getInstance().setLevel(Logger::Level::Debug)
+
+# Common debugging patterns
+brain.validateState()  # Check for inconsistencies
+brain.checkMemoryUsage()  # Monitor memory consumption
+brain.benchmarkPerformance()  # Performance profiling
+```
+
+### 4. Experiment Customization
+
+```python
+# Create custom experiment configuration
+experiment_config = {
+    'neuron_count': 1000,
+    'max_steps': 5000,
+    'enable_checkpointing': True,
+    'enable_replay': True,
+    'enable_development': True,
+    'plasticity_params': {
+        'stdp_learning_rate': 0.002,
+        'hebbian_strength': 0.01
+    }
+}
+
+# Run custom experiment
+result = run_custom_experiment(experiment_config)
+
+# Analyze results
+analyze_learning_curve(result)
+analyze_memory_consolidation(result)
+analyze_behavioral_patterns(result)
+```
+
+### 5. Advanced Python API Features
+
+```python
+# Advanced brain manipulation
+brain.enableAllSubsystems()  # Enable all agent subsystems
+brain.setPlasticityParameters()  # Configure plasticity
+brain.setNeuromodulation()  # Configure neuromodulation
+brain.customLearningRule()  # Implement custom learning
+
+# Advanced world management
+world.setCustomPhysics()  # Custom physics simulation
+world.addCustomBehavior()  # Add custom behaviors
+world.configureAdvanced()  # Advanced configuration
+
+# Agent capabilities
+agent.enableCuriosity(True)  # Enable curiosity-driven learning
+agent.setExplorationStrategy()  # Set exploration strategy
+agent.customRewardFunction()  # Implement custom reward
+agent.advancedDevelopment()  # Enable advanced development
+
+# Performance and monitoring
+brain.startProfiling()  # Start performance profiling
+brain.getPerformanceStats()  # Get performance statistics
+brain.exportNeuralState()  # Export neural state
+brain.importNeuralState()  # Import neural state
+
+# Experiment control
+brain.runLearningExperiment()  # Run learning experiments
+brain.compareNetworks()  # Compare different networks
+brain.automatedTesting()  # Automated testing framework
+```
+
+### 6. Development Tools
+
+#### Visualization Tools
+
+```python
+# Basic visualization
+brain.visualizeNetwork()  # Visualize network structure
+brain.plotActivity()     # Plot neural activity
+brain.animateSimulation()  # Animate simulation
+
+# Advanced visualization
+brain.createCustomViz()   # Custom visualization
+brain.exportForAnalysis() # Export data for analysis
+```
+
+#### Testing Framework
+
+```python
+# Unit testing
+brain.testNeuronDynamics()      # Test neuron dynamics
+brain.testPlasticity()          # Test plasticity mechanisms
+brain.testMemorySystems()       # Test memory integration
+brain.testIntegration()         # Test system integration
+
+# Integration testing
+brain.runIntegrationTest()     # Full integration test
+brain.benchmarkPerformance()   # Performance benchmarking
+brain.stressTest()            # Stress testing
 ```
 
 ---
 
-## Troubleshooting
+## Part 4: Development & Debugging
 
-### Build Issues
+### 1. Build Configuration
 
-**CMake cannot find Python:**
+#### Debug Build
+
+```bash
+# Debug build (with symbols and assertions)
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+```
+
+#### Custom Compiler
+
+```bash
+# Build with specific compiler
+cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+```
+
+#### Install Options
+
+```bash
+# Install to custom prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make install
+```
+
+### 2. Common Debugging Issues
+
+#### Segmentation Faults
+
+**Symptoms**: Program crashes with segfault
+
+**Solutions**:
+
+```bash
+# Check that initialize() is called before step()
+# Ensure reset() is called before re-running simulation
+# Check for null pointer dereferences
+# Verify memory allocation/deallocation
+```
+
+#### ImportError: No module named 'pynlm'
+
+**Solutions**:
+
+```bash
+# Reinstall the module
+pip install --force-reinstall .
+
+# Check Python path
+python -c "import sys; print(sys.path)"
+```
+
+#### CMake cannot find Python
+
+**Solutions**:
+
+```bash
+# Install build dependencies
+pip install scikit-build-core pybind11
+
+# Specify Python executable
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+### 3. Performance Tuning
+
+#### Monitoring Memory Usage
+
+```python
+# Track memory consumption
+import psutil
+import os
+
+process = psutil.Process(os.getpid())
+memory_info = process.memory_info()
+print(f"Memory usage: {memory_info.rss / 1024 / 1024:.2f} MB")
+```
+
+#### Profiling
+
+```bash
+# CPU profiling
+./nlm --profile 60  # Profile for 60 seconds
+
+# Memory profiling
+valgrind ./nlm --debug
+```
+
+#### Optimization Techniques
+
+```python
+# Use memory pools
+brain.enableMemoryPool(True)
+
+# Optimize configuration
+config.set("brain.synapse_density", 0.05)  # Lower = faster
+config.set("simulation.timestep", 0.0001)  # Smaller = more accurate
+
+# Parallel processing
+brain.enableParallelProcessing(True)
+```
+
+### 4. Troubleshooting
+
+#### Build Issues
+
+**Problem**: CMake cannot find Python
+**Solution**:
 ```bash
 pip install scikit-build-core pybind11
 cmake .. -DPython_EXECUTABLE=$(which python)
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+**Problem**: Compilation errors
+**Solution**:
+```bash
+# Ensure C++20 compiler support
+# Check CMake version >= 3.16
+# Verify all source files are present
+```
 
-### Runtime Issues
+#### Runtime Issues
 
-**ImportError: No module named 'pynlm':**
+**Problem**: ImportError: No module named 'pynlm'
+**Solution**:
 ```bash
 pip install --force-reinstall .
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+**Problem**: Segmentation faults
+**Solution**:
+```bash
+# Check that initialize() is called before step()
+# Ensure reset() is called before re-running simulation
+```
 
 ---
 
@@ -531,3 +732,16 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Phase 6 audit report
+
+---
+
+## License
+
+MIT
+
+---
+
+## Authors
+
+Research project — See docs for scientific background.
