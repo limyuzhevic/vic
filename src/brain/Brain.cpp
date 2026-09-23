@@ -1,24 +1,8 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/RewardModulatedSTDP.hpp"
+#include "../plasticity/TripletSTDP.hpp"
 
 namespace nlm {
 
@@ -55,6 +39,10 @@ struct Brain::Impl {
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Advanced plasticity rules
+    std::unique_ptr<RewardModulatedSTDP> rewardModulatedSTDP;
+    std::unique_ptr<TripletSTDP> tripletSTDP;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -106,6 +94,10 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
+        // Initialize advanced plasticity rules
+        rewardModulatedSTDP = std::make_unique<RewardModulatedSTDP>();
+        tripletSTDP = std::make_unique<TripletSTDP>();
+        
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
@@ -136,11 +128,33 @@ struct Brain::Impl {
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+// Configure structural plasticity
+        float synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+        float pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
+        
+        // Configure reward-modulated STDP
+        float rLtpWeight = pImpl->config->getOr<float>("stdp_r_ltp_weight", 0.01f);
+        float rLtdWeight = pImpl->config->getOr<float>("stdp_r_ltd_weight", 0.012f);
+        float rTimeConstant = pImpl->config->getOr<float>("stdp_r_tau", 20.0f);
+        float rEligibilityDecay = pImpl->config->getOr<float>("stdp_r_eligibility_decay", 0.01f);
+        float rRewardScale = pImpl->config->getOr<float>("stdp_r_reward_scale", 1.0f);
+        if (pImpl->rewardModulatedSTDP) {
+            pImpl->rewardModulatedSTDP->configure(rLtpWeight, rLtdWeight, rTimeConstant);
+            pImpl->rewardModulatedSTDP->setEligibilityDecay(rEligibilityDecay);
+            pImpl->rewardModulatedSTDP->setRewardScale(rRewardScale);
+        }
+        
+        // Configure triplet STDP
+        float tA1 = pImpl->config->getOr<float>("stdp_t_a1", 0.01f);
+        float tA2 = pImpl->config->getOr<float>("stdp_t_a2", 0.01f);
+        float tA3 = pImpl->config->getOr<float>("stdp_t_a3", 0.01f);
+        float tTau1 = pImpl->config->getOr<float>("stdp_t_tau1", 20.0f);
+        float tTau2 = pImpl->config->getOr<float>("stdp_t_tau2", 200.0f);
+        if (pImpl->tripletSTDP) {
+            pImpl->tripletSTDP->configure(tA1, tA2, tA3, tTau1, tTau2);
+        }
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -1075,6 +1089,15 @@ std::shared_ptr<const Config> Brain::getConfig() const {
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+// Get advanced plasticity rules
+RewardModulatedSTDP* Brain::getRewardModulatedSTDP() {
+    return pImpl->rewardModulatedSTDP.get();
+}
+
+TripletSTDP* Brain::getTripletSTDP() {
+    return pImpl->tripletSTDP.get();
 }
 
 void Brain::logStatus() const {

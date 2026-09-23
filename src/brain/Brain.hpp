@@ -1,11 +1,11 @@
-#pragma once
-
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/RewardModulatedSTDP.hpp"
+#include "../plasticity/TripletSTDP.hpp"
 #include <memory>
 #include <string>
 
@@ -189,6 +189,10 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Get advanced plasticity rules
+    RewardModulatedSTDP* getRewardModulatedSTDP();
+    TripletSTDP* getTripletSTDP();
     
     // Logging
     void logStatus() const;
