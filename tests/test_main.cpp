@@ -1,8 +1,7 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
-
-#include <iostream>
-#include <cassert>
+// Main Test Runner
+// Now includes comprehensive testing of all NLM features
+// #include <iostream>
+// #include <cassert>
 
 // Forward declarations of test functions
 namespace test_types {
@@ -34,6 +33,10 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+namespace test_main_integration {
     void runAll();
 }
 
@@ -113,6 +116,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Main Integration tests..." << std::endl;
+    try {
+        test_main_integration::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

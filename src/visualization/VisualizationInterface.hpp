@@ -3,11 +3,16 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <mutex>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// Real-time console visualization for NLM debugging and analysis
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -19,7 +24,7 @@ public:
     // Update visualization data
     void update();
     
-    // Render current state
+    // Render current state to console
     void render();
     
     // Close visualization
@@ -32,6 +37,13 @@ public:
     void setUpdateRate(double hz);
     double getUpdateRate() const;
     
+    // Enable/disable different visualization modes
+    void enableNetworkVisualization(bool enable);
+    void enableActivityVisualization(bool enable);
+    void enableSpikeVisualization(bool enable);
+    void enableWeightVisualization(bool enable);
+    void enableStatisticsVisualization(bool enable);
+    
     // Network visualization
     void visualizeNetwork(const class Brain& brain);
     
@@ -43,6 +55,21 @@ public:
     
     // Weight matrix visualization
     void visualizeWeights(const class Brain& brain);
+    
+    // Statistical visualization
+    void visualizeStatistics(const class Brain& brain, double timestep);
+    
+    // Progress tracking
+    void setProgress(const std::string& phase, double progress);
+    
+    // Set color theme
+    void setColorTheme(const std::string& theme);
+    
+    // Clear screen
+    static void clearScreen();
+    
+    // Get formatted timestamp
+    static std::string getTimestamp();
     
 private:
     struct Impl;

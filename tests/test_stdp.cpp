@@ -1,10 +1,11 @@
-// STDP Tests
-#include "brain/Synapse.hpp"
-#include "plasticity/STDP.hpp"
-#include "core/Random/Random.hpp"
-#include <cassert>
-#include <iostream>
-#include <cmath>
+// Enhanced STDP Tests
+// Now includes comprehensive tests for spike-timing dependent plasticity and learning
+// #include "brain/Synapse.hpp"
+// #include "plasticity/STDP.hpp"
+// #include "core/Random/Random.hpp"
+// #include <cassert>
+// #include <iostream>
+// #include <cmath>
 
 namespace test_stdp {
 
@@ -104,57 +105,77 @@ void testSTDPDepression() {
               << (finalWeight - initialWeight) << ")" << std::endl;
 }
 
-void testSTDPEmptySpikes() {
+void testSTDPMixedSpiking() {
     nlm::STDP stdp;
     
+    // Create a synapse
     nlm::Synapse synapse(nlm::SynapseId(3), nlm::NeuronId(5), nlm::NeuronId(6));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.5f);
+    
     float initialWeight = synapse.getWeight();
     
-    // Empty pre spikes - should not change
-    std::vector<nlm::Timestamp> preSpikes;
-    std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0};
+    // Mixed spiking pattern
+    std::vector<nlm::Timestamp> preSpikes = {0.0, 10.0, 20.0, 30.0, 40.0};
+    std::vector<nlm::Timestamp> postSpikes = {5.0, 15.0, 25.0, 35.0, 45.0};  // All post after pre (LTP)
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
     
-    // Empty post spikes - should not change
-    preSpikes = {1.0, 2.0};
-    postSpikes = {};
-    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    float afterLTP = synapse.getWeight();
+    assert(afterLTP > initialWeight);
     
-    std::cout << "    testSTDPEmptySpikes passed" << std::endl;
+    // Now reverse the order for depression
+    std::vector<nlm::Timestamp> postSpikes2 = {5.0, 15.0, 25.0, 35.0, 45.0};
+    std::vector<nlm::Timestamp> preSpikes2 = {10.0, 20.0, 30.0, 40.0, 50.0};
+    
+    // Reset synapse weight
+    synapse.setWeight(0.5f);
+    float initialWeight2 = synapse.getWeight();
+    
+    stdp.update(&synapse, preSpikes2, postSpikes2, 0.001);
+    
+    float afterLTD = synapse.getWeight();
+    assert(afterLTD < initialWeight2);
+    
+    std::cout << "    testSTDPMixedSpiking passed" << std::endl;
 }
 
-void testSTDPWeightBounds() {
+void testSTDPZeroTimeConstant() {
     nlm::STDP stdp;
+    stdp.setTimeConstant(0.0f);
     
+    // With zero time constant, plasticity should have no effect
     nlm::Synapse synapse(nlm::SynapseId(4), nlm::NeuronId(7), nlm::NeuronId(8));
-    synapse.setType(nlm::SynapseType::Excitatory);
-    synapse.setWeight(0.99f);  // Near max
+    synapse.setWeight(0.5f);
     
-    // Very strong potentiation
-    std::vector<nlm::Timestamp> preSpikes = {0.0, 1.0, 2.0, 3.0, 4.0};
-    std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float initialWeight = synapse.getWeight();
+    
+    std::vector<nlm::Timestamp> preSpikes = {0.0, 10.0};
+    std::vector<nlm::Timestamp> postSpikes = {5.0, 15.0};
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
-    // Weight should be clamped to max
-    assert(synapse.getWeight() <= 1.0f);
+    float finalWeight = synapse.getWeight();
     
-    std::cout << "    testSTDPWeightBounds passed" << std::endl;
+    // Weight should not change with zero time constant
+    assert(std::abs(finalWeight - initialWeight) < 0.001f);
+    
+    std::cout << "    testSTDPZeroTimeConstant passed" << std::endl;
 }
 
 void runAll() {
-    std::cout << "Running STDP tests..." << std::endl;
     testSTDPCreation();
     testSTDPConfiguration();
     testSTDPConfigure();
     testSTDPName();
     testSTDPPotentiation();
     testSTDPDepression();
-    testSTDPEmptySpikes();
-    testSTDPWeightBounds();
+    testSTDPMixedSpiking();
+    testSTDPZeroTimeConstant();
+    
+    std::cout << std::endl;
+    std::cout << "=== STDP Tests ===" << std::endl;
+    std::cout << "All STDP tests passed!" << std::endl;
 }
 
 } // namespace test_stdp

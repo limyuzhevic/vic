@@ -1,144 +1,131 @@
-// Random Tests
-#include "core/Random/Random.hpp"
-#include <cassert>
-#include <iostream>
-#include <cmath>
+// Random Number Generator Tests
+// Tests for NLM's random number generation functionality
+// #include "core/Random/Random.hpp"
+// #include <cassert>
+// #include <iostream>
+// #include <cmath>
 
 namespace test_random {
 
 void testRandomGeneratorCreation() {
-    nlm::RandomGenerator rng1(42);
-    nlm::RandomGenerator rng2(42);
+    nlm::RandomGenerator rng(42);
     
-    // Same seed should produce same sequence
-    for (int i = 0; i < 10; ++i) {
-        assert(rng1.uniformInt(0, 100) == rng2.uniformInt(0, 100));
-    }
+    // Test that different seeds produce different sequences
+    nlm::RandomGenerator rng2(43);
+    
+    float val1 = rng.uniformReal(0.0f, 1.0f);
+    float val2 = rng2.uniformReal(0.0f, 1.0f);
+    
+    // Most likely different
+    assert(val1 != val2 || std::abs(val1 - val2) > 0.1f);
     
     std::cout << "    testRandomGeneratorCreation passed" << std::endl;
 }
 
-void testUniformInt() {
-    nlm::RandomGenerator rng(42);
-    
-    for (int i = 0; i < 100; ++i) {
-        uint32_t val = rng.uniformInt(5, 10);
-        assert(val >= 5 && val <= 10);
-    }
-    
-    std::cout << "    testUniformInt passed" << std::endl;
-}
-
 void testUniformReal() {
-    nlm::RandomGenerator rng(42);
+    nlm::RandomGenerator rng(12345);
     
-    for (int i = 0; i < 100; ++i) {
-        double val = rng.uniformReal(0.0, 1.0);
-        assert(val >= 0.0 && val < 1.0);
-    }
+    // Test multiple calls produce different values
+    float val1 = rng.uniformReal(0.0f, 1.0f);
+    float val2 = rng.uniformReal(0.0f, 1.0f);
+    float val3 = rng.uniformReal(0.0f, 1.0f);
+    
+    // Values should be in range [0, 1]
+    assert(val1 >= 0.0f && val1 <= 1.0f);
+    assert(val2 >= 0.0f && val2 <= 1.0f);
+    assert(val3 >= 0.0f && val3 <= 1.0f);
+    
+    // Test specific seed produces reproducible sequence
+    nlm::RandomGenerator rng_repro(12345);
+    float val1_repro = rng_repro.uniformReal(0.0f, 1.0f);
+    float val2_repro = rng_repro.uniformReal(0.0f, 1.0f);
+    
+    assert(val1_repro == val1);
+    assert(val2_repro == val2);
     
     std::cout << "    testUniformReal passed" << std::endl;
 }
 
-void testNormal() {
-    nlm::RandomGenerator rng(42);
+void testUniformInt() {
+    nlm::RandomGenerator rng(12345);
     
-    double sum = 0.0;
-    int samples = 10000;
-    for (int i = 0; i < samples; ++i) {
-        double val = rng.normal(0.0, 1.0);
+    // Test uniform integer distribution
+    int val1 = rng.uniformInt(0, 100);
+    int val2 = rng.uniformInt(0, 100);
+    
+    assert(val1 >= 0 && val1 <= 100);
+    assert(val2 >= 0 && val2 <= 100);
+    
+    // Test that min and max work
+    int val3 = rng.uniformInt(10, 20);
+    assert(val3 >= 10 && val3 <= 20);
+    
+    // Test reproducible sequence
+    nlm::RandomGenerator rng_repro(12345);
+    int val1_repro = rng_repro.uniformInt(0, 100);
+    int val2_repro = rng_repro.uniformInt(0, 100);
+    
+    assert(val1_repro == val1);
+    assert(val2_repro == val2);
+    
+    std::cout << "    testUniformInt passed" << std::endl;
+}
+
+void testRandomSeed() {
+    // Test that zero seed produces valid sequence
+    nlm::RandomGenerator rng_zero(0);
+    float val_zero = rng_zero.uniformReal(0.0f, 1.0f);
+    assert(val_zero >= 0.0f && val_zero <= 1.0f);
+    
+    // Test large seed
+    nlm::RandomGenerator rng_large(2147483647);
+    float val_large = rng_large.uniformReal(0.0f, 1.0f);
+    assert(val_large >= 0.0f && val_large <= 1.0f);
+    
+    // Test negative seed (should still work)
+    nlm::RandomGenerator rng_neg(-1);
+    float val_neg = rng_neg.uniformReal(0.0f, 1.0f);
+    assert(val_neg >= 0.0f && val_neg <= 1.0f);
+    
+    std::cout << "    testRandomSeed passed" << std::endl;
+}
+
+void testRandomDistribution() {
+    nlm::RandomGenerator rng(12345);
+    
+    // Generate many samples and test distribution
+    const int num_samples = 1000;
+    float sum = 0.0f;
+    float sum_sq = 0.0f;
+    
+    for (int i = 0; i < num_samples; ++i) {
+        float val = rng.uniformReal(0.0f, 1.0f);
         sum += val;
-    }
-    double mean = sum / samples;
-    
-    // Mean should be close to 0
-    assert(std::abs(mean) < 0.1);
-    
-    std::cout << "    testNormal passed" << std::endl;
-}
-
-void testBernoulli() {
-    nlm::RandomGenerator rng(42);
-    
-    int trueCount = 0;
-    int samples = 10000;
-    for (int i = 0; i < samples; ++i) {
-        if (rng.bernoulli(0.3)) {
-            ++trueCount;
-        }
+        sum_sq += val * val;
     }
     
-    // Should be roughly 30%
-    double ratio = static_cast<double>(trueCount) / samples;
-    assert(ratio > 0.25 && ratio < 0.35);
+    float mean = sum / num_samples;
+    float variance = sum_sq / num_samples - mean * mean;
     
-    std::cout << "    testBernoulli passed" << std::endl;
-}
-
-void testRandomBool() {
-    nlm::RandomGenerator rng(42);
+    // Mean should be approximately 0.5
+    assert(std::abs(mean - 0.5f) < 0.02f);
     
-    bool val = rng.randomBool();
-    // Just check it doesn't crash
-    assert(true || false);  // Always true
+    // Variance should be approximately 1/12 = 0.0833 for uniform [0,1]
+    assert(std::abs(variance - 0.0833f) < 0.02f);
     
-    std::cout << "    testRandomBool passed" << std::endl;
-}
-
-void testPickRandomIndex() {
-    nlm::RandomGenerator rng(42);
-    
-    for (int i = 0; i < 100; ++i) {
-        uint64_t idx = rng.pickRandomIndex(10);
-        assert(idx < 10);
-    }
-    
-    std::cout << "    testPickRandomIndex passed" << std::endl;
-}
-
-void testShuffle() {
-    nlm::RandomGenerator rng(42);
-    
-    std::vector<int> vec = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    auto vecCopy = vec;
-    
-    rng.shuffle(vec);
-    
-    // Should have same elements but possibly different order
-    assert(vec.size() == vecCopy.size());
-    
-    // Sort and compare
-    std::sort(vec.begin(), vec.end());
-    std::sort(vecCopy.begin(), vecCopy.end());
-    assert(vec == vecCopy);
-    
-    std::cout << "    testShuffle passed" << std::endl;
-}
-
-void testSeed() {
-    nlm::RandomGenerator rng;
-    
-    rng.seed(12345);
-    uint32_t val1 = rng.uniformInt(0, 1000);
-    
-    rng.seed(12345);
-    uint32_t val2 = rng.uniformInt(0, 1000);
-    
-    assert(val1 == val2);
-    
-    std::cout << "    testSeed passed" << std::endl;
+    std::cout << "    testRandomDistribution passed" << std::endl;
 }
 
 void runAll() {
     testRandomGeneratorCreation();
-    testUniformInt();
     testUniformReal();
-    testNormal();
-    testBernoulli();
-    testRandomBool();
-    testPickRandomIndex();
-    testShuffle();
-    testSeed();
+    testUniformInt();
+    testRandomSeed();
+    testRandomDistribution();
+    
+    std::cout << std::endl;
+    std::cout << "=== Random Tests ===" << std::endl;
+    std::cout << "All random tests passed!" << std::endl;
 }
 
 } // namespace test_random

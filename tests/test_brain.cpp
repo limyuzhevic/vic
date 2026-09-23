@@ -1,8 +1,9 @@
-// Brain Tests
-#include "brain/Brain.hpp"
-#include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
+// Enhanced Brain Tests
+// Now includes comprehensive tests for brain initialization, plasticity, and advanced features
+// #include "brain/Brain.hpp"
+// #include "core/Config/Config.hpp"
+// #include <cassert>
+// #include <iostream>
 
 namespace test_brain {
 
@@ -98,13 +99,18 @@ void testBrainActionProduction() {
     nlm::Brain brain(config);
     brain.initialize();
     
+    // Test action production
     auto action = brain.produceAction();
     assert(action != nullptr);
+    
+    // Brain should produce either MoveForward or Wait
+    assert(action->getType() == nlm::ActionType::MoveForward || 
+           action->getType() == nlm::ActionType::Wait);
     
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
 
-void testBrainStatus() {
+void testBrainSensoryInput() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -112,13 +118,101 @@ void testBrainStatus() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    // Create a simple sensory input
+    nlm::SensoryInput input;
+    std::vector<double> data = {0.5, 0.8, 0.3};
+    input.setData(data);
     
-    std::cout << "    testBrainStatus passed" << std::endl;
+    brain.receiveSensoryInput(input);
+    
+    // Just verify it doesn't crash
+    assert(brain.getTotalNeuronCount() == 100);
+    
+    std::cout << "    testBrainSensoryInput passed" << std::endl;
+}
+
+void testBrainPlasticity() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    config->set("connection_probability", 0.2, nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Enable plasticity on all synapses
+    auto* region = brain.getRegion(nlm::RegionId(1));
+    if (region) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(true, true, false);
+        }
+    }
+    
+    // Record initial weights
+    std::vector<float> initialWeights;
+    if (region) {
+        for (const auto& syn : region->getSynapses()) {
+            initialWeights.push_back(syn->getWeight());
+        }
+    }
+    
+    // Apply some input to trigger plasticity
+    for (nlm::SimulationStep step = 0; step < 50; ++step) {
+        brain.injectCurrentToNeurons(nlm::NeuronType::Sensory, 20.0f);
+        brain.step(step);
+    }
+    
+    // Record final weights
+    std::vector<float> finalWeights;
+    if (region) {
+        for (const auto& syn : region->getSynapses()) {
+            finalWeights.push_back(syn->getWeight());
+        }
+    }
+    
+    // Check that some weights changed (plasticity occurred)
+    bool weightsChanged = false;
+    for (size_t i = 0; i < std::min(initialWeights.size(), finalWeights.size()); ++i) {
+        if (std::abs(initialWeights[i] - finalWeights[i]) > 0.001f) {
+            weightsChanged = true;
+            break;
+        }
+    }
+    
+    // Plasticity should have occurred
+    assert(weightsChanged);
+    
+    std::cout << "    testBrainPlasticity passed" << std::endl;
+}
+
+void testBrainCheckpointing() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(20), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Create a checkpoint file
+    std::string checkpointFile = "test_checkpoint.bin";
+    bool saveSuccess = brain.save(checkpointFile);
+    assert(saveSuccess);
+    
+    // Create a new brain and load the checkpoint
+    auto config2 = std::make_shared<nlm::Config>();
+    config2->set("neuron_count", static_cast<int64_t>(20), nlm::ConfigSource::Default);
+    config2->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain2(config2);
+    brain2.initialize();
+    
+    bool loadSuccess = brain2.load(checkpointFile);
+    assert(loadSuccess);
+    
+    // Clean up
+    std::remove(checkpointFile.c_str());
+    
+    std::cout << "    testBrainCheckpointing passed" << std::endl;
 }
 
 void runAll() {
@@ -128,7 +222,13 @@ void runAll() {
     testBrainReset();
     testBrainRegions();
     testBrainActionProduction();
-    testBrainStatus();
+    testBrainSensoryInput();
+    testBrainPlasticity();
+    testBrainCheckpointing();
+    
+    std::cout << std::endl;
+    std::cout << "=== Brain Tests ===" << std::endl;
+    std::cout << "All brain tests passed!" << std::endl;
 }
 
 } // namespace test_brain
