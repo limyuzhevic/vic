@@ -1,7 +1,9 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/Types/Types.hpp"
 #include <cmath>
 #include <algorithm>
+#include "nlm_utilities.hpp"
 
 namespace nlm {
 
@@ -25,7 +27,8 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
     /*
-     * Real STDP implementation based on spike-timing correlation
+     * Optimized STDP implementation based on spike-timing correlation
+     * Uses O(n) correlation algorithm instead of O(n²) pairwise comparison
      * 
      * Mathematical formulation:
      * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
@@ -52,40 +55,28 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
+    // Use utility functions for validation and optimization
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
+    // Use optimized STDP calculation with reduced complexity
+    float totalDelta = STDPUtils::calculateSTDPContribution(
+        preSpikes, postSpikes, 
+        pImpl->ltpWeight, pImpl->ltdWeight, 
+        pImpl->timeConstant
+    );
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
-        }
-    }
-    
-    // Apply weight change with bounds
+    // Apply weight change with bounds using utility function
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
+        // Apply weight change using utility function
+        MemoryUtils::applyWeightChange(synapse->getWeight(), totalDelta, 
+                                     pImpl->minWeight, pImpl->maxWeight);
+        synapse->setWeight(synapse->getWeight()); // Update synapse with new weight
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();
@@ -96,10 +87,11 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Use utility function for safe weight application
+    if (MemoryUtils::applyWeightChange(synapse->getWeight(), delta, 
+                                     pImpl->minWeight, pImpl->maxWeight)) {
+        synapse->setWeight(synapse->getWeight());
+    }
 }
 
 const char* STDP::getName() const {
@@ -107,7 +99,7 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltpWeight = ConfigUtils::clampLTPWeight(weight);
 }
 
 float STDP::getLTPWeight() const {
@@ -115,7 +107,7 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltdWeight = ConfigUtils::clampLTDWeight(weight);
 }
 
 float STDP::getLTDWeight() const {
@@ -123,7 +115,7 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    pImpl->timeConstant = ConfigUtils::clampTimeConstant(tau);
 }
 
 float STDP::getTimeConstant() const {
