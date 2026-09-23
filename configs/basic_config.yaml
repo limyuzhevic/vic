@@ -1,0 +1,10 @@
+{    "max_steps": 1000,
+    "time_step": 0.001,
+    "leak_conductance": 10.0,
+    "neuron_threshold": -55.0,
+    "working_memory_capacity": 100,
+    "episodic_memory_capacity": 1000,
+    "default_synaptic_weight": 0.5,
+    "hidden_output_weight": 0.3,
+    "recurrent_weight": 0.2,
+    "inter_region_weight": 0.5}
