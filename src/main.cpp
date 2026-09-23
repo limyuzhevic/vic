@@ -60,45 +60,37 @@ struct LearningExperiment {
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+    // Helper method to record weights from first region
+    void recordWeights(std::vector<float>& weights, const std::string& logPrefix) {
+        weights.clear();
         
-        // Record initial weights from first region
+        // Record weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                weights.push_back(syn->getWeight());
             }
         }
         
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
+        NLM_LOG_INFO(logPrefix + " recorded:");
+        NLM_LOG_INFO("  Synapses: " + std::to_string(brain->getTotalSynapseCount()));
+        if (!weights.empty()) {
+            float sum = std::accumulate(weights.begin(), weights.end(), 0.0f);
+            float mean = sum / weights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
     
+    void recordInitialState() {
+        initialSynapseCount = brain->getTotalSynapseCount();
+        recordWeights(initialWeights, "Initial state");
+    }
+    
     void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
-            }
-        }
+        recordWeights(finalWeights, "Final state");
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
-        NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
     }
     
     void computeStatistics() {

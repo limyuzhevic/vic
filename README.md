@@ -1,70 +1,125 @@
-# NLM — 熙然
+# NLM (熙然) — Neural Learning Machine
 
-**An Experimental Artificial Developmental Brain**
+**An Experimental Artificial Developmental Brain with Python Interface**
 
-## What is NLM?
+## Overview
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM (熙然, meaning "serene flow") is an experimental computational brain project implemented in C++ with a Python interface. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
+### Key Features
+
+**Python Interface**: Use the `pynlm` Python library for easy brain simulation and experimentation.
+
+**Advanced C++ Core**: Complete spiking neural network simulation with:
+- Leaky Integrate-and-Fire (LIF) neurons
+- Event-driven spike propagation with delays
+- Multiple plasticity mechanisms (STDP, Hebbian, structural)
+- Full brain integration (Phase 6)
+
+**What NLM IS NOT**:
 - A transformer or LLM
 - A chatbot
 - A deep learning model
 - A pretrained AI system
 
-NLM IS intended to become:
+**What NLM IS**:
 - A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
+- A brain-inspired architecture with real neurons and synapses
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
-## Current Phase
+## Quick Start (Python API)
 
-**PHASE 6: FINAL INTEGRATION**
+```python
+import pynlm
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+# Create a brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
 
-### Phase 6 Integration Achievements
+# Run simulation
+for step in range(100):
+    brain.step(step)
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
+```
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+## Complete Agent Example
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+```python
+import pynlm
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable learning subsystems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agent.enableStructuralPlasticity(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation based on action result
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+# Run the simulation
+run_agent_simulation(1000)
+```
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+## Building (Optional)
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
+If you need to build the C++ core from source:
 
 ```bash
 mkdir build
@@ -73,14 +128,203 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+The Python bindings (`pynlm`) are pre-built and included in the package.
 
-### Phase 6 Demo (Integration Test)
+## Installation
+
+Install the Python library:
+
 ```bash
-./nlm_phase6_demo
+pip install .
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+For development:
+
+```bash
+pip install -e .
+```
+
+## Project Structure
+
+```
+NLM/
+├── Python Interface
+│   └── pynlm/           # Python bindings (main user interface)
+├── Core Components (C++)
+│   ├── src/core/        # Core utilities
+│   ├── src/brain/       # Neural components (integrated)
+│   ├── src/neuromodulation/ # Neuromodulators (integrated)
+│   ├── src/memory/     # Memory systems (integrated)
+│   ├── src/cognition/  # Cognitive mechanisms (integrated)
+│   └── ...
+├── Documentation
+│   ├── docs/           # Technical documentation
+│   ├── easy_usage.md   # Beginner guide
+│   └── HOW_TO_USE.md   # Comprehensive guide
+├── Examples & Demos
+│   ├── src/experiments/ # Phase experiments
+│   └── examples/       # Python examples
+└── Tests
+    └── tests/          # Unit tests
+```
+
+## Key Classes and Methods
+
+### Brain Class
+
+| Method | Description |
+|--------|-------------|
+| `createBrain(config)` | Create a new brain |
+| `brain.initialize()` | Initialize the brain |
+| `brain.step(step)` | Run one simulation step |
+| `brain.getTotalSpikeCount()` | Get total spike count |
+| `brain.getFiringNeuronCount()` | Get currently firing neurons |
+| `brain.getAverageFiringRate()` | Get average firing rate |
+| `brain.getDevelopmentalStage()` | Get current developmental stage |
+
+### Config Class
+
+| Method | Description |
+|--------|-------------|
+| `createDefaultConfig()` | Create default configuration |
+| `config.set(key, value)` | Set configuration parameter |
+| `config.has(key)` | Check if key exists |
+
+### AgentBrain Class
+
+| Method | Description |
+|--------|-------------|
+| `createAgentBrain(brain)` | Create agent interface |
+| `agent.initialize(world)` | Initialize with world |
+| `agent.processSensoryInput(percept)` | Process sensory input |
+| `agent.decodeMotorCommand()` | Decode motor command |
+| `agent.applyRewardModulation(reward, predicted)` | Apply reward learning |
+
+### SimpleWorld Class
+
+| Method | Description |
+|--------|-------------|
+| `createSimpleWorld()` | Create simple 2D world |
+| `world.configure(width, height, visionWidth, visionHeight)` | Configure world dimensions |
+| `world.reset()` | Reset world state |
+| `world.update(timestep)` | Update world |
+| `world.applyMotorCommand(cmd, time)` | Apply motor command |
+
+## Advanced Usage
+
+### Custom Configuration
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.2)
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.dopamine.scale", 2.0)
+
+brain = pynlm.createBrain(config)
+```
+
+### Multiple Regions
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+
+# Add different brain regions
+region1_id = brain.addRegion("Sensory")
+region2_id = brain.addRegion("Motor")
+region3_id = brain.addRegion("Association")
+
+print(f"Created {brain.getRegionCount()} regions")
+```
+
+### Checkpoints and Persistence
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(500):
+    brain.step(step)
+
+# Save brain state
+brain.save("my_brain_checkpoint.bin")
+
+# Later, load the saved state
+new_brain = pynlm.createBrain(config)
+new_brain.load("my_brain_checkpoint.bin")
+```
+
+## Development and Extension
+
+### For Advanced Users
+
+NLM provides several extension points:
+
+1. **Custom Sensory Inputs**: Create custom sensory modalities
+2. **Specialized World Models**: Implement different environment dynamics
+3. **New Plasticity Rules**: Add custom learning mechanisms
+4. **Advanced Memory Systems**: Implement specialized memory architectures
+
+### Configuration Options
+
+See `HOW_TO_USE.md` for complete configuration documentation including:
+- Brain parameters (neuron count, connectivity, etc.)
+- Plasticity configuration (STDP, Hebbian, structural)
+- Neuromodulation parameters (dopamine, curiosity, novelty)
+- Development stages and progression
+
+## Examples and Demos
+
+Check out the examples directory for:
+
+- **Basic brain simulation** - Simple neural activity
+- **Agent in world** - Complete perception-action loop
+- **Learning experiments** - Demonstrating plasticity
+- **Development demos** - Brain maturation over time
+
+## Further Reading
+
+- [HOW_TO_USE.md](HOW_TO_USE.md) - Comprehensive usage guide
+- [easy_usage.md](easy_usage.md) - Beginner-friendly guide
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [docs/SCIENCE.md](docs/SCIENCE.md) - Scientific background
+
+## Scientific Limitations
+
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model
+- No realistic ion channel dynamics
+- Limited biological fidelity
+- Dependent on available computing resources
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
+
+## Key Achievements (Phase 6)
+
+- ✅ All neural systems integrated into coherent brain loop
+- ✅ Memory systems connected to neural processing
+- ✅ Neuromodulation affects plasticity and dynamics
+- ✅ Prediction integrated with learning
+- ✅ Development affects plasticity rates
+- ✅ Checkpoint save/load working
+- ✅ Replay and consolidation functional
+- ✅ Complete Phase 6 integration experiment
 
 ## Project Structure
 
