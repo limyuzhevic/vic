@@ -73,6 +73,14 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+This builds all targets including:
+- `nlm` - Main simulation executable (Phase 6)
+- `nlm_phase3_demo` - Phase 3 demonstration
+- `nlm_phase4_demo` - Phase 4 demonstration  
+- `nlm_phase6_demo` - Phase 6 integration test (NEW)
+- `nlm_phase6` - Phase 6 integration library (NEW)
+- `nlm_core`, `nlm_agent`, `nlm_world` - Core libraries
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
@@ -81,6 +89,16 @@ make -j4
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2/3/4 Demos (Legacy Examples)
+
+For reference, earlier phases are available:
+```bash
+./nlm_phase3_demo    # Phase 3: World interaction
+./nlm_phase4_demo    # Phase 4: Advanced cognition
+```
+
+These demonstrate specific brain systems before Phase 6 integration.
 
 ## Project Structure
 
@@ -161,6 +179,7 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- Phase 6 demo executable added
 
 ## Scientific Limitations
 

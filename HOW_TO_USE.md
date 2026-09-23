@@ -46,12 +46,14 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | Main simulation executable (Phase 6) |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 integration test |
+| `nlm_phase6` | Static Library | Phase 6 integration components |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
