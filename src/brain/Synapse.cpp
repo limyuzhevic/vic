@@ -1,7 +1,10 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Validation/Validation.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -48,6 +51,20 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    // Validate input parameters
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(static_cast<float>(id.index())),
+                           "Synapse constructor: synapse ID is not valid",
+                           ErrorCode::InvalidParameter,);
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(static_cast<float>(source.index())),
+                           "Synapse constructor: source neuron ID is not valid",
+                           ErrorCode::InvalidParameter,);
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(static_cast<float>(destination.index())),
+                           "Synapse constructor: destination neuron ID is not valid",
+                           ErrorCode::InvalidParameter,);
+    VALIDATE_PARAMETER_RETURN(source != destination,
+                           "Synapse constructor: source and destination neurons must be different",
+                           ErrorCode::InvalidParameter,);
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -94,13 +111,29 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(weight),
+                           "Synapse::setWeight: weight is not finite",
+                           ErrorCode::InvalidParameter,);
+    VALIDATE_PARAMETER_RETURN(Validation::IsValidWeight(weight),
+                           "Synapse::setWeight: weight is out of valid range [-1, 1]",
+                           ErrorCode::OutOfBounds,);
     pImpl->weight = weight;
+    LOG_INFO(std::format("Synapse::setWeight: Synapse {} weight set to {:.6f}",
+                     getId(), weight));
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(delta),
+                           "Synapse::addToWeight: delta is not finite",
+                           ErrorCode::InvalidParameter,);
+    
     pImpl->weight += delta;
+    
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    LOG_INFO(std::format("Synapse::addToWeight: Synapse {} weight adjusted by {:.6f} to {:.6f}",
+                     getId(), delta, pImpl->weight));
 }
 
 Delay Synapse::getDelay() const {
@@ -108,6 +141,9 @@ Delay Synapse::getDelay() const {
 }
 
 void Synapse::setDelay(Delay delay) {
+    VALIDATE_PARAMETER_RETURN(delay >= 0,
+                           "Synapse::setDelay: delay must be non-negative",
+                           ErrorCode::InvalidParameter,);
     pImpl->delay = delay;
 }
 
@@ -128,6 +164,10 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsValidTimestamp(timestamp),
+                           "Synapse::recordPreSpike: timestamp is invalid",
+                           ErrorCode::InvalidParameter, nullptr);
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +175,10 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsValidTimestamp(timestamp),
+                           "Synapse::recordPostSpike: timestamp is invalid",
+                           ErrorCode::InvalidParameter, nullptr);
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -158,14 +202,14 @@ PlasticityFlags& Synapse::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }
 
+const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
 void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
 }
 
 float Synapse::getEligibilityTrace() const {
@@ -173,10 +217,20 @@ float Synapse::getEligibilityTrace() const {
 }
 
 void Synapse::setEligibilityTrace(float trace) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(trace),
+                           "Synapse::setEligibilityTrace: trace is not finite",
+                           ErrorCode::InvalidParameter,);
     pImpl->eligibilityTrace = trace;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(decayRate),
+                           "Synapse::decayEligibilityTrace: decay rate is not finite",
+                           ErrorCode::InvalidParameter,);
+    VALIDATE_PARAMETER_RETURN(decayRate >= 0.0f && decayRate <= 1.0f,
+                           "Synapse::decayEligibilityTrace: decay rate must be in [0, 1]",
+                           ErrorCode::InvalidParameter, nullptr);
+    
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -188,10 +242,17 @@ float Synapse::getEfficacy() const {
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsFinite(efficacy),
+                           "Synapse::setEfficacy: efficacy is not finite",
+                           ErrorCode::InvalidParameter,);
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
 void Synapse::step(Timestamp currentTime) {
+    VALIDATE_PARAMETER_RETURN(Validation::IsValidTimestamp(currentTime),
+                           "Synapse::step: current time is invalid",
+                           ErrorCode::InvalidParameter, nullptr);
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
@@ -202,6 +263,10 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        VALIDATE_PARAMETER_RETURN(Validation::IsFinite(timeSincePre),
+                               "Synapse::step: time since pre spike is not finite",
+                               ErrorCode::InvalidParameter, nullptr);
+        
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
@@ -231,6 +296,8 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
+    VALIDATE_NULL_RETURN(&rng, "Synapse::initializeRandom: random generator is null",);
+    
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
@@ -260,6 +327,10 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    LOG_INFO(std::format("Synapse::initializeRandom: Synapse {} initialized with weight {:.6f}, type: {}",
+                     getId(), pImpl->weight, static_cast<int>(pImpl->type)));
 }
 
 } // namespace nlm
+

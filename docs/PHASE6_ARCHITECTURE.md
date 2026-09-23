@@ -2,18 +2,20 @@
 
 ## Overview
 
-Phase 6 integrates all previously separate systems into a coherent artificial brain. The architecture follows a closed-loop design where neural activity, plasticity, memory, neuromodulation, and behavior continuously influence each other.
+**Phase 6 Status:** NOT COMPLETE. The NLM architecture contains sophisticated components but most cognitive systems are disconnected from the main brain loop. The brain has the *anatomy* of a cognitive system but lacks the *integration* that makes it function as a coherent artificial brain.
 
-## Brain Loop Architecture
+This document reflects the **current implementation state** (35.8% integration) rather than the intended Phase 6 design. The architecture follows a closed-loop design where neural activity, plasticity, memory, neuromodulation, and behavior continuously influence each other, but many connections are missing.
 
-The main simulation loop (`Brain::step()`) implements the complete brain simulation:
+## Working Brain Loop Architecture
+
+The current `Brain::step()` implementation includes only:
 
 ```cpp
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    // 1. Process pending delayed spikes (deliver synaptic input)
+    // 1. Process pending delayed spikes (deliver synaptic input) ✅
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
-    // 2. Update all neurons (LIF dynamics)
+    // 2. Update all neurons (LIF dynamics) ✅
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -22,39 +24,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // 3. Detect spikes and schedule spike events
+    // 3. Detect spikes and schedule spike events ✅
     // ... spike detection and propagation ...
     
-    // 4. Update working memory
-    pImpl->workingMemory->update(pImpl->timestep);
+    // 4. Apply plasticity rules (STDP and Hebbian) ✅
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            // STDP and Hebbian applied
+        }
+    }
     
-    // 5. Apply neuromodulation effects
-    // - Dopamine affects neural excitability
-    // - Novelty detection updates
-    // - Curiosity computation
-    
-    // 6. Apply plasticity rules (STDP and Hebbian)
-    // with neuromodulation modulation
-    
-    // 7. Update episodic memory with current experience
-    
-    // 8. Update prediction system
-    
-    // 9. Update attention system
-    
-    // 10. Update concept formation
-    
-    // 11. Apply structural plasticity (synaptogenesis/pruning)
-    
-    // 12. Replay important memories
-    
-    // 13. Apply development effects
-    
-    // 14. Memory consolidation
-    
-    // 15. Checkpoint management
+    // 5. Apply structural plasticity periodically (every 100 steps) ✅
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
 }
 ```
+
+**What's NOT called in the current brain loop:**
+- ❌ Working memory update
+- ❌ Episodic memory storage
+- ❌ Prediction system update
+- ❌ Attention update
+- ❌ Concept formation
+- ❌ Planning
+- ❌ Development update (beyond structural plasticity)
+- ❌ Neuromodulation update (dopamine, etc.)
+- ❌ Memory consolidation
+- ❌ Replay
+
+---
 
 ## Memory Systems
 
@@ -68,11 +67,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Competition among memory traces
 - Decay of weak traces
 
-**Integration:**
-- Stores firing neurons each step
-- Updated each simulation step
-- Influences attention competition
-- Decays over time if not reinforced
+**CURRENT STATUS:** ⚠️ **DISCONNECTED**
+- NeuralWorkingMemory class exists with proper mechanisms
+- But `Brain::getWorkingMemory()` returns nullptr
+- Never updated in brain loop
+- No integration with sensory processing or action selection
 
 ### Episodic Memory (NeuralEpisodicMemory)
 
@@ -84,11 +83,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Relevance-weighted recall
 - Replay during offline periods
 
-**Integration:**
-- Episodes captured every 10 simulation steps
-- Replay triggered every 100 steps
-- Consolidation every 1000 steps
-- Influences future behavior through replay
+**CURRENT STATUS:** ❌ **NOT USED**
+- Class exists but never instantiated
+- Brain doesn't call any episodic memory functions
+- No experience capture, storage, or replay
 
 ### Associative Memory (NeuralAssociativeMemory)
 
@@ -99,9 +97,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Spreading activation for recall
 - Strength modification through experience
 
-**Integration:**
-- Associated with episodic memory
-- Updated during experience encoding
+**CURRENT STATUS:** ❌ **EMPTY IMPLEMENTATION**
+- Defined but with minimal functionality
+- Never used in the brain
+- No pattern associations created or recalled
 
 ## Neuromodulation Systems
 
@@ -114,11 +113,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Phasic and tonic signaling
 - Behavioral vigor modulation
 
-**Integration:**
-- Affects neural excitability (dopamine level modulates membrane potential)
-- Scales STDP learning rates
-- Modulates plasticity through eligibility traces
-- Affects action selection indirectly through learning
+**CURRENT STATUS:** ⚠️ **LIMITED**
+- Dopamine class exists
+- Affects neural excitability
+- **Only**: Scales STDP weight scaling (lines 465-466 in Brain.cpp)
+- No connection to memory or attention
 
 ### Curiosity
 
@@ -129,7 +128,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Exploration drive computation
 - Decay over time
 
-**Integration:**
+**CURRENT STATUS:** ✅ **WORKING (Phase 2)**
+- Integrated into AgentBrain
 - Used by AgentBrain for exploration decisions
 - Stored in AgentBrain for action selection
 - Affects motor command decoding
@@ -143,7 +143,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Comparison with previous patterns
 - Decay over time
 
-**Integration:**
+**CURRENT STATUS:** ✅ **WORKING (Phase 2)**
 - Computed from vision changes in AgentBrain
 - Used for curiosity computation
 - Stored for later use
@@ -158,10 +158,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Confidence tracking
 - History tracking
 
-**Integration:**
-- Called in brain loop (placeholder for full implementation)
-- Prediction error affects curiosity
-- Future: will affect attention and planning
+**CURRENT STATUS:** ❌ **NOT INTEGRATED**
+- PredictionSystem class exists with full functionality
+- `Brain::getPredictionSystem()` returns nullptr
+- Never updated in brain loop
+- Prediction errors computed but not used
 
 ## Cognition Systems
 
@@ -175,9 +176,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Action quality from experience
 - Plan success tracking
 
-**Integration:**
-- Initialized in Brain
-- Future: will be used for goal-directed behavior
+**CURRENT STATUS:** ❌ **NOT USED**
+- NeuralPlanner class exists with complete implementation
+- Never instantiated or called anywhere in the brain
+- Planning mechanisms available but disconnected from action selection
 
 ### Concept Formation
 
@@ -189,9 +191,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Instance tracking
 - Stability measurement
 
-**Integration:**
-- Initialized in Brain
-- Future: will process sensory patterns for generalization
+**CURRENT STATUS:** ❌ **NOT USED**
+- ConceptFormation class exists with full implementation
+- Never instantiated or called
+- No concept formation from experiences
 
 ### Attentional Selection
 
@@ -203,10 +206,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Top-down and bottom-up bias
 - Inhibition and excitation
 
-**Integration:**
-- Processes working memory competitors
-- Updated each step
-- Applies excitation to winners, inhibition to losers
+**CURRENT STATUS:** ❌ **NOT USED**
+- AttentionalSelection class exists
+- But never processes working memory competitors
+- No competitive attention in current brain loop
 
 ## Development System
 
@@ -217,10 +220,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Plasticity modification by stage
 - Auto-advance based on age
 
-**Integration:**
-- Updated every 1000 steps
-- Modifies structural plasticity rates
-- Affects neural excitability indirectly through plasticity
+**CURRENT STATUS:** ⚠️ **MINIMAL**
+- Development system implemented
+- **Only**: Modifies structural plasticity rates
+- No effect on:
+  - Neural excitability
+  - Plasticity rules themselves
+  - Attention
+  - Memory consolidation
+  - Neuromodulation levels
 
 ## Checkpoint System
 
@@ -231,84 +239,136 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 - Neuron and synapse state saving
 - Checkpoint manager for automated saves
 
-**Integration:**
-- `Brain::save()` writes checkpoint
-- `Brain::load()` reads checkpoint
-- CheckpointManager handles periodic saves
+**CURRENT STATUS:** ❌ **NOT CONNECTED**
+- CheckpointSystem fully implemented with reader/writer/manager
+- **But**: `Brain::save()` and `Brain::load()` are stubs
+- No state persistence
 
-## Data Flow
+## Current Working Integration (Phase 3/4)
 
-### Sensory Processing
+The **working brain loop** is actually the Phase 3/4 integration:
+
+```cpp
+// In experiment/demos:
+while (running) {
+    // 1. Get observation from world ✅
+    SensoryPercept percept = world.observe(agent);
+    
+    // 2. Process sensory input ✅
+    agentBrain.processSensoryInput(percept);
+    
+    // 3. Brain step ✅
+    brain.step(step);
+    
+    // 4. Decode motor command ✅
+    MotorCommand cmd = agentBrain.decodeMotorCommand();
+    
+    // 5. Apply action to world ✅
+    world.applyAction(agent, cmd);
+    
+    // 6. Compute reward ✅
+    float reward = world.computeReward(agent);
+    
+    // 7. Apply reward modulation ✅
+    agentBrain.applyRewardModulation(reward, predictedReward);
+}
+```
+
+**What's missing after the loop:**
+- No memory storage of experiences
+- No prediction training
+- No concept formation from observations
+- No planning integration
+- No sleep/rest cycle
+
+## Data Flow (What Works vs What's Missing)
+
+### Sensory Processing (WORKING)
 ```
 World → SensoryPercept → AgentBrain::processSensoryInput()
-                              ↓
-                        Brain::receiveSensoryInput()
-                              ↓
-                        Sensory neurons receive current
-                              ↓
-                        LIF dynamics integrate input
+                               ↓
+                         Brain::receiveSensoryInput()
+                               ↓
+                         Sensory neurons receive current
+                               ↓
+                         LIF dynamics integrate input
 ```
 
-### Action Selection
+### Action Selection (WORKING)
 ```
 Motor neuron activity → AgentBrain::decodeMotorCommand()
-                              ↓
-                        Curiosity exploration check
-                              ↓
-                        MotorCommand selected
-                              ↓
-                        World::applyAction()
+                               ↓
+                         Curiosity exploration check
+                               ↓
+                         MotorCommand selected
+                               ↓
+                         World::applyAction()
 ```
 
-### Memory Formation
+### Memory Formation (NOT WORKING)
 ```
-Brain step (spikes) → Working memory stores firing neurons
-                              ↓
-                        Every 10 steps: Episodic memory captures state
-                              ↓
-                        Every 100 steps: Replay of important episodes
-                              ↓
-                        Every 1000 steps: Consolidation
+Brain step (spikes) → Working memory stores firing neurons (NOT CALLED)
+                               ↓
+                         Every 10 steps: Episodic memory captures state (NOT CALLED)
+                               ↓
+                         Every 100 steps: Replay of important episodes (NOT CALLED)
+                               ↓
+                         Every 1000 steps: Consolidation (NOT CALLED)
 ```
 
-### Learning
+### Learning (PARTIALLY WORKING)
 ```
 Reward from environment → AgentBrain::applyRewardModulation()
-                              ↓
-                        Dopamine computed (prediction error)
-                              ↓
-                        Synapses with eligibility traces updated
-                              ↓
-                        STDP weights modulated by dopamine
+                               ↓
+                         Dopamine computed (prediction error)
+                               ↓
+                         Synapses with eligibility traces updated
+                               ↓
+                         STDP weights modulated by dopamine
 ```
 
 ## System Independence and Coupling
 
-### Loose Coupling (can function somewhat independently):
-- Working memory (stores current activity)
-- Episodic memory (stores experiences)
-- Prediction system (computes errors)
-- Concept formation (organizes patterns)
+### Actually Loosely Coupled (but not connected):
+- Working memory (defined but never called)
+- Episodic memory (defined but never instantiated)
+- Prediction system (defined but never instantiated)
+- Concept formation (defined but never instantiated)
 
-### Tight Coupling (strongly interconnected):
-- Neurons ↔ Synapses ↔ Plasticity
-- Dopamine ↔ Eligibility traces ↔ Synaptic weights
-- Novelty ↔ Curiosity ↔ Exploration
-- Development ↔ Plasticity rates ↔ Structural plasticity
+### Actually Tightly Coupled (minimal):
+- Neurons ↔ Synapses ↔ Plasticity (✅ working)
+- Dopamine ↔ Eligibility traces ↔ Synaptic weights (⚠️ limited)
+- Novelty ↔ Curiosity ↔ Exploration (✅ working in Phase 2)
+- Development ↔ Plasticity rates ↔ Structural plasticity (⚠️ minimal)
 
 ## Extension Points
 
 ### Where to add new mechanisms:
 
-1. **New plasticity rules**: Add to `Brain::step()` after STDP/Hebbian
-2. **New neuromodulators**: Add to `Brain::Impl` and update `Brain::step()`
-3. **New memory types**: Add to `Brain::Impl` and update `Brain::step()`
-4. **New cognition**: Add to `Brain::Impl` and connect to perception/action
+1. **Connect Existing Systems:** Priority 1 is connecting what already exists
+   - Connect WorkingMemory to sensory processing
+   - Connect EpisodicMemory to experience logging
+   - Connect PredictionSystem to sensory processing
+   - Connect NeuralPlanner to action selection
+   - Connect ConceptFormation to experience processing
 
-### Key integration hooks:
+2. **Implement Missing Mechanisms:**
+   - Implement `Brain::save()` and `Brain::load()` using CheckpointSystem
+   - Implement sleep/rest cycle with memory consolidation
+   - Implement replay mechanism
+   - Implement full dopamine effects on plasticity
+   - Implement ACh effects on attention/memory
 
-1. `receiveSensoryInput()` - Entry point for perception
-2. `produceAction()` - Exit point for action
-3. `step()` - Main loop where all systems update
-4. `applyRewardModulation()` - Where learning signals apply
-5. `save()/load()` - State persistence
+3. **Implement Missing Mechanisms:**
+   - Test memory retention over time
+   - Test prediction accuracy improvement
+   - Test continual learning
+   - Test developmental progression
+   - Test multi-system interaction
+
+4. **Optimize:**
+   - Profile and optimize hot paths
+   - Integrate performance infrastructure
+   - Enable multithreading where safe
+
+---

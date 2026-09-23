@@ -1,6 +1,7 @@
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Validation/Validation.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
@@ -18,6 +19,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <sstream>
 
 namespace nlm {
@@ -175,15 +177,43 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
+    VALIDATE_NULL_RETURN(pImpl->config, "Brain::initialize: config pointer is null", false);
+    VALIDATE_NULL_RETURN(pImpl->config.get(), "Brain::initialize: config object is null", false);
+    
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Get and validate configuration values
+    VALIDATE_PARAMETER_RETURN(pImpl->config->hasKey("neuron_count"), 
+                           "Brain::initialize: 'neuron_count' configuration missing",
+                           ErrorCode::ConfigurationError, false);
+    
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    VALIDATE_PARAMETER_RETURN(neuronCount > 0,
+                           "Brain::initialize: neuron_count must be positive",
+                           ErrorCode::ConfigurationError, false);
+    
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    VALIDATE_PARAMETER_RETURN(regionCount > 0,
+                           "Brain::initialize: region_count must be positive",
+                           ErrorCode::ConfigurationError, false);
+    
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    VALIDATE_PARAMETER_RETURN(Validation::IsValidWeight(connectionProbability),
+                           "Brain::initialize: connection_probability must be in [-1, 1]",
+                           ErrorCode::ConfigurationError, false);
+    
+    // Validate timestep
+    VALIDATE_PARAMETER_RETURN(pImpl->config->hasKey("simulation_timestep"),
+                           "Brain::initialize: 'simulation_timestep' configuration missing",
+                           ErrorCode::ConfigurationError, false);
+    
+    pImpl->timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    VALIDATE_PARAMETER_RETURN(pImpl->timestep > 0.0,
+                           "Brain::initialize: simulation_timestep must be positive",
+                           ErrorCode::ConfigurationError, false);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, timestep: " + std::to_string(pImpl->timestep));
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {

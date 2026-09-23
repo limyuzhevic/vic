@@ -4,10 +4,16 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**Current Status:** NLM is in Phase 6 (Final Integration) with approximately 35.8% system integration achieved. The neural core (LIF neurons, spikes, basic plasticity) works excellently, but many cognitive systems (memory, prediction, higher cognition) are disconnected from the main brain loop.
+
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the NLM Python API with current capabilities
+4. CLI usage for running simulations
+5. Advanced usage patterns
+
+---
 
 ---
 
@@ -19,6 +25,10 @@ This document covers:
 - **CMake**: Version 3.16 or higher
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
+
+### Current Implementation Note
+
+Phase 6 integration is in progress. The neural core (LIF neurons, spikes, basic plasticity) is fully functional, but many higher-level systems are still being integrated.
 
 ### Build Steps
 
@@ -47,12 +57,12 @@ After successful compilation, you will have:
 | Target | Type | Description |
 |--------|------|-------------|
 | `nlm` | Executable | Main simulation executable |
-| `nlm_core` | Static Library | Core brain components |
-| `nlm_agent` | Static Library | Agent system |
-| `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration (working) |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration (framework exists, not fully working) |
 | `nlm_test` | Executable | Unit test suite |
+| `nlm_cli` | Executable | Command-line interface (Phase 2 real neural computation) |
+
+**Note:** The main `nlm` executable may be minimal since Phase 6 integration is not complete.
 
 ### Build Options
 
@@ -76,7 +86,7 @@ make install
 
 ```bash
 # Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
+pip install scikit-build-core pybind11 numpy
 
 # Build and install
 pip install .
@@ -111,11 +121,16 @@ print(pynlm.__version__)
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Working: Neural core is functional!")
+
+# Try enhanced features
+agent = pynlm.createAgentBrain(brain)
+print(f"Agent has {agent.getSensoryInputSize()} sensory inputs and {agent.getMotorOutputSize()} motor outputs")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Python Library (Current Capabilities)
 
 ### Basic Usage
 
@@ -184,7 +199,7 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Complete Agent Example (Phase 2 Integration Working)
 
 ```python
 import pynlm
@@ -211,11 +226,11 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable working subsystems
+    agent.enableRewardModulation(True)      # Learn from rewards
+    agent.enableCuriosity(True)             # Exploration drive
+    agent.enableDevelopment(True)           # Brain maturation
+    # Note: structural_plasticity is enabled by default
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -272,9 +287,9 @@ brain.step(step_number)           # Run one simulation step
 brain.step(step_number, time)    # Run step with timestamp
 brain.reset()                     # Reset brain state
 
-# Input/Output
+# Input/Output (NOT IMPLEMENTED - returns nullptr)
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+brain.produceAction()                     # Get motor action (STUB)
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -283,13 +298,16 @@ brain.getFiringNeuronCount()     # Currently firing
 brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+# State (NOT IMPLEMENTED)
+brain.save("checkpoint.bin")       # Save state (STUB - returns false)
+brain.load("checkpoint.bin")       # Load state (STUB - returns false)
 
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+
+# Development tracking
+brain.getDevelopmentalStage()     # Current stage
 ```
 
 #### Config Class
@@ -306,9 +324,9 @@ if config.has("brain.neuron_count"):
 config.set("brain.neuron_count", 1000)
 config.set("learning.rate", 0.001)
 
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# File I/O (NOT IMPLEMENTED)
+config.loadFromFile("config.json")  # STUB
+config.saveToFile("config.json")    # Not yet implemented
 ```
 
 #### AgentBrain Class
@@ -335,9 +353,9 @@ agent.getDevelopmentalStage()
 
 # Subsystem enable/disable
 agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
 agent.enableCuriosity(True/False)
+agent.enableDevelopment(True/False)
+agent.enableStructuralPlasticity(True/False)
 
 # Statistics
 agent.getCuriosityLevel()
@@ -416,6 +434,8 @@ pynlm.WorldObjectType.Marker
 
 ---
 
+---
+
 ## Part 4: Configuration Options
 
 ### Brain Configuration
@@ -454,80 +474,261 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 5: Example Scripts
+---
 
-### Minimal Example
+## Part 6: CLI Usage
 
-```python
-import pynlm
+### Basic CLI Commands
 
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+The NLM CLI (`nlm_cli`) provides a command-line interface for running simulations:
 
-# Simulate
-for i in range(100):
-    brain.step(i)
+```bash
+# Run a simple brain simulation
+./nlm_cli run --neuron-count 100 --max-steps 500
 
-print("Simulation complete!")
+# Run with verbose output
+./nlm_cli run --neuron-count 500 --max-steps 1000 --verbose
+
+# Run with custom timestep
+./nlm_cli run --neuron-count 200 --timestep 0.0001
 ```
 
-### Environment Interaction
+### Available Commands
 
-```python
-import pynlm
+#### `./nlm_cli run`
+Run a simple brain simulation with configurable parameters.
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+**Options:**
+- `--neuron-count, -n <n>`: Number of neurons (default: 1000)
+- `--timestep, -t <t>`: Simulation timestep (default: 0.001)
+- `--max-steps <n>`: Maximum simulation steps (default: 1000)
+- `--output <file>`: Output file for brain state
+- `--verbose, -v`: Enable verbose output
+- `--log-level <level>`: Set log level (DEBUG, INFO, WARN, ERROR)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+**Examples:**
+```bash
+nlm_cli run --neuron-count 500 --max-steps 2000
+nlm_cli run -v -t 0.0001
+```
+
+#### `./nlm_cli experiment <name>`
+Run predefined experiments.
+
+**Available experiments:**
+- `connectivity`: Test basic neural connectivity
+- `plasticity`: Plasticity learning experiment
+- `stdp`: STDP verification experiment
+- `phase2`: Complete Phase 2 demonstration
+
+**Options:**
+- `--output <file>`: Output file for experiment results
+
+**Examples:**
+```bash
+nlm_cli experiment connectivity
+nlm_cli experiment plasticity --output plasticity_results.json
+```
+
+#### `./nlm_cli config`
+Configuration management.
+
+**Subcommands:**
+- `list`: List current configuration
+- `generate`: Generate default configuration file
+- `validate <file>`: Validate a configuration file
+
+**Options:**
+- `--config <file>`: Configuration file to use (default: configs/default.cfg)
+- `--output <file>`: Output file for generated config
+
+**Examples:**
+```bash
+nlm_cli config list
+nlm_cli config generate --output my_config.cfg
+nlm_cli config validate custom_config.cfg
+```
+
+#### `./nlm_cli export <format>`
+Export brain state to various formats.
+
+**Supported formats:**
+- `json`: JSON format (default)
+- `xml`: XML format
+- `csv`: CSV format for neural data
+- `binary`: Binary format
+
+**Options:**
+- `--output <file>`: Output file for exported data
+- `--brain <id>`: Specific brain region to export
+
+**Examples:**
+```bash
+nlm_cli export json
+nlm_cli export csv --output neurons.csv
+```
+
+#### `./nlm_cli import <file>`
+Import brain state from a file.
+
+**Options:**
+- `--format <format>`: Format of the input file (JSON, XML, etc.)
+- `--region <id>`: Region to import into
+
+**Examples:**
+```bash
+nlm_cli import saved_brain.json
+nlm_cli import neural_data.xml --format xml
+```
+
+#### `./nlm_cli profile`
+Profile performance metrics.
+
+**Options:**
+- `--output <file>`: Output file for profile data (JSON)
+- `--duration <seconds>`: Duration of profiling (default: 60)
+
+**Examples:**
+```bash
+nlm_cli profile --output profile.json
+nlm_cli profile --duration 300
+```
+
+#### `./nlm_cli test`
+Run unit tests and integration tests.
+
+**Options:**
+- `--unit`: Run only unit tests
+- `--integration`: Run only integration tests
+- `--output <file>`: Output file for test results
+- `--format <format>`: Output format (text, json, xml)
+
+**Examples:**
+```bash
+nlm_cli test
+nlm_cli test --unit --format json
+```
+
+#### `./nlm_cli monitor`
+Monitor brain status in real-time.
+
+**Options:**
+- `--interval <seconds>`: Update interval (default: 1)
+- `--output <file>`: Log file for monitoring
+- `--metrics <list>`: Metrics to monitor (spikes, firing_rate, memory, etc.)
+
+**Examples:**
+```bash
+nlm_cli monitor --interval 0.5
+nlm_cli monitor --metrics spikes,firing_rate --output monitor.log
+```
+
+#### `./nlm_cli benchmark`
+Run performance benchmarks.
+
+**Options:**
+- `--output <file>`: Output file for benchmark results
+- `--scale <factor>`: Scale factor for benchmark (1=small, 2=medium, 3=large)
+- `--iterations <n>`: Number of iterations (default: 10)
+
+**Examples:**
+```bash
+nlm_cli benchmark
+nlm_cli benchmark --scale 2 --iterations 20
 ```
 
 ---
 
 ## Troubleshooting
 
-### Build Issues
+### Current Known Issues (Phase 6 Status)
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+The following issues are documented in `docs/PHASE6_FINAL_AUDIT.md`:
+
+#### Memory Systems (NOT INTEGRATED)
+- `Brain::getWorkingMemory()`, `Brain::getEpisodicMemory()`, etc. return nullptr
+- Memory systems exist but are not connected to the brain loop
+- No episodic memory storage or replay
+
+#### Prediction System (NOT INTEGRATED)
+- `Brain::getPredictionSystem()` returns nullptr
+- Prediction system exists but never trained or used
+
+#### Checkpoint System (STUBS)
+- `Brain::save()` and `Brain::load()` are stubs (return false)
+- CheckpointSystem exists but not connected to Brain
+
+#### Cognition Systems (NOT USED)
+- NeuralPlanner, ConceptFormation, SelfModel, SocialLearning exist but never instantiated
+- All cognitive mechanisms implemented but disconnected
+
+#### Development (MINIMAL)
+- Development stages exist but only affect structural plasticity rates
+- No effect on neural excitability, attention, memory consolidation
+
+#### Neuromodulation (PARTIAL)
+- Dopamine only scales STDP weights
+- Other neuromodulators (ACh, NE, 5-HT) are stubs
+- No integration with memory or attention
+
+### Working Solutions
+
+#### What Works:
+1. **Neural Core**: LIF neurons, spikes, synaptic transmission, STDP, Hebbian plasticity
+2. **Agent System**: Sensory processing, motor decoding, reward modulation, curiosity, novelty detection
+3. **World Simulation**: 2D environment, vision, touch, internal sensing
+4. **Basic Integration**: Brain-Agent-world loop works for Phase 3/4
+
+#### What to Focus On:
+1. Phase 4 cognitive experiments (they test the disconnected systems)
+2. The CLI interface for simulation control
+3. Building on the working neural core foundation
+
+### Example: Fixing Common Issues
+
+#### Issue: Brain not learning from rewards
+```python
+# Problem: Reward modulation may not be working properly
+
+# Solution 1: Check if reward modulation is enabled
+agent.enableRewardModulation(True)
+
+# Solution 2: Debug reward values
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Check reward
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    print(f"Step {step}: reward = {reward}")
+    agent.applyRewardModulation(reward, 0.0)
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+#### Issue: Low curiosity levels
+```python
+# Problem: Curiosity system may not be responding
 
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
+# Solution: Debug curiosity computation
+agent.enableCuriosity(True)
+for step in range(100):
+    # ... simulation loop ...
+    curiosity = agent.getCuriosityLevel()
+    novelty = agent.getNoveltyLevel()
+    print(f"Step {step}: curiosity={curiosity:.3f}, novelty={novelty:.3f}")
 ```
-
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
 
 ---
 
 ## Further Reading
 
+- [PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Current Phase 6 audit (35.8% integration)
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [easy_usage.md](easy_usage.md) - Quick start guide
+- [src/cli/CLI_USER_GUIDE.md](src/cli/CLI_USER_GUIDE.md) - Detailed CLI documentation
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Current system integration status
