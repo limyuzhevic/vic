@@ -19,14 +19,7 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
-
-using namespace nlm;
+#include <chrono>
 
 void printBanner() {
     std::cout << R"(
@@ -250,7 +243,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("  ERROR: Region 1 not found");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -267,7 +263,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +297,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -320,6 +316,30 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
 }
+
+// Improved error handling function
+void handleError(const std::string& message, int exitCode = 1) {
+    NLM_LOG_ERROR("FATAL ERROR: " + message);
+    std::cerr << "ERROR: " << message << std::endl;
+    std::exit(exitCode);
+}
+
+// Performance timing utilities
+class Timer {
+private:
+    std::chrono::high_resolution_clock::time_point startTime;
+    std::string name;
+public:
+    Timer(const std::string& timerName) : name(timerName) {
+        startTime = std::chrono::high_resolution_clock::now();
+    }
+    
+    ~Timer() {
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        NLM_LOG_INFO("[" + name + "] Completed in " + std::to_string(duration.count()) + " ms");
+    }
+};
 
 int main(int argc, char** argv) {
     printBanner();
@@ -357,10 +377,11 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Warning: Config file not found: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
+    } else {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
     }
     
     // Override with command line args
@@ -403,26 +424,34 @@ int main(int argc, char** argv) {
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+        handleError("Failed to initialize brain!");
     }
     
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    {
+        Timer timer("Test 1 - Basic Connectivity");
+        runBasicConnectivityTest(brain);
+    }
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    {
+        Timer timer("Test 2 - Plasticity Experiment");
+        runPlasticityExperiment(brain);
+    }
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
-    runStdpVerification(brain);
+    {
+        Timer timer("Test 3 - STDP Verification");
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

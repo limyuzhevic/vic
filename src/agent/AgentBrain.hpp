@@ -4,10 +4,34 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
-#include <memory>
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
 #include <vector>
 
 namespace nlm {
+
+// Forward declarations
+class Config;
+class RandomGenerator;
+class SimulationClock;
+class Logger;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class PredictionSystem;
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+class DevelopmentSystem;
+class Dopamine;
+class Curiosity;
+class Novelty;
+class PredictionError;
+
+// Helper function for safe null pointer access
+template<typename T>
+T* assertNotNull(T* ptr, const std::string& operation);
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
