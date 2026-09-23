@@ -1,9 +1,12 @@
 // Synapse Tests
+#include "TestFramework.hpp"
 #include "brain/Synapse.hpp"
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <numeric>
+#include <algorithm>
 
 namespace test_synapse {
 
