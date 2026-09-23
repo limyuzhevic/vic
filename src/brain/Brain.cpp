@@ -1,28 +1,81 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../performance/SparseConnectivity.hpp"
 
 namespace nlm {
 
-struct Brain::Impl {
+// Structure for sparse connectivity integration
+struct SparseConnectivityManager {
+    std::unique_ptr<SparseConnectivity> connectivity;
+    std::unordered_map<RegionId, SparseConnectivity> regionConnectivity;
+    bool enabled = true;
+    float connectionSparsity = 0.15f;  // Biological typical: 10-20%
+    
+    void configure(bool enable, float sparsity) {
+        enabled = enable && sparsity > 0.0f;
+        connectionSparsity = sparsity;
+    }
+    
+    void initializeConnectivityForRegion(RegionId regionId, RandomGenerator& rng, 
+                                        size_t numNeurons, float connectionProbability) {
+        if (!enabled) return;
+        
+        auto& sparseConn = regionConnectivity[regionId];
+        sparseConn.reserveNeurons(numNeurons);
+        
+        // Calculate target number of synapses based on sparsity
+        size_t maxPossible = numNeurons * numNeurons;
+        size_t targetSynapses = static_cast<size_t>(maxPossible * connectionSparsity);
+        
+        // Create random sparse connectivity
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        std::uniform_int_distribution<NeuronId> neuronDist(0, numNeurons - 1);
+        std::normal_distribution<float> weightDist(0.5f, 0.1f);  // Normalized weights
+        
+        for (size_t i = 0; i < targetSynapses; ++i) {
+            NeuronId source = neuronDist(rng);
+            NeuronId dest = neuronDist(rng);
+            if (source == dest) continue;  // No self-connections
+            
+            float connRand = dist(rng);
+            if (connRand > connectionProbability * connectionSparsity) continue;
+            
+            float weight = weightDist(rng);
+            weight = std::max(0.0f, std::min(1.0f, weight));  // Clamp to [0,1]
+            
+            uint8_t synapseType = (weight > 0.6f) ? 0 : 1;  // Excitatory (>0.6), Inhibitory (<=0.6)
+            
+            sparseConn.addSynapse(source, dest, weight, 1, synapseType);
+        }
+    }
+    
+    SparseConnectivity* getConnectivity(RegionId regionId) {
+        auto it = regionConnectivity.find(regionId);
+        if (it != regionConnectivity.end()) {
+            return &it->second;
+        }
+        return nullptr;
+    }
+    
+    void updateNeuronIdMapping(RegionId regionId, NeuronId oldId, NeuronId newId) {
+        auto it = regionConnectivity.find(regionId);
+        if (it != regionConnectivity.end()) {
+            // Update all synapses with oldId to newId
+            auto& sparseConn = it->second;
+            auto& synapses = sparseConn.getSynapses();
+            
+            for (auto& syn : synapses) {
+                if (syn.sourceNeuron == oldId) {
+                    syn.sourceNeuron = newId;
+                }
+                if (syn.destNeuron == oldId) {
+                    syn.destNeuron = newId;
+                }
+            }
+            
+            // Update adjacency lists (this is a simplified approach)
+            // A full implementation would update outgoing_ and incoming_ maps
+        }
+    }
+};
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
@@ -78,9 +131,13 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Sparse connectivity manager for memory-efficient neural connectivity
+    std::unique_ptr<SparseConnectivityManager> sparseConnectivityManager;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , sparseConnectivityManager(std::make_unique<SparseConnectivityManager>())
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -130,11 +187,10 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        // Configure sparse connectivity
+        bool enableSparseConnectivity = config->getOr<bool>("enable_sparse_connectivity", true);
+        float connectionSparsity = config->getOr<float>("connection_sparsity", 0.15f);
+        sparseConnectivityManager->configure(enableSparseConnectivity, connectionSparsity);
         
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
@@ -157,7 +213,17 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {
+    if (!config) {
+        NLM_LOG_ERROR("Brain constructor: Invalid configuration provided (null)");
+        // Set up minimal valid config to avoid crashes
+        pImpl->config = std::make_shared<Config>();
+        pImpl->config->set("random_seed", 42, ConfigSource::Default);
+        pImpl->config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        pImpl->config->set("neuron_count", 100, ConfigSource::Default);
+        pImpl->config->set("region_count", 1, ConfigSource::Default);
+    }
+}
 
 Brain::~Brain() = default;
 
@@ -177,13 +243,52 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain::initialize: Configuration is null");
+        return false;
+    }
+    
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_WARN("Brain::initialize: Invalid neuron_count (0), using default 1000");
+        neuronCount = 1000;
+    }
+    if (neuronCount > 100000) {
+        NLM_LOG_WARN("Brain::initialize: Very large neuron_count (" + std::to_string(neuronCount) + "), may impact performance");
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_WARN("Brain::initialize: Invalid region_count (0), using default 1");
+        regionCount = 1;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_WARN("Brain::initialize: Invalid connection_probability (" + std::to_string(connectionProbability) + "), using default 0.1");
+        connectionProbability = 0.1f;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Ensure random generator is properly initialized
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("Brain::initialize: Random generator not initialized");
+        return false;
+    }
+    
+    // Validate brain pointer
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Brain::initialize: Spike system not initialized");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Configuration validation passed");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -224,7 +329,12 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Initialize random connectivity and synapse weights
+            // Initialize sparse connectivity for memory efficiency
+            size_t neuronsInRegion = region->getTotalNeuronCount();
+            pImpl->sparseConnectivityManager->initializeConnectivityForRegion(
+                RegionId(i + 1), *pImpl->rng, neuronsInRegion, connectionProbability);
+            
+            // Fall back to dense connectivity for compatibility
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
         }
     }
@@ -299,6 +409,68 @@ bool Brain::initialize() {
     return true;
 }
 
+// Helper method to initialize all integrated systems
+void Brain::initializeIntegratedSystems() {
+    // Initialize memory systems
+    pImpl->workingMemory->initialize(this);
+    pImpl->workingMemory->setCapacity(pImpl->config->getOr<size_t>("working_memory_capacity", getTotalNeuronCount() / 10));
+    
+    pImpl->episodicMemory->initialize(this);
+    pImpl->episodicMemory->setMaxEpisodes(pImpl->config->getOr<size_t>("max_episodes", 1000));
+    
+    pImpl->associativeMemory->initialize(this);
+    
+    // Initialize cognition systems
+    pImpl->planner->initialize(this);
+    pImpl->planner->setPlanningDepth(pImpl->config->getOr<size_t>("planning_depth", 5));
+    
+    pImpl->conceptFormation->initialize(this);
+    
+    pImpl->attention->initialize(this);
+    pImpl->attention->setInhibitionStrength(pImpl->config->getOr<float>("inhibition_strength", 0.5f));
+    pImpl->attention->setExcitationStrength(pImpl->config->getOr<float>("excitation_strength", 1.5f));
+    
+    // Initialize neuromodulation systems
+    pImpl->novelty->initialize(this);
+    pImpl->curiosity->initialize(this);
+}
+
+// Helper method to register spike handlers
+void Brain::registerSpikeHandlers() {
+    // Register spike handlers for event-driven processing
+    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+        // Count spikes
+        ++pImpl->totalSpikesThisStep;
+        ++pImpl->totalSpikesTotal;
+    });
+    
+    // Register delayed spike handler to deliver synaptic input
+    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+        // Find destination neuron and deliver synaptic input
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->getId() == event.destination_neuron) {
+                    // Apply synaptic weight as current
+                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    if (event.is_excitatory) {
+                        neuron->receiveExcitatoryInput(synapticCurrent);
+                    } else {
+                        neuron->receiveInhibitoryInput(-synapticCurrent);
+                    }
+                    return;
+                }
+            }
+        }
+    });
+}
+
+// Helper method to configure checkpoint system
+void Brain::configureCheckpointSystem() {
+    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+}
+
 void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
@@ -325,12 +497,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // Validate inputs
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Brain::step: Spike system not initialized");
+        return;
+    }
+    if (currentStep == 0 && currentTime == 0.0) {
+        NLM_LOG_WARN("Brain::step: Step 0 may indicate simulation initialization issue");
+    }
+    
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    try {
+        pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Brain::step: Error processing delayed spikes: " + std::string(e.what()));
+    }
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
@@ -617,26 +802,66 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Validate inputs
+    if (!neuron) {
+        NLM_LOG_WARN("Brain::injectCurrent: Invalid neuron ID (null)");
+        return;
+    }
+    
+    // Search for neuron in all regions
+    bool found = false;
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
-            if (n->getId() == neuron) {
+            if (n && n->getId() == neuron) {
                 n->injectCurrent(current);
-                return;
+                found = true;
+                break;
             }
         }
+        if (found) break;
+    }
+    
+    if (!found) {
+        NLM_LOG_WARN("Brain::injectCurrent: Neuron " + std::to_string(static_cast<uint64_t>(neuron)) + 
+                     " not found in any region");
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate input
+    if (static_cast<uint8_t>(type) == 0) {
+        NLM_LOG_WARN("Brain::injectCurrentToNeurons: Invalid neuron type (null)");
+        return;
+    }
+    
+    bool foundNeurons = false;
+    int neuronCount = 0;
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+            if (pop && pop->getNeuronType() == type) {
+                const auto& neurons = pop->getNeurons();
+                if (!neurons.empty()) {
+                    foundNeurons = true;
+                    for (auto* neuron : neurons) {
+                        if (neuron) {
+                            neuron->injectCurrent(current);
+                            ++neuronCount;
+                        }
+                    }
                 }
             }
         }
+    }
+    
+    if (!foundNeurons) {
+        NLM_LOG_WARN("Brain::injectCurrentToNeurons: No neurons found with type " + 
+                     std::to_string(static_cast<int>(type)));
+    } else {
+        NLM_LOG_DEBUG("Brain::injectCurrentToNeurons: Injected current to " + 
+                     std::to_string(neuronCount) + " neurons of type " + 
+                     std::to_string(static_cast<int>(type)));
     }
 }
 

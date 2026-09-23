@@ -26,7 +26,59 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+void printHelp() {
+    std::cout << R"(
+NLM — 熙然 Neural Learning Machine
+
+USAGE:
+  nlm [OPTIONS]
+
+OPTIONS:
+  --help                    Show this help message and exit
+  --version                 Show version information and exit
+  --config <file>           Load configuration from file (default: configs/default.cfg)
+  --neurons <count>         Override number of neurons (default: 500 for test mode)
+  --regions <count>         Override number of brain regions (default: 1)
+  --timestep <seconds>      Override simulation timestep (default: 0.001)
+  --steps <count>           Run specific number of simulation steps (default: 1000)
+  --experiments <list>      Run specific experiments: all, connectivity, plasticity, stdp, phase6
+  --seed <number>           Set random seed for reproducible results
+  --enable-sparse           Enable sparse connectivity optimization (default: enabled)
+  --disable-sparse          Disable sparse connectivity optimization
+  --sparsity <float>        Set connectivity sparsity (0.0-1.0, default: 0.15)
+  --visualization           Enable visualization (requires GUI support)
+  --log-level <level>       Set log level: debug, info, warn, error (default: info)
+  --log-file <file>         Output logs to file (default: nlm.log)
+  --checkpoint-dir <dir>    Directory for checkpoint files (default: ./checkpoints)
+  --performance-mode <mode> Performance mode: basic, optimized, maximum (default: optimized)
+  --memory-limit <mb>       Memory limit in MB (default: system limit)
+
+EXPERIMENTS:
+  all                     Run all available experiments
+  connectivity            Basic neural connectivity test
+  plasticity              Plasticity learning experiment
+  stdp                    Spike-timing dependent plasticity verification
+  phase6                  Phase 6 integration experiment
+
+EXAMPLES:
+  nlm --help                     Show help
+  nlm --version                  Show version
+  nlm --neurons 1000 --regions 2  Run with 1000 neurons and 2 regions
+  nlm --config custom.cfg         Use custom configuration file
+  nlm --experiments phase6        Run Phase 6 integration experiment only
+  nlm --enable-sparse --sparsity 0.1 Enable sparse connectivity with 10% density
+  nlm --log-level debug --steps 5000 Run with debug logging for 5000 steps
+
+For more information, visit: https://github.com/nlm-project/nlm
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM — 熙然 Neural Learning Machine v0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Built with C++20, SIMD optimizations, and advanced neural integration" << std::endl;
+    std::cout << "Scientific background: https://nlm.readthedocs.io" << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(
