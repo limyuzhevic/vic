@@ -21,10 +21,11 @@ namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
+        NLM (Neural Learning Machine) Python Bindings v0.1.0
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Version: 0.1.0
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -398,7 +399,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("setRandomSeed", &AgentBrain::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible results")
+        .def("getRandomSeed", &AgentBrain::getRandomSeed,
+             "Get current random seed")
+        .def("getBrainStats", [](const AgentBrain& agent) {
+            std::stringstream ss;
+            auto* brain = agent.getBrain();
+            if (brain) {
+                ss << "Brain Statistics:" << std::endl;
+                ss << "  Total Neurons: " << brain->getTotalNeuronCount() << std::endl;
+                ss << "  Total Synapses: " << brain->getTotalSynapseCount() << std::endl;
+                ss << "  Firing Neurons: " << brain->getFiringNeuronCount() << std::endl;
+                ss << "  Average Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+                ss << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+            }
+            return ss.str();
+        }, "Get formatted brain statistics string")
+        .def("saveBrainState", &AgentBrain::saveBrainState, py::arg("filepath"),
+             "Save brain state to file")
+        .def("loadBrainState", &AgentBrain::loadBrainState, py::arg("filepath"),
+             "Load brain state from file")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +438,76 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add convenience function to create complete agent setup
+    m.def("createCompleteAgentSetup", [](std::shared_ptr<Config> config, 
+                                         float worldWidth, float worldHeight,
+                                         size_t visionWidth, size_t visionHeight) {
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldWidth, worldHeight, visionWidth, visionHeight);
+        world->reset();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("config"), py::arg("worldWidth"), py::arg("worldHeight"),
+        py::arg("visionWidth"), py::arg("visionHeight"),
+        "Create a complete agent setup with brain, world, and agent interface");
+    
+    // Add utility functions for simulation management
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain,
+                             std::shared_ptr<AgentBrain> agent,
+                             std::shared_ptr<SimpleWorld> world,
+                             size_t numSteps, double timestep) {
+        if (!brain || !agent || !world) {
+            throw std::runtime_error("All components must be initialized");
+        }
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(timestep);
+            
+            // Get sensory input
+            const auto& percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step);
+            
+            // Decode motor command
+            auto motorCmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motorCmd, world->getSimulationTime());
+            
+            // Apply reward modulation
+            auto internal = percept.getInternal();
+            float reward = internal && !internal->empty() ? internal->front() : 0.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(timestep);
+        }
+        
+        return std::make_tuple(brain->getTotalSpikeCount(),
+                               brain->getFiringNeuronCount());
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+        py::arg("numSteps"), py::arg("timestep") = 0.1,
+        "Run a complete simulation loop");
+    
+    // Add function to get system information
+    m.def("getSystemInfo", []() {
+        std::stringstream ss;
+        ss << "NLM Neural Learning Machine" << std::endl;
+        ss << "Version: 0.1.0" << std::endl;
+        ss << "Phase: 6 - Final Integration" << std::endl;
+        ss << std::endl;
+        ss << "Core Components:" << std::endl;
+        ss << "  - Neural Processing (LIF neurons, spike propagation)" << std::endl;
+        ss << "  - Memory Systems (Working, Episodic, Associative)" << std::endl;
+        ss << "  - Neuromodulation (Dopamine, Curiosity, Novelty)" << std::endl;
+        ss << "  - Prediction Systems" << std::endl;
+        ss << "  - Cognitive Mechanisms (Planning, Attention)" << std::endl;
+        ss << "  - Development Systems (Plasticity, Maturation)" << std::endl;
+        ss << "  - Environment Interface" << std::endl;
+        return ss.str();
+    }, "Get system information and version details");
 
 } // namespace nlm

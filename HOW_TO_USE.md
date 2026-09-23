@@ -256,6 +256,120 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
+### Advanced Agent Example with System Information
+
+```python
+import pynlm
+
+# Get system information first
+print(pynlm.getSystemInfo())
+
+# Create configuration with custom parameters
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.dopamine.scale", 1.5)
+
+# Create complete agent setup
+brain, world, agent = pynlm.createCompleteAgentSetup(
+    config, worldWidth=30, worldHeight=30,
+    visionWidth=12, visionHeight=12
+)
+
+# Initialize everything
+brain.initialize()
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+print("\nStarting advanced simulation...")
+print("Brain Statistics:")
+print(agent.getBrainStats())
+
+# Run simulation with detailed logging
+for step in range(500):
+    world.update(0.05)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    agent.applyRewardModulation(0.1, 0.05)
+    agent.updateDevelopment(0.05)
+    
+    if step % 50 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print(f"\nSimulation complete!")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f}")
+
+# Save brain state for later
+brain.save("advanced_simulation_checkpoint.bin")
+print("Brain state saved!")
+```
+
+### Batch Simulation with Different Configurations
+
+```python
+import pynlm
+
+def batch_simulation(config_name, world_size, steps):
+    """Run a simulation with given configuration and parameters."""
+    print(f"Running batch simulation: {config_name}, World {world_size}x{world_size}, Steps: {steps}")
+    
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", world_size * world_size // 2)
+    
+    brain, world, agent = pynlm.createCompleteAgentSetup(
+        config, worldSize, worldSize, 6, 6
+    )
+    
+    brain.initialize()
+    agent.initialize(world)
+    
+    # Run simulation
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    for step in range(steps):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+    
+    return {
+        'config': config_name,
+        'world_size': worldSize,
+        'steps': steps,
+        'final_firing': brain.getFiringNeuronCount(),
+        'total_spikes': brain.getTotalSpikeCount(),
+        'avg_firing_rate': brain.getAverageFiringRate()
+    }
+
+# Run batch simulations
+configs = ['default', 'high_plasticity', 'high_curiosity']
+world_sizes = [10, 15, 20]
+steps_list = [200, 500, 1000]
+
+results = []
+for config in configs:
+    for world_size in world_sizes:
+        for steps in steps_list:
+            result = batch_simulation(config, world_size, steps)
+            results.append(result)
+
+# Print summary
+print("\n=== Batch Simulation Summary ===")
+for result in results:
+    print(f"Config: {result['config']}, World: {result['world_size']}, Steps: {result['steps']}")
+    print(f"  Results: {result['final_firing']} firing neurons, {result['total_spikes']} total spikes")
+```
+
 ### Key Classes and Methods
 
 #### Brain Class

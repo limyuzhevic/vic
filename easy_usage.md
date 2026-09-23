@@ -4,6 +4,8 @@
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
+**NLM (熙然, meaning "serene flow")** is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
 - **Synapses** = Connections between brain cells
