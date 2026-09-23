@@ -360,7 +360,7 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using default configuration.");
     }
     
     // Override with command line args

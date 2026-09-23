@@ -153,6 +153,11 @@ struct Brain::Impl {
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
+    ~Impl() {
+        // Clean up all unique_ptr members
+        // (They will be automatically destroyed when this destructor is called)
+    }
+    
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
@@ -641,22 +646,42 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
 }
 
 SpikeSystem* Brain::getSpikeSystem() {
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Brain not properly initialized or spike system missing");
+        return nullptr;
+    }
     return pImpl->spikeSystem.get();
 }
 
 const SpikeSystem* Brain::getSpikeSystem() const {
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Brain not properly initialized or spike system missing");
+        return nullptr;
+    }
     return pImpl->spikeSystem.get();
 }
 
 STDP* Brain::getSTDP() {
+    if (!pImpl || !pImpl->stdp) {
+        NLM_LOG_ERROR("Brain not properly initialized or STDP system missing");
+        return nullptr;
+    }
     return pImpl->stdp.get();
 }
 
 Hebbian* Brain::getHebbian() {
+    if (!pImpl || !pImpl->hebbian) {
+        NLM_LOG_ERROR("Brain not properly initialized or Hebbian system missing");
+        return nullptr;
+    }
     return pImpl->hebbian.get();
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    if (!pImpl || !pImpl->structuralPlasticity) {
+        NLM_LOG_ERROR("Brain not properly initialized or structural plasticity system missing");
+        return nullptr;
+    }
     return pImpl->structuralPlasticity.get();
 }
 
