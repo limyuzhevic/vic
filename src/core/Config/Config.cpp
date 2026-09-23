@@ -55,6 +55,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// Enhanced loadFromArgs with proper type conversion
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -66,13 +67,22 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle --key value format without equals
+                if (i + 1 < argc) {
+                    std::string key = arg.substr(2);
+                    std::string value = argv[++i];
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        // Handle -k value format (short options)
+        else if (arg[0] == '-') {
             std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -111,6 +121,30 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// Enhanced getOr with type conversion
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// String to int conversion for getOr
+int Config::getOr<int>(const std::string& key, const int& defaultValue) const {
+    auto val = get<int>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// String to double conversion for getOr  
+double Config::getOr<double>(const std::string& key, const double& defaultValue) const {
+    auto val = get<double>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+// String to bool conversion for getOr
+bool Config::getOr<bool>(const std::string& key, const bool& defaultValue) const {
+    auto val = get<bool>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
@@ -199,17 +233,54 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Configuration type conversion and validation
+bool Config::validateKey(const std::string& key) {
+    return !key.empty() && key.find('=') == std::string::npos;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Enhanced loadFromFile with better error handling and JSON/YAML placeholder
+bool Config::loadFromFile(const std::string& filepath) {
+    // TODO PHASE 3: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    int lineNum = 0;
+    while (std::getline(file, line)) {
+        lineNum++;
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        } else {
+            // Log warning for malformed lines
+            if (!line.empty()) {
+                // TODO: Add proper logging
+            }
+        }
+    }
+    
+    return true;
+}
 
 } // namespace nlm

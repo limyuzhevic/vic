@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_config_improvements {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -22,6 +26,10 @@ namespace test_clock {
 }
 
 namespace test_neuron {
+    void runAll();
+}
+
+namespace test_agentbrain_memory_safety {
     void runAll();
 }
 
@@ -65,6 +73,15 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Config Improvements tests..." << std::endl;
+    try {
+        test_config_improvements::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << "Running Random tests..." << std::endl;
     try {
         test_random::runAll();
@@ -86,6 +103,15 @@ int main() {
     std::cout << "Running Neuron tests..." << std::endl;
     try {
         test_neuron::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running AgentBrain Memory Safety tests..." << std::endl;
+    try {
+        test_agentbrain_memory_safety::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

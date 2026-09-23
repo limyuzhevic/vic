@@ -68,8 +68,14 @@ public:
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+template<typename T>
+T getOr(const std::string& key, const T& defaultValue) const;
+
+// Enhanced set methods with better type handling
+void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
