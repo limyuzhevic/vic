@@ -243,7 +243,12 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Configure prediction system parameters
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->setPredictionHorizon(50);
+        pImpl->predictionSystem->setPredictionAccuracy(0.7f);
+        pImpl->predictionSystem->setPredictionUpdateInterval(10);
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -255,9 +260,11 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
+    // Initialize neuromodulation systems
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -538,12 +545,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important episodes into semantic memory
+        auto importantEpisodes = pImpl->episodicMemory->getImportantEpisodes();
+        pImpl->associativeMemory->storeAssociation(importantEpisodes);
     }
     
     // ========== STEP 13: Apply development effects ==========

@@ -39,13 +39,103 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics            ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << R"(
+NLM — 熙然 (Real Neural Computation - Phase 2)
+===============================================
+
+An experimental artificial developmental brain implementing:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+
+USAGE:
+    nlm [OPTIONS] [CONFIG_FILE]
+
+OPTIONS:
+    --help, -h              Print this help message and exit
+    --version, -v           Print version information and exit
+    --config FILE, -c FILE   Load configuration from FILE
+                             (default: configs/default.cfg)
+    --neuron-count N        Override number of neurons (default: 500)
+    --region-count R        Override number of regions (default: 1)
+    --timestep T            Override simulation timestep (default: 0.001)
+    --seed S                Set random seed (default: 42)
+    --verbose, -V           Enable verbose logging
+    --quiet, -q             Suppress most logging (errors only)
+
+CONFIGURATION:
+    Configuration can be specified via:
+    1. Command line arguments (as shown above)
+    2. Configuration file (key=value format)
+    3. Default values (built into program)
+
+    Configuration file format:
+        # Comments start with #
+        key=value
+        another_key=123
+        float_value=0.5
+        bool_value=true
+        int64_value=42
+
+    Common configuration keys:
+        random_seed           Random number generator seed
+        simulation_timestep   Time step size (seconds)
+        neuron_count          Total number of neurons
+        region_count          Number of neural regions
+        connection_probability Probability of connection between neurons
+        stdp_ltp_weight        STDP LTP learning rate
+        stdp_ltd_weight        STDP LTD learning rate
+        stdp_tau              STDP time constant (ms)
+        synaptogenesis_rate    Rate of new synapse formation
+        pruning_rate          Rate of synapse elimination
+        log_level             Logging level (Debug, Info, Warning, Error)
+        checkpoint_dir        Directory for checkpoint saves
+
+EXAMPLES:
+    # Run with default configuration
+    nlm
+
+    # Load specific configuration file
+    nlm my_config.cfg
+
+    # Override parameters via command line
+    nlm --neuron-count 1000 --timestep 0.0005 --seed 12345
+
+    # Show help
+    nlm --help
+
+    # Show version
+    nlm --version
+
+The program runs three integration tests:
+1. Basic connectivity test - verify neural communication
+2. Plasticity learning experiment - test STDP and Hebbian learning
+3. STDP verification - test spike-timing dependent plasticity
+
+For more information, see:
+- README.md for project overview
+- HOW_TO_USE.md for Python API
+- easy_usage.md for quick start guide
+- docs/ARCHITECTURE.md for system architecture
+
+NLM is a research project - please read LICENSE and documentation
+for important limitations and disclaimers.
+
+Copyright (c) 2026 NLM Project
+MIT License
+
+)}" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -324,6 +414,30 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Print help if requested
+    bool showHelp = false;
+    bool showVersion = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        }
+    }
+    
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+        std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+        std::cout << "Built: " << __DATE__ << " " << __TIME__ << std::endl;
+        return 0;
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -343,18 +457,40 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    if (arg == "--log-level") {
+        if (i + 1 < argc) {
+            config->set("log_level", std::string(argv[++i]), ConfigSource::CommandLine);
         }
+    } else if (arg == "--checkpoint-dir") {
+        if (i + 1 < argc) {
+            config->set("checkpoint_dir", std::string(argv[++i]), ConfigSource::CommandLine);
+        }
+    } else if (arg == "--replay-interval") {
+        if (i + 1 < argc) {
+            config->set("replay_interval", std::stoll(argv[++i]), ConfigSource::CommandLine);
+        }
+    } else if (arg == "--consolidation-interval") {
+        if (i + 1 < argc) {
+            config->set("consolidation_interval", std::stoll(argv[++i]), ConfigSource::CommandLine);
+        }
+    } else if (arg.substr(0, 7) == "--config") {
+        if (arg.find('=') != std::string::npos) {
+            configFile = arg.substr(arg.find('=') + 1);
+        } else if (i + 1 < argc) {
+            configFile = argv[++i];
+        }
+    } else if (arg == "--help" || arg == "-h") {
+        // Handled earlier
+    } else if (arg == "--version" || arg == "-v") {
+        // Handled earlier
+    } else if (!arg.empty() && arg[0] == '-') {
+        // Unknown option
+        std::cerr << "Warning: Unknown option '" << arg << "' (skipping)" << std::endl;
+    } else {
+        // Assume it's a config file
+        configFile = arg;
     }
+}
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -366,7 +502,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default configuration for Phase 2 testing
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -381,6 +517,12 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Logging configuration
+    config->set("log_level", std::string("Info"), ConfigSource::Default);
+    config->set("checkpoint_dir", std::string("./checkpoints"), ConfigSource::Default);
+    config->set("replay_interval", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("consolidation_interval", static_cast<int64_t>(1000), ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
