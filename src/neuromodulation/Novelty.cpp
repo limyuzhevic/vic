@@ -20,9 +20,13 @@ Novelty::Novelty() : pImpl(new Impl) {}
 
 Novelty::~Novelty() = default;
 
-void Novelty::initialize(Brain* brain) {
+void Novelty::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
+}
+
+const char* Novelty::getName() const {
+    return "Novelty";
 }
 
 float Novelty::getLevel() const {
@@ -33,7 +37,17 @@ void Novelty::setLevel(float level) {
     pImpl->level = level;
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
+float Novelty::getPlasticityFactor() const {
+    // Novelty affects learning - higher novelty increases plasticity
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Novelty::update(TimestepDuration dt) {
+    // Decay novelty
+    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Novelty::detectNovelty(const Observation& observation,
                             const Observation& previousObservation) {
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
@@ -66,11 +80,6 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     
     // Store current pattern for next comparison
     pImpl->lastPattern = currentPattern;
-}
-
-void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {

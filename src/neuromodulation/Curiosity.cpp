@@ -22,13 +22,32 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 
 Curiosity::~Curiosity() = default;
 
-void Curiosity::initialize(Brain* brain) {
+void Curiosity::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
 
+const char* Curiosity::getName() const {
+    return "Curiosity";
+}
+
 float Curiosity::getLevel() const {
     return pImpl->level;
+}
+
+void Curiosity::setLevel(float level) {
+    pImpl->level = level;
+}
+
+float Curiosity::getPlasticityFactor() const {
+    // Curiosity affects exploration drive, not directly plasticity
+    // But higher curiosity can increase willingness to explore novel solutions
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Curiosity::update(TimestepDuration dt) {
+    // Base Neuromodulator update - no-op since we use the custom update
+    // The actual curiosity computation happens via update(float novelty, float predictionError, TimestepDuration dt)
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {

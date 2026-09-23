@@ -17,6 +17,9 @@ public:
     DevelopmentSystem();
     ~DevelopmentSystem();
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Get current developmental stage
     DevelopmentalStage getStage() const;
     void setStage(DevelopmentalStage stage);
@@ -50,6 +53,8 @@ private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    
+    Brain* brain_;
 };
 
 } // namespace nlm

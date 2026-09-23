@@ -18,13 +18,36 @@ PredictionError::PredictionError() : pImpl(new Impl) {}
 
 PredictionError::~PredictionError() = default;
 
-void PredictionError::initialize(Brain* brain) {
+void PredictionError::initialize(class Brain* brain) {
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
 
+const char* PredictionError::getName() const {
+    return "PredictionError";
+}
+
 float PredictionError::getError() const {
     return pImpl->error;
+}
+
+void PredictionError::setLevel(float level) {
+    pImpl->error = level;
+}
+
+float PredictionError::getLevel() const {
+    return pImpl->error;
+}
+
+float PredictionError::getPlasticityFactor() const {
+    // Prediction error affects learning - higher error increases plasticity
+    // This is the classic error-driven learning signal
+    return 0.5f + 0.5f * std::abs(pImpl->error);
+}
+
+void PredictionError::update(TimestepDuration dt) {
+    // Prediction error decays over time (for stability)
+    pImpl->error = pImpl->error * std::exp(-0.1f * static_cast<float>(dt));
 }
 
 void PredictionError::computeError(float predicted, float actual) {
@@ -36,6 +59,8 @@ void PredictionError::computeError(float predicted, float actual) {
 
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
+    // Update error based on new prediction
+    computeError(newPrediction, pImpl->actualValue);
 }
 
 const std::vector<float>& PredictionError::getHistory() const {

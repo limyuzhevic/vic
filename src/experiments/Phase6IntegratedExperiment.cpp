@@ -190,18 +190,18 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 2: Neuromodulation systems exist
-    if (brain->getDopamine() != nullptr) {
-        NLM_LOG_INFO("[PASS] Dopamine system is integrated");
+    // Test 2b: Novelty and PredictionError systems exist
+    if (brain->getNovelty() != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Novelty system is NOT integrated");
         success = false;
     }
-    
-    if (brain->getCuriosity() != nullptr) {
-        NLM_LOG_INFO("[PASS] Curiosity system is integrated");
+
+    if (brain->getPredictionErrorSignal() != nullptr) {
+        NLM_LOG_INFO("[PASS] PredictionError system is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] PredictionError system is NOT integrated");
         success = false;
     }
     

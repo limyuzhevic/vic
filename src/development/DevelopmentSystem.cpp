@@ -13,9 +13,15 @@ struct DevelopmentSystem::Impl {
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0), brain_(nullptr) {}
 
 DevelopmentSystem::~DevelopmentSystem() = default;
+
+void DevelopmentSystem::initialize(class Brain* brain) {
+    brain_ = brain;
+    setStage(DevelopmentalStage::Initial);
+    setDevelopmentalAge(0.0);
+}
 
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;

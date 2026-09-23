@@ -7,22 +7,26 @@ namespace nlm {
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
 
-class Curiosity {
+class Curiosity : public Neuromodulator {
 public:
     Curiosity();
-    ~Curiosity();
+    ~Curiosity() override;
     
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
+    // Neuromodulator interface
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
     // Get curiosity level
-    float getLevel() const;
+    float getExplorationDrive() const;
     
     // Update curiosity based on novelty and prediction error
     void update(float novelty, float predictionError, TimestepDuration dt);
-    
-    // Get exploration drive (same as level)
-    float getExplorationDrive() const;
     
     // Set curiosity parameters
     void setNoveltyWeight(float weight);
