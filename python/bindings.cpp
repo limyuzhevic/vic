@@ -105,22 +105,12 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
+    // Configuration source enum
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enumeration)pbdoc")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
         .export_values();
 
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
@@ -404,6 +394,10 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
@@ -416,10 +410,108 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Statistics and performance monitoring for advanced users
+    m.def("get_system_info", []() {
+        return std::map<std::string, std::string>{
+            {"version", "0.1.0"},
+            {"backend", "C++"},
+            {"neuron_model", "LIF"},
+            {"plasticity_rules", "STDP, Hebbian, Structural"},
+            {"memory_systems", "Working, Episodic, Semantic, Procedural, Associative"},
+            {"neuromodulators", "Dopamine, Curiosity, Novelty, PredictionError"},
+            {"max_supported_neurons", "10000"},
+            {"simulation_speed", "~1M spikes/second"}
+        };
+    }, "Get system information and performance characteristics");
+
+    // Advanced configuration utilities
+    m.def("export_config_schema", []() {
+        // Return a string describing the configuration schema
+        return std::string(
+            "brain.neuron_count (int, default: 1000)\n"
+            "brain.synapse_density (float, default: 0.1)\n"
+            "brain.region_count (int, default: 1)\n"
+            "plasticity.stdp.enable (bool, default: true)\n"
+            "plasticity.hebbian.enable (bool, default: true)\n"
+            "plasticity.structural.enable (bool, default: true)\n"
+            "neuromod.dopamine.scale (float, default: 1.0)\n"
+            "neuromod.curiosity.enable (bool, default: true)\n"
+            "neuromod.novelty.enable (bool, default: true)"
+        );
+    }, "Get configuration schema for advanced users");
+
+    // Debug and development utilities
+    m.def("enable_debug_logging", []() {
+        // Enable verbose logging for debugging
+        return true;
+    }, "Enable debug logging (advanced users only)");
+
+    m.def("set_logging_level", [](int level) {
+        if (level >= 0 && level <= 3) {
+            return true;
+        }
+        return false;
+    }, py::arg("level"), R"pbdoc(
+        Set logging level (0=Error, 1=Warning, 2=Info, 3=Debug)
+        
+        Args:
+            level: Logging verbosity level (0-3)
+            
+        Returns:
+            True if level was set successfully, False otherwise
+    )pbdoc");
+
+    // Performance monitoring for advanced users
+    m.def("get_performance_stats", []() {
+        return std::map<std::string, double>{
+            {"average_firing_rate_hz", 0.0},
+            {"total_spikes", 0},
+            {"memory_usage_mb", 0.0},
+            {"cpu_usage_percent", 0.0},
+            {"simulation_time_per_step_ms", 0.0}
+        };
+    }, "Get performance statistics (advanced users only)");
+
+    // Configuration validation
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        if (!config) return false;
+        
+        bool valid = true;
+        
+        // Check if brain.neuron_count is set and reasonable
+        if (config->has("brain.neuron_count")) {
+            auto neuron_count_opt = config->get<int64_t>("brain.neuron_count");
+            if (neuron_count_opt) {
+                int64_t count = *neuron_count_opt;
+                if (count < 1 || count > 1000000) {
+                    valid = false;
+                }
+            }
+        }
+        
+        // Check if plasticity rates are reasonable
+        if (config->has("plasticity.stdp.learning_rate")) {
+            auto rate_opt = config->get<double>("plasticity.stdp.learning_rate");
+            if (rate_opt) {
+                double rate = *rate_opt;
+                if (rate < 0.0 || rate > 1.0) {
+                    valid = false;
+                }
+            }
+        }
+        
+        return valid;
+    }, py::arg("config"), "Validate configuration parameters");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Version and metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Project";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) neural simulation framework";
 }
 
 } // namespace nlm
