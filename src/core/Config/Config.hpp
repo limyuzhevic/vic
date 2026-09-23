@@ -31,6 +31,33 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration options for predefined schemas
+enum class ConfigSchema {
+    Phase1,      // Phase 1 skeleton
+    Phase2,      // Phase 2 neural computation
+    Phase3,      // Phase 3 world interaction
+    Phase4,      // Phase 4 cognition
+    Phase5,      // Phase 5 performance
+    Phase6       // Phase 6 final integration
+};
+
+// Configuration file format
+enum class FileFormat {
+    JSON,
+    YAML,
+    KeyValue
+};
+
+// Configuration schema (backwards compatibility)
+enum class Schema {
+    Phase1,
+    Phase2,
+    Phase3,
+    Phase4,
+    Phase5,
+    Phase6
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -46,6 +73,21 @@ struct ConfigEntry {
 // Main configuration class
 class Config {
 public:
+    enum class FileFormat {
+        JSON,
+        YAML,
+        KeyValue
+    };
+    
+    enum class Schema {
+        Phase1,
+        Phase2,
+        Phase3,
+        Phase4,
+        Phase5,
+        Phase6
+    };
+    
     Config();
     ~Config();
     
@@ -87,19 +129,64 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Configuration schema operations
+    void applySchema(ConfigSchema schema);
+    void applySchema(Schema schema);
     
-    // Get configuration summary
+    // Configuration management
+    void clear();
+    void validateConfig() const;
+    void mergeConfig(const Config& other);
+    
+    // Configuration summary and debugging
     std::string summary() const;
+    
+    // Helper methods
+    std::string getFileExtension(const std::string& filepath) const;
+    Config::FileFormat detectFileFormat(const std::string& filepath) const;
+    std::string trim(const std::string& str) const;
+    std::string toLower(const std::string& str) const;
+    ConfigSchema stringToSchema(const std::string& schemaStr) const;
+    
+    // Configuration entry creation
+    ConfigEntry createEntryFromSchema(const std::string& key, const ConfigValue& value, Schema schema) const;
+    
+    // Debug and information
+    void showHelp() const;
+    void showVersion() const;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Internal implementation details
+    bool loadFromKeyValue(const std::string& content);
+    bool loadFromJSON(const std::string& content);
+    bool loadFromYAML(const std::string& content);
+    
+    void applyPhase1Schema();
+    void applyPhase2Schema();
+    void applyPhase3Schema();
+    void applyPhase4Schema();
+    void applyPhase5Schema();
+    void applyPhase6Schema();
+    
+    std::string getPhase1Description(const std::string& key) const;
+    std::string getPhase2Description(const std::string& key) const;
+    std::string getPhase3Description(const std::string& key) const;
+    std::string getPhase4Description(const std::string& key) const;
+    std::string getPhase5Description(const std::string& key) const;
+    std::string getPhase6Description(const std::string& key) const;
+    
+    // Configuration state
+    bool verboseMode = false;
+    bool batchMode = false;
+    ConfigSchema currentSchema = ConfigSchema::Phase6;
+    std::string logFile;
+    std::string configFormat;
+    
+    // Backwards compatibility
+    static constexpr Schema deprecatedSchema = Schema::Phase2;
 };
 
 } // namespace nlm
