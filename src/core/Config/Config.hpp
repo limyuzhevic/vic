@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -18,17 +19,17 @@ using ConfigValue = std::variant<
     double,
     bool,
     std::string,
-    std::vector<int>,
+    std::vector<int64_t>,
     std::vector<double>,
     std::vector<std::string>
 >;
 
 // Configuration source
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default = 0,
+    File = 1,
+    CommandLine = 2,
+    Runtime = 3
 };
 
 // Configuration entry
