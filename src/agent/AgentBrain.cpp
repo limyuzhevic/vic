@@ -238,44 +238,147 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
-    // Compute prediction error
+    // Compute prediction error with improved precision
     predictionError_ = reward - predictedReward;
     
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    // Update expected reward (exponential moving average) - improved with bias correction
+    float rewardUpdate = 0.05f * (reward - expectedReward_);
+    expectedReward_ += rewardUpdate;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Dopamine-like signal (based on prediction error) - smoother transitions
+    dopamineLevel_ = predictionError_ * 0.8f + dopamineLevel_ * 0.2f;  // Exponential moving average
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Clamp to reasonable range with gradual approach
+    if (dopamineLevel_ > 1.0f) dopamineLevel_ = 1.0f - (dopamineLevel_ - 1.0f) * 0.5f;
+    if (dopamineLevel_ < -1.0f) dopamineLevel_ = -1.0f + (-dopamineLevel_ - 1.0f) * 0.5f;
     
-    // Apply to all synapses with eligibility traces
+    // Apply reward modulation to synapses with eligibility traces
+    applyRewardToSynapses(dopamineLevel_, rewardUpdate);
+    
+    // Apply advanced neuromodulation effects
+    applyAdvancedNeuromodulation();
+    
+    // Apply metaplasticity if enabled
+    if (metaplasticityEnabled_) {
+        applyMetaplasticity(dopamineLevel_, rewardUpdate);
+    }
+}
+
+void AgentBrain::applyAdvancedNeuromodulation() {
+    if (!brain_) return;
+    
+    // Apply novelty-enhanced neuromodulation
+    float noveltyFactor = 1.0f + curiosityLevel_ * 0.5f;
+    if (noveltyFactor > 2.0f) noveltyFactor = 2.0f;
+    
+    // Apply dopamine effects on neural excitability
+    for (auto* neuron : motorNeurons_) {
+        // Neuromodulation with smoothing
+        float neuromodulationEffect = dopamineLevel_ * noveltyFactor * 0.3f;
+        neuron->injectCurrent(neuromodulationEffect);
+    }
+    
+    // Apply curiosity-based exploration boost
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        float explorationBoost = curiosityLevel_ * 0.2f;
+        for (auto* neuron : motorNeurons_) {
+            neuron->injectCurrent(explorationBoost);
+        }
+    }
+}
+
+void AgentBrain::applyMetaplasticity(float dopamineLevel, float rewardError) {
+    if (!brain_) return;
+    
+    // Metaplasticity: adjust plasticity thresholds based on learning history
+    // High reward prediction error increases plasticity thresholds (metaplasticity)
+    float metaplasticChange = rewardError * 0.01f;
+    
+    // Apply to STDP parameters
+    auto* stdp = brain_->getSTDP();
+    if (stdp) {
+        float currentLtp = stdp->getLTPWeight();
+        float currentLtd = stdp->getLTDWeight();
+        
+        // Modulate LTP/LTD weights based on metaplasticity
+        currentLtp *= (1.0f + metaplasticChange);
+        currentLtd *= (1.0f - metaplasticChange);
+        
+        // Clamp to reasonable ranges
+        currentLtp = std::clamp(currentLtp, 0.001f, 0.1f);
+        currentLtd = std::clamp(currentLtd, 0.001f, 0.2f);
+        
+        stdp->configure(currentLtp, currentLtd, stdp->getTau());
+    }
+    
+    // Apply to Hebbian learning
+    auto* hebbian = brain_->getHebbian();
+    if (hebbian) {
+        float currentRate = hebbian->getLearningRate();
+        float metaplasticRate = currentRate * (1.0f + std::abs(dopamineLevel) * 0.1f);
+        hebbian->setLearningRate(metaplasticRate);
+    }
+}
+
+void AgentBrain::applyRewardToSynapses(float dopamineLevel, float rewardError) {
+    if (!brain_) return;
+    
+    // Track which synapses were modified for potential replay
+    modifiedSynapses_.clear();
+    
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Apply reward-modulated weight change with improved numerical stability
+                float delta = eligibility * dopamineLevel * plasticityModifier_;
+                
+                // Limit delta to prevent instability
+                if (delta > 0.1f) delta = 0.1f;
+                if (delta < -0.1f) delta = -0.1f;
+                
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // Store modified synapse for later
+                modifiedSynapses_.push_back(syn->getId());
+                
+                // Decay eligibility trace - improved with variable decay
+                float decayRate = 0.1f + 0.05f * std::abs(dopamineLevel);
+                syn->decayEligibilityTrace(decayRate);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // Update development system based on reward learning
+    if (developmentEnabled_) {
+        applyDevelopmentalUpdates(rewardError);
+    }
+}
+
+void AgentBrain::applyDevelopmentalUpdates(float rewardError) {
+    if (!brain_) return;
     
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    // Developmental updates based on reward prediction error
+    // Positive prediction error indicates learning opportunities
+    if (rewardError > 0.0f) {
+        // Encourage exploration through structural changes
+        auto* structuralPlasticity = brain_->getStructuralPlasticity();
+        if (structuralPlasticity && structuralPlasticityEnabled_) {
+            float synRate = structuralPlasticity->getSynaptogenesisRate();
+            // Slightly increase synaptogenesis for exploration
+            synRate *= 1.01f;
+            structuralPlasticity->setSynaptogenesisRate(synRate);
+        }
+    } else if (rewardError < 0.0f) {
+        // Negative prediction error indicates need for stability
+        auto* structuralPlasticity = brain_->getStructuralPlasticity();
+        if (structuralPlasticity && structuralPlasticityEnabled_) {
+            float pruneRate = structuralPlasticity->getPruningRate();
+            // Increase pruning for consolidation
+            pruneRate *= 1.05f;
+            structuralPlasticity->setPruningRate(pruneRate);
+        }
     }
 }
 

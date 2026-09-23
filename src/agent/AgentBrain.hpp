@@ -6,8 +6,13 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <unordered_set>
 
 namespace nlm {
+
+// Forward declarations for advanced features
+class STDP;
+class Hebbian;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -69,12 +74,28 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced configuration for power users
+    void enableMetaplasticity(bool enable) { metaplasticityEnabled_ = enable; }
+    void enableBatchOperations(bool enable) { batchOperationsEnabled_ = enable; }
+    bool isMetaplasticityEnabled() const { return metaplasticityEnabled_; }
+    bool isBatchOperationsEnabled() const { return batchOperationsEnabled_; }
+    
+    // Performance monitoring
+    size_t getPerformanceUpdateCounter() const { return performanceUpdateCounter_; }
+    void incrementPerformanceCounter() { performanceUpdateCounter_++; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Enhanced reward application
+    void applyRewardToSynapses(float dopamineLevel, float rewardError);
+    void applyAdvancedNeuromodulation();
+    void applyMetaplasticity(float dopamineLevel, float rewardError);
+    void applyDevelopmentalUpdates(float rewardError);
     
     std::shared_ptr<Brain> brain_;
     
@@ -109,9 +130,19 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Advanced configuration flags
+    bool metaplasticityEnabled_;
+    bool batchOperationsEnabled_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Performance tracking
+    size_t performanceUpdateCounter_;
+    
+    // Modified synapses for potential replay
+    std::unordered_set<NeuronId> modifiedSynapses_;
 };
 
 } // namespace nlm
