@@ -351,7 +351,210 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
+             "Log brain status")
+        
+        // Enhanced brain methods
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system for advanced neural dynamics control")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getPredictionError", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random number generator")
+        .def("getRandomSeed", &Brain::getRandomGenerator,
+             [](Brain* brain) {
+                 auto* rng = brain->getRandomGenerator();
+                 return rng ? rng->getSeed() : 0;
+             }, "Get random seed")
+        .def("setRandomSeed", [](Brain* brain, uint64_t seed) {
+             auto* rng = brain->getRandomGenerator();
+             if (rng) rng->setSeed(seed);
+         }, py::arg("seed"), "Set random seed for reproducibility")
+        .def("getSimulationTime", &Brain::getSimulationTime,
+             "Get current simulation time")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
              "Log brain status");
+
+    // Enhanced configuration methods
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        })
+        // Enhanced configuration methods
+        .def("setInt", [](Config& self, const std::string& key, int value, 
+                         ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set integer configuration value")
+        .def("setDouble", [](Config& self, const std::string& key, double value,
+                             ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set double configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value,
+                           ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set boolean configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value,
+                             ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set string configuration value")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            return self.get<int>(key);
+        }, py::arg("key"), "Get integer value")
+        .def("getDouble", [](const Config& self, const std::string& key) {
+            return self.get<double>(key);
+        }, py::arg("key"), "Get double value")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            return self.get<bool>(key);
+        }, py::arg("key"), "Get boolean value")
+        .def("getString", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"), "Get string value")
+        .def("getIntOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get integer value or default")
+        .def("getDoubleOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get double value or default")
+        .def("getBoolOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get boolean value or default")
+        .def("getStringOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get string value or default")
+        .def("remove", &Config::remove,
+             py::arg("key"), "Remove configuration key")
+        .def("merge", [](Config& self, const Config& other) {
+            for (const auto& key : other.getKeys()) {
+                auto value = other.get<ConfigValue>(key);
+                if (value) {
+                    self.set(key, *value, ConfigSource::Runtime);
+                }
+            }
+        }, py::arg("other"), "Merge another config into this one")
+        .def("validate", [](const Config& self, const std::vector<std::string>& requiredKeys) {
+            for (const auto& key : requiredKeys) {
+                if (!self.has(key)) {
+                    return false;
+                }
+            }
+            return true;
+        }, py::arg("requiredKeys"), "Validate that all required keys are present")
+        .def("getRequiredKeys", &Config::getKeys,
+             "Get all configuration keys")
+        // Enhanced convenience methods
+        .def("setFromJson", [](Config& self, const std::string& jsonString) {
+            // Try to parse JSON (placeholder implementation)
+            // In real implementation, would use a proper JSON parser
+            return false;
+        }, py::arg("jsonString"), "Set configuration from JSON string")
+        .def("toJson", [](const Config& self) {
+            // Convert to JSON representation (placeholder)
+            return "{}";
+        }, "Convert configuration to JSON string")
+        .def("clearSource", [](Config& self, ConfigSource source) {
+            auto it = std::remove_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [source](const ConfigEntry& e) { return e.source == source; });
+            self.pImpl->entries.erase(it, self.pImpl->entries.end());
+        }, py::arg("source"), "Clear configuration values from a specific source")
+        .def("getBySource", [](const Config& self, ConfigSource source) {
+            std::vector<std::pair<std::string, std::string>> result;
+            for (const auto& entry : self.pImpl->entries) {
+                if (entry.source == source) {
+                    result.push_back({entry.key, ""}); // Value is variant type
+                }
+            }
+            return result;
+        }, py::arg("source"), "Get all keys from a specific source")
+        .def("countBySource", [](const Config& self, ConfigSource source) {
+            return std::count_if(self.pImpl->entries.begin(), self.pImpl->entries.end(),
+                [source](const ConfigEntry& e) { return e.source == source; });
+        }, py::arg("source"), "Count entries from a specific source")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
