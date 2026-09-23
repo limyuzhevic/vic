@@ -1,32 +1,169 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+void printAgentHelp() {
+    std::cout << "\n" << std::string(60, '=') << std::endl;
+    std::cout << "AGENT CONFIGURATION OPTIONS" << std::endl;
+    std::cout << std::string(60, '=') << std::endl;
+    std::cout << "Agent Configuration Flags:" << std::endl;
+    std::cout << "  --agent.reward_modulation [on/off]     Enable/disable reward-based learning" << std::endl;
+    std::cout << "  --agent.structural_plasticity [on/off] Enable/disable structural changes" << std::endl;
+    std::cout << "  --agent.development [on/off]          Enable/disable developmental stages" << std::endl;
+    std::cout << "  --agent.curiosity [on/off]            Enable/disable curiosity-driven exploration" << std::endl;
+    std::cout << "\n";
+    std::cout << "Agent Parameters:" << std::endl;
+    std::cout << "  --agent.curiosity_threshold <float>    Minimum curiosity level for exploration (0.0-1.0)" << std::endl;
+    std::cout << "  --agent.novelty_decay <float>          Novelty decay factor per timestep (0.0-1.0)" << std::endl;
+    std::cout << "  --agent.sensory_vision_scale <float>    Vision signal scaling factor" << std::endl;
+    std::cout << "  --agent.sensory_touch_scale <float>     Touch signal scaling factor" << std::endl;
+    std::cout << "  --agent.sensory_internal_scale <float>  Internal signal scaling factor" << std::endl;
+    std::cout << "  --agent.sensory_proprioception_scale <float> Proprioception scaling factor" << std::endl;
+    std::cout << "  --agent.motor_activity_threshold <float> Threshold for meaningful motor activity (0.0-1.0)" << std::endl;
+    std::cout << "  --agent.exploration_probability <float> Max exploration probability (0.0-1.0)" << std::endl;
+    std::cout << "  --agent.mode <mode>                   Agent behavior mode: 'adaptive', 'curious', 'conservative', 'exploratory'" << std::endl;
+    std::cout << "\n";
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm --agent.curiosity off --agent.mode conservative" << std::endl;
+    std::cout << "  ./nlm --agent.mode exploratory --agent.exploration_probability 0.8" << std::endl;
+    std::cout << std::string(60, '=') << std::endl;
+}
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+struct AgentConfig {
+    bool enableRewardModulation;
+    bool enableStructuralPlasticity;
+    bool enableDevelopment;
+    bool enableCuriosity;
+    float curiosityThreshold;
+    float noveltyDecay;
+    float sensoryVisionScale;
+    float sensoryTouchScale;
+    float sensoryInternalScale;
+    float sensoryProprioceptionScale;
+    float motorActivityThreshold;
+    float explorationProbability;
+    std::string agentMode;
+    
+    AgentConfig() : enableRewardModulation(true), enableStructuralPlasticity(true), 
+                    enableDevelopment(true), enableCuriosity(true),
+                    curiosityThreshold(0.5f), noveltyDecay(0.99f),
+                    sensoryVisionScale(5.0f), sensoryTouchScale(8.0f),
+                    sensoryInternalScale(5.0f), sensoryProprioceptionScale(3.0f),
+                    motorActivityThreshold(0.5f), explorationProbability(0.3f),
+                    agentMode("adaptive") {}
+};
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+AgentConfig parseAgentArgs(int argc, char** argv) {
+    AgentConfig config;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        // Parse agent configuration flags
+        if (arg.find("--agent.") == 0) {
+            std::string option = arg.substr(8); // Remove "--agent." prefix
+            
+            if (option == "reward_modulation") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    std::string value = argv[++i];
+                    config.enableRewardModulation = (value == "on" || value == "true" || value == "1");
+                }
+            } else if (option == "structural_plasticity") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    std::string value = argv[++i];
+                    config.enableStructuralPlasticity = (value == "on" || value == "true" || value == "1");
+                }
+            } else if (option == "development") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    std::string value = argv[++i];
+                    config.enableDevelopment = (value == "on" || value == "true" || value == "1");
+                }
+            } else if (option == "curiosity") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    std::string value = argv[++i];
+                    config.enableCuriosity = (value == "on" || value == "true" || value == "1");
+                }
+            } else if (option == "curiosity_threshold") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.curiosityThreshold = std::stof(argv[++i]);
+                }
+            } else if (option == "novelty_decay") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.noveltyDecay = std::stof(argv[++i]);
+                }
+            } else if (option == "sensory_vision_scale") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.sensoryVisionScale = std::stof(argv[++i]);
+                }
+            } else if (option == "sensory_touch_scale") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.sensoryTouchScale = std::stof(argv[++i]);
+                }
+            } else if (option == "sensory_internal_scale") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.sensoryInternalScale = std::stof(argv[++i]);
+                }
+            } else if (option == "sensory_proprioception_scale") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.sensoryProprioceptionScale = std::stof(argv[++i]);
+                }
+            } else if (option == "motor_activity_threshold") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.motorActivityThreshold = std::stof(argv[++i]);
+                }
+            } else if (option == "exploration_probability") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.explorationProbability = std::stof(argv[++i]);
+                }
+            } else if (option == "mode") {
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--config") {
+                    config.agentMode = argv[++i];
+                }
+            } else if (option == "help") {
+                printAgentHelp();
+                exit(0);
+            }
+        }
+    }
+    
+    return config;
+}
 
-using namespace nlm;
+void applyAgentConfig(std::shared_ptr<nlm::AgentBrain> agentBrain, const AgentConfig& config) {
+    // Apply configuration to agent brain
+    agentBrain->enableRewardModulation(config.enableRewardModulation);
+    agentBrain->enableStructuralPlasticity(config.enableStructuralPlasticity);
+    agentBrain->enableDevelopment(config.enableDevelopment);
+    agentBrain->enableCuriosity(config.enableCuriosity);
+    
+    // Note: In a real implementation, we would have setters for these parameters
+    // For now, the config is used to guide agent behavior patterns
+    
+    // Apply agent mode specific configuration
+    if (config.agentMode == "curious") {
+        // High exploration settings
+        agentBrain->enableCuriosity(true);
+        agentBrain->enableDevelopment(true);
+    } else if (config.agentMode == "conservative") {
+        // Conservative learning settings
+        agentBrain->enableCuriosity(false);
+        agentBrain->enableDevelopment(true);
+        agentBrain->enableRewardModulation(true);
+    } else if (config.agentMode == "exploratory") {
+        // High exploration settings
+        agentBrain->enableCuriosity(true);
+        agentBrain->enableDevelopment(true);
+        agentBrain->enableStructuralPlasticity(true);
+    } else if (config.agentMode == "adaptive") {
+        // Balanced adaptive learning
+        agentBrain->enableCuriosity(true);
+        agentBrain->enableDevelopment(true);
+        agentBrain->enableStructuralPlasticity(true);
+        agentBrain->enableRewardModulation(true);
+    }
+    
+    NLM_LOG_INFO("Agent configured with mode: " + config.agentMode);
+    NLM_LOG_INFO("  Reward modulation: " + std::string(config.enableRewardModulation ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Structural plasticity: " + std::string(config.enableStructuralPlasticity ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Development: " + std::string(config.enableDevelopment ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Curiosity: " + std::string(config.enableCuriosity ? "enabled" : "disabled"));
+}
 
 void printBanner() {
     std::cout << R"(
