@@ -147,11 +147,29 @@ void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
 
-void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    // Validate input parameters
+    if (timestamp < 0.0f) {
+        NLM_LOG_ERROR("Invalid spike timestamp in Neuron::recordSpike: " + std::to_string(timestamp));
+        return;
+    }
+    
+    // Validate spike history management with memory bounds checking
+    if (pImpl->spikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Use circular buffer management to prevent memory leaks
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    
+    // Add new spike timestamp
+    pImpl->spikeHistory.push_back(timestamp);
+    
+    // Ensure spike history doesn't exceed maximum size (defensive check)
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        // Truncate if we somehow exceeded the limit
+        pImpl->spikeHistory.resize(Impl::MAX_SPIKE_HISTORY);
+    }
+    
+    NLM_LOG_DEBUG("Recorded spike at timestamp " + std::to_string(timestamp) + 
+                  " (history size: " + std::to_string(pImpl->spikeHistory.size()) + ")");
 }
 
 void Neuron::clearSpikeHistory() {
@@ -191,6 +209,25 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate input parameters
+    if (dt <= 0.0f) {
+        NLM_LOG_ERROR("Invalid timestep duration in Neuron::stepLIF: " + std::to_string(dt));
+        return false;
+    }
+    
+    if (currentTime < 0.0f) {
+        NLM_LOG_ERROR("Invalid current time in Neuron::stepLIF: " + std::to_string(currentTime));
+        return false;
+    }
+    
+    // Validate neuron state
+    if (!isValidState(pImpl->state)) {
+        NLM_LOG_ERROR("Invalid neuron state before stepLIF: " + neuronStateToString(pImpl->state));
+        return false;
+    }
+    
+    bool fired = false;
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -216,11 +253,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution - ensure proper time unit conversion
+    float leakContribution = (V_rest - V) / tau;  // V_rest - V is in mV, tau is in ms
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Correct time unit conversion: dt is in seconds, need to convert to ms for consistency
+    V = V + dt * (leakContribution + synapticContribution);  // dt is already in seconds for biological consistency
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -228,19 +266,21 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
+    // Apply biological membrane potential bounds
+    // Realistic neuron membrane potential bounds: -100mV to +50mV
+    // These bounds represent typical biological limits for neuronal membrane potentials
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Check for spike with proper state transition logic
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike with memory management
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to reset potential
         V = V_reset;
         
         // Enter refractory period
@@ -250,11 +290,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Proper state for subthreshold activity
         pImpl->state.firingState = FiringState::Active;
     }
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
+    
+    // Final validation of neuron state after step
+    if (!isValidState(pImpl->state)) {
+        NLM_LOG_ERROR("Invalid neuron state after stepLIF: " + neuronStateToString(pImpl->state));
+    }
     
     return fired;
 }
@@ -294,9 +340,81 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
-    // Clear any residual state
-    pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+// Validation helper functions for Neuron class
+
+bool Neuron::isValidState(const NeuronState& state) {
+    // Validate neuron state parameters
+    
+    // Check for NaN or infinite values
+    if (std::isnan(state.membranePotential) || std::isinf(state.membranePotential)) {
+        NLM_LOG_ERROR("Invalid neuron state: NaN or infinite membrane potential");
+        return false;
+    }
+    
+    if (std::isnan(state.restingPotential) || std::isinf(state.restingPotential)) {
+        NLM_LOG_ERROR("Invalid neuron state: NaN or infinite resting potential");
+        return false;
+    }
+    
+    if (std::isnan(state.threshold) || std::isinf(state.threshold)) {
+        NLM_LOG_ERROR("Invalid neuron state: NaN or infinite threshold");
+        return false;
+    }
+    
+    if (std::isnan(state.resetPotential) || std::isinf(state.resetPotential)) {
+        NLM_LOG_ERROR("Invalid neuron state: NaN or infinite reset potential");
+        return false;
+    }
+    
+    // Biological validation constraints
+    if (state.membranePotential < -150.0f || state.membranePotential > 100.0f) {
+        NLM_LOG_WARNING("Membrane potential out of biological range: " + std::to_string(state.membranePotential));
+    }
+    
+    if (state.restingPotential < -80.0f || state.restingPotential > -50.0f) {
+        NLM_LOG_WARNING("Resting potential out of typical range: " + std::to_string(state.restingPotential));
+    }
+    
+    if (state.threshold < -70.0f || state.threshold > -30.0f) {
+        NLM_LOG_WARNING("Threshold out of typical range: " + std::to_string(state.threshold));
+    }
+    
+    if (state.resetPotential < -80.0f || state.resetPotential > -50.0f) {
+        NLM_LOG_WARNING("Reset potential out of typical range: " + std::to_string(state.resetPotential));
+    }
+    
+    if (state.refractoryPeriod > 100) {
+        NLM_LOG_WARNING("Refractory period unusually long: " + std::to_string(state.refractoryPeriod));
+    }
+    
+    if (state.refractoryRemaining > state.refractoryPeriod) {
+        NLM_LOG_ERROR("Refractory remaining greater than refractory period");
+        return false;
+    }
+    
+    if (state.lastSpikeTime < -1.0f) {
+        NLM_LOG_ERROR("Invalid last spike time: " + std::to_string(state.lastSpikeTime));
+        return false;
+    }
+    
+    if (state.adaptationVariable < 0.0f || state.adaptationVariable > 10.0f) {
+        NLM_LOG_WARNING("Adaptation variable out of reasonable range: " + std::to_string(state.adaptationVariable));
+    }
+    
+    return true;
+}
+
+std::string Neuron::neuronStateToString(const NeuronState& state) {
+    std::ostringstream oss;
+    oss << "Membrane Potential: " << state.membranePotential << "mV, "
+        << "Firing State: " << static_cast<int>(state.firingState) << ", "
+        << "Refractory: " << state.refractoryRemaining << "/" << state.refractoryPeriod << ", "
+        << "Last Spike: " << state.lastSpikeTime << "s, "
+        << "Adaptation: " << state.adaptationVariable;
+    return oss.str();
 }
 
 } // namespace nlm

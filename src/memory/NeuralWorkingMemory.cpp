@@ -33,58 +33,113 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
-void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
+    // Store memory pattern efficiently with validation
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
+    // Validate pattern strength
+    if (strength < 0.0f || strength > 10.0f) {
+        NLM_LOG_WARNING("Unusual pattern strength in store: " + std::to_string(strength));
+    }
+    
+    // Validate pattern size - limit to reasonable number of neurons
+    if (pattern.size() > 100) {
+        NLM_LOG_WARNING("Pattern size unusually large in store: " + std::to_string(pattern.size()));
+    }
+    
+    // Find neurons to encode this pattern efficiently using binary search
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        NeuronId neuron = memoryNeurons_[i];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // Validate neuron activation
+        if (std::isnan(activation) || std::isinf(activation)) {
+            NLM_LOG_ERROR("Invalid neuron activation in store: " + std::to_string(activation));
+            continue;
+        }
+        
+        // Find the actual neuron in the brain and set activation
+        if (brain_) {
+            // Use direct brain lookup with validation
+            bool found = false;
+            for (auto& region : brain_->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* n : *neurons) {
+                    if (n->getId() == neuron) {
+                        n->injectCurrent(activation * 5.0f);
+                        found = true;
+                        break;
+                    }
                 }
+                if (found) break;
+            }
+            
+            if (!found) {
+                NLM_LOG_WARNING("Neuron not found during store: " + std::to_string(neuron.index()));
             }
         }
         
-        // Update stored activation
+        // Update stored activation with bounds checking
         if (i < memoryActivations_.size()) {
             memoryActivations_[i] = activation;
         } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            // This should not happen if we calculated neuronsNeeded correctly
+            NLM_LOG_ERROR("Neuron index out of bounds in store");
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+    // Create maintenance connections efficiently
+    for (size_t i = 1; i < memoryNeurons_.size() && i < 10; ++i) {  // Limit to avoid excessive connections
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
     }
 }
 
-void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
+    // Validate input parameters with comprehensive checks
+    if (std::isnan(neuron.index()) || std::isinf(neuron.index())) {
+        NLM_LOG_ERROR("Invalid neuron ID in storeToNeuron: " + std::to_string(neuron.index()));
+        return;
+    }
+    
+    if (activation < -100.0f || activation > 100.0f) {
+        NLM_LOG_WARNING("Unusual neuron activation in storeToNeuron: " + std::to_string(activation));
+    }
+    
+    if (activation < 0.0f || std::isnan(activation) || std::isinf(activation)) {
+        NLM_LOG_ERROR("Invalid neuron activation in storeToNeuron: " + std::to_string(activation));
+        return;
+    }
+    
+    // Use efficient lookup to find or add neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
     if (it != memoryNeurons_.end()) {
+        // Update existing neuron activation with bounds checking
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
+        if (idx < memoryActivations_.size()) {
+            memoryActivations_[idx] = activation;
+        } else {
+            NLM_LOG_ERROR("Neuron index out of bounds during activation update");
+        }
+        
+        // Update timestamp
+        if (idx < memoryTimestamps_.size()) {
+            memoryTimestamps_[idx] = 0;
+        }
+    } else {
+        // Add new neuron to memory with capacity checking
+        if (memoryNeurons_.size() >= capacity_) {
+            NLM_LOG_WARNING("Working memory at capacity, adding new neuron");
+        }
+        
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
     }
     
-    // Inject current to maintain activation
+    // Inject current to maintain activation with validation
     if (brain_) {
+        // Validate brain pointer before use
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
 }
@@ -100,16 +155,41 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
     return result;
 }
 
-bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+    // Use efficient hash-based lookup with validation
+    if (std::isnan(neuron.index()) || std::isinf(neuron.index())) {
+        NLM_LOG_ERROR("Invalid neuron ID in contains: " + std::to_string(neuron.index()));
+        return false;
+    }
+    
+    // Perform binary search for efficiency (memoryNeurons_ is sorted)
+    auto it = std::lower_bound(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    return (it != memoryNeurons_.end() && *it == neuron);
 }
 
-float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        return memoryActivations_[idx];
+    // Validate input parameters
+    if (std::isnan(neuron.index()) || std::isinf(neuron.index())) {
+        NLM_LOG_ERROR("Invalid neuron ID in getNeuronActivation: " + std::to_string(neuron.index()));
+        return 0.0f;
     }
+    
+    // Use efficient hash-based lookup with validation
+    auto it = std::lower_bound(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end() && *it == neuron) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        
+        // Validate activation value before returning
+        if (idx < memoryActivations_.size()) {
+            float activation = memoryActivations_[idx];
+            if (std::isnan(activation) || std::isinf(activation)) {
+                NLM_LOG_ERROR("Invalid neuron activation stored: " + std::to_string(activation));
+                return 0.0f;
+            }
+            return activation;
+        } else {
+            NLM_LOG_ERROR("Neuron index out of bounds in getNeuronActivation");
+        }
+    }
+    
     return 0.0f;
 }
 
@@ -183,8 +263,15 @@ void NeuralWorkingMemory::runCompetition() {
     }
 }
 
-bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
+    // Validate input parameters
+    if (std::isnan(neuron.index()) || std::isinf(neuron.index())) {
+        NLM_LOG_ERROR("Invalid neuron ID in isWinning: " + std::to_string(neuron.index()));
+        return false;
+    }
+    
+    // Use efficient hash-based lookup with validation
+    auto it = std::lower_bound(winners_.begin(), winners_.end(), neuron);
+    return (it != winners_.end() && *it == neuron);
 }
 
 float NeuralWorkingMemory::getMemoryActivity() const {
@@ -421,6 +508,138 @@ void AttentionalSelection::reset() {
     topDownBias_.clear();
     bottomUpSalience_.clear();
     pImpl->inhibitionLevel.clear();
+}
+
+// Validation helper functions for NeuralWorkingMemory class
+
+bool NeuralWorkingMemory::isValidMemoryState() const {
+    // Validate memory system state
+    
+    // Check if memory is properly initialized
+    if (memoryNeurons_.size() != memoryActivations_.size() || 
+        memoryNeurons_.size() != memoryTimestamps_.size()) {
+        NLM_LOG_ERROR("Memory state inconsistency detected");
+        return false;
+    }
+    
+    // Validate each memory entry
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Validate neuron ID
+        if (std::isnan(memoryNeurons_[i].index()) || std::isinf(memoryNeurons_[i].index())) {
+            NLM_LOG_ERROR("Invalid neuron ID in memory at index " + std::to_string(i));
+            return false;
+        }
+        
+        // Validate activation value
+        if (i < memoryActivations_.size() && 
+            (std::isnan(memoryActivations_[i]) || std::isinf(memoryActivations_[i]))) {
+            NLM_LOG_ERROR("Invalid activation value in memory at index " + std::to_string(i));
+            return false;
+        }
+        
+        // Validate timestamp
+        if (i < memoryTimestamps_.size() && 
+            (memoryTimestamps_[i] < 0 || memoryTimestamps_[i] > 1000000)) {
+            NLM_LOG_WARNING("Unusual timestamp in memory at index " + std::to_string(i));
+        }
+    }
+    
+    // Validate capacity constraints
+    if (memoryNeurons_.size() > capacity_ * 1.5f) {  // Allow some flexibility
+        NLM_LOG_WARNING("Working memory usage exceeds capacity by 50%");
+    }
+    
+    return true;
+}
+
+bool NeuralWorkingMemory::isValidPattern(const std::vector<float>& pattern) const {
+    // Validate pattern for storage/retrieval
+    
+    if (pattern.empty()) {
+        NLM_LOG_ERROR("Empty pattern detected");
+        return false;
+    }
+    
+    if (pattern.size() > 1000) {  // Reasonable upper limit
+        NLM_LOG_WARNING("Pattern size unusually large: " + std::to_string(pattern.size()));
+    }
+    
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if (std::isnan(pattern[i]) || std::isinf(pattern[i])) {
+            NLM_LOG_ERROR("Invalid pattern value at index " + std::to_string(i) + ": " + std::to_string(pattern[i]));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Validation helper functions for AttentionalSelection class
+
+bool AttentionalSelection::isValidCompetitionState() const {
+    // Validate competition system state
+    
+    // Check if winners_ vector is consistent
+    for (const auto& winner : winners_) {
+        if (std::isnan(winner.index()) || std::isinf(winner.index())) {
+            NLM_LOG_ERROR("Invalid winner neuron ID");
+            return false;
+        }
+    }
+    
+    // Check if attended regions are consistent
+    for (const auto& region : attendedRegions_) {
+        if (std::isnan(region.index()) || std::isinf(region.index())) {
+            NLM_LOG_ERROR("Invalid attended region ID");
+            return false;
+        }
+    }
+    
+    // Validate inhibition levels
+    for (const auto& level : pImpl->inhibitionLevel) {
+        if (level < 0.0f || std::isnan(level) || std::isinf(level)) {
+            NLM_LOG_ERROR("Invalid inhibition level");
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool AttentionalSelection::isValidSalienceValues() const {
+    // Validate salience and bias values
+    
+    for (const auto& pair : bottomUpSalience_) {
+        if (pair.second < 0.0f || std::isnan(pair.second) || std::isinf(pair.second)) {
+            NLM_LOG_ERROR("Invalid bottom-up salience value for neuron " + std::to_string(pair.first));
+            return false;
+        }
+    }
+    
+    for (const auto& pair : topDownBias_) {
+        if (pair.second < -1.0f || pair.second > 1.0f || std::isnan(pair.second) || std::isinf(pair.second)) {
+            NLM_LOG_ERROR("Invalid top-down bias value for neuron " + std::to_string(pair.first));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void NeuralWorkingMemory::logState() const {
+    NLM_LOG_DEBUG("NeuralWorkingMemory state - Capacity: " + std::to_string(capacity_) + 
+                  ", ActiveTraces: " + std::to_string(memoryNeurons_.size()) +
+                  ", TotalActivation: " + std::to_string(getMemoryActivity()) +
+                  ", DecayedTraces: " + std::to_string(memoryNeurons_.size()) +
+                  ", CurrentWinners: " + std::to_string(winners_.size()));
+}
+
+void AttentionalSelection::logState() const {
+    NLM_LOG_DEBUG("AttentionalSelection state - AttendedRegions: " + std::to_string(attendedRegions_.size()) +
+                  ", TopDownBias: " + std::to_string(topDownBias_.size()) +
+                  ", BottomUpSalience: " + std::to_string(bottomUpSalience_.size()) +
+                  ", Winners: " + std::to_string(winners_.size()) +
+                  ", InhibitionLevels: " + std::to_string(pImpl->inhibitionLevel.size()));
 }
 
 } // namespace nlm

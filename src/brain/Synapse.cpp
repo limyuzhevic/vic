@@ -93,14 +93,28 @@ SynapticWeight Synapse::getWeight() const {
     return pImpl->weight;
 }
 
-void Synapse::setWeight(SynapticWeight weight) {
+    // Validate input parameters for weight setting
+    if (!isValidSynapticWeight(weight, "setWeight")) {
+        NLM_LOG_ERROR("Invalid synaptic weight in setWeight: " + std::to_string(weight));
+        return;
+    }
+    
+    // Update synaptic weight with validation
     pImpl->weight = weight;
+    
+    NLM_LOG_DEBUG("Synaptic weight set to " + std::to_string(weight));
 }
 
-void Synapse::addToWeight(SynapticWeight delta) {
-    pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Validate input parameters for weight modification
+    float newWeight = pImpl->weight + delta;
+    if (!isValidSynapticWeight(newWeight, "addToWeight")) {
+        NLM_LOG_ERROR("Invalid synaptic weight in addToWeight after adding " + std::to_string(delta));
+        return;
+    }
+    
+    pImpl->weight = newWeight;
+    
+    NLM_LOG_DEBUG("Synaptic weight updated to " + std::to_string(pImpl->weight) + " (delta: " + std::to_string(delta) + ")");
 }
 
 Delay Synapse::getDelay() const {

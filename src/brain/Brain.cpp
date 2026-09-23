@@ -765,6 +765,22 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Validate file path and ensure directory exists
+        std::filesystem::path filePath(filepath);
+        std::filesystem::path dirPath = filePath.parent_path();
+        if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+            if (!std::filesystem::create_directories(dirPath)) {
+                NLM_LOG_ERROR("Failed to create directory: " + dirPath.string());
+                return false;
+            }
+        }
+        
+        // Validate brain state before saving
+        if (!validateBeforeSave()) {
+            NLM_LOG_ERROR("Brain state validation failed before save");
+            return false;
+        }
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
@@ -805,6 +821,12 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+        // Validate neuron data consistency
+        if (neuronData.membranePotential.size() != getTotalNeuronCount()) {
+            NLM_LOG_ERROR("Neuron data size mismatch during save");
+            return false;
+        }
+        
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
             return false;
@@ -821,6 +843,12 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
             }
+        }
+        
+        // Validate synapse data consistency
+        if (synapseData.weight.size() != getTotalSynapseCount() - pImpl->interRegionConnections.size()) {
+            NLM_LOG_ERROR("Synapse data size mismatch during save");
+            return false;
         }
         
         if (!writer.writeSynapses(synapseData)) {
@@ -1112,6 +1140,129 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+bool Brain::validateBeforeSave() const {
+    // Validate brain state before saving
+    try {
+        // Check that all systems are initialized
+        if (!pImpl->rng) {
+            NLM_LOG_WARNING("Random generator not initialized before save");
+            return false;
+        }
+        
+        // Validate each region
+        for (const auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Invalid region found during save validation");
+                return false;
+            }
+            
+            // Check that populations are valid
+            for (const auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_ERROR("Invalid population found during save validation");
+                    return false;
+                }
+                
+                // Check that neurons are valid
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_ERROR("Invalid neuron found during save validation");
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        // Validate memory systems
+        if (pImpl->workingMemory && !pImpl->workingMemory->isValid()) {
+            NLM_LOG_WARNING("Working memory validation failed");
+        }
+        
+        if (pImpl->episodicMemory && !pImpl->episodicMemory->isValid()) {
+            NLM_LOG_WARNING("Episodic memory validation failed");
+        }
+        
+        // Validate neuromodulation systems
+        if (pImpl->dopamine && !pImpl->dopamine->isValid()) {
+            NLM_LOG_WARNING("Dopamine system validation failed");
+        }
+        
+        NLM_LOG_INFO("Brain state validation passed for save operation");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception during save validation: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::isValidNeuronState(const NeuronCheckpointData& neuronData, size_t idx) const {
+    // Validate individual neuron state
+    if (idx >= neuronData.membranePotential.size()) {
+        return false;
+    }
+    
+    float V = neuronData.membranePotential[idx];
+    float V_rest = neuronData.restingPotential[idx];
+    float threshold = neuronData.threshold[idx];
+    float V_reset = neuronData.resetPotential[idx];
+    float g_leak = neuronData.leakConductance[idx];
+    
+    // Validate neuron state ranges
+    if (std::isnan(V) || std::isnan(V_rest) || std::isnan(threshold) || 
+        std::isnan(V_reset) || std::isnan(g_leak)) {
+        NLM_LOG_ERROR("Invalid neuron state: NaN values found at index " + std::to_string(idx));
+        return false;
+    }
+    
+    // Biological constraints for neuron state
+    if (V < -150.0f || V > 100.0f) {  // Unlikely membrane potential values
+        NLM_LOG_WARNING("Membrane potential out of biological range at index " + std::to_string(idx));
+    }
+    
+    if (threshold <= V_rest) {  // Threshold should be above resting potential
+        NLM_LOG_WARNING("Threshold <= resting potential at index " + std::to_string(idx));
+    }
+    
+    if (V_reset >= V_rest) {  // Reset should be different from resting
+        NLM_LOG_WARNING("Reset potential >= resting potential at index " + std::to_string(idx));
+    }
+    
+    if (g_leak < 0.0f || g_leak > 10.0f) {  // Unlikely leak conductance
+        NLM_LOG_WARNING("Leak conductance out of reasonable range at index " + std::to_string(idx));
+    }
+    
+    return true;
+}
+
+bool Brain::isValidSynapseParameters(float weight, Delay delay, size_t idx,
+                                      const SynapseCheckpointData& synapseData) const {
+    // Validate individual synapse parameters
+    
+    // Check for NaN or infinite values
+    if (std::isnan(weight) || std::isinf(weight)) {
+        NLM_LOG_ERROR("Invalid synapse weight at index " + std::to_string(idx));
+        return false;
+    }
+    
+    if (delay < 0) {
+        NLM_LOG_ERROR("Negative synapse delay at index " + std::to_string(idx));
+        return false;
+    }
+    
+    // Validate weight range
+    if (weight < -2.0f || weight > 2.0f) {  // Wider than biologically plausible
+        NLM_LOG_WARNING("Synapse weight out of biological range at index " + std::to_string(idx));
+    }
+    
+    // Validate delay range
+    if (delay > 1000) {  // Extremely long delay
+        NLM_LOG_WARNING("Synapse delay extremely long at index " + std::to_string(idx));
+    }
+    
+    return true;
 }
 
 } // namespace nlm

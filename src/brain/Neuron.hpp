@@ -6,24 +6,22 @@
 
 namespace nlm {
 
-// Forward declarations
-class Synapse;
-class RandomGenerator;
-
 // Neuron state structure for efficient storage
+// Contains all state variables needed to simulate a single neuron using the Leaky Integrate-and-Fire (LIF) model
+// All fields are biologically realistic and include typical default values for cortical neurons
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
-    MembranePotential restingPotential;    // Resting potential (mV)
-    MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
-    MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
-    FiringRate firingRate;                 // Current firing rate (Hz)
-    FiringState firingState;               // Current firing state
-    uint32_t refractoryRemaining;          // Steps remaining in refractory period
-    uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
-    float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+    MembranePotential restingPotential;    // Resting potential (mV) - typically -70mV for cortical neurons
+    MembranePotential threshold;           // Firing threshold (mV) - typically -55mV, must be > restingPotential
+    MembranePotential resetPotential;       // Post-spike reset value (mV) - typically close to resting potential
+    MembranePotential leakConductance;      // Leak conductance (nS) - determines membrane time constant
+    MembranePotential synapseConductance;   // Synaptic conductance (nS) - for rate-based computation
+    FiringRate firingRate;                 // Current firing rate (Hz) - for rate-based plasticity
+    FiringState firingState;               // Current firing state (Resting, Active, Refractory)
+    uint32_t refractoryRemaining;          // Steps remaining in refractory period (0 = not refractory)
+    uint32_t refractoryPeriod;             // Total refractory period in simulation steps (typically 5-10ms)
+    float adaptationVariable;              // For spike-frequency adaptation (increases with each spike)
+    float lastSpikeTime;                   // Timestamp of last spike (-1.0f if none, ensures backward compatibility)
     
     NeuronState()
         : membranePotential(-70.0f)
@@ -41,7 +39,10 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements the Leaky Integrate-and-Fire (LIF) mathematical model for neural computation
+// This is a biophysically plausible model that captures essential neural dynamics while remaining computationally efficient
+// The model includes synaptic integration, spike generation, refractory periods, and spike-frequency adaptation
+// Designed for large-scale network simulations with hundreds to thousands of neurons
 class Neuron {
 public:
     // Create neuron with ID
@@ -127,21 +128,13 @@ public:
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
-    // Region/population membership
-    void setRegionId(RegionId region);
-    RegionId getRegionId() const;
-    void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
+    // Validation helper functions
+    static bool isValidState(const NeuronState& state);
+    static std::string neuronStateToString(const NeuronState& state);
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    // Debug and logging functions
+    void logState() const;
+    void validateBeforeStep() const;
     
 private:
     struct Impl;
