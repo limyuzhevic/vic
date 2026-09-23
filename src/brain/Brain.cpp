@@ -487,32 +487,119 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            episode.energy = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            episode.novelty = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+            episode.action = ActionType::Wait;  // Could be set based on actual action taken
             
-            // Store active neurons
+            // Store comprehensive sensory state
+            if (pImpl->workingMemory) {
+                std::vector<float> sensoryPattern = pImpl->workingMemory->retrieve();
+                episode.sensoryState = sensoryPattern;
+            } else {
+                // If working memory not available, create a basic sensory pattern from active neurons
+                episode.sensoryState.resize(pImpl->sensoryNeurons.size(), 0.0f);
+                size_t idx = 0;
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (idx < episode.sensoryState.size()) {
+                                episode.sensoryState[idx] = 
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                                idx++;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Store active neurons with detailed activation levels
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                            episode.neuronActivations.push_back(activation);
                         }
                     }
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Store resulting sensory state (after action processing)
+            episode.resultingSensoryState = episode.sensoryState;  // Could be enhanced with action effects
+            
+            // Store prediction error if available
+            if (pImpl->predictionSystem) {
+                episode.novelty = pImpl->predictionSystem->getPredictionError();
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // Create sensory input from current brain state for prediction
+        std::vector<float> currentSensoryData;
+        currentSensoryData.reserve(pImpl->sensoryNeurons.size());
+        
+        for (auto* sensoryNeuron : pImpl->sensoryNeurons) {
+            const auto& state = sensoryNeuron->getState();
+            float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+            currentSensoryData.push_back(activation);
+        }
+        
+        // Convert to SensoryInput for prediction
+        // Use InternalSignals since we're encoding internal neural state
+        std::unique_ptr<class InternalSignals> currentSensoryInput = std::make_unique<class InternalSignals>();
+        for (float value : currentSensoryData) {
+            currentSensoryInput->addSignal(value);
+        }
+        
+        // Make prediction for next state
+        auto prediction = pImpl->predictionSystem->predictNextState(*currentSensoryInput);
+        
+        // Get prediction error from the prediction system
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate attention and learning
+        if (predictionError > 0.1f) {  // High prediction error indicates something novel
+            // Apply novelty signal to working memory
+            if (pImpl->workingMemory) {
+                // Strengthen working memory traces based on prediction error
+                pImpl->workingMemory->strengthenMemory(1.0f + predictionError);
+            }
+            
+            // Update curiosity-based exploration
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(predictionError * 0.5f);
+            }
+        }
+        
+        // Update prediction based on actual sensory input
+        pImpl->predictionSystem->updatePredictions(*prediction, *currentSensoryInput);
+        
+        // Use prediction system to guide attention selection
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Add prediction error as salience to relevant neurons
+            float salience = predictionError * 2.0f;  // Scale prediction error to salience
+            
+            // Find most active neurons and apply prediction-based salience
+            size_t topN = std::min(static_cast<size_t>(3), pImpl->workingMemory->getMemoryNeurons().size());
+            std::vector<NeuronId> topNeurons;
+            std::vector<float> topActivations;
+            
+            for (size_t i = 0; i < topN && i < pImpl->workingMemory->getMemoryNeurons().size(); ++i) {
+                NeuronId neuron = pImpl->workingMemory->getMemoryNeurons()[i];
+                float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                topNeurons.push_back(neuron);
+                topActivations.push_back(activation);
+            }
+            
+            // Apply prediction-based salience
+            for (size_t i = 0; i < topNeurons.size(); ++i) {
+                pImpl->attention->applyBottomUpSalience(topNeurons[i], salience * topActivations[i]);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
