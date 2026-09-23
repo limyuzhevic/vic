@@ -1,4 +1,4 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - Enhanced HOW TO USE
 
 ## Overview
 
@@ -7,7 +7,7 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the enhanced NLM Python API with modern Python features
 
 ---
 
@@ -104,20 +104,103 @@ pip install dist/*.whl
 ```python
 import pynlm
 
-# Check version
-print(pynlm.__version__)
+# Check module metadata
+print(pynlm.__version__)       # "0.1.0"
+print(pynlm.__author__)        # "NLM Authors"
+print(pynlm.__license__)       # "MIT"
+print(pynlm.__description__)   # "Python bindings for NLM..."
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Neurons: {brain.total_neurons}")      # Pythonic property
+print(f"Synapses: {brain.total_synapses}")    # Pythonic property
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Enhanced Python Library
 
-### Basic Usage
+### Modern Python Features
+
+The enhanced NLM Python API now includes modern Python features:
+
+#### 1. Module Metadata
+
+```python
+import pynlm
+
+# Access module information
+print(pynlm.__version__)       # "0.1.0"
+print(pynlm.__author__)        # "NLM Authors"
+print(pynlm.__license__)       # "MIT"
+print(pynlm.__description__)   # "Python bindings for NLM..."
+```
+
+#### 2. Custom Exception Hierarchy
+
+```python
+import pynlm
+
+# New custom exception types
+brain = pynlm.createBrain(config)
+
+# Example: Catch specific NLM errors
+try:
+    config.loadFromFile("config.json")
+except pynlm.ConfigurationError as e:
+    print(f"Configuration error: {e}")
+except pynlm.SimulationError as e:
+    print(f"Simulation error: {e}")
+except pynlm.ValidationError as e:
+    print(f"Validation error: {e}")
+except pynlm.NLMException as e:
+    print(f"NLM error: {e}")
+```
+
+#### 3. Context Managers
+
+```python
+# Automatic resource management and cleanup
+with brain:
+    for i in range(1000):
+        brain.step(i)
+```
+
+#### 4. Pythonic Properties
+
+```python
+# Direct property access (replaces verbose getter methods)
+brain.total_neurons       # Instead of brain.getTotalNeuronCount()
+brain.total_synapses      # Instead of brain.getTotalSynapseCount()
+brain.firing_neurons      # Instead of brain.getFiringNeuronCount()
+brain.average_firing_rate  # Instead of brain.getAverageFiringRate()
+
+config.neuron_count       # Instead of config.set("brain.neuron_count")
+config.synapse_density    # Instead of verbose config access
+```
+
+#### 5. Convenience Functions
+
+```python
+# Quick setup and helpers
+agent = pynlm.setup_agent_simulation(config, world)
+
+# Statistical helpers
+stats = pynlm.brain_stats(brain)
+print(f"Total neurons: {stats['neurons']}")
+
+# Enable all features
+pynlm.enable_all_features(agent)
+
+# Complete simulation
+pynlm.run_episode(brain, agent, world, 500)
+
+# Safe operations
+success = pynlm.safe_brain_operation(brain, lambda b: b.step(0))
+```
+
+### Enhanced Basic Usage
 
 #### Creating a Brain
 
@@ -127,16 +210,17 @@ import pynlm
 # Create a default configuration
 config = pynlm.createDefaultConfig()
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Optionally configure specific parameters using Pythonic properties
+# config.neuron_count = 1000
+# config.synapse_density = 0.1
+# config.learning_rate = 0.001
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Total neurons: {brain.total_neurons}")      # Pythonic property
+print(f"Total synapses: {brain.total_synapses}")    # Pythonic property
 ```
 
 #### Running a Simulation
@@ -155,7 +239,7 @@ for step in range(1000):
     
     # Log statistics periodically
     if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+        print(f"Step {step}: {brain.firing_neurons} firing neurons")  # Pythonic property
 ```
 
 #### Creating a Simple World
@@ -184,13 +268,13 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Enhanced Agent Example with Modern Features
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_enhanced_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with enhanced Python features."""
     
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
@@ -211,11 +295,8 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable all features using convenience function
+    pynlm.enable_all_features(agent)
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -244,19 +325,24 @@ def run_agent_simulation(num_steps=1000):
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Print enhanced progress
         if step % 100 == 0:
             print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Firing neurons: {brain.firing_neurons}")
+            print(f"  Average firing rate: {brain.average_firing_rate:.2f}")
+            
+            # Use convenience function for comprehensive agent state
+            agent_state = pynlm.get_agent_state(agent)
+            print(f"  Curiosity level: {agent_state['curiosity_level']:.3f}")
+            print(f"  Novelty level: {agent_state['novelty_level']:.3f}")
+            print(f"  Prediction error: {agent_state['prediction_error']:.3f}")
+            print(f"  Development stage: {agent_state['developmental_stage']}")
 
 # Run the simulation
-run_agent_simulation(1000)
+run_enhanced_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### Key Classes and Methods (Enhanced)
 
 #### Brain Class
 
@@ -276,16 +362,16 @@ brain.reset()                     # Reset brain state
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
 action = brain.produceAction()             # Get motor action
 
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
+# Statistics (using Pythonic properties)
+brain.total_neurons       # Total neurons
+brain.total_synapses      # Total synapses
+brain.firing_neurons      # Currently firing
+brain.average_firing_rate  # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
 # State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+brain.save("checkpoint.bin")      # Save state
+brain.load("checkpoint.bin")      # Load state
 
 # Regions
 region_id = brain.addRegion("cortex")
@@ -298,13 +384,13 @@ region = brain.getRegion(region_id)
 # Create
 config = pynlm.createDefaultConfig()
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
+# Query using Pythonic properties
+print(config.neuron_count)      # Direct property access
+print(config.synapse_density)   # Direct property access
 
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+# Modify using Pythonic properties
+config.neuron_count = 1000
+config.synapse_density = 0.1
 
 # File I/O
 config.loadFromFile("config.json")
@@ -339,11 +425,8 @@ agent.enableStructuralPlasticity(True/False)
 agent.enableDevelopment(True/False)
 agent.enableCuriosity(True/False)
 
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Statistics using convenience function
+state = pynlm.get_agent_state(agent)
 ```
 
 #### SimpleWorld Class
@@ -414,11 +497,197 @@ pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
 ```
 
+### Enhanced Convenience Functions
+
+#### Quick Setup Helper
+
+```python
+# One-liner for complete agent setup
+agent = pynlm.setup_agent_simulation(config, world)
+```
+
+#### Statistical Helper
+
+```python
+# Get comprehensive brain statistics
+stats = pynlm.brain_stats(brain)
+print(f"Neurons: {stats['neurons']}")
+print(f"Synapses: {stats['synapses']}")
+print(f"Firing neurons: {stats['firing_neurons']}")
+```
+
+#### World Helper
+
+```python
+# Create configured world quickly
+world = pynlm.create_world_with_objects(20, 20, 8, 8)
+```
+
+#### Complete Simulation
+
+```python
+# Run complete episode with all features
+pynlm.run_episode(brain, agent, world, 500, 0.1)
+```
+
+#### Error Handling Helper
+
+```python
+# Safe operation execution
+success = pynlm.safe_brain_operation(brain, lambda b: b.step(0))
+```
+
+### Modern Usage Examples
+
+#### Complete Enhanced Agent Example
+
+```python
+import pynlm
+
+class SmartAgent:
+    def __init__(self):
+        self.config = pynlm.createDefaultConfig()
+        self.brain = pynlm.createBrain(self.config)
+        self.world = pynlm.createSimpleWorld()
+        self.agent = pynlm.createAgentBrain(self.brain)
+        
+        # Quick setup
+        self.world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        self.world.reset()
+        self.agent.initialize(self.world)
+        
+        # Enable all features for advanced learning
+        pynlm.enable_all_features(self.agent)
+    
+    def run_simulation(self, steps=1000):
+        print(f"Starting agent simulation with {steps} steps")
+        
+        for step in range(steps):
+            # Update world
+            self.world.update(0.1)
+            
+            # Get and process sensory input
+            percept = self.world.getSensoryPercept()
+            self.agent.processSensoryInput(percept)
+            
+            # Brain thinks
+            self.brain.step(step)
+            
+            # Get action from brain
+            action = self.agent.decodeMotorCommand()
+            self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            # Apply learning
+            reward = self._get_reward(percept, action)
+            self.agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            self.agent.updateDevelopment(0.1)
+            
+            # Print progress
+            if step % 100 == 0:
+                stats = pynlm.brain_stats(self.brain)
+                agent_state = pynlm.get_agent_state(self.agent)
+                print(f"Step {step}: {stats['firing_neurons']} neurons firing, "
+                      f"curiosity: {agent_state['curiosity_level']:.2f}")
+    
+    def _get_reward(self, percept, action):
+        # Example reward function
+        return percept.getInternal()[0] if percept.getInternal() else 0.0
+
+def advanced_simulation_example():
+    """Example of advanced simulation using all features"""
+    print("=== Advanced NLM Simulation Example ===")
+    
+    agent = SmartAgent()
+    agent.run_simulation(1000)
+    
+    print("=== Simulation Complete ===")
+    print(f"Final brain stats: {pynlm.brain_stats(agent.brain)}")
+    print(f"Final agent state: {pynlm.get_agent_state(agent.agent)}")
+
+# Run the example
+advanced_simulation_example()
+```
+
+#### Using Pythonic Properties
+
+```python
+import pynlm
+
+# Create and initialize
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Use Pythonic properties instead of verbose getter methods
+print(f"Total neurons: {brain.total_neurons}")
+print(f"Firing neurons: {brain.firing_neurons}")
+print(f"Average firing rate: {brain.average_firing_rate}")
+
+# Context manager for automatic cleanup
+with brain:
+    for i in range(1000):
+        brain.step(i)
+        if i % 100 == 0:
+            print(f"Progress: {i} steps")
+
+# Property-based configuration
+config.neuron_count = 1000
+config.synapse_density = 0.1
+config.learning_rate = 0.001
+```
+
+#### Error Handling with Custom Exceptions
+
+```python
+import pynlm
+
+def robust_simulation():
+    try:
+        # Create and configure
+        config = pynlm.createDefaultConfig()
+        config.neuron_count = 100
+        
+        # Use Pythonic property access
+        if not config.neuron_count:
+            raise pynlm.ConfigurationError("Required neuron_count not found")
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Safe operation
+        success = pynlm.safe_brain_operation(brain, lambda b: b.step(0))
+        
+        return success
+        
+    except pynlm.ConfigurationError as e:
+        print(f"Configuration problem: {e}")
+        return False
+    except pynlm.SimulationError as e:
+        print(f"Simulation failed: {e}")
+        return False
+    except pynlm.ValidationError as e:
+        print(f"Validation error: {e}")
+        return False
+    except pynlm.NLMException as e:
+        print(f"NLM error: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return False
+
+# Usage
+robust_simulation()
+```
+
 ---
 
-## Part 4: Configuration Options
+## Enhanced Configuration Options
 
-### Brain Configuration
+### Modern Configuration (Updated)
+
+#### Brain Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -433,7 +702,7 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
-### Plasticity Configuration
+#### Plasticity Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -444,7 +713,7 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+#### Neuromodulation Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -452,16 +721,36 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
+### Enhanced Configuration (Modern)
+
+```python
+# Modern Pythonic configuration
+config = pynlm.createDefaultConfig()
+
+# Property-based configuration (replaces set() calls)
+config.neuron_count = 1000
+config.synapse_density = 0.1
+config.learning_rate = 0.001
+
+# Property-based access (replaces get() calls)
+print(f"Neurons: {config.neuron_count}")
+print(f"Synapse density: {config.synapse_density}")
+
+# File I/O (unchanged)
+config.loadFromFile("config.json")
+config.saveToFile("config.json")
+```
+
 ---
 
-## Part 5: Example Scripts
+## Enhanced Example Scripts
 
-### Minimal Example
+### Minimal Example (Modern)
 
 ```python
 import pynlm
 
-# Create and initialize
+# Create and initialize using Pythonic syntax
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
@@ -473,12 +762,12 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
-### Environment Interaction
+### Environment Interaction (Enhanced)
 
 ```python
 import pynlm
 
-# Setup
+# Setup using enhanced features
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
@@ -488,17 +777,16 @@ world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 agent.initialize(world)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+# Enable all features
+pynlm.enable_all_features(agent)
+
+# Run episode using convenience function
+pynlm.run_episode(brain, agent, world, 500)
 ```
 
 ---
 
-## Troubleshooting
+## Enhanced Troubleshooting
 
 ### Build Issues
 
@@ -524,10 +812,119 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+### Modern Error Handling
+
+**Custom Exception Examples:**
+```python
+try:
+    config = pynlm.createDefaultConfig()
+    config.loadFromFile("config.json")
+except pynlm.ConfigurationError as e:
+    print(f"Fix configuration: {e}")
+except pynlm.SimulationError as e:
+    print(f"Fix simulation: {e}")
+except pynlm.ValidationError as e:
+    print(f"Fix validation: {e}")
+except pynlm.NLMException as e:
+    print(f"NLM error: {e}")
+except pynlm.MemoryError as e:
+    print(f"Memory issue: {e}")
+```
+
+**Safe Operations:**
+```python
+# Check if operation succeeds
+success = pynlm.safe_brain_operation(brain, lambda b: b.step(0))
+if success:
+    print("Operation completed successfully")
+else:
+    print("Operation failed - safer than try/catch")
+```
+
+### Enhanced Runtime Issues
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try using `pynlm.brain_stats(brain)` to check current state
+- Verify Pythonic properties: `brain.total_neurons`, `brain.firing_neurons`
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+- Use `pynlm.enable_all_features(agent)` to enable all features
+- Verify agent state: `pynlm.get_agent_state(agent)`
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Use `pynlm.brain_stats(brain)` to check progress
+- Some neurons need input to fire - make sure sensory input is connected
+
+### Performance Tips (Modern)
+
+1. **Use Pythonic properties**: `brain.total_neurons` instead of `brain.getTotalNeuronCount()`
+2. **Leverage convenience functions**: `pynlm.setup_agent_simulation()`, `pynlm.run_episode()`
+3. **Monitor statistics**: Use `pynlm.brain_stats()` for performance tracking
+4. **Safe operations**: Use `pynlm.safe_brain_operation()` for robust error handling
+5. **Context managers**: Use `with brain:` for automatic resource management
+
 ---
 
-## Further Reading
+## Modern Python Features
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+The enhanced NLM Python API now provides:
+
+1. **Modern Python features**: Properties, context managers, custom exceptions
+2. **Convenience functions**: Simplified common patterns
+3. **Better error handling**: Custom exception hierarchy with specific error types
+4. **Performance improvements**: Batch operations and efficient helpers
+5. **Backward compatibility**: Existing code continues to work
+6. **Enhanced documentation**: Comprehensive examples and migration guides
+7. **Property-based API**: More intuitive, Pythonic interface
+8. **Automatic resource management**: Context managers for safety
+
+## Migration Guide
+
+### From Old to New API
+
+**Old API (verbose):**
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(brain.getTotalNeuronCount())        # Old way
+print(brain.getFiringNeuronCount())       # Old way
+```
+
+**New Enhanced API (Pythonic):**
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(brain.total_neurons)                # New Pythonic property
+print(brain.firing_neurons)               # New Pythonic property
+
+# Using convenience functions
+stats = pynlm.brain_stats(brain)
+print(f"Brain has {stats['neurons']} neurons")
+```
+
+## Conclusion
+
+The enhanced NLM Python API now provides:
+
+1. **Modern Python features**: Properties, context managers, custom exceptions
+2. **Convenience functions**: Simplified common patterns
+3. **Better error handling**: Custom exception hierarchy
+4. **Performance improvements**: Batch operations and efficient helpers
+5. **Backward compatibility**: Existing code continues to work
+6. **Enhanced documentation**: Comprehensive examples and migration guides
+7. **Property-based API**: More intuitive, Pythonic interface
+8. **Automatic resource management**: Context managers for safety
+
+These improvements make NLM more accessible to Python developers while maintaining the power of the underlying C++ neural simulation framework.

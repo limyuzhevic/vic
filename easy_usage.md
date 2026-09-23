@@ -287,6 +287,79 @@ print("Agent simulation complete!")
 
 ---
 
+## New Pythonic Features
+
+The NLM Python bindings now include modern Python features:
+
+### 1. Python Module Metadata
+
+```python
+import pynlm
+
+print(pynlm.__version__)       # "0.1.0"
+print(pynlm.__author__)        # "NLM Authors"
+print(pynlm.__description__)   # "Python bindings for NLM..."
+```
+
+### 2. Pythonic Properties
+
+```python
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Use Pythonic properties instead of getter methods
+print(f"Neurons: {brain.total_neurons}")      # Instead of brain.getTotalNeuronCount()
+print(f"Synapses: {brain.total_synapses}")    # Instead of brain.getTotalSynapseCount()
+print(f"Firing: {brain.firing_neurons}")     # Instead of brain.getFiringNeuronCount()
+```
+
+### 3. Context Managers
+
+```python
+with brain:
+    for i in range(100):
+        brain.step(i)
+```
+
+### 4. Enhanced Configuration
+
+```python
+config = pynlm.createDefaultConfig()
+config.neuron_count = 1000          # Property-based configuration
+config.synapse_density = 0.1
+config.learning_rate = 0.001
+```
+
+### 5. Convenience Functions
+
+```python
+# Quick agent setup
+agent = pynlm.setup_agent_simulation(config, world)
+
+# Statistical helpers
+stats = pynlm.brain_stats(brain)
+print(f"Total neurons: {stats['neurons']}")
+
+# Enable all features at once
+pynlm.enable_all_features(agent)
+
+# Complete simulation
+pynlm.run_episode(brain, agent, world, 500)
+```
+
+### 6. Custom Exception Handling
+
+```python
+try:
+    config.loadFromFile("config.json")
+except pynlm.ConfigurationError as e:
+    print(f"Configuration error: {e}")
+except pynlm.SimulationError as e:
+    print(f"Simulation error: {e}")
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +367,13 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## New Comprehensive Guide
+
+For a complete guide to all new features, check out `enhanced_usage.md` which includes:
+- Modern Python patterns
+- Advanced examples
+- Performance tips
+- Error handling best practices
+- Migration from old to new API
+
+That's it! You're now ready to use NLM with all its modern Python enhancements.
