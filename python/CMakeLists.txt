@@ -57,7 +57,10 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
-    ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+    ${NLM_SOURCE_DIR}/performance/PerformanceProfiler.cpp
+    ${NLM_SOURCE_DIR}/performance/PerformanceAnalyzer.cpp
+    ${NLM_SOURCE_DIR}/performance/MemoryProfiler.cpp
+    ${NLM_SOURCE_DIR}/performance/ConfigurationProfiler.cpp
 )
 
 set(NLM_AGENT_SOURCES
@@ -88,7 +91,7 @@ target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlm_performance)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)

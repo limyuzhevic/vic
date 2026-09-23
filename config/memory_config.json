@@ -1,0 +1,14 @@
+{
+  "memory": {
+    "pooling": true,
+    "slab_allocation": true,
+    "event_driven": true,
+    "cache_friendly": true,
+    "small_data_types": true
+  },
+  "brain": {
+    "neuron_count": 5000,
+    "synapse_density": 0.05,
+    "learning_rate": 0.01
+  }
+}

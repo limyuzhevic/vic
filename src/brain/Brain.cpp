@@ -3,6 +3,7 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/BatchStepProcessor.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -19,6 +20,9 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <filesystem>
+#include <future>
+#include <chrono>
 
 namespace nlm {
 
@@ -69,14 +73,28 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // ========== PERFORMANCE PROFILING ==========
+    bool isProfilingEnabled;
+    double totalCpuTimeMs;
+    double totalWallTimeMs;
+    size_t totalMemoryUsage;
+    size_t peakMemoryUsage;
+    size_t profilingStartStep;
+    std::chrono::high_resolution_clock::time_point profilingStartTime;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    std::unordered_map<std::string, double> componentCpuTimes;
+    std::unordered_map<std::string, double> componentWallTimes;
+    std::unordered_map<std::string, size_t> componentMemoryUsages;
+    std::unordered_map<std::string, size_t> componentPeakMemoryUsages;
+    
+    std::vector<std::string> profilingHotspots;
+    std::vector<std::string> optimizationRecommendations;
+    std::vector<std::string> bottleneckAnalysis;
+    
+    std::unique_ptr<PerformanceProfiler> performanceProfiler;
+    std::unique_ptr<MemoryProfiler> memoryProfiler;
+    std::unique_ptr<PerformanceAnalyzer> performanceAnalyzer;
+    std::unique_ptr<ConfigurationProfiler> configurationProfiler;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -145,12 +163,29 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
+        // Configure checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize performance profiling
+        isProfilingEnabled = false;
+        totalCpuTimeMs = 0.0;
+        totalWallTimeMs = 0.0;
+        totalMemoryUsage = 0;
+        peakMemoryUsage = 0;
+        profilingStartStep = 0;
+        componentCpuTimes.clear();
+        componentWallTimes.clear();
+        componentMemoryUsages.clear();
+        componentPeakMemoryUsages.clear();
+        profilingHotspots.clear();
+        optimizationRecommendations.clear();
+        bottleneckAnalysis.clear();
+        
+        // Create performance profiling components
+        performanceProfiler = std::make_unique<PerformanceProfiler>();
+        memoryProfiler = std::make_unique<MemoryProfiler>();
+        performanceAnalyzer = std::make_unique<PerformanceAnalyzer>();
+        configurationProfiler = std::make_unique<ConfigurationProfiler>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -297,6 +332,149 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
     
     return true;
+}
+
+// ========== BATCH PROCESSING IMPLEMENTATION ==========
+
+bool Brain::stepBatch(SimulationStep startStep, SimulationStep endStep) {
+    pImpl->batchStepsProcessed = startStep;
+    pImpl->batchTotalSteps = endStep - startStep + 1;
+    pImpl->batchStartTime = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    pImpl->batchProgress = 0.0;
+    
+    NLM_LOG_INFO("Starting batch processing: steps " + std::to_string(startStep) + 
+                 " to " + std::to_string(endStep) +
+                 " (" + std::to_string(pImpl->batchTotalSteps) + " steps)");
+    
+    StepResult result = pImpl->batchStepProcessor->processBatch(
+        this, startStep, endStep, pImpl->currentTime
+    );
+    
+    // Update batch statistics
+    pImpl->batchStepsProcessed = result.stepsProcessed;
+    pImpl->batchProgress = result.stepsProcessed / static_cast<double>(pImpl->batchTotalSteps);
+    
+    NLM_LOG_INFO("Batch processing complete: " + std::to_string(result.stepsProcessed) + 
+                 " steps processed, " + std::to_string(result.totalSpikes) + " spikes,
+                 time: " + std::to_string(result.wallTime) + "s");
+    
+    return result.stepsProcessed > 0;
+}
+
+bool Brain::stepBatchWithTime(SimulationStep startStep, SimulationStep endStep,
+                              Timestamp startTime, Timestamp endTime) {
+    Timestamp currentTime = startTime;
+    Timestamp targetEndTime = endTime;
+    Timestamp timestep = static_cast<Timestamp>(pImpl->timestep);
+    
+    NLM_LOG_INFO("Starting time-based batch processing: " + std::to_string(startTime) +
+                 " to " + std::to_string(endTime) + " seconds");
+    
+    StepResult result = pImpl->batchStepProcessor->processBatchWithTime(
+        this, startStep, endStep, startTime, endTime
+    );
+    
+    // Update batch statistics
+    pImpl->batchStepsProcessed = result.stepsProcessed;
+    pImpl->batchProgress = result.stepsProcessed / static_cast<double>(pImpl->batchTotalSteps);
+    
+    NLM_LOG_INFO("Time-based batch processing complete: " + std::to_string(result.stepsProcessed) +
+                 " steps, " + std::to_string(result.totalSpikes) + " spikes,
+                 time: " + std::to_string(result.wallTime) + "s");
+    
+    return result.stepsProcessed > 0;
+}
+
+bool Brain::stepBatchWithEarlyTermination(SimulationStep startStep, SimulationStep endStep) {
+    // Configure early termination
+    BatchStepProcessor::Config config = pImpl->batchStepProcessor->getConfig();
+    config.shouldTerminate = []() -> bool {
+        // Simple early termination based on spike rate
+        // This could be enhanced with more sophisticated metrics
+        return false;
+    };
+    config.earlyTerminationThreshold = 0.95f; // 95% threshold
+    pImpl->batchStepProcessor->setConfig(config);
+    
+    return stepBatch(startStep, endStep);
+}
+
+bool Brain::stepBatchWithCheckpointing(SimulationStep startStep, SimulationStep endStep,
+                                      const std::string& checkpointDir,
+                                      uint64_t checkpointInterval) {
+    StepResult result = pImpl->batchStepProcessor->processBatchWithCheckpointing(
+        this, startStep, endStep, pImpl->currentTime,
+        checkpointDir, checkpointInterval
+    );
+    
+    // Update batch statistics
+    pImpl->batchStepsProcessed = result.stepsProcessed;
+    pImpl->batchProgress = result.stepsProcessed / static_cast<double>(pImpl->batchTotalSteps);
+    
+    NLM_LOG_INFO("Checkpointing batch processing complete: " +
+                 std::to_string(result.stepsProcessed) + " steps, " +
+                 std::to_string(result.checkpointCount) + " checkpoints");
+    
+    return result.stepsProcessed > 0;
+}
+
+std::future<bool> Brain::stepBatchAsync(SimulationStep startStep, SimulationStep endStep) {
+    auto task = [this, startStep, endStep]() -> bool {
+        return stepBatch(startStep, endStep);
+    };
+    
+    // Submit to thread pool
+    return pImpl->batchStepProcessor->getThreadPool().submit(task);
+}
+
+Brain::BatchStats Brain::getBatchStats() const {
+    BatchStats stats;
+    stats.stepsProcessed = pImpl->batchStepsProcessed;
+    stats.totalSteps = pImpl->batchTotalSteps;
+    stats.progress = pImpl->batchProgress;
+    stats.estimatedTimeRemaining = 0.0; // Could be calculated based on progress
+    
+    // Estimate memory usage
+    if (pImpl->batchStepProcessor) {
+        BatchStepProcessor::ProcessingStats procStats = pImpl->batchStepProcessor->getStats();
+        stats.memoryUsage = static_cast<size_t>(procStats.memoryUsage.load());
+    }
+    
+    stats.neuronsProcessed = getTotalNeuronCount() * stats.stepsProcessed;
+    stats.spikesGenerated = getTotalSpikeCount();
+    
+    return stats;
+}
+
+void Brain::enableBatchOptimization(bool enable) {
+    if (pImpl->batchStepProcessor) {
+        pImpl->batchStepProcessor->enableSIMD(enable);
+        pImpl->batchStepProcessor->enableMultithreading(enable);
+        pImpl->batchStepProcessor->enableMemoryPool(enable);
+    }
+}
+
+bool Brain::isBatchOptimizationEnabled() const {
+    return pImpl->batchStepProcessor && 
+           pImpl->batchStepProcessor->isSIMDEnabled() &&
+           pImpl->batchStepProcessor->isMultithreadingEnabled();
+}
+
+BatchStepProcessor* Brain::getBatchStepProcessor() {
+    return pImpl->batchStepProcessor.get();
+}
+
+void Brain::setBatchConfig(const BatchStepProcessor::Config& config) {
+    if (pImpl->batchStepProcessor) {
+        pImpl->batchStepProcessor->setConfig(config);
+    }
+}
+
+const BatchStepProcessor::Config& Brain::getBatchConfig() const {
+    static BatchStepProcessor::Config defaultConfig;
+    return pImpl->batchStepProcessor ? 
+           pImpl->batchStepProcessor->getConfig() : defaultConfig;
 }
 
 void Brain::step(SimulationStep currentStep) {
@@ -1114,4 +1292,255 @@ void Brain::logStatus() const {
     }
 }
 
+// ========== PERFORMANCE PROFILING IMPLEMENTATIONS ==========
+
+void Brain::enableProfiling() {
+    pImpl->isProfilingEnabled = true;
+    pImpl->profilingStartStep = pImpl->currentStep;
+    pImpl->profilingStartTime = std::chrono::high_resolution_clock::now();
+    
+    // Initialize performance profiling components
+    nlm::PerformanceProfiler::ProfilingConfig profilerConfig;
+    profilerConfig.enableCPUProfiling = true;
+    profilerConfig.enableMemoryTracking = true;
+    profilerConfig.enableThreadProfiling = true;
+    profilerConfig.enableBottleneckDetection = true;
+    profilerConfig.enableRealTimeMonitoring = false;
+    
+    pImpl->performanceProfiler->initialize(profilerConfig);
+    
+    nlm::MemoryProfiler::MemoryProfilingConfig memoryConfig;
+    memoryConfig.enableAllocationTracking = true;
+    memoryConfig.enableDeallocationTracking = true;
+    memoryConfig.enableLeakDetection = true;
+    memoryConfig.enableFragmentationAnalysis = false;
+    
+    pImpl->memoryProfiler->initialize(memoryConfig);
+}
+
+std::string Brain::getPerformanceProfile() const {
+    std::ostringstream profile;
+    
+    profile << "=== Performance Profile ===\n";
+    profile << "Profiling enabled: " << (pImpl->isProfilingEnabled ? "Yes" : "No") << "\n";
+    profile << "Start step: " << pImpl->profilingStartStep << "\n";
+    profile << "Current step: " << pImpl->currentStep << "\n";
+    
+    if (pImpl->performanceProfiler) {
+        profile << "Performance profiler data:\n";
+        auto performanceData = pImpl->performanceProfiler->getAllPerformanceData();
+        for (const auto& pair : performanceData) {
+            const auto& data = pair.second;
+            profile << "  Component: " << data.name << " (" << data.category << ")\n";
+            profile << "    CPU Time: " << data.cpuTimeMs << " ms\n";
+            profile << "    Wall Time: " << data.wallTimeMs << " ms\n";
+            profile << "    Memory: " << data.memoryBytes << " bytes\n";
+            profile << "    Peak Memory: " << data.peakMemoryBytes << " bytes\n";
+            profile << "    Call Count: " << data.callCount << "\n";
+            profile << "    Average Time: " << data.avgTimeMs << " ms\n\n";
+        }
+        
+        // Generate bottlenecks
+        auto bottlenecks = pImpl->performanceProfiler->analyzeBottlenecks();
+        if (!bottlenecks.empty()) {
+            profile << "Performance Bottlenecks:\n";
+            for (const auto& bottleneck : bottlenecks) {
+                profile << "  " << bottleneck.name << " (Severity: " << bottleneck.severity << ")\n";
+                profile << "    Impact: " << bottleneck.impactScore << "\n";
+                profile << "    Description: " << bottleneck.description << "\n";
+                profile << "    Recommendation: " << bottleneck.recommendation << "\n\n";
+            }
+        }
+        
+        // Generate optimization recommendations
+        auto recommendations = pImpl->performanceProfiler->getOptimizationRecommendations();
+        if (!recommendations.empty()) {
+            profile << "Optimization Recommendations:\n";
+            for (const auto& rec : recommendations) {
+                profile << "  " << rec.issue << "\n";
+                profile << "    Potential Gain: " << rec.potentialGain << "\n";
+                profile << "    Estimated Effort: " << rec.estimatedEffort << "\n";
+                profile << "    Description: " << rec.description << "\n";
+                profile << "    Implementation Hint: " << rec.implementationHint << "\n\n";
+            }
+        }
+    }
+    
+    return profile.str();
+}
+
+std::string Brain::getMemoryProfile() const {
+    std::ostringstream profile;
+    
+    profile << "=== Memory Profile ===\n";
+    profile << "Peak Memory Usage: " << pImpl->getPeakMemoryMB() << " MB\n";
+    
+    if (pImpl->memoryProfiler) {
+        auto memoryStats = pImpl->memoryProfiler->getMemoryStats();
+        profile << "Memory Statistics:\n";
+        profile << "  Total Allocated: " << memoryStats.totalAllocated << " bytes\n";
+        profile << "  Current Usage: " << memoryStats.currentUsage << " bytes\n";
+        profile << "  Peak Usage: " << memoryStats.peakUsage << " bytes\n";
+        profile << "  Allocated Count: " << memoryStats.allocatedCount << "\n";
+        profile << "  Deallocated Count: " << memoryStats.deallocatedCount << "\n";
+        profile << "  Active Allocations: " << memoryStats.activeAllocations << "\n";
+        profile << "  Average Allocation Size: " << memoryStats.averageAllocationSize << " bytes\n";
+        
+        // Memory breakdown
+        auto breakdown = pImpl->memoryProfiler->getMemoryBreakdown();
+        profile << "\nMemory Breakdown:\n";
+        profile << "  Neurons: " << breakdown.neuronsMB << " MB\n";
+        profile << "  Synapses: " << breakdown.synapsesMB << " MB\n";
+        profile << "  Events: " << breakdown.eventsMB << " MB\n";
+        profile << "  Other: " << breakdown.otherMB << " MB\n";
+        
+        // Memory leak detection
+        auto leaks = pImpl->memoryProfiler->detectMemoryLeaks();
+        if (!leaks.empty()) {
+            profile << "\nMemory Leaks Detected:\n";
+            for (const auto& leak : leaks) {
+                profile << "  " << leak.leakType << "\n";
+                profile << "    Size: " << leak.leakSizeBytes << " bytes\n";
+                profile << "    Component: " << leak.componentName << "\n";
+                profile << "    Confidence: " << leak.confidence << "\n";
+                profile << "    Fix: " << leak.fixRecommendation << "\n\n";
+            }
+        }
+    }
+    
+    return profile.str();
+}
+
+std::string Brain::getOptimizationRecommendations() const {
+    std::ostringstream recommendations;
+    
+    recommendations << "=== Optimization Recommendations ===\n\n";
+    
+    // Performance recommendations
+    if (pImpl->performanceProfiler) {
+        auto perfRecommendations = pImpl->performanceProfiler->getOptimizationRecommendations();
+        recommendations << "Performance Optimizations:\n";
+        for (const auto& rec : perfRecommendations) {
+            recommendations << "  " << rec.issue << "\n";
+            recommendations << "    Potential Gain: " << rec.potentialGain << "\n";
+            recommendations << "    Estimated Effort: " << rec.estimatedEffort << "\n";
+            recommendations << "    Description: " << rec.description << "\n\n";
+        }
+    }
+    
+    // Memory recommendations
+    if (pImpl->memoryProfiler) {
+        auto leaks = pImpl->memoryProfiler->detectMemoryLeaks();n
+        if (!leaks.empty()) {
+            recommendations << "Memory Optimizations:\n";
+            for (const auto& leak : leaks) {
+                recommendations << "  Fix memory leak in " << leak.componentName << "\n";
+                recommendations << "    Estimated gain: " << leak.leakSizeBytes / 1024 / 1024 << " MB\n";
+                recommendations << "    Fix: " << leak.fixRecommendation << "\n\n";
+            }
+        }
+    }
+    
+    // Configuration recommendations
+    if (pImpl->configurationProfiler) {
+        recommendations << "Configuration Optimizations:\n";
+        recommendations << "  Consider optimizing simulation parameters\n";
+        recommendations << "  Adjust neuron counts based on performance characteristics\n";
+        recommendations << "  Optimize connectivity probabilities for better performance\n\n";
+    }
+    
+    recommendations << "=== End of Recommendations ===\n";
+    return recommendations.str();
+}
+
+std::string Brain::getBottleneckAnalysis() const {
+    std::ostringstream analysis;
+    
+    analysis << "=== Bottleneck Analysis ===\n\n";
+    
+    // Performance bottlenecks
+    if (pImpl->performanceProfiler) {
+        auto bottlenecks = pImpl->performanceProfiler->analyzeBottlenecks();
+        analysis << "Performance Bottlenecks:\n";
+        for (const auto& bottleneck : bottlenecks) {
+            analysis << "  " << bottleneck.name << " (Severity: " << bottleneck.severity << ")\n";
+            analysis << "    Impact: " << bottleneck.impactScore << "\n";
+            analysis << "    Affected Components: " << bottleneck.affectedComponents << "\n";
+            analysis << "    Time Lost: " << bottleneck.timeLostMs << " ms\n";
+            analysis << "    Description: " << bottleneck.description << "\n";
+            analysis << "    Recommendation: " << bottleneck.recommendation << "\n\n";
+        }
+    }
+    
+    // Memory bottlenecks
+    if (pImpl->memoryProfiler) {
+        auto memoryStats = pImpl->memoryProfiler->getMemoryStats();
+        if (memoryStats.peakUsage > 500 * 1024 * 1024) { // > 500 MB
+            analysis << "Memory Bottleneck:\n";
+            analysis << "  Peak memory usage is high: " << memoryStats.peakUsage / 1024 / 1024 << " MB\n";
+            analysis << "  Consider reducing memory footprint or optimizing memory usage\n\n";
+        }
+    }
+    
+    analysis << "=== End of Bottleneck Analysis ===\n";
+    return analysis.str();
+}
+
+Brain::DetailedPerformanceMetrics Brain::getDetailedMetrics() const {
+    DetailedPerformanceMetrics metrics;
+    
+    metrics.cpuTimeMs = pImpl->totalCpuTimeMs;
+    metrics.memoryUsageMB = pImpl->getPeakMemoryMB();
+    metrics.gpuTimeMs = 0.0; // Not implemented yet
+    metrics.threadCount = std::thread::hardware_concurrency();
+    
+    // Collect hotspots from performance profiler
+    if (pImpl->performanceProfiler) {
+        auto performanceData = pImpl->performanceProfiler->getAllPerformanceData();
+        for (const auto& pair : performanceData) {
+            const auto& data = pair.second;
+            if (data.cpuTimeMs > 100.0) { // Hot spot threshold
+                metrics.hotspots.push_back(data.name + " (" + std::to_string(data.cpuTimeMs) + "ms CPU)");
+            }
+        }
+    }
+    
+    // Collect recommendations from performance analyzer
+    if (pImpl->performanceAnalyzer) {
+        // Analysis would be done here
+        metrics.recommendations.push_back("Optimize hot components identified above");
+        metrics.recommendations.push_back("Consider parallelization for CPU-intensive tasks");
+    }
+    
+    return metrics;
+}
+
+bool Brain::isProfilingEnabled() const {
+    return pImpl->isProfilingEnabled;
+}
+
+void Brain::resetPerformanceCounters() {
+    pImpl->isProfilingEnabled = false;
+    pImpl->totalCpuTimeMs = 0.0;
+    pImpl->totalWallTimeMs = 0.0;
+    pImpl->totalMemoryUsage = 0;
+    pImpl->peakMemoryUsage = 0;
+    pImpl->profilingStartStep = 0;
+    pImpl->componentCpuTimes.clear();
+    pImpl->componentWallTimes.clear();
+    pImpl->componentMemoryUsages.clear();
+    pImpl->componentPeakMemoryUsages.clear();
+    pImpl->profilingHotspots.clear();
+    pImpl->optimizationRecommendations.clear();
+    pImpl->bottleneckAnalysis.clear();
+    
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->reset();
+    }
+    if (pImpl->memoryProfiler) {
+        pImpl->memoryProfiler->reset();
+    }
+}
+
 } // namespace nlm
+

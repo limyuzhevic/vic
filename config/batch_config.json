@@ -1,0 +1,14 @@
+{
+  "batch": {
+    "enabled": true,
+    "batch_size": 1000,
+    "SIMD_enabled": true,
+    "multithreading_enabled": true,
+    "memory_pool_enabled": true,
+    "early_termination_threshold": 0.95
+  },
+  "brain": {
+    "neuron_count": 10000,
+    "synapse_density": 0.1
+  }
+}

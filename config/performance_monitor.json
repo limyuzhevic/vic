@@ -1,0 +1,12 @@
+{
+  "performance": {
+    "profiling": true,
+    "memory_profiling": true,
+    "batch_processing": true,
+    "checkpointing": true
+  },
+  "brain": {
+    "neuron_count": 5000,
+    "synapse_density": 0.1
+  }
+}

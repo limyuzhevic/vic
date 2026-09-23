@@ -12,10 +12,18 @@ namespace nlm {
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
-public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
+// Factory methods
+    static std::shared_ptr<AgentBrain> createWithBrain(std::shared_ptr<Brain> brain);
+    static std::shared_ptr<AgentBrain> createWithConfig(std::shared_ptr<Config> config);
+    static std::shared_ptr<AgentBrain> createDefault();
     
+    // Configuration builder methods
+    AgentBrain& withBrain(std::shared_ptr<Brain> brain);
+    AgentBrain& withConfig(std::shared_ptr<Config> config);
+    AgentBrain& withWorld(const SimpleWorld& world);
+    AgentBrain& enableAllFeatures();
+    AgentBrain& disableAllFeatures();
+
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
@@ -68,7 +76,7 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,6 +84,29 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Reward modulation helper methods
+    void computeNeuromodulationState(float reward, float predictedReward);
+    void applySynapseRewardModulation();
+    void updatePlasticityBasedOnDopamine();
+    
+    // Sensory processing helper methods
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void computeNoveltyLevel(const std::vector<float>& vision);
+    void updateCuriosityLevel();
+    
+    // Motor processing helper methods
+    float calculateMotorActivity(const std::vector<Neuron*>& neurons);
+    MotorCommand selectBestMotorCommand(
+        float forwardAct, float backwardAct, float leftAct, 
+        float rightAct, float interactAct, float waitAct);
+    
+    // Development processing helper methods
+    void updateDevelopmentalStage();
+    void configureStructuralPlasticity();
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

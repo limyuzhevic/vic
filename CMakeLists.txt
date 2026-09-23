@@ -112,14 +112,20 @@ add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlm_performance)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Performance and batch processing
+add_library(nlm_performance STATIC
+    # Performance optimizations
+    src/performance/PerformanceProfiler.cpp
+    src/performance/PerformanceAnalyzer.cpp
+    src/performance/MemoryProfiler.cpp
+    src/performance/ConfigurationProfiler.cpp
+    # Batch processing
+    src/performance/BatchBrain.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
@@ -144,8 +150,54 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Test executables for new features
+add_executable(nlm_test_logger
+    tests/test_logger.cpp
+)
+target_link_libraries(nlm_test_logger PRIVATE nlm_core)
+
+add_executable(nlm_test_config
+    tests/test_config.cpp
+)
+target_link_libraries(nlm_test_config PRIVATE nlm_core)
+
+add_executable(nlm_test_batch_processor
+    tests/test_batch_processor.cpp
+)
+target_link_libraries(nlm_test_batch_processor PRIVATE nlm_core nlm_performance)
+
+add_executable(nlm_test_performance_profiler
+    tests/test_performance_profiler.cpp
+)
+target_link_libraries(nlm_test_performance_profiler PRIVATE nlm_core nlm_performance)
+
+add_executable(nlm_test_python_bindings
+    tests/test_python_bindings.cpp
+)
+target_link_libraries(nlm_test_python_bindings PRIVATE nlm_core nlm_performance)
+
+add_executable(nlm_test_system_integration
+    tests/test_system_integration.cpp
+)
+target_link_libraries(nlm_test_system_integration PRIVATE nlm_core nlm_performance)
+
+add_executable(nlm_test_performance_benchmarks
+    tests/test_performance_benchmarks.cpp
+)
+target_link_libraries(nlm_test_performance_benchmarks PRIVATE nlm_core nlm_performance)
+
+add_executable(nlm_test_memory_management
+    tests/test_memory_management.cpp
+)
+target_link_libraries(nlm_test_memory_management PRIVATE nlm_core nlm_performance)
+
+add_executable(nlm_test_error_handling
+    tests/test_error_handling.cpp
+)
+target_link_libraries(nlm_test_error_handling PRIVATE nlm_core nlm_performance)

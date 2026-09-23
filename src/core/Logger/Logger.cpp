@@ -102,24 +102,33 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+// Logger class implementation with hierarchical logging
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::shared_ptr<HierarchicalLogger> hierarchicalLogger;
+    std::unordered_map<std::string, std::shared_ptr<ILogger>> legacyLoggers;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->hierarchicalLogger = std::make_shared<HierarchicalLogger>();
+}
 
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
+    pImpl->legacyLoggers[logger->getLevel() == LogLevel::Debug ? "legacy_debug" : 
+                        logger->getLevel() == LogLevel::Info ? "legacy_info" :
+                        logger->getLevel() == LogLevel::Warning ? "legacy_warning" :
+                        logger->getLevel() == LogLevel::Error ? "legacy_error" : "legacy_critical"] = logger;
 }
 
 void Logger::clearLoggers() {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.clear();
+    pImpl->legacyLoggers.clear();
 }
 
 void Logger::setLevel(LogLevel level) {
@@ -127,12 +136,15 @@ void Logger::setLevel(LogLevel level) {
     for (auto& logger : pImpl->loggers) {
         logger->setLevel(level);
     }
+    pImpl->hierarchicalLogger->setGlobalLevel(level);
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+                 const std::string& file, int line, const std::string& function,
+                 const std::string& component, const std::string& parentComponent) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Create log entry with component information
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -140,40 +152,55 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    entry.component = component;
+    entry.parentComponent = parentComponent;
     
+    // First, log to legacy loggers for backward compatibility
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
+    
+    // Then, log to hierarchical logger
+    pImpl->hierarchicalLogger->log(entry);
 }
 
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
+void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function,
+                   const std::string& component, const std::string& parentComponent) {
+    log(LogLevel::Debug, message, file, line, function, component, parentComponent);
 }
 
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
+void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function,
+                  const std::string& component, const std::string& parentComponent) {
+    log(LogLevel::Info, message, file, line, function, component, parentComponent);
 }
 
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
+void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function,
+                     const std::string& component, const std::string& parentComponent) {
+    log(LogLevel::Warning, message, file, line, function, component, parentComponent);
 }
 
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
+void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function,
+                   const std::string& component, const std::string& parentComponent) {
+    log(LogLevel::Error, message, file, line, function, component, parentComponent);
 }
 
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
+void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function,
+                      const std::string& component, const std::string& parentComponent) {
+    log(LogLevel::Critical, message, file, line, function, component, parentComponent);
 }
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    
+    // Check legacy loggers
+    for (auto& [name, logger] : pImpl->legacyLoggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
     }
-    return false;
+    
+    // Check hierarchical logger
+    return pImpl->hierarchicalLogger->shouldLog("", LogEntry{level, "", "", 0, "", {}, "", ""});
 }
 
 Logger& Logger::getGlobal() {
@@ -186,12 +213,56 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // In practice, we just use getGlobal() which is already static
 }
 
+void Logger::enableComponent(const std::string& componentName, bool enabled) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->hierarchicalLogger->setComponentEnabled(componentName, enabled);
+}
+
+void Logger::setComponentLevel(const std::string& componentName, LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    auto componentLogger = pImpl->hierarchicalLogger->getComponentLogger(componentName);
+    if (componentLogger) {
+        componentLogger->setLevel(level);
+    }
+}
+
+void Logger::setComponentFilter(const std::string& componentName, 
+                               const std::function<bool(const std::string&, const LogEntry&)>& filter) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    auto componentLogger = pImpl->hierarchicalLogger->getComponentLogger(componentName);
+    if (componentLogger) {
+        componentLogger->setFilter(filter);
+    }
+}
+
+void Logger::registerComponentLogger(const std::string& componentName,
+                                     const std::string& parentComponent,
+                                     LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->hierarchicalLogger->registerComponentLogger(componentName, parentComponent, level);
+}
+
+std::shared_ptr<ComponentLogger> Logger::getComponentLogger(const std::string& componentName,
+                                                             const std::string& parentComponent) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->hierarchicalLogger->getComponentLogger(componentName, parentComponent);
+}
+
+std::shared_ptr<HierarchicalLogger> Logger::getHierarchicalLogger() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->hierarchicalLogger;
+}
+
 // LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+    : level_(level), file_(file), line_(line), function_(function), component_("") {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_, component_);
+}
+
+void LogStream::setComponent(const std::string& component) {
+    component_ = component;
 }
 
 } // namespace nlm

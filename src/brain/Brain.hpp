@@ -115,6 +115,52 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+    // ========== BATCH PROCESSING ==========
+    
+    // Process multiple simulation steps efficiently
+    bool stepBatch(SimulationStep startStep, SimulationStep endStep);
+    
+    // Process multiple steps with continuous time
+    bool stepBatchWithTime(SimulationStep startStep, SimulationStep endStep, 
+                          Timestamp startTime, Timestamp endTime);
+    
+    // Process multiple steps with early termination support
+    bool stepBatchWithEarlyTermination(SimulationStep startStep, SimulationStep endStep);
+    
+    // Process multiple steps with checkpointing for large batches
+    bool stepBatchWithCheckpointing(SimulationStep startStep, SimulationStep endStep,
+                                   const std::string& checkpointDir = "./batch_checkpoints",
+                                   uint64_t checkpointInterval = 10000);
+    
+    // Process batch asynchronously for parallel execution
+    std::future<bool> stepBatchAsync(SimulationStep startStep, SimulationStep endStep);
+    
+    // Get batch processing status and statistics
+    struct BatchStats {
+        SimulationStep stepsProcessed = 0;
+        SimulationStep totalSteps = 0;
+        size_t neuronsProcessed = 0;
+        size_t spikesGenerated = 0;
+        double progress = 0.0;  // 0.0 - 1.0
+        double estimatedTimeRemaining = 0.0; // seconds
+        size_t memoryUsage = 0; // bytes
+    };
+    
+    BatchStats getBatchStats() const;
+    
+    // Enable/disable batch processing optimizations
+    void enableBatchOptimization(bool enable);
+    bool isBatchOptimizationEnabled() const;
+    
+    // Get the batch processor instance
+    BatchStepProcessor* getBatchStepProcessor();
+    
+    // Set batch processing configuration
+    void setBatchConfig(const BatchStepProcessor::Config& config);
+    
+    // Get batch processing configuration
+    const BatchStepProcessor::Config& getBatchConfig() const;
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
@@ -187,12 +233,53 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
+// Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
     // Logging
     void logStatus() const;
+
+    // ========== PERFORMANCE PROFILING ==========
     
+    // Enable performance monitoring
+    void enableProfiling();
+    
+    // Get current performance profile
+    std::string getPerformanceProfile() const;
+    
+    // Get memory profile
+    std::string getMemoryProfile() const;
+    
+    // Get optimization recommendations
+    std::string getOptimizationRecommendations() const;
+    
+    // Get bottleneck analysis
+    std::string getBottleneckAnalysis() const;
+    
+    // Get detailed performance metrics
+    struct DetailedPerformanceMetrics {
+        double cpuTimeMs{0.0};
+        double memoryUsageMB{0.0};
+        double gpuTimeMs{0.0};
+        size_t threadCount{0};
+        std::vector<std::string> hotspots;
+        std::vector<std::string> recommendations;
+        
+        std::string toJSON() const {
+            return "{\"cpuTimeMs\": " + std::to_string(cpuTimeMs) + ", \"memoryUsageMB\": " + 
+                   std::to_string(memoryUsageMB) + ", \"gpuTimeMs\": " + std::to_string(gpuTimeMs) + 
+                   ", \"threadCount\": " + std::to_string(threadCount) + "}";
+        }
+    };
+    
+    DetailedPerformanceMetrics getDetailedMetrics() const;
+    
+    // Check if profiling is enabled
+    bool isProfilingEnabled() const;
+    
+    // Reset performance counters
+    void resetPerformanceCounters();
+
 private:
     struct Impl;
     Impl* pImpl;
