@@ -151,6 +151,11 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# Advanced: Enable specific neuromodulators
+agent.setNoveltyWeight(0.3)              # Set curiosity sensitivity
+agent.setPredictionErrorWeight(0.7)     # Set learning drive
+agent.enablePredictionError(True)       # Enable prediction-based learning
 ```
 
 ---
@@ -294,4 +299,28 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**Advanced Users:**
+- Explore the `src/experiments/` directory for advanced simulation examples
+- Study the `docs/` directory for deep technical documentation
+- Implement custom neuron models or learning rules
+- Extend the Python API with new commands and features
+- Optimize performance using SIMD and parallel processing features
+
+**Research & Development:**
+- Modify configuration files in `configs/` to experiment with different parameters
+- Create custom brain architectures by extending the base classes
+- Implement new neuromodulation systems or modify existing ones
+- Build custom environments and task domains
+
+**Performance & Production:**
+- Use checkpointing for long simulations
+- Implement parallel processing for large networks
+- Profile and optimize simulation performance
+- Use the benchmark system for performance comparison
+
+**Community & Extension:**
+- Share your custom implementations and configurations
+- Contribute to the NLM ecosystem by adding new features
+- Join the research community for collaborative development
+
+That's it! You're now ready to use NLM at any skill level, from beginner simulations to advanced research implementations.
