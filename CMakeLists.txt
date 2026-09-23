@@ -87,10 +87,33 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
+# Neuromodulation system (aggregates neuromodulators)
+add_library(nlm_neuromodulation STATIC
+    src/neuromodulation/NeuromodulationSystem.cpp
 )
+target_include_directories(nlm_neuromodulation PUBLIC src)
+target_link_libraries(nlm_neuromodulation PUBLIC nlm_core)
+
+# Memory system (aggregated memory management)
+add_library(nlm_memory STATIC
+    src/memory/MemorySystem.cpp
+)
+target_include_directories(nlm_memory PUBLIC src)
+target_link_libraries(nlm_memory PUBLIC nlm_core)
+
+# Development system wrapper (development stages and effects)
+add_library(nlm_development STATIC
+    src/development/DevelopmentSystemWrapper.cpp
+)
+target_include_directories(nlm_development PUBLIC src)
+target_link_libraries(nlm_development PUBLIC nlm_core)
+
+# NeuralCore - Core neural computation and region management
+add_library(nlm_neural_core STATIC
+    src/brain/NeuralCore.cpp
+)
+target_include_directories(nlm_neural_core PUBLIC src)
+target_link_libraries(nlm_neural_core PUBLIC nlm_core)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
