@@ -5,22 +5,26 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "AdvancedConfig.hpp"
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
+// Configuration value types (backward compatibility)
 using ConfigValue = std::variant<
     int,
     int64_t,
     double,
     bool,
+    float,
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<float>,
+    std::vector<std::string>,
+    PlasticityFlags
 >;
 
 // Configuration source
@@ -43,7 +47,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class (backward compatibility)
 class Config {
 public:
     Config();
@@ -55,7 +59,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML or key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,9 +97,70 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    /**
+     * Get enhanced configuration manager (advanced features)
+     */
+    ConfigManager& getAdvancedConfig();
+    
+    /**
+     * Get enhanced configuration manager (const version)
+     */
+    const ConfigManager& getAdvancedConfig() const;
+    
+    /**
+     * Set enhanced configuration schema
+     */
+    void setAdvancedSchema(const ConfigSchema& schema);
+    
+    /**
+     * Get enhanced configuration schema
+     */
+    const ConfigSchema& getAdvancedSchema() const;
+    
+    /**
+     * Enable/disable validation
+     */
+    void setValidation(bool enabled);
+    
+    /**
+     * Check if validation is enabled
+     */
+    bool isValidationEnabled() const;
+    
+    /**
+     * Enable/disable environment variable expansion
+     */
+    void setEnvironmentExpansion(bool enabled);
+    
+    /**
+     * Check if environment variable expansion is enabled
+     */
+    bool isEnvironmentExpansionEnabled() const;
+    
+    /**
+     * Enable/disable type coercion
+     */
+    void setTypeCoercion(bool enabled);
+    
+    /**
+     * Check if type coercion is enabled
+     */
+    bool isTypeCoercionEnabled() const;
+    
+    /**
+     * Convert to enhanced configuration manager
+     */
+    explicit operator ConfigManager&();
+    
+    /**
+     * Convert to enhanced configuration manager (const version)
+     */
+    explicit operator const ConfigManager&() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::unique_ptr<ConfigManager> advancedConfig;
     
     // Internal helpers
     static std::string trim(const std::string& str);

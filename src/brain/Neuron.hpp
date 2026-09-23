@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -142,6 +142,14 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // ========== LIF NEURON SPECIFICS ==========
+    
+    // Real LIF step function - returns true if neuron fired
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    
+    // Apply spike-frequency adaptation
+    void updateAdaptation();
     
 private:
     struct Impl;

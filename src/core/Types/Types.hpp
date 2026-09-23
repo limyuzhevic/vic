@@ -109,18 +109,8 @@ enum class SynapseType : uint8_t {
     GapJunction
 };
 
-// Synaptic plasticity state flags
-struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
-    
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
-                                  reward_modulated(false), structural(false), 
-                                  eligible(false) {}
-};
+// Plasticity configuration (not in variant, use float for plasticity values)
+// e.g., stdp_ltp_weight = 0.02f, stdp_ltd_weight = 0.015f
 
 // Developmental state
 enum class DevelopmentalStage : uint8_t {

@@ -19,6 +19,30 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Basic type bindings (NeuronId, SynapseId, RegionId, PopulationId)
+void bindBasicTypes(py::module_ &m);
+
+// Enum bindings (NeuronType, SynapseType, ActionType, etc.)
+void bindEnumTypes(py::module_ &m);
+
+// Core classes (Config, Brain, AgentBrain, SimpleWorld)
+void bindCoreClasses(py::module_ &m);
+
+// Sensory inputs (Vision, Audio, InternalSignals)
+void bindSensoryInputs(py::module_ &m);
+
+// Actions and objects
+void bindActionsAndObjects(py::module_ &m);
+
+// Agent components (AgentBody, SensoryPercept, etc.)
+void bindAgentComponents(py::module_ &m);
+
+// Helper functions
+void bindHelperFunctions(py::module_ &m);
+
+// Global constants
+void bindGlobalConstants(py::module_ &m);
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -29,6 +53,19 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Modular binding registration
+    bindBasicTypes(m);
+    bindEnumTypes(m);
+    bindSensoryInputs(m);
+    bindActionsAndObjects(m);
+    bindCoreClasses(m);
+    bindAgentComponents(m);
+    bindHelperFunctions(m);
+    bindGlobalConstants(m);
+}
+
+// Basic type bindings (NeuronId, SynapseId, RegionId, PopulationId)
+void bindBasicTypes(py::module_ &m) {
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -72,7 +109,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
+}
 
+// Enum bindings (NeuronType, SynapseType, ActionType, etc.)
+void bindEnumTypes(py::module_ &m) {
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
         .value("Inhibitory", NeuronType::Inhibitory)
@@ -141,29 +181,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+}
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
-
+// Sensory inputs (Vision, Audio, InternalSignals)
+void bindSensoryInputs(py::module_ &m) {
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -197,7 +218,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
+}
 
+// Actions and objects
+void bindActionsAndObjects(py::module_ &m) {
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -220,7 +244,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
+}
 
+// Agent components (AgentBody, SensoryPercept, etc.)
+void bindAgentComponents(py::module_ &m) {
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
@@ -262,6 +289,31 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+}
+
+// Core classes (Config, Brain, AgentBrain, SimpleWorld)
+void bindCoreClasses(py::module_ &m) {
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -399,7 +451,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+}
 
+// Helper functions
+void bindHelperFunctions(py::module_ &m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -415,11 +470,14 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+}
 
+// Global constants
+void bindGlobalConstants(py::module_ &m) {
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
-} // namespace nlm
+}// namespace nlm

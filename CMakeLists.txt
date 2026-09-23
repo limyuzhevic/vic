@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/AdvancedConfig.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -85,7 +86,16 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
-)
+    # Performance
+    src/performance/CheckpointSystem.cpp
+    src/performance/EventQueue.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/SparseConnectivity.cpp
+    src/performance/OptimizedBrain.cpp
+    src/performance/Performance.cpp
+    src/performance/PerformanceMonitor.cpp
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
