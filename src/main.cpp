@@ -18,7 +18,6 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
@@ -48,114 +47,127 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+// Enhanced configuration loading and validation
+class EnhancedConfigLoader {
+public:
+    EnhancedConfigLoader(std::shared_ptr<Config> config) : config(config) {}
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
-    
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
+    bool loadConfiguration(const std::vector<std::string>& configFiles) {
+        bool anyLoaded = false;
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        for (const auto& file : configFiles) {
+            if (config->loadFromFile(file)) {
+                anyLoaded = true;
+                NLM_LOG_INFO("✓ Loaded configuration from: " + file);
+            } else {
+                NLM_LOG_WARNING("⚠ Could not load configuration from: " + file);
             }
         }
         
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
+        return anyLoaded;
     }
     
-    void recordFinalState() {
-        finalWeights.clear();
+    void applyCommandLineOverrides(int argc, char** argv) {
+        config->loadFromArgs(argc, argv);
+        NLM_LOG_INFO("✓ Applied command line configuration overrides");
+    }
+    
+    void displayConfigurationSummary() {
+        NLM_LOG_INFO("Current Configuration Summary:");
+        NLM_LOG_INFO(config->summary());
         
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Display schema information
+        ConfigRegistry& registry = ConfigRegistry::getInstance();
+        NLM_LOG_INFO("\nConfiguration Schema:");
+        NLM_LOG_INFO(registry.getSchemaDescription());
+    }
+    
+    bool validateConfiguration() {
+        ConfigRegistry& registry = ConfigRegistry::getInstance();
+        bool allValid = true;
+        
+        for (const auto& key : config->getKeys()) {
+            if (!registry.validateFull(key, config->getOr<std::string>(key, ""))) {
+                NLM_LOG_ERROR("✗ Configuration validation failed for key: " + key);
+                const ConfigSchema* schema = registry.getSchema(key);
+                if (schema) {
+                    NLM_LOG_ERROR("  Error: " + schema->validationError);
+                }
+                allValid = false;
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
-        
-        NLM_LOG_INFO("Final state recorded:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        if (allValid) {
+            NLM_LOG_INFO("✓ All configuration entries are valid");
+            
+            // Display validation report
+            std::map<std::string, ConfigValue> configMap;
+            for (const auto& key : config->getKeys()) {
+                auto val = config->get<std::string>(key);
+                if (val.has_value()) {
+                    configMap[key] = ConfigValue(val.value());
+                }
+            }
+            
+            NLM_LOG_INFO("\n" + registry.getValidationReport(configMap));
         }
+        
+        return allValid;
     }
     
-    void computeStatistics() {
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("=== Learning Experiment Results ===");
-        NLM_LOG_INFO("");
+private:
+    std::shared_ptr<Config> config;
+};
+
+// Enhanced logging and diagnostics
+class DiagnosticsManager {
+public:
+    void setupDiagnostics(std::shared_ptr<Logger> logger) {
+        // Add file logging if enabled
+        std::string logFilename = config->getOr<std::string>("log_filename", "nlm.log");
+        bool logToFile = config->getOr<bool>("log_to_file", false);
         
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
-            return;
+        if (logToFile) {
+            auto fileLogger = std::make_shared<FileLogger>(logFilename);
+            if (fileLogger) {
+                logger->addLogger(fileLogger);
+                NLM_LOG_INFO("✓ File logging enabled: " + logFilename);
+            }
         }
         
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        // Set log level
+        std::string logLevel = config->getOr<std::string>("log_level", "INFO");
+        LogLevel level = LogLevel::Info;
         
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        if (logLevel == "DEBUG") level = LogLevel::Debug;
+        else if (logLevel == "WARNING") level = LogLevel::Warning;
+        else if (logLevel == "ERROR") level = LogLevel::Error;
         
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
-        
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Spike Activity:");
-        NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
-        NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
-        
-        // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
-        NLM_LOG_INFO("");
-        if (learningOccurred) {
-            NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
-        } else {
-            NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
-        }
+        auto consoleLogger = std::make_shared<ConsoleLogger>(level);
+        logger->addLogger(consoleLogger);
+        NLM_LOG_INFO("✓ Console logging configured with level: " + logLevel);
+    }
+    
+    void setConfig(std::shared_ptr<Config> config) {
+        this->config = config;
+    }
+    
+private:
+    std::shared_ptr<Config> config;
+};
+
+// Performance monitoring
+class PerformanceMonitor {
+public:
+    void logConfigurationPerformance(const ConfigStats& stats) {
+        NLM_LOG_INFO("=== Configuration Performance ===");
+        NLM_LOG_INFO("  Total configuration entries: " + std::to_string(stats.totalEntries));
+        NLM_LOG_INFO("  File-based entries: " + std::to_string(stats.fileEntries));
+        NLM_LOG_INFO("  Command line entries: " + std::to_string(stats.commandLineEntries));
+        NLM_LOG_INFO("  Runtime entries: " + std::to_string(stats.runtimeEntries));
+        NLM_LOG_INFO("  Configuration load time: N/A (manual timing needed)");
+        NLM_LOG_INFO("  Memory usage: N/A (manual measurement needed)");
+        NLM_LOG_INFO("===============================");
     }
 };
 
@@ -326,11 +338,43 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize enhanced logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Create enhanced configuration
+    auto config = std::make_shared<Config>();
+    EnhancedConfigLoader configLoader(config);
+    DiagnosticsManager diagnostics;
+    diagnostics.setConfig(config);
+    PerformanceMonitor perfMonitor;
+    
+    // Load configuration files (try .cfg, .json, .yaml)
+    std::vector<std::string> configFiles = {"configs/default.cfg"};
+    if (!configLoader.loadConfiguration(configFiles)) {
+        NLM_LOG_WARNING("Using default configuration (no config files loaded)");
+    }
+    
+    // Apply command line overrides
+    configLoader.applyCommandLineOverrides(argc, argv);
+    
+    // Display configuration summary
+    configLoader.displayConfigurationSummary();
+    
+    // Validate configuration
+    if (!configLoader.validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed. Using defaults.");
+    }
+    
+    // Setup diagnostics based on configuration
+    diagnostics.setupDiagnostics(logger);
+    
+    // Log performance metrics
+    ConfigStats stats;
+    stats.totalEntries = config->getKeys().size();
+    perfMonitor.logConfigurationPerformance(stats);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
