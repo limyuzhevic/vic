@@ -65,7 +65,7 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
+    // Sensory and motor neuron caches for efficient access
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
@@ -78,9 +78,14 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
+    // Developmental state
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+    
+    // Constructor with proper initialization using value initialization
+    explicit Impl(std::shared_ptr<Config> cfg)
+        : config(std::move(cfg))
+        , rng(std::make_unique<RandomGenerator>(42))  // Initialize immediately with default seed
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -90,24 +95,36 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , checkpointManager(std::make_unique<CheckpointManager>())
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
+        // Re-initialize random generator with seed from config (overrides default)
+        uint64_t seed = 42;
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
+        // Initialize plasticity systems in proper order
+        initializePlasticitySystems();
+        initializeIntegratedSystems();
+        configurePlasticityParameters();
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        checkpointManager->configure(checkpointDir, 10000, 5, true);
+    }
+    
+    // Helper methods for initialization
+    void initializePlasticitySystems() {
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+    }
+    
+    void initializeIntegratedSystems() {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -129,7 +146,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
-        
+    }
+    
+    void configurePlasticityParameters() {
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
@@ -142,19 +161,11 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
+        // Get timestep and integration intervals
         timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}

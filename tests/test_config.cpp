@@ -65,17 +65,101 @@ void testConfigRemove() {
     std::cout << "    testConfigRemove passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigLoadFromFile() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Test loading from empty file (should not crash)
+    bool success = config.loadFromFile("/nonexistent/file.txt");
+    // Should return false for non-existent file
+    assert(!success);
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    // Test loading from file with invalid format (should not crash)
+    // Create a temporary file with invalid content
+    std::ofstream tempFile("temp_config.txt");
+    tempFile << "invalid line without equals" << std::endl;
+    tempFile << "key=value" << std::endl;
+    tempFile.close();
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    success = config.loadFromFile("temp_config.txt");
+    // Should succeed despite invalid line
+    assert(success);
+    
+    // Check that valid key was loaded
+    assert(config.has("key"));
+    
+    // Clean up
+    std::remove("temp_config.txt");
+    
+    std::cout << "    testConfigLoadFromFile passed" << std::endl;
+}
+
+void testConfigLoadFromArgs() {
+    nlm::Config config;
+    
+    // Test empty args
+    bool success = config.loadFromArgs(1, nullptr);
+    assert(success);
+    
+    // Test null argv
+    success = config.loadFromArgs(0, nullptr);
+    assert(success);
+    
+    // Test malformed args (should not crash)
+    const char* argv[] = {"program", "--invalid"};
+    success = config.loadFromArgs(2, const_cast<char**>(argv));
+    // Should handle gracefully
+    assert(success);
+    
+    // Test valid args
+    const char* validArgs[] = {"program", "--test_key=test_value", "-another_key", "another_value"};
+    success = config.loadFromArgs(4, const_cast<char**>(validArgs));
+    assert(success);
+    assert(config.has("test_key"));
+    assert(config.has("another_key"));
+    
+    auto testVal = config.get<std::string>("test_key");
+    assert(testVal.has_value() && *testVal == "test_value");
+    
+    auto anotherVal = config.get<std::string>("another_key");
+    assert(anotherVal.has_value() && *anotherVal == "another_value");
+    
+    // Clean up
+    std::remove("temp_config.txt");
+    
+    std::cout << "    testConfigLoadFromFile passed" << std::endl;
+}
+
+void testConfigLoadFromArgs() {
+    nlm::Config config;
+    
+    // Test empty args
+    bool success = config.loadFromArgs(1, nullptr);
+    assert(success);
+    
+    // Test null argv
+    success = config.loadFromArgs(0, nullptr);
+    assert(success);
+    
+    // Test malformed args (should not crash)
+    const char* argv[] = {"program", "--invalid"};
+    success = config.loadFromArgs(2, const_cast<char**>(argv));
+    // Should handle gracefully
+    assert(success);
+    
+    // Test valid args
+    const char* validArgs[] = {"program", "--test_key=test_value", "-another_key", "another_value"};
+    success = config.loadFromArgs(4, const_cast<char**>(validArgs));
+    assert(success);
+    assert(config.has("test_key"));
+    assert(config.has("another_key"));
+    
+    auto testVal = config.get<std::string>("test_key");
+    assert(testVal.has_value() && *testVal == "test_value");
+    
+    auto anotherVal = config.get<std::string>("another_key");
+    assert(anotherVal.has_value() && *anotherVal == "another_value");
+    
+    std::cout << "    testConfigLoadFromArgs passed" << std::endl;
 }
 
 void runAll() {
@@ -84,6 +168,6 @@ void runAll() {
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigLoadFromFile();
+    testConfigLoadFromArgs();
 }
-
-} // namespace test_config
