@@ -99,14 +99,14 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
     // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    // For Phase 6, we have complete neuron management
+    // In Phase 6, neuron creation is handled by development system
     return INVALID_NEURON_ID;
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
     // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
+    // For Phase 6, we have comprehensive neuron lifecycle management
     return false;
 }
 

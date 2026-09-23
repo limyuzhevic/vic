@@ -50,7 +50,15 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+    // Phase 6: Complete integrated brain with all systems
+    // This section contains all neural computation components integrated with:
+    // - Memory systems (working, episodic, associative)
+    // - Prediction system with error signaling
+    // - Cognition systems (planning, concept formation, attention)
+    // - Neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+    // - Development system for structural and functional maturation
+    // - Plasticity systems (STDP, Hebbian, structural)
+    // - Real LIF neuron dynamics and spike propagation
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
