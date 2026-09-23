@@ -5,7 +5,7 @@
  * that all brain systems are properly connected.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
-    // Create experiment
+    // Check Phase6IntegratedExperiment header
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
