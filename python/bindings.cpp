@@ -142,24 +142,70 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(
+        Configuration class for NLM system
+        
+        The Config class manages all simulation parameters including brain
+        properties, plasticity settings, neuromodulation parameters, and
+        simulation control options. Configuration can be loaded from JSON
+        files, command line arguments, or set programmatically.
+        
+        Configuration values can be various types (int, float, string, bool)
+        and are stored with their source (default, file, command_line, runtime).
+    )pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON or .ini file.\n\n"
+             "Args:\n"
+             "    filepath: Path to configuration file\n\n"
+             "Returns:\n"
+             "    True if file loaded successfully, False otherwise\n\n"
+             "The file can be in JSON format (preferred) or simple key=value format\n"
+             "for backward compatibility. JSON values are automatically typed (int, float, string, bool)."
+        )
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments.\n\n"
+           "Args:\n"
+           "    argc: Number of command line arguments\n"
+           "    argv: Array of command line argument strings\n\n"
+           "Supported formats:\n"
+           "    --key=value : Set key to value\n"
+           "    -key value   : Set key to value\n\n"
+           "Returns:\n"
+           "    True if arguments parsed successfully, False otherwise"
+        )
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file.\n\n"
+             "Args:\n"
+             "    filepath: Path where configuration will be saved\n\n"
+             "Returns:\n"
+             "    True if file saved successfully, False otherwise\n\n"
+             "The configuration is saved in JSON format for readability and future loading."
+        )
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Check if a configuration key exists.\n\n"
+             "Args:\n"
+             "    key: Configuration key to check\n\n"
+             "Returns:\n"
+             "    True if key exists, False otherwise"
+        )
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys.\n\n"
+             "Returns:\n"
+             "    List of all configuration keys"
+        )
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             "Clear all configuration entries.\n\n"
+             "This removes all configuration settings, leaving the config in its\n"
+             "default state."
+        )
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get a human-readable summary of all configuration entries.\n\n"
+             "Returns:\n"
+             "    String containing all configuration keys and values with sources"
+        )
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
