@@ -12,9 +12,33 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "src/performance/Performance.hpp"
+#include "src/experiments/Experiment.hpp"
+#include "src/experiments/ExperimentRunner.hpp"
+#include "src/experiments/Phase6IntegratedExperiment.hpp"
+#include "src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -24,7 +48,31 @@ PYBIND11_MODULE(pynlm, m) {
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This module provides a comprehensive Python API for neural simulation,
+        memory, prediction, neuromodulation, and cognitive functions.
+        
+        Usage Example:
+            import pynlm
+            
+            # Create a simple brain
+            config = pynlm.createDefaultConfig()
+            brain = pynlm.createBrain(config)
+            brain.initialize()
+            
+            # Add some neurons
+            brain.addRegion("cortex")
+            brain.addRegion("hippocampus")
+            
+            # Run simulation
+            for step in range(100):
+                brain.step(step)
+        
+        The API follows Pythonic patterns for ease of use:
+        - High-level factory functions for common operations
+        - Comprehensive type hints and docstrings
+        - Consistent naming conventions
+        - Both low-level and high-level access
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -142,6 +190,158 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Type definitions with comprehensive documentation
+    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &NeuronId::value)
+        .def("index", &NeuronId::index)
+        .def("__eq__", &NeuronId::operator==)
+        .def("__ne__", &NeuronId::operator!=)
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const NeuronId& id) {
+            return "<NeuronId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &SynapseId::value)
+        .def("index", &SynapseId::index)
+        .def("__eq__", &SynapseId::operator==)
+        .def("__ne__", &SynapseId::operator!=)
+        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const SynapseId& id) {
+            return "<SynapseId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &RegionId::value)
+        .def("index", &RegionId::index)
+        .def("__eq__", &RegionId::operator==)
+        .def("__ne__", &RegionId::operator!=)
+        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const RegionId& id) {
+            return "<RegionId: " + std::to_string(id.value) + ">";
+        });
+
+    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &PopulationId::value)
+        .def("index", &PopulationId::index)
+        .def("__eq__", &PopulationId::operator==)
+        .def("__ne__", &PopulationId::operator!=);
+
+    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
+
+    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
+        .value("Excitatory", SynapseType::Excitatory)
+        .value("Inhibitory", SynapseType::Inhibitory)
+        .value("Modulatory", SynapseType::Modulatory)
+        .value("Electrical", SynapseType::Electrical)
+        .value("GapJunction", SynapseType::GapJunction)
+        .export_values();
+
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
+        .value("Resting", FiringState::Resting)
+        .value("Active", FiringState::Active)
+        .value("Refractory", FiringState::Refractory)
+        .value("Inhibited", FiringState::Inhibited)
+        .export_values();
+
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enumeration)pbdoc")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
+        .export_values();
+
+    py::enum_<NeuromodulatorType>(m, "NeuromodulatorType", R"pbdoc(Neuromodulator type enumeration)pbdoc")
+        .value("Dopamine", NeuromodulatorType::Dopamine)
+        .value("Acetylcholine", NeuromodulatorType::Acetylcholine)
+        .value("Norepinephrine", NeuromodulatorType::Norepinephrine)
+        .value("Serotonin", NeuromodulatorType::Serotonin)
+        .export_values();
+
+    py::enum_<MemorySystemType>(m, "MemorySystemType", R"pbdoc(Memory system type enumeration)pbdoc")
+        .value("WorkingMemory", MemorySystemType::WorkingMemory)
+        .value("EpisodicMemory", MemorySystemType::EpisodicMemory)
+        .value("AssociativeMemory", MemorySystemType::AssociativeMemory)
+        .export_values();
+
+    py::enum_<DevelopmentStageType>(m, "DevelopmentStageType", R"pbdoc(Development stage type enumeration)pbdoc")
+        .value("Initial", DevelopmentStageType::Initial)
+        .value("CriticalPeriod", DevelopmentStageType::CriticalPeriod)
+        .value("Maturation", DevelopmentStageType::Maturation)
+        .value("Adult", DevelopmentStageType::Adult)
+        .value("Aging", DevelopmentStageType::Aging)
+        .export_values();
+
+    py::enum_<ExperimentType>(m, "ExperimentType", R"pbdoc(Experiment type enumeration)pbdoc")
+        .value("Phase3Demo", ExperimentType::Phase3Demo)
+        .value("Phase4Demo", ExperimentType::Phase4Demo)
+        .value("Phase5Demo", ExperimentType::Phase5Demo)
+        .value("Phase6Demo", ExperimentType::Phase6Demo)
+        .value("AblationStudy", ExperimentType::AblationStudy)
+        .value("ScalingBenchmark", ExperimentType::ScalingBenchmark)
+        .export_values();
+
+    // Core configuration class with enhanced Python interface
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -149,7 +349,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -400,26 +600,121 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Create useful constants for common configuration values
+    m.attr("BRAIN_NEURON_COUNT_DEFAULT") = 1000;
+    m.attr("BRAIN_SYNAPSE_DENSITY_DEFAULT") = 0.1f;
+    m.attr("BRAIN_V_THRESH_DEFAULT") = -50.0f;
+    m.attr("BRAIN_V_REST_DEFAULT") = -70.0f;
+    m.attr("WORLD_WIDTH_DEFAULT") = 20.0f;
+    m.attr("WORLD_HEIGHT_DEFAULT") = 20.0f;
+    m.attr("VISION_WIDTH_DEFAULT") = 8;
+    m.attr("VISION_HEIGHT_DEFAULT") = 8;
+    m.attr("MAX_ENERGY_DEFAULT") = 100.0f;
+    m.attr("ENERGY_DECAY_RATE_DEFAULT") = 0.1f;
+    m.attr("SIMULATION_DT_DEFAULT") = 0.1;
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Setup convenience functions and aliases
+    m.def("createConfig", &createDefaultConfig, "Create a default configuration (alias for createDefaultConfig)");
+    m.def("initConfig", &createDefaultConfig, "Initialize a new configuration (alias for createDefaultConfig)");
+    m.def("resetWorld", &SimpleWorld::reset, py::arg("world"), "Reset world to initial state");
+    m.def("stepBrain", &Brain::step, py::arg("brain"), py::arg("step"), "Perform one brain simulation step");
+    m.def("stepBrainWithTime", &Brain::step, py::arg("brain"), py::arg("step"), py::arg("time"), "Perform brain step with timestamp");
+    m.def("processInput", &AgentBrain::processSensoryInput, py::arg("agent"), py::arg("percept"), "Process sensory input in agent brain");
+    m.def("decodeAction", &AgentBrain::decodeMotorCommand, py::arg("agent"), "Decode motor command from agent brain");
+    m.def("getMetrics", &getBrainMetrics, py::arg("brain"), "Get comprehensive metrics from brain");
+    m.def("getEnvironmentMetrics", &getEnvironmentMetrics, py::arg("world"), "Get environmental metrics");
+    m.def("saveBrainState", &Brain::save, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+    m.def("loadBrainState", &Brain::load, py::arg("brain"), py::arg("filepath"), "Load brain state from file");
+    m.def("enableAllFeatures", &enableAllAgentFeatures, py::arg("agent"), "Enable all learning features in agent");
+    m.def("disableAllFeatures", &disableAllAgentFeatures, py::arg("agent"), "Disable all learning features in agent");
+    
+    // Visualization and performance monitoring shortcuts
+    m.def("createVisualization", &VisualizationInterface::initialize, py::arg("interface"), "Initialize visualization interface");
+    m.def("updateVisualization", &VisualizationInterface::update, py::arg("interface"), "Update visualization");
+    m.def("renderVisualization", &VisualizationInterface::render, py::arg("interface"), "Render current visualization");
+    m.def("getPerformanceMetrics", &getPerformanceMetrics, py::arg("brain"), "Get performance metrics");
+    m.def("getMemoryUsage", &getMemoryUsage, py::arg("brain"), "Get memory usage statistics");
+    m.def("getSimulationStats", &getSimulationStats, py::arg("brain"), py::arg("world"), "Get comprehensive simulation statistics");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Experiment management shortcuts
+    m.def("createExperiment", &ExperimentRunner::createExperiment, py::arg("runner"), py::arg("name"), "Create a new experiment");
+    m.def("runExperiment", &ExperimentRunner::runExperiment, py::arg("runner"), py::arg("experiment"), py::arg("brain"), py::arg("world"), py::arg("maxSteps"), "Run an experiment");
+    m.def("runBatchExperiments", &ExperimentRunner::runBatch, py::arg("runner"), py::arg("experiments"), py::arg("brainTemplate"), py::arg("worldTemplate"), py::arg("maxSteps"), "Run batch of experiments");
+    m.def("saveExperimentResults", &ExperimentRunner::saveResults, py::arg("runner"), py::arg("filepath"), "Save experiment results");
+    m.def("setExperimentSeed", &ExperimentRunner::setGlobalSeed, py::arg("runner"), py::arg("seed"), "Set random seed for experiment reproducibility");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Helper functions for complex operations
+    m.def("initializeAgent", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world) {
+        agent->initialize(*world);
+    }, py::arg("agent"), py::arg("world"), "Initialize agent with world");
+    
+    m.def("runCompleteSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                    std::shared_ptr<AgentBrain> agent, int numSteps) {
+        return runAgentSimulation(brain, world, agent, numSteps);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), 
+        "Run complete agent simulation with brain, world, and agent");
+    
+    m.def("createCompleteSetup", [](const Config& config) {
+        auto brain = createBrain(config);
+        brain->initialize();
+        auto world = createSimpleWorld();
+        world->configure(world->getWidth(), world->getHeight(), 
+                        world->getVisionWidth(), world->getVisionHeight());
+        world->reset();
+        auto agent = createAgentBrain(brain);
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("config"), "Create complete brain-world-agent setup");
+    
+    m.def("benchmarkBrain", &benchmarkBrainPerformance, py::arg("brain"), py::arg("steps"), 
+          "Benchmark brain performance over given number of steps");
+    
+    m.def("monitorPerformance", &monitorBrainPerformance, py::arg("brain"), py::arg("world"),
+          "Monitor brain performance and collect metrics");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Add version and metadata
+    m.attr("__version__") = "2.0.0"; // Updated version
+    m.attr("__description__") = "Comprehensive NLM Python API with full system integration";
+    m.attr("__author__") = "NLM Development Team";
+    m.attr("__doc__") = R"pbdoc(
+        NLM Python Bindings v2.0.0
+        =========================
+        
+        Enhanced Python bindings for the NLM (Neural Learning Machine) neural simulation framework.
+        
+        This module provides a comprehensive, Pythonic API for neural network simulation,
+        cognitive systems, memory, neuromodulation, and development.
+        
+        Key Features:
+        - Complete brain-world-agent loop integration
+        - Advanced memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+        - Development stages and plasticity
+        - Cognitive functions (attention, planning, concept formation)
+        - Experiment management and performance monitoring
+        - Visualization interface
+        - Comprehensive statistics and metrics
+        
+        The API is designed for both beginners and advanced users, with high-level
+        convenience functions for common tasks and low-level access to advanced features.
+        
+        See easy_usage.md and HOW_TO_USE.md for detailed documentation.
+    )pbdoc";
+
+    m.def("getModuleInfo", []() {
+        return py::dict(
+            "version"_a = "2.0.0",
+            "description"_a = "Comprehensive NLM Python API with full system integration",
+            "author"_a = "NLM Development Team",
+            "features"_a = py::list({
+                "brain_world_agent_loop"_s,
+                "memory_systems"_s,
+                "neuromodulation"_s,
+                "development"_s,
+                "cognition"_s,
+                "experiment_management"_s,
+                "visualization"_s,
+                "performance_monitoring"_s
+            })
+        );
+    }, "Get information about the NLM module");
 }
-
-} // namespace nlm
