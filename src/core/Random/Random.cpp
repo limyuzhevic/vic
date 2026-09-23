@@ -106,7 +106,7 @@ bool RandomGenerator::randomBool() {
 }
 
 uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
+    return static_cast<uint32_t>(uniformInt(static_cast<uint32_t>(0ULL), static_cast<uint32_t>(1ULL)));
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
@@ -119,10 +119,10 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
+        bytes[i] = static_cast<uint8_t>(uniformInt(static_cast<uint32_t>(0ULL), static_cast<uint32_t>(255ULL)));
     }
 }
-
+// Engine accessors - implemented in the .cpp file
 std::mt19937_64& RandomGenerator::engine() {
     return pImpl->gen;
 }
@@ -132,3 +132,4 @@ const std::mt19937_64& RandomGenerator::engine() const {
 }
 
 } // namespace nlm
+

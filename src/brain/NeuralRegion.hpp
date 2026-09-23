@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class RandomGenerator;
+
 // NeuralRegion: A brain region containing multiple populations and local connectivity
 // PLACEHOLDER - Phase 2 will implement region-level dynamics
 

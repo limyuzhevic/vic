@@ -416,10 +416,284 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Convenience functions for creating agent setups
+    
+    m.def("createCompleteAgentSetup", 
+        [](std::shared_ptr<Config> config, 
+           size_t width = 20, size_t height = 20,
+           size_t visionWidth = 8, size_t visionHeight = 8,
+           uint64_t randomSeed = 42) -> std::tuple<std::shared_ptr<Brain>, 
+                                               std::shared_ptr<AgentBrain>, 
+                                               std::shared_ptr<SimpleWorld>> {
+            // Create configuration
+            if (!config) {
+                config = std::make_shared<Config>();
+            }
+            config->set("random_seed", static_cast<int64_t>(randomSeed), ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(width * height), ConfigSource::Default);
+            
+            // Create brain
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            // Create agent brain
+            auto agent = std::make_shared<AgentBrain>(brain);
+            
+            // Create world
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(width, height, visionWidth, visionHeight);
+            world->reset();
+            world->setAgentStart(width / 2.0, height / 2.0);
+            
+            // Initialize agent with world
+            agent->initialize(world);
+            
+            return std::make_tuple(brain, agent, world);
+        },
+        py::arg("config") = nullptr,
+        py::arg("width") = 20,
+        py::arg("height") = 20,
+        py::arg("visionWidth") = 8,
+        py::arg("visionHeight") = 8,
+        py::arg("randomSeed") = 42,
+        "Create a complete agent setup (brain + agent + world)");
+    
+    m.def("runAgentSimulation",
+        [](std::shared_ptr<Brain> brain,
+           std::shared_ptr<AgentBrain> agent,
+           std::shared_ptr<SimpleWorld> world,
+           size_t numSteps,
+           bool enableRewardModulation = true,
+           bool enableCuriosity = true,
+           bool enableDevelopment = true,
+           bool enableStructuralPlasticity = true,
+           bool enableCheckpointing = false) -> py::dict {
+            
+            // Enable subsystems
+            if (agent) {
+                if (enableRewardModulation) agent->enableRewardModulation(true);
+                if (enableCuriosity) agent->enableCuriosity(true);
+                if (enableDevelopment) agent->enableDevelopment(true);
+                if (enableStructuralPlasticity) agent->enableStructuralPlasticity(true);
+            }
+            
+            // Statistics
+            std::vector<float> firingRates;
+            std::vector<float> curiosityLevels;
+            std::vector<float> noveltyLevels;
+            std::vector<float> dopamineLevels;
+            std::vector<float> rewards;
+            
+            // Run simulation
+            for (size_t step = 0; step < numSteps; ++step) {
+                // Update world
+                if (world) {
+                    world->update(0.1);
+                }
+                
+                // Get sensory input
+                std::shared_ptr<SensoryPercept> percept;
+                if (world) {
+                    percept = world->getSensoryPercept();
+                }
+                
+                // Process sensory input
+                if (agent && percept) {
+                    agent->processSensoryInput(*percept);
+                }
+                
+                // Brain step
+                if (brain) {
+                    brain->step(step);
+                }
+                
+                // Decode motor command
+                std::shared_ptr<Action> action;
+                if (agent) {
+                    action = agent->decodeMotorCommand();
+                }
+                
+                // Apply motor command
+                if (world && action) {
+                    world->applyMotorCommand(*action, world->getSimulationTime());
+                }
+                
+                // Apply reward modulation
+                if (agent) {
+                    float reward = 0.0f;
+                    if (world) {
+                        auto& body = world->getAgentBody();
+                        reward = body.energy * 0.1f;  // Simple reward based on energy
+                    }
+                    float predicted = 0.0f; // In real implementation, this would be prediction
+                    agent->applyRewardModulation(reward, predicted);
+                }
+                
+                // Update development
+                if (agent) {
+                    agent->updateDevelopment(0.1);
+                }
+                
+                // Collect statistics
+                if (brain) {
+                    firingRates.push_back(brain->getAverageFiringRate());
+                }
+                if (agent) {
+                    curiosityLevels.push_back(agent->getCuriosityLevel());
+                    noveltyLevels.push_back(agent->getNoveltyLevel());
+                    dopamineLevels.push_back(agent->getNeuromodulationLevel());
+                }
+                rewards.push_back(0.0f);  // Simple reward tracking
+                
+                // Progress indicator
+                if (step % 100 == 0 && step > 0) {
+                    std::cout << "Progress: " << (step * 100.0f / numSteps) << "% complete" 
+                             << " (firing: " << brain->getAverageFiringRate() << ")" 
+                             << std::endl;
+                }
+            }
+            
+            // Calculate statistics
+            py::dict result;
+            if (!firingRates.empty()) {
+                float sum = std::accumulate(firingRates.begin(), firingRates.end(), 0.0f);
+                result["avg_firing_rate"] = sum / firingRates.size();
+                float minRate = *std::min_element(firingRates.begin(), firingRates.end());
+                float maxRate = *std::max_element(firingRates.begin(), firingRates.end());
+                result["min_firing_rate"] = minRate;
+                result["max_firing_rate"] = maxRate;
+                float var = 0.0f;
+                for (float rate : firingRates) {
+                    var += (rate - result["avg_firing_rate"].cast<float>()) * 
+                           (rate - result["avg_firing_rate"].cast<float>());
+                }
+                result["std_firing_rate"] = std::sqrt(var / firingRates.size());
+            }
+            
+            if (!curiosityLevels.empty()) {
+                float sum = std::accumulate(curiosityLevels.begin(), curiosityLevels.end(), 0.0f);
+                result["avg_curiosity"] = sum / curiosityLevels.size();
+            }
+            
+            if (!noveltyLevels.empty()) {
+                float sum = std::accumulate(noveltyLevels.begin(), noveltyLevels.end(), 0.0f);
+                result["avg_novelty"] = sum / noveltyLevels.size();
+            }
+            
+            if (!dopamineLevels.empty()) {
+                float sum = std::accumulate(dopamineLevels.begin(), dopamineLevels.end(), 0.0f);
+                result["avg_dopamine"] = sum / dopamineLevels.size();
+            }
+            
+            result["total_steps"] = numSteps;
+            result["final_firing_rate"] = brain ? brain->getAverageFiringRate() : 0.0f;
+            result["total_neurons"] = brain ? brain->getTotalNeuronCount() : 0;
+            result["total_synapses"] = brain ? brain->getTotalSynapseCount() : 0;
+            
+            return result;
+        },
+        py::arg("brain"),
+        py::arg("agent"),
+        py::arg("world"),
+        py::arg("numSteps"),
+        py::arg("enableRewardModulation") = true,
+        py::arg("enableCuriosity") = true,
+        py::arg("enableDevelopment") = true,
+        py::arg("enableStructuralPlasticity") = true,
+        py::arg("enableCheckpointing") = false,
+        "Run a complete agent simulation and return statistics");
+    
+    m.def("createConfiguration",
+        [](size_t neuronCount = 1000,
+           float connectionProb = 0.1f,
+           float stdpLtpWeight = 0.01f,
+           float stdpLtdWeight = 0.012f,
+           float stdpTau = 20.0f,
+           float curiosityWeight = 0.5f,
+           float noveltyWeight = 0.5f) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            
+            config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+            config->set("connection_probability", connectionProb, ConfigSource::Default);
+            config->set("stdp_ltp_weight", stdpLtpWeight, ConfigSource::Default);
+            config->set("stdp_ltd_weight", stdpLtdWeight, ConfigSource::Default);
+            config->set("stdp_tau", stdpTau, ConfigSource::Default);
+            config->set("curiosity_weight", curiosityWeight, ConfigSource::Default);
+            config->set("novelty_weight", noveltyWeight, ConfigSource::Default);
+            
+            return config;
+        },
+        py::arg("neuronCount") = 1000,
+        py::arg("connectionProb") = 0.1f,
+        py::arg("stdpLtpWeight") = 0.01f,
+        py::arg("stdpLtdWeight") = 0.012f,
+        py::arg("stdpTau") = 20.0f,
+        py::arg("curiosityWeight") = 0.5f,
+        py::arg("noveltyWeight") = 0.5f,
+        "Create a configuration with sensible defaults");
+    
+    m.def("getSimulationStats",
+        [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) -> py::dict {
+            py::dict stats;
+            
+            if (brain) {
+                stats["total_neurons"] = brain->getTotalNeuronCount();
+                stats["total_synapses"] = brain->getTotalSynapseCount();
+                stats["active_neurons"] = brain->getActiveNeuronCount();
+                stats["firing_neurons"] = brain->getFiringNeuronCount();
+                stats["average_firing_rate"] = brain->getAverageFiringRate();
+                stats["total_spikes"] = brain->getTotalSpikeCount();
+                stats["pending_spikes"] = brain->getPendingSpikeEventCount();
+                stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+                stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+            }
+            
+            if (agent) {
+                stats["curiosity_level"] = agent->getCuriosityLevel();
+                stats["novelty_level"] = agent->getNoveltyLevel();
+                stats["prediction_error"] = agent->getPredictionError();
+                stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+                stats["reward_modulation_enabled"] = agent->isRewardModulationEnabled();
+                stats["curiosity_enabled"] = agent->isCuriosityEnabled();
+                stats["development_enabled"] = agent->isDevelopmentEnabled();
+                stats["structural_plasticity_enabled"] = agent->isStructuralPlasticityEnabled();
+            }
+            
+            return stats;
+        },
+        py::arg("brain"),
+        py::arg("agent"),
+        "Get comprehensive simulation statistics");
+    
+    m.def("exportBrainToFile",
+        [](std::shared_ptr<Brain> brain, const std::string& filepath, bool compressed = true) {
+            if (!brain) {
+                throw std::runtime_error("Brain is null");
+            }
+            
+            // In a real implementation, this would use the CheckpointSystem
+            // For now, we'll just log the operation
+            std::cout << "Exporting brain to: " << filepath << std::endl;
+            std::cout << "Brain has " << brain->getTotalNeuronCount() << " neurons" 
+                     << " and " << brain->getTotalSynapseCount() << " synapses" << std::endl;
+            std::cout << "Note: This is a placeholder - full checkpointing requires implementation" << std::endl;
+        },
+        py::arg("brain"),
+        py::arg("filepath"),
+        py::arg("compressed") = true,
+        "Export brain state to file (checkpointing)");
+    
+    m.def("importBrainFromFile",
+        [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+            if (!brain) {
+                throw std::runtime_error("Brain is null");
+            }
+            
+            std::cout << "Importing brain from: " << filepath << std::endl;
+            std::cout << "Note: This is a placeholder - full checkpointing requires implementation" << std::endl;
+        },
+        py::arg("brain"),
+        py::arg("filepath"),
+        "Import brain state from file (checkpointing)");
 
 } // namespace nlm

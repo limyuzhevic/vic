@@ -1,4 +1,5 @@
 #include "NeuralPopulation.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <numeric>
 
