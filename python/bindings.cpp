@@ -145,24 +145,98 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON/YAML file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) return py::cast(*val);
+            auto val64 = self.get<int64_t>(key);
+            if (val64) return py::cast(*val64);
+            auto valf = self.get<double>(key);
+            if (valf) return py::cast(*valf);
+            auto valb = self.get<bool>(key);
+            if (valb) return py::cast(*valb);
+            auto vals = self.get<std::string>(key);
+            if (vals) return py::cast(*vals);
+            auto valv = self.get<std::vector<int>>(key);
+            if (valv) return py::cast(*valv);
+            auto valdv = self.get<std::vector<double>>(key);
+            if (valdv) return py::cast(*valdv);
+            auto valsv = self.get<std::vector<std::string>>(key);
+            if (valsv) return py::cast(*valsv);
+            auto valbv = self.get<std::vector<bool>>(key);
+            if (valbv) return py::cast(*valbv);
+            return py::none();
+        }, py::arg("key"), "Get a configuration value (returns None if not found)")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value") = 0, "Get an integer configuration value")
+        .def("getDouble", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value") = 0.0, "Get a double configuration value")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value") = "", "Get a string configuration value")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("default_value") = false, "Get a boolean configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int value, int source) {
+            self.set(key, value, static_cast<ConfigSource>(source));
+        }, py::arg("key"), py::arg("value"), py::arg("source") = 3, "Set an integer configuration value")
+        .def("setDouble", [](Config& self, const std::string& key, double value, int source) {
+            self.set(key, value, static_cast<ConfigSource>(source));
+        }, py::arg("key"), py::arg("value"), py::arg("source") = 3, "Set a double configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value, int source) {
+            self.set(key, value, static_cast<ConfigSource>(source));
+        }, py::arg("key"), py::arg("value"), py::arg("source") = 3, "Set a string configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value, int source) {
+            self.set(key, value, static_cast<ConfigSource>(source));
+        }, py::arg("key"), py::arg("value"), py::arg("source") = 3, "Set a boolean configuration value")
+        .def("setValidator", &Config::setValidator, py::arg("key"), py::arg("validator"),
+             "Set a validation function for a configuration key")
+        .def("setConstraints", &Config::setConstraints, py::arg("constraints"),
+             "Set validation constraints for the configuration")
+        .def("validate", &Config::validate, "Validate the configuration and return result")
+        .def("isValid", &Config::isValid, "Check if configuration is valid")
+        .def("getKeys", &Config::getKeys, "Get all configuration keys")
+        .def("getKeysWithPrefix", &Config::getKeysWithPrefix, py::arg("prefix"),
+             "Get configuration keys that start with a prefix")
+        .def("clear", &Config::clear, "Clear all configuration entries")
+        .def("clear", &Config::clear, "Clear all configuration entries")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
+        .def("stats", &Config::stats, "Get statistics about the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    py::class_<ValidationFunction>(m, "ValidationFunction")
+        .def(py::init<>())
+        .def("__call__", [](ValidationFunction& func, const std::string& key, const ConfigValue& value) {
+            return func(key, value);
+        });
+
+    py::class_<ConfigConstraints>(m, "ConfigConstraints")
+        .def(py::init<>())
+        .def_readwrite("required_keys", &ConfigConstraints::requiredKeys)
+        .def_readwrite("min_float", &ConfigConstraints::minFloat)
+        .def_readwrite("max_float", &ConfigConstraints::maxFloat)
+        .def_readwrite("min_int", &ConfigConstraints::minInt)
+        .def_readwrite("max_int", &ConfigConstraints::maxInt);
+
+    py::enum_<ValidationResult>(m, "ValidationResult", R"pbdoc(Validation result enumeration)pbdoc")
+        .value("Success", ValidationResult::Success)
+        .value("InvalidType", ValidationResult::InvalidType)
+        .value("OutOfRange", ValidationResult::OutOfRange)
+        .value("InvalidFormat", ValidationResult::InvalidFormat)
+        .value("MissingRequired", ValidationResult::MissingRequired)
+        .export_values();
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

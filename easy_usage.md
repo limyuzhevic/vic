@@ -14,15 +14,142 @@ That's it! NLM simulates all of this.
 
 ---
 
-## The 3 Things You Need to Know
+## Configuration Guide
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+### Creating and Using Configurations
+
+NLM provides a flexible configuration system that allows you to:
+
+1. **Use default configurations**
+   ```python
+   import pynlm
+   
+   # Create a default configuration
+   config = pynlm.createDefaultConfig()
+   
+   # Modify specific parameters
+   config.set("brain.neuron_count", 1000)
+   config.set("plasticity.stdp.learning_rate", 0.001)
+   ```
+
+2. **Load from file**
+   ```python
+   # Create configuration and load from JSON/YAML file
+   config = pynlm.createDefaultConfig()
+   config.loadFromFile("my_config.json")
+   ```
+
+3. **Validate configurations**
+   ```python
+   # Check if configuration is valid
+   if config.isValid() {
+       print("Configuration is valid!")
+   } else {
+       print("Configuration has validation errors")
+       print(config.validate())
+   }
+   ```
+
+4. **Set validation rules**
+   ```python
+   # Define validation rules for specific parameters
+   config.setValidator("brain.neuron_count", 
+       lambda key, value: ValidationResult.OutOfRange if (value < 100 || value > 10000) else ValidationResult.Success)
+   ```
+
+5. **Save configurations**
+   ```python
+   # Save configuration to file
+   config.saveToFile("my_config.json")
+   ```
+
+### Configuration Examples
+
+#### Example 1: Custom Learning Configuration
+```python
+import pynlm
+
+# Create configuration for focused learning
+config = pynlm.createDefaultConfig()
+
+# Set parameters for high plasticity
+config.set("plasticity.hebbian.enable", true)
+config.set("plasticity.stdp.enable", true)
+config.set("plasticity.stdp.learning_rate", 0.05)
+
+# Configure for faster learning
+config.set("brain.synapse_density", 0.2)
+config.set("development.synaptogenesis_rate", 0.001)
+
+# Enable neuromodulation for reward-based learning
+config.set("neuromod.dopamine.scale", 1.0)
+config.set("neuromod.curiosity.enable", true)
+
+# Save custom configuration
+config.saveToFile("learning_config.json")
+```
+
+#### Example 2: Development-Focused Configuration
+```python
+import pynlm
+
+# Start with defaults
+config = pynlm.createDefaultConfig()
+
+# Configure for developmental learning
+config.set("development.enable", true)
+config.set("development.stage", pynlm.DevelopmentalStage.CriticalPeriod)
+config.set("development.synaptogenesis_rate", 0.002)
+config.set("development.pruning_rate", 0.0005)
+
+# Set longer critical period for more development
+config.set("development.critical_period_end", 200.0)
+
+# Create brain with this config
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### Example 3: Performance-Optimized Configuration
+```python
+import pynlm
+
+# Create performance configuration
+config = pynlm.createDefaultConfig()
+
+# Optimize for speed
+config.set("brain.neuron_count", 200)  # Fewer neurons for speed
+config.set("simulation.timestep", 0.01)  # Larger timestep
+config.set("plasticity.enable", false)  # No plasticity for pure simulation
+
+# Still keep basic functionality
+config.set("brain.connection_probability", 0.1)
+config.set("log_level", pynlm.LogLevel.Warning)  # Reduce logging
+```
+
+### Configuration Parameters Reference
+
+Here are some common configuration parameters you can use:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `brain.neuron_count` | int | 500 | Number of neurons |
+| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
+| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
+| `plasticity.stdp.enable` | bool | true | Enable STDP learning |
+| `plasticity.stdp.learning_rate` | float | 0.01 | STDP learning rate |
+| `development.enable` | bool | true | Enable developmental processes |
+| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
+| `log_level` | string | "INFO" | Logging verbosity level |
+
+### Quick Configuration Tips
+
+1. **For research:** Use smaller neuron counts and enable all plasticity mechanisms
+2. **For demos:** Use default configuration or create lightweight configs
+3. **For production:** Optimize for performance with fewer neurons and limited plasticity
+4. **For development:** Enable developmental stages and curiosity for exploration
 
 ---
-
-## Quick Start (Copy & Paste)
 
 ### Example 1: Simplest Brain
 

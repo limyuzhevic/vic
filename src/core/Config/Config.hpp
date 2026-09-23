@@ -20,7 +20,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<bool>
 >;
 
 // Configuration source
@@ -31,16 +32,41 @@ enum class ConfigSource {
     Runtime
 };
 
+// Validation result
+enum class ValidationResult {
+    Success,
+    InvalidType,
+    OutOfRange,
+    InvalidFormat,
+    MissingRequired
+};
+
+// Configuration validation function
+using ValidationFunction = std::function<ValidationResult(const std::string&, const ConfigValue&)>;
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    ValidationFunction validator;
     
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc, const ValidationFunction& val)
+        : key(k), value(v), source(s), description(desc), validator(val) {}
+};
+
+// Configuration constraints
+struct ConfigConstraints {
+    std::vector<std::string> requiredKeys;
+    std::unordered_map<std::string, ValidationFunction> validators;
+    double minFloat = std::numeric_limits<double>::lowest();
+    double maxFloat = std::numeric_limits<double>::max();
+    int minInt = std::numeric_limits<int>::min();
+    int maxInt = std::numeric_limits<int>::max();
 };
 
 // Main configuration class
@@ -84,8 +110,23 @@ public:
     // Remove key
     void remove(const std::string& key);
     
+    // Check existence
+    bool has(const std::string& key) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
     // Get all keys
     std::vector<std::string> getKeys() const;
+    
+    // Get keys by prefix (hierarchical support)
+    std::vector<std::string> getKeysWithPrefix(const std::string& prefix) const;
+    
+    // Validation and constraints
+    void setValidator(const std::string& key, const ValidationFunction& validator);
+    void setConstraints(const ConfigConstraints& constraints);
+    ValidationResult validate() const;
+    bool isValid() const;
     
     // Clear all
     void clear();
@@ -93,13 +134,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get configuration statistics
+    std::string stats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    ConfigConstraints constraints;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool validateValue(const ConfigEntry& entry);
+    static std::string valueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
