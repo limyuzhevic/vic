@@ -127,6 +127,16 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Advanced CLI interface executable
+add_executable(nlm_cli
+    src/agent/NLM_CLI.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+
+# Include Boost libraries for CLI
+find_package(Boost REQUIRED COMPONENTS program_options filesystem system)
+target_link_libraries(nlm_cli Boost::program_options Boost::filesystem Boost::system)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
