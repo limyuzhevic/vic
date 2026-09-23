@@ -100,6 +100,17 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
+# Enhanced Python bindings
+add_library(pynlm_enhanced MODULE
+    python/bindings_enhanced.cpp
+)
+target_include_directories(pynlm_enhanced PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+    ${PYTHON_INCLUDE_DIRS}
+)
+target_link_libraries(pynlm_enhanced PUBLIC nlm_core nlm_agent nlm_world)
+
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp

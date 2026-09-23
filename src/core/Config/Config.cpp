@@ -86,7 +86,23 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert entry.value back to string representation
+        std::string valueStr;
+        std::visit([&valueStr](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                valueStr = arg;  // String values should be quoted
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                valueStr = std::to_string(arg);
+            } else if constexpr (std::is_same_v<T, double>) {
+                valueStr = std::to_string(arg);
+            } else if constexpr (std::is_same_v<T, bool>) {
+                valueStr = arg ? "true" : "false";
+            }
+        }, entry.value);
+        
+        file << entry.key << " = " << valueStr << "\n";
     }
     
     return true;
