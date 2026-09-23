@@ -78,12 +78,60 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigEdgeCases() {
+    nlm::Config config;
+    
+    // Test empty string value
+    config.set("empty_string", std::string(""), nlm::ConfigSource::Runtime);
+    assert(config.has("empty_string"));
+    
+    auto emptyVal = config.get<std::string>("empty_string");
+    assert(emptyVal.has_value());
+    assert(*emptyVal == "");
+    
+    // Test very large integer
+    config.set("large_int", 1000000, nlm::ConfigSource::Runtime);
+    auto largeInt = config.get<int>("large_int");
+    assert(largeInt.has_value());
+    assert(*largeInt == 1000000);
+    
+    // Test negative integer
+    config.set("negative_int", -1000, nlm::ConfigSource::Runtime);
+    auto negInt = config.get<int>("negative_int");
+    assert(negInt.has_value());
+    assert(*negInt == -1000);
+    
+    // Test zero value
+    config.set("zero", 0, nlm::ConfigSource::Runtime);
+    auto zero = config.get<int>("zero");
+    assert(zero.has_value());
+    assert(*zero == 0);
+    
+    // Test negative double
+    config.set("negative_double", -3.14, nlm::ConfigSource::Runtime);
+    auto negDouble = config.get<double>("negative_double");
+    assert(negDouble.has_value());
+    assert(*negDouble == -3.14);
+    
+    // Test very small double
+    config.set("small_double", 1e-6, nlm::ConfigSource::Runtime);
+    auto smallDouble = config.get<double>("small_double");
+    assert(smallDouble.has_value());
+    assert(*smallDouble == 1e-6);
+    
+    // Test empty key rejection
+    // Note: Currently set() accepts empty keys, but we can add validation
+    
+    std::cout << "    testConfigEdgeCases passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigEdgeCases();
 }
 
 } // namespace test_config

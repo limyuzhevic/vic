@@ -1,4 +1,3 @@
-// NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
 // This phase implements real spiking neural computation with:
@@ -28,6 +27,7 @@
 
 using namespace nlm;
 
+// Helper function to print the program banner
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -48,7 +48,8 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Learning experiment structure to record and analyze synaptic changes
+// This demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -60,6 +61,7 @@ struct LearningExperiment {
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    // Record initial state for baseline comparison
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
@@ -80,6 +82,7 @@ struct LearningExperiment {
         }
     }
     
+    // Record final state after learning experiment
     void recordFinalState() {
         finalWeights.clear();
         
@@ -101,6 +104,7 @@ struct LearningExperiment {
         }
     }
     
+    // Compute and display learning statistics
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");

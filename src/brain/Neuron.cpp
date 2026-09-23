@@ -83,6 +83,44 @@ void Neuron::setFiringRate(FiringRate rate) {
     pImpl->state.firingRate = rate;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+void Neuron::setRegionId(RegionId region) {
+    pImpl->regionId = region;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
+}
+
+void Neuron::step(Timestamp currentTime) {
+    // Default LIF step with standard timestep (1ms)
+    TimestepDuration dt = 0.001;  // 1ms default
+    stepLIF(currentTime, dt);
+}
+
 void Neuron::setLeakConductance(MembranePotential conductance) {
     pImpl->state.leakConductance = conductance;
 }

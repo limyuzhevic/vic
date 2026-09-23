@@ -167,9 +167,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        for (const Neuron* n : neurons) {
+            // Check for null pointer before accessing state
+            if (n) {
+                // Use membrane potential deviation from rest as activity measure
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
         }
         return sum / neurons.size();
     };
