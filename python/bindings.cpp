@@ -420,6 +420,207 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
-} // namespace nlm
+    // Add improved helper functions for Python users
+    // These provide more Pythonic interfaces and better documentation
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, 
+    R"pbdoc(Create a default configuration for the brain.
+    
+    Returns:
+        A new Config object with sensible defaults for Phase 6 integration.
+        This configuration includes:
+        - Standard simulation timestep (0.001s)
+        - Reasonable brain parameters (500 neurons, 1 region)
+        - Enabled learning features (reward modulation, curiosity, etc.)
+    )pbdoc");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, 
+    py::arg("config"), 
+    R"pbdoc(Create a new brain instance with the given configuration.
+    
+    Args:
+        config: Configuration object for the brain. Use createDefaultConfig()
+               for a sensible starting point.
+    
+    Returns:
+        A new Brain instance ready for initialization. The brain will be
+        initialized using the configuration parameters (call brain.initialize()).
+    )pbdoc");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    },
+    R"pbdoc(Create a simple 2D world for agent-environment interaction.
+    
+    Returns:
+        A new SimpleWorld instance with default settings suitable for
+        agent navigation and interaction tasks.
+    )pbdoc");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    },
+    py::arg("brain"),
+    R"pbdoc(Create an agent brain interface that connects a brain to a world.
+    
+    The agent brain provides the interface between neural processing and
+    environmental interaction, handling:
+    - Sensory input from the world
+    - Motor action output to the world
+    - Reward and neuromodulation signals
+    - Development and learning
+    
+    Args:
+        brain: The brain instance to interface
+    
+    Returns:
+        An AgentBrain instance ready for world interaction. The agent brain
+        must be initialized with a world (call agentBrain.initialize(world)).
+    )pbdoc");
+
+    // Advanced simulation helper function
+    m.def("runSimulationLoop", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                  std::shared_ptr<AgentBrain> agent, size_t numSteps),
+    py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+    R"pbdoc(Run a complete simulation loop with agent-environment interaction.
+    
+    This convenience function handles the full agent-environment interaction
+    loop, making it easy to set up and run complex simulations without
+    manual step-by-step code.
+    
+    The loop executes these steps for each iteration:
+    1. Update world environment (time passes, physics, etc.)
+    2. Get sensory perception from world (what agent sees/hears/etc.)
+    3. Process sensory input through agent brain (neural processing)
+    4. Execute brain computation step (neurons fire, learn, etc.)
+    5. Generate motor action through agent (what agent decides to do)
+    6. Apply action in world environment (action affects world)
+    
+    Args:
+        brain: The brain instance
+        world: The environment world
+        agent: The agent brain interface  
+        numSteps: Number of simulation steps to run
+    
+    Returns:
+        Dictionary with comprehensive simulation statistics including:
+        - steps_completed: Number of steps executed
+        - total_spikes: Total neural spikes across all steps
+        - avg_firing_rate: Average neural firing rate
+        - final_reward: Total accumulated reward
+        - episode_count: Number of episodes completed
+        - config_summary: Configuration used for simulation
+    )pbdoc",
+    py::return_value_policy::copy);
+
+    // Legacy compatibility functions for Phase 2 code
+    m.def("getLegacyWorkingMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<WorkingMemory> {
+          return std::shared_ptr<WorkingMemory>(brain->getWorkingMemory());
+      },
+      py::arg("brain"),
+      R"pbdoc(Get legacy working memory interface for backward compatibility.
+      
+      IMPORTANT: This returns the legacy Phase 2 WorkingMemory interface,
+      NOT the neural WorkingMemory interface introduced in Phase 6.
+      
+      For new code, use the neural working memory interface:
+          neural_working_memory = brain.getWorkingMemory()
+      
+      This legacy interface is provided for compatibility with existing
+      Phase 2 code that expects the old working memory API.
+      
+      Args:
+          brain: The brain instance
+      
+      Returns:
+          Legacy WorkingMemory interface (Phase 2 compatibility)
+      )pbdoc");
+
+    m.def("getLegacyPredictionSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionSystem> {
+          return std::shared_ptr<PredictionSystem>(brain->getPredictionSystemLegacy());
+      },
+      py::arg("brain"),
+      R"pbdoc(Get legacy prediction system interface for backward compatibility.
+      
+      IMPORTANT: This returns the legacy Phase 2 PredictionSystem interface,
+      NOT the neural PredictionSystem interface introduced in Phase 6.
+      
+      For new code, use the neural prediction system interface:
+          neural_prediction = brain.getPredictionSystem()
+      
+      This legacy interface is provided for compatibility with existing
+      Phase 2 code that expects the old prediction system API.
+      
+      Args:
+          brain: The brain instance
+      
+      Returns:
+          Legacy PredictionSystem interface (Phase 2 compatibility)
+      )pbdoc");
+
+    // Utility functions for common configuration patterns
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Configure for exploration and learning
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.2f, ConfigSource::Default);
+        
+        // Enable learning features
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", true, ConfigSource::Default);
+        config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        config->set("enable_development", true, ConfigSource::Default);
+        
+        // Set exploration parameters
+        config->set("exploration_rate", 0.5f, ConfigSource::Default);
+        config->set("novelty_threshold", 0.1f, ConfigSource::Default);
+        
+        return config;
+    },
+    R"pbdoc(Create a configuration optimized for exploration and learning.
+    
+    This configuration is suitable for creating agents that need to explore
+    their environment, discover new resources, and learn through experience.
+    
+    Returns:
+        A configuration with exploration-friendly parameters including
+        more neurons, multiple brain regions, and enabled learning systems.
+    )pbdoc");
+
+    m.def("createNavigationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Configure for navigation tasks
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        config->set("simulation_timestep", 0.002, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        
+        // Enable basic learning but focus on navigation
+        config->set("enable_reward_modulation", true, ConfigSource::Default);
+        config->set("enable_curiosity", false, ConfigSource::Default);
+        config->set("enable_structural_plasticity", false, ConfigSource::Default);
+        config->set("enable_development", false, ConfigSource::Default);
+        
+        return config;
+    },
+    R"pbdoc(Create a configuration optimized for navigation and control tasks.
+    
+    This configuration is suitable for agents that need to navigate efficiently
+    through environments, focus on goal-directed behavior, and avoid getting
+    distracted by unnecessary exploration.
+    
+    Returns:
+        A configuration with navigation-friendly parameters including
+        moderate complexity and focused learning capabilities.
+    )pbdoc");
+}

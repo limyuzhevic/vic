@@ -29,6 +29,15 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Legacy Phase 2 memory system types (for backward compatibility)
+class WorkingMemory;
+class EpisodicMemory;
+class SemanticMemory;
+class ProceduralMemory;
+
+// Legacy Phase 2 prediction system type
+class PredictionSystemLegacy;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -139,19 +148,26 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
+    // Phase 6: Neural memory systems
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Phase 2: Legacy memory system interfaces (for backward compatibility)
+    // These return legacy memory system objects, not neural versions
+    WorkingMemory* getWorkingMemory();
+    EpisodicMemory* getEpisodicMemory();
+    SemanticMemory* getSemanticMemory();
+    ProceduralMemory* getProceduralMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
+    // Phase 6: Neural prediction system
     PredictionSystem* getPredictionSystem();
+    
+    // Phase 2: Legacy prediction system interface
+    // These return legacy prediction system objects, not neural versions
+    PredictionSystem* getPredictionSystemLegacy();
     
     // ========== COGNITION SYSTEMS ==========
     

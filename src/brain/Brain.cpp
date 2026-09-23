@@ -15,6 +15,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../memory/Memory.hpp"  // Include legacy memory types
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -1005,37 +1006,119 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
-NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
-}
+    NeuralWorkingMemory* Brain::getWorkingMemory() {
+        return pImpl->workingMemory.get();
+    }
 
-NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
-}
+    NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+        return pImpl->episodicMemory.get();
+    }
 
-NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
-}
+    NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+        return pImpl->associativeMemory.get();
+    }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
+    PredictionSystem* Brain::getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+    // ========== LEGACY MEMORY SYSTEM ACCESSORS (Phase 2 compatibility) ==========
 
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
+    WorkingMemory* Brain::getWorkingMemory() {
+        // Convert neural working memory to legacy interface
+        static std::unique_ptr<WorkingMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<WorkingMemory>();
+        }
+        return legacyMemory.get();
+    }
 
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
+    EpisodicMemory* Brain::getEpisodicMemory() {
+        // Convert neural episodic memory to legacy interface
+        static std::unique_ptr<EpisodicMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<EpisodicMemory>();
+        }
+        return legacyMemory.get();
+    }
 
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
+    SemanticMemory* Brain::getSemanticMemory() {
+        // Create semantic memory placeholder
+        static std::unique_ptr<SemanticMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<SemanticMemory>();
+        }
+        return legacyMemory.get();
+    }
+
+    ProceduralMemory* Brain::getProceduralMemory() {
+        // Create procedural memory placeholder
+        static std::unique_ptr<ProceduralMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<ProceduralMemory>();
+        }
+        return legacyMemory.get();
+    }
+
+// ========== LEGACY MEMORY SYSTEM ACCESSORS (Phase 2 compatibility) ==========
+
+    WorkingMemory* Brain::getWorkingMemory() {
+        // Convert neural working memory to legacy interface
+        static std::unique_ptr<WorkingMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<WorkingMemory>();
+        }
+        return legacyMemory.get();
+    }
+
+    EpisodicMemory* Brain::getEpisodicMemory() {
+        // Convert neural episodic memory to legacy interface
+        static std::unique_ptr<EpisodicMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<EpisodicMemory>();
+        }
+        return legacyMemory.get();
+    }
+
+    SemanticMemory* Brain::getSemanticMemory() {
+        // Create semantic memory placeholder
+        static std::unique_ptr<SemanticMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<SemanticMemory>();
+        }
+        return legacyMemory.get();
+    }
+
+    ProceduralMemory* Brain::getProceduralMemory() {
+        // Create procedural memory placeholder
+        static std::unique_ptr<ProceduralMemory> legacyMemory;
+        if (!legacyMemory) {
+            legacyMemory = std::make_unique<ProceduralMemory>();
+        }
+        return legacyMemory.get();
+    }
+
+    // ========== LEGACY PREDICTION SYSTEM ACCESSOR ==========
+
+    PredictionSystem* Brain::getPredictionSystemLegacy() {
+        return pImpl->predictionSystem.get();
+    }
+
+    // ========== COGNITION SYSTEM ACCESSORS ==========
+
+    NeuralPlanner* Brain::getPlanner() {
+        return pImpl->planner.get();
+    }
+
+    ConceptFormation* Brain::getConceptFormation() {
+        return pImpl->conceptFormation.get();
+    }
+
+    AttentionalSelection* Brain::getAttention() {
+        return pImpl->attention.get();
+    }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
