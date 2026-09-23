@@ -1,46 +1,21 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "NeuralWorkingMemory.hpp"
 #include <vector>
 #include <functional>
 
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Now implemented using NeuralWorkingMemory for real neural dynamics
 
-class WorkingMemory {
-public:
-    WorkingMemory();
-    ~WorkingMemory();
-    
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
-    
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
-    
-    // Check if item exists
-    bool contains(NeuronId neuron) const;
-    
-    // Clear all
-    void clear();
-    
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
-    
-    // Decay all items
-    void decay(float decayRate);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+// NeuralWorkingMemory is the real implementation (see NeuralWorkingMemory.hpp)
+// This alias maintains backward compatibility
+using WorkingMemory = NeuralWorkingMemory;
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Now implemented using NeuralEpisodicMemory for real neural dynamics
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -80,7 +55,7 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// PLACEHOLDER - Needs implementation (basic string storage only)
 
 class SemanticMemory {
 public:
@@ -108,7 +83,7 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// PLACEHOLDER - Needs implementation (neural pattern storage only)
 
 struct Skill {
     std::string name;
@@ -144,7 +119,7 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// PLACEHOLDER - Needs implementation (basic association storage only)
 
 class AssociativeMemory {
 public:

@@ -3,23 +3,26 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 
 namespace nlm {
 
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// Provides basic text-based visualization and logging for brain monitoring
 class VisualizationInterface {
 public:
     VisualizationInterface();
     ~VisualizationInterface();
     
-    // Initialize visualization
-    bool initialize();
+    // Initialize visualization with logging file
+    bool initialize(const std::string& logFile = "nlm_visualization.log");
     
     // Update visualization data
     void update();
     
-    // Render current state
+    // Render current state to log file
     void render();
     
     // Close visualization
@@ -32,17 +35,24 @@ public:
     void setUpdateRate(double hz);
     double getUpdateRate() const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Log brain statistics
+    void logStatistics(const class Brain& brain, const std::string& label = "");
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    // Log network connectivity
+    void logNetwork(const class Brain& brain);
     
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    // Log activity patterns
+    void logActivity(const class Brain& brain);
     
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    // Log spike events
+    void logSpikes(const std::vector<class SpikeEvent>& spikes);
+    
+    // Log weight matrices
+    void logWeights(const class Brain& brain);
+    
+    // Generate simple ASCII visualization
+    std::string visualizeNetworkASCII(const class Brain& brain) const;
+    std::string visualizeActivityASCII(const class Brain& brain) const;
     
 private:
     struct Impl;
