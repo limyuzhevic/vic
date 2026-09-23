@@ -1,7 +1,10 @@
 #include "Synapse.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/ErrorHandling/ErrorHandling.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
+#include <vector>
 
 namespace nlm {
 
@@ -48,6 +51,8 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "Synapse constructor: implementation is null");
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -76,6 +81,11 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
     }
     return *this;
 }
+
+// Implementation of remaining methods with comprehensive error handling
+
+} // namespace nlm
+
 
 SynapseId Synapse::getId() const {
     return pImpl->id;

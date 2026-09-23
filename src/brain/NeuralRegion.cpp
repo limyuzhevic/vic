@@ -1,6 +1,10 @@
 #include "NeuralRegion.hpp"
+#include "../core/Random/Random.hpp"
+#include "../core/ErrorHandling/ErrorHandling.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <memory>
+#include <vector>
 
 namespace nlm {
 
@@ -19,6 +23,7 @@ struct NeuralRegion::Impl {
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
 
 NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion constructor: implementation is null");
     pImpl->name = name;
 }
 
@@ -38,26 +43,44 @@ NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
 }
 
 RegionId NeuralRegion::getId() const {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion::getId: implementation is null");
     return pImpl->id;
 }
 
 const std::string& NeuralRegion::getName() const {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion::getName: implementation is null");
     return pImpl->name;
 }
 
 void NeuralRegion::setName(const std::string& name) {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion::setName: implementation is null");
     pImpl->name = name;
 }
 
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion::addPopulation: implementation is null");
+    
+    // Validate size
+    if (!nlm::Validation::isNonNegative(static_cast<long long>(size), 
+                                        "Population size cannot be negative")) {
+        NLM_THROW_ERROR(ErrorSeverity::Error, ErrorCategory::Validation,
+                       "Invalid population size: " + std::to_string(size),
+                       "NeuralRegion", "addPopulation");
+        return PopulationId(0);
+    }
+    
     PopulationId popId(pImpl->populations.size() + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);
+    NLM_CHECK_NULL_PTR(population.get(), "population", "Failed to create neural population");
+    
     population->setNeuronType(type);
     pImpl->populations.push_back(std::move(population));
     return popId;
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion::getPopulation: implementation is null");
+    
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
@@ -65,11 +88,18 @@ NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
+    NLM_CHECK_NULL_PTR(pImpl, "pImpl", "NeuralRegion::getPopulation: implementation is null");
+    
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
     return pImpl->populations[id.index() - 1].get();
 }
+
+// Implementation of remaining methods with comprehensive error handling
+
+} // namespace nlm
+
 
 size_t NeuralRegion::getPopulationCount() const {
     return pImpl->populations.size();

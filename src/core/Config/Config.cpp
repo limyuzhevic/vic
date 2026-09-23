@@ -1,16 +1,23 @@
 #include "Config.hpp"
+#include "ConfigManager.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::shared_ptr<ConfigManager> configManager;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize ConfigManager as singleton
+    initializeConfigManager();
+    pImpl->configManager = std::shared_ptr<ConfigManager>(&getConfigManager(), [](ConfigManager*) {});
+}
 
 Config::~Config() = default;
 
@@ -19,77 +26,34 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    if (!pImpl->configManager) return false;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    bool success = pImpl->configManager->loadFromFile(filepath);
+    
+    // Sync Config entries with ConfigManager
+    if (success) {
+        syncWithConfigManager();
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+    return success;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+    if (!pImpl->configManager) return false;
+    
+    bool success = pImpl->configManager->loadFromCommandLine(argc, argv);
+    
+    // Sync Config entries with ConfigManager
+    if (success) {
+        syncWithConfigManager();
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
+    if (!pImpl->configManager) return false;
+    return pImpl->configManager->saveToFile(filepath);
 }
 
 template<typename T>
@@ -197,6 +161,42 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Helper methods for managing parameter groups
+void Config::syncWithConfigManager() {
+    if (!pImpl->configManager) return;
+    
+    // Clear old entries
+    pImpl->entries.clear();
+    
+    // Sync from ConfigManager
+    auto paramNames = pImpl->configManager->getAllParameterNames();
+    for (const auto& name : paramNames) {
+        // Try to get parameter in various types
+        std::optional<int> intVal = pImpl->configManager->getParameter<int>(name);
+        if (intVal.has_value()) {
+            pImpl->entries.emplace_back(name, ConfigValue(*intVal), ConfigSource::Default, "");
+            continue;
+        }
+        
+        std::optional<double> doubleVal = pImpl->configManager->getParameter<double>(name);
+        if (doubleVal.has_value()) {
+            pImpl->entries.emplace_back(name, ConfigValue(*doubleVal), ConfigSource::Default, "");
+            continue;
+        }
+        
+        std::optional<bool> boolVal = pImpl->configManager->getParameter<bool>(name);
+        if (boolVal.has_value()) {
+            pImpl->entries.emplace_back(name, ConfigValue(*boolVal), ConfigSource::Default, "");
+            continue;
+        }
+        
+        std::optional<std::string> stringVal = pImpl->configManager->getParameter<std::string>(name);
+        if (stringVal.has_value()) {
+            pImpl->entries.emplace_back(name, ConfigValue(*stringVal), ConfigSource::Default, "");
+        }
+    }
 }
 
 // Explicit template instantiations
