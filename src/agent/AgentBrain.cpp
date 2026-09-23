@@ -18,7 +18,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , episodicMemoryEnabled_(false)
+    , replayEnabled_(false)
     , sensoryNoveltyDecay_(0.99f)
+    , experienceReady_(false)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -67,6 +70,7 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    experienceReady_ = false;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -279,38 +283,18 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+void AgentBrain::reset() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    experienceReady_ = false;
     
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
-    }
-    
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
-        }
-    }
+    // Clear previous vision
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -334,17 +318,86 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::storeEpisodicMemory(const SensoryPercept& percept, const MotorCommand& action,
+                            float reward, const AgentBody& body, float novelty,
+                            float curiosity, float predictionError) {
+    if (!brain_ || !episodicMemoryEnabled_) return;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Capture current experience for episodic memory
+    captureCurrentExperience(percept, action, reward, body, novelty, curiosity, predictionError);
+    
+    if (!experienceReady_) return;
+    
+    // Convert to brain's episodic memory format
+    if (brain_->getEpisodicMemory()) {
+        // For now, we integrate with the existing brain episodic memory
+        // In the future, this would call a specific method on the episodic memory system
+        
+        // Store as episode in brain's episodic memory
+        brain_->getEpisodicMemory()->storeEpisode(currentExperience_);
+        
+        NLM_LOG_INFO("Stored episodic memory item: action=" + std::to_string((int)action) +
+                     ", reward=" + std::to_string(reward) +
+                     ", novelty=" + std::to_string(novelty));
+    }
+    
+    // Store for next episode
+    lastExperience_ = currentExperience_;
+    experienceReady_ = false;
+}
+
+void AgentBrain::captureCurrentExperience(const SensoryPercept& percept, const MotorCommand& action,
+                                         float reward, const AgentBody& body, float novelty,
+                                         float curiosity, float predictionError) {
+    // Capture current sensory state
+    currentExperience_.sensoryState = percept.getAllSignals();
+    
+    // Capture agent's physical state
+    currentExperience_.x = body.x;
+    currentExperience_.y = body.y;
+    currentExperience_.orientation = body.orientation;
+    currentExperience_.energy = body.energy;
+    currentExperience_.health = body.health;
+    
+    // Capture action and rewards
+    currentExperience_.action = action;
+    currentExperience_.reward = reward;
+    currentExperience_.novelty = novelty;
+    currentExperience_.curiosity = curiosity;
+    currentExperience_.predictionError = predictionError;
+    
+    // Capture neural state
+    currentExperience_.activeNeurons.clear();
+    currentExperience_.neuronActivations.clear();
+    
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - 
+                                neuron->getState().restingPotential) > 5.0f) {
+                        currentExperience_.activeNeurons.push_back(neuron->getId());
+                        currentExperience_.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - 
+                                    neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    currentExperience_.timestamp = std::chrono::high_resolution_clock::now();
+    experienceReady_ = true;
+}
+
+void AgentBrain::prepareEpisodicMemoryItem(const StoredExperience& experience) {
+    // This method prepares the experience for storage in episodic memory
+    // Can be overridden by derived classes for custom formatting
+    // For now, just log that an experience is being prepared
+    NLM_LOG_INFO("Preparing episodic memory item: action=" + std::to_string((int)experience.action) +
+                 ", reward=" + std::to_string(experience.reward) +
+                 ", novelty=" + std::to_string(experience.novelty));
 }
 
 } // namespace nlm

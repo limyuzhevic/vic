@@ -51,6 +51,8 @@ struct Brain::Impl {
     std::unique_ptr<Novelty> novelty;
     
     // Phase 2: Real neural computation components
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
+    
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
@@ -78,6 +80,10 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    std::vector<float> predictionErrorHistory;
+    
+    float currentPredictionError;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,6 +98,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentPredictionError(0.0f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -113,16 +120,18 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+    // Initialize prediction system (using NeuralPrediction for real prediction)
+    predictionSystem = std::make_unique<PredictionSystem>();
+    neuralPrediction = std::make_unique<NeuralPrediction>();
+    neuralPrediction->initialize(this);
+    
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
@@ -289,6 +298,21 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Set checkpoint providers
+    pImpl->checkpointManager->setNeuronProvider(
+        [this](NeuronCheckpointData& data) {
+            // Populate NeuronCheckpointData from current brain state
+            return fillNeuronCheckpointData(data);
+        }
+    );
+    
+    pImpl->checkpointManager->setSynapseProvider(
+        [this](SynapseCheckpointData& data) {
+            // Populate SynapseCheckpointData from current brain state
+            return fillSynapseCheckpointData(data);
+        }
+    );
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -509,10 +533,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8: Update prediction system (using NeuralPrediction) ==========
+    float predictionError = 0.0f;
+    if (pImpl->neuralPrediction && pImpl->lastSensoryInput) {
+        // Use NeuralPrediction for real prediction
+        predictionError = pImpl->neuralPrediction->updateWithObservation(pImpl->lastSensoryInput->getData(), currentStep);
+        
+        // Generate prediction for current state
+        auto prediction = pImpl->neuralPrediction->generatePrediction(currentStep);
+        
+        // Update dopamine based on prediction error
+        if (pImpl->dopamine) {
+            pImpl->dopamine->update(predictionError);
+        }
+    } else if (pImpl->predictionSystem) {
+        // Fallback to placeholder prediction system
+        // TODO: Replace with NeuralPrediction integration
+        predictionError = 0.1f * std::sin(static_cast<float>(currentStep) * 0.01f);
+    }
+    
+    pImpl->currentPredictionError = predictionError;
+    pImpl->predictionErrorHistory.push_back(predictionError);
+    if (pImpl->predictionErrorHistory.size() > 100) {
+        pImpl->predictionErrorHistory.erase(pImpl->predictionErrorHistory.begin());
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -613,6 +656,17 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Update prediction system with new sensory input
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->recordSensoryInput(input);
+    }
+}
+
+void Brain::recordSensoryForPrediction(const class SensoryInput& input, SimulationStep currentStep) {
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->recordSensoryInput(input);
     }
 }
 
@@ -762,85 +816,14 @@ void Brain::reset() {
 }
 
 bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
-        }
-        
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
-        
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
-        
-        for (const auto& region : pImpl->regions) {
-            for (const auto& pop : region->getPopulations()) {
-                for (const auto* neuron : pop->getNeurons()) {
-                    const auto& state = neuron->getState();
-                    neuronData.membranePotential.push_back(state.membranePotential);
-                    neuronData.restingPotential.push_back(state.restingPotential);
-                    neuronData.threshold.push_back(state.threshold);
-                    neuronData.resetPotential.push_back(state.resetPotential);
-                    neuronData.leakConductance.push_back(state.leakConductance);
-                    neuronData.firingState.push_back(static_cast<uint8_t>(state.firingState));
-                    neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
-                    neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
-                    neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
-                }
-            }
-        }
-        
-        if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
-            return false;
-        }
-        
-        // Write synapses
-        SynapseCheckpointData synapseData;
-        for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
-            }
-        }
-        
-        if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
-            return false;
-        }
-        
-        // Finalize
-        if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
-            return false;
-        }
-        
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+    if (!pImpl->checkpointManager) {
+        NLM_LOG_ERROR("Checkpoint manager not available");
         return false;
     }
+    
+    NLM_LOG_INFO("Saving brain state to " + filepath);
+    
+    return pImpl->checkpointManager->saveImmediately(filepath);
 }
 
 bool Brain::load(const std::string& filepath) {
@@ -895,10 +878,22 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - need to find matching synapses and restore their state
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* synapse : pop->getSynapses()) {
+                    if (synapseIdx < synapseData.weight.size()) {
+                        // Restore synapse state
+                        synapsex->setWeight(synapseData.weight[synapseIdx]);
+                        // Note: Could also restore delay, plasticity flags, etc.
+                    }
+                    synapseIdx++;
+                }
+            }
+        }
         
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         

@@ -52,6 +52,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
+    agent.enableEpisodicMemory(true);  // Enable episodic memory integration
+    agent.enableReplay(true);  // Enable replay capability
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
@@ -80,8 +82,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
         totalReward += reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Store episode in episodic memory
+        if (agent.isEpisodicMemoryEnabled() && agent.getBrain()->getEpisodicMemory()) {
+            agent.storeEpisodicMemory(percept, cmd, reward, agent.getBrain()->getRegions()[0].get(), 
+                                   agent.getNoveltyLevel(), agent.getCuriosityLevel(),
+                                   agent.getPredictionError());
+        } else {
+            // Debug: Log when episodic memory is not available
+            NLM_LOG_INFO("Episodic memory not available for storage");
+        }
         
         // Update development
         if (config.enableDevelopment) {

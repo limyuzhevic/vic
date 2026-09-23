@@ -6,11 +6,12 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <chrono>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction, motor decoding, and episodic memory storage
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -63,11 +64,20 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableEpisodicMemory(bool enable) { episodicMemoryEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isEpisodicMemoryEnabled() const { return episodicMemoryEnabled_; }
+    
+    // Episodic memory methods
+    void storeEpisodicMemory(const SensoryPercept& percept, const MotorCommand& action, 
+                            float reward, const AgentBody& body, float novelty,
+                            float curiosity, float predictionError);
+    void enableReplay(bool enable) { replayEnabled_ = enable; }
+    bool isReplayEnabled() const { return replayEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -108,10 +118,39 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool episodicMemoryEnabled_;
+    bool replayEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Experience tracking for episodic memory
+    struct StoredExperience {
+        std::vector<float> sensoryState;
+        float x, y;
+        float orientation;
+        float energy;
+        float health;
+        MotorCommand action;
+        float reward;
+        float novelty;
+        float curiosity;
+        float predictionError;
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> neuronActivations;
+        std::chrono::time_point<std::chrono::high_resolution_clock> timestamp;
+    };
+    
+    StoredExperience currentExperience_;
+    StoredExperience lastExperience_;
+    bool experienceReady_;
+    
+    // Helper methods for episodic memory
+    void captureCurrentExperience(const SensoryPercept& percept, const MotorCommand& action,
+                                 float reward, const AgentBody& body, float novelty,
+                                 float curiosity, float predictionError);
+    void prepareEpisodicMemoryItem(const StoredExperience& experience);
 };
 
 } // namespace nlm
