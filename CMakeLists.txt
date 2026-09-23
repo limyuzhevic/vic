@@ -85,6 +85,10 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Phase 2: Application helpers and refactoring
+    src/nlm/ConfigHelper.cpp
+    src/nlm/BrainInitializationHelper.cpp
+    src/nlm/MainHelperFunctions.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
