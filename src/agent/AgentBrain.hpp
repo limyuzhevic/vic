@@ -6,15 +6,25 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <deque>
 
 namespace nlm {
 
+// Forward declarations
+class RandomGenerator;
+
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with enhanced algorithms
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -28,7 +38,7 @@ public:
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    // Decode brain motor activity into motor command (enhanced)
     MotorCommand decodeMotorCommand();
     
     // Apply neuromodulation based on reward
@@ -57,6 +67,7 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -70,27 +81,38 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
+    // Enhanced motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Enhanced helper methods
+    float calculateActionPriority(MotorCommand cmd, const std::vector<float>& neuralActivity) const;
+    enum class ExplorationStrategy { None, Selective, Balanced, Maximal };
+    ExplorationStrategy selectExplorationStrategy() const;
+    void updateAttention(const std::vector<float>& visualInput, double timestamp);
+    void updatePredictionSystem(const std::vector<float>& rewardSequence);
+    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups (enhanced with additional actions)
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     
-    // Sensory neuron groups
+    // Enhanced sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    std::vector<Neuron*> sensoryAudio_;
+    std::vector<Neuron*> sensoryBalance_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -112,6 +134,20 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Enhanced monitoring and prediction state
+    std::vector<float> attentionFocus_;
+    std::deque<std::vector<float>> predictionBuffer_;
+    std::deque<float> rewardHistory_;
+    std::deque<MotorCommand> actionHistory_;
+    std::map<MotorCommand, float> actionSuccess_;
+    
+    // Configuration parameters
+    int maxPredictionHorizon_;
+    float attentionWeight_;
+    
+    // Random generator for exploration
+    std::unique_ptr<std::mt19937> randomGenerator_;
 };
 
 } // namespace nlm

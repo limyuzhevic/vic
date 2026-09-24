@@ -6,12 +6,36 @@
 #include <variant>
 #include <optional>
 
+/**
+ * @namespace nlm
+ * @brief Neural Learning Machine (NLM) - An experimental artificial developmental brain simulation framework.
+ * 
+ * NLM provides a complete brain simulation platform with integrated neural dynamics,
+ * memory systems, prediction mechanisms, neuromodulation, and developmental stages.
+ * The system simulates biological brain processes using simplified neuron models
+ * and spike-based neural dynamics.
+ */
+
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
+/**
+ * @namespace nlm::config
+ * @brief Configuration system for NLM
+ * 
+ * Handles loading, saving, and management of simulation parameters and settings.
+ * Supports multiple configuration sources with precedence rules.
+ */
+namespace config {
+
+/**
+ * @brief Configuration value types supported by NLM
+ * 
+ * Using std::variant to store different types of configuration values with
+ * automatic type checking and conversion capabilities.
+ */
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -23,25 +47,53 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
+/**
+ * @enum ConfigSource
+ * @brief Source of configuration value
+ * 
+ * Different sources have different precedence for resolving conflicts:
+ * Runtime > CommandLine > File > Default
+ */
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,    ///< Default configuration values
+    File,       ///< Loaded from file (JSON format)
+    CommandLine,///< Command line arguments
+    Runtime     ///< Set programmatically at runtime
 };
 
-// Configuration entry
+/**
+ * @struct ConfigEntry
+ * @brief Single configuration key-value pair with metadata
+ * 
+ * Stores the configuration value along with its source and descriptive
+ * information for documentation and debugging purposes.
+ */
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;             ///< Configuration key/name
+    ConfigValue value;           ///< Configuration value (type-safe variant)
+    ConfigSource source;         ///< Source of this configuration value
+    std::string description;     ///< Human-readable description of the parameter
     
+    /**
+     * @brief Default constructor
+     * 
+     * Creates an empty configuration entry with Default source.
+     */
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    /**
+     * @brief Constructor with all parameters
+     * 
+     * @param k Configuration key
+     * @param v Configuration value
+     * @param s Source of configuration
+     * @param desc Description of the parameter
+     */
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+} // namespace config
 
 // Main configuration class
 class Config {
