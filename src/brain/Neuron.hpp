@@ -93,6 +93,12 @@ public:
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
+    void setMembraneCapacitance(float capacitance);
+    float getMembraneCapacitance() const;
+    void setMembraneTimeConstant(float timeConstant);
+    float getMembraneTimeConstant() const;
+    void setMembranePotentialClamp(MembranePotential min, MembranePotential max);
+    std::pair<MembranePotential, MembranePotential> getMembranePotentialClamp() const;
     
     // Spike detection
     bool checkThreshold() const;
@@ -115,6 +121,7 @@ public:
     void recordSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
+    size_t getSpikeHistorySize() const;
     
     // Synapse management (incoming and outgoing)
     void addIncomingSynapse(SynapseHandle handle);
@@ -132,6 +139,14 @@ public:
     RegionId getRegionId() const;
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
+    
+    // Spike-frequency adaptation control
+    void setAdaptationDecayRate(float decayRate);
+    float getAdaptationDecayRate() const;
+    void setAdaptationIncrement(float increment);
+    float getAdaptationIncrement() const;
+    void setModulatoryInputScaling(float scaling);
+    float getModulatoryInputScaling() const;
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics

@@ -38,10 +38,10 @@ struct Synapse::Impl {
     static constexpr float MIN_WEIGHT = -1.0f;
     static constexpr float MAX_WEIGHT = 1.0f;
     
-    // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    // Configurable short-term plasticity parameters
+    float stpFacilitationTau;    // Facilitation time constant (ms)
+    float stpDepressionTau;      // Depression time constant (ms)
+    float stpUMax;               // Max utilization factor
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
@@ -60,6 +60,11 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Initialize configurable STP parameters with default values
+    pImpl->stpFacilitationTau = 100.0f;  // Default: 100ms
+    pImpl->stpDepressionTau = 200.0f;    // Default: 200ms
+    pImpl->stpUMax = 1.0f;               // Default: 1.0
 }
 
 Synapse::~Synapse() = default;
@@ -125,6 +130,30 @@ bool Synapse::isExcitatory() const {
 
 bool Synapse::isInhibitory() const {
     return pImpl->type == SynapseType::Inhibitory;
+}
+
+void Synapse::setStpFacilitationTimeConstant(float tau) {
+    pImpl->stpFacilitationTau = tau;
+}
+
+float Synapse::getStpFacilitationTimeConstant() const {
+    return pImpl->stpFacilitationTau;
+}
+
+void Synapse::setStpDepressionTimeConstant(float tau) {
+    pImpl->stpDepressionTau = tau;
+}
+
+float Synapse::getStpDepressionTimeConstant() const {
+    return pImpl->stpDepressionTau;
+}
+
+void Synapse::setStpMaxUtilization(float uMax) {
+    pImpl->stpUMax = uMax;
+}
+
+float Synapse::getStpMaxUtilization() const {
+    return pImpl->stpUMax;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
@@ -202,7 +231,8 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Use configurable STP parameters
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / pImpl->stpFacilitationTau);
     }
     
     // Decay short-term depression
@@ -211,8 +241,8 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Recovery from depression toward 1.0 - use configurable parameter
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / pImpl->stpDepressionTau));
     }
     
     // Decay eligibility trace for reward-modulated learning

@@ -47,6 +47,14 @@ public:
     bool isExcitatory() const;
     bool isInhibitory() const;
     
+    // Short-term plasticity parameters
+    void setStpFacilitationTimeConstant(float tau);
+    float getStpFacilitationTimeConstant() const;
+    void setStpDepressionTimeConstant(float tau);
+    float getStpDepressionTimeConstant() const;
+    void setStpMaxUtilization(float uMax);
+    float getStpMaxUtilization() const;
+    
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);

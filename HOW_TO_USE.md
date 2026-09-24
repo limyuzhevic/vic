@@ -452,77 +452,353 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
----
+## Part 4: Advanced Usage and Best Practices
 
-## Part 5: Example Scripts
+### Common Error Handling Patterns
 
-### Minimal Example
-
+#### 1. Initialization Errors
 ```python
 import pynlm
 
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
+try:
+    config = pynlm.createDefaultConfig()
+    # Configure parameters with validation
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.synapse_density", 0.2)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    print("Brain initialized successfully")
+except Exception as e:
+    print(f"Initialization failed: {e}")
+    # Common issues: invalid parameter values, memory allocation errors
 ```
 
-### Environment Interaction
-
+#### 2. Simulation Runtime Errors
 ```python
 import pynlm
 
-# Setup
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+# Always call initialize before using the brain
+brain.initialize()
+
+# Run simulation with error handling
+for step in range(1000):
+    try:
+        brain.step(step)
+        
+        # Check for simulation issues
+        firing_count = brain.getFiringNeuronCount()
+        if firing_count > brain.getTotalNeuronCount() * 0.9:
+            print(f"Warning: High firing rate at step {step}: {firing_count} firing neurons")
+        
+        # Log statistics periodically
+        if step % 100 == 0:
+            print(f"Step {step}: {firing_count} firing neurons, "
+                  f"rate: {brain.getAverageFiringRate():.2f} Hz")
+    except RuntimeError as e:
+        print(f"Simulation error at step {step}: {e}")
+        # Typical errors: invalid timestep, neuron limit exceeded
+        break
+    except MemoryError as e:
+        print(f"Memory error at step {step}: {e}")
+        # Typical errors: insufficient memory for large networks
+        break
 ```
 
----
+### Configuration Examples
 
-## Troubleshooting
+#### 1. Custom Neuron Parameters
+```python
+import pynlm
 
-### Build Issues
+# Create default configuration
+config = pynlm.createDefaultConfig()
 
-**CMake cannot find Python:**
+# Customize neuron dynamics for your use case
+config.set("brain.v_thresh", -55.0)      # Raise threshold for slower firing
+config.set("brain.v_rest", -65.0)       # Change resting potential  
+config.set("brain.tau_mem", 25.0)       # Slower membrane time constant
+config.set("brain.tau_ref", 3.0)        # Longer refractory period
+
+# Configure plasticity
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.005)
+config.set("plasticity.hebbian.enable", True)
+
+# Configure structural plasticity
+config.set("synaptogenesis_rate", 0.0001)
+config.set("pruning_rate", 0.00005)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### 2. Large-Scale Network Configuration
+```python
+import pynlm
+
+# Create configuration for large-scale simulation
+config = pynlm.createDefaultConfig()
+
+# Scale up for research
+config.set("brain.neuron_count", 5000)           # Large network
+config.set("brain.region_count", 5)              # Multiple regions
+config.set("brain.synapse_density", 0.05)        # Sparse connections
+config.set("simulation.timestep", 0.0005)        # Fine time resolution
+
+# Enable advanced features
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+config.set("memory.working_memory.capacity", 10.0)
+config.set("memory.episodic_memory.capacity", 60.0)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Created large-scale brain:")
+print(f"  - {brain.getTotalNeuronCount()} neurons")
+print(f"  - {brain.getTotalSynapseCount()} synapses")
+print(f"  - {brain.getTotalRegionCount()} regions")
+```
+
+#### 3. Performance Optimization Configuration
+```python
+import pynlm
+
+# Configuration optimized for performance
+config = pynlm.createDefaultConfig()
+
+# Balance between biological accuracy and performance
+config.set("brain.neuron_count", 1000)          # Reasonable size
+config.set("brain.synapse_density", 0.1)         # Moderate connectivity
+config.set("simulation.timestep", 0.001)        # Standard timestep
+config.set("random_seed", 42)                   # Reproducible results
+
+# Enable only essential plasticity for speed
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("plasticity.hebbian.enable", False)   # Disable for speed
+
+# Disable memory-intensive features
+config.set("neuromod.curiosity.enable", False)
+config.set("neuromod.novelty.enable", False)
+config.set("memory.working_memory.capacity", 0.0)  # Disable
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Performance-optimized brain created")
+```
+
+### Debugging and Troubleshooting
+
+#### 1. Common Issues and Solutions
+
+**Issue**: Brain doesn't learn during plasticity experiments
+```python
+# Common cause: plasticity not enabled
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+```
+
+**Issue**: Excessive firing causing instability
+```python
+# Solutions:
+config.set("brain.v_thresh", -50.0)       # Raise threshold
+config.set("brain.tau_mem", 30.0)         # Slower membrane dynamics
+config.set("brain.tau_ref", 5.0)          # Longer refractory period
+```
+
+**Issue**: Simulation too slow
+```python
+# Optimize performance:
+config.set("brain.neuron_count", 500)      # Smaller network
+config.set("brain.synapse_density", 0.05)  # Fewer connections
+config.set("simulation.timestep", 0.002)   # Larger timestep
+config.set("random_seed", 123)             # Pre-compute if deterministic
+```
+
+#### 2. Error Code Reference
+
+| Error Type | Description | Solution |
+|------------|-------------|----------|
+| `RuntimeError` | Invalid timestep or invalid state | Check timestep configuration and call initialize() |
+| `MemoryError` | Insufficient memory for network size | Reduce neuron count or disable memory features |
+| `std::exception` | Configuration error | Validate parameter ranges using getParameterInfo() |
+
+### Best Practices
+
+#### 1. Configuration Management
+```python
+# Always validate configuration before use
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# Set multiple parameters with validation
+try:
+    config.set("brain.neuron_count", 1000)
+    config.set("brain.synapse_density", 0.1)
+    config.set("plasticity.stdp.learning_rate", 0.001)
+    
+    # Check parameter bounds
+    for param in ["brain.neuron_count", "brain.synapse_density"]:
+        info = config.getParameterInfo(param)
+        print(f"{param}: {info.description}")
+except Exception as e:
+    print(f"Configuration error: {e}")
+```
+
+#### 2. Resource Management
+```python
+import pynlm
+import gc
+import psutil
+
+# Monitor memory usage
+process = psutil.Process()
+config = pynlm.createDefaultConfig()
+
+for epoch in range(5):
+    # Create and use brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run simulation
+    for step in range(100):
+        brain.step(step)
+    
+    # Clean up
+    del brain
+    gc.collect()
+    
+    # Check memory
+    mem_mb = process.memory_info().rss / 1024 / 1024
+    print(f"Epoch {epoch + 1}: Memory usage: {mem_mb:.1f} MB")
+```
+
+#### 3. Testing and Validation
+```python
+import pynlm
+
+# Test configuration with predefined values
+def test_configuration():
+    config = pynlm.createDefaultConfig()
+    
+    # Test with known valid values
+    test_params = {
+        "brain.neuron_count": 100,
+        "brain.synapse_density": 0.1,
+        "plasticity.stdp.learning_rate": 0.001,
+        "simulation.timestep": 0.001,
+        "random_seed": 42
+    }
+    
+    for param, value in test_params.items():
+        try:
+            config.set(param, value)
+            retrieved = config.get(type(value).__name__, param)
+            if retrieved == value:
+                print(f"✓ {param}: {value} - OK")
+            else:
+                print(f"✗ {param}: Expected {value}, got {retrieved}")
+        except Exception as e:
+            print(f"✗ {param}: {e}")
+
+test_configuration()
+```
+
+### Advanced Features
+
+#### 1. Batch Configuration
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# Set multiple parameters at once
+batch_params = [
+    ("brain.neuron_count", 1000),
+    ("brain.synapse_density", 0.1),
+    ("plasticity.stdp.learning_rate", 0.001),
+    ("plasticity.hebbian.enable", True),
+    ("simulation.timestep", 0.001)
+]
+
+config.setBatch(batch_params)
+
+# Verify all parameters were set
+for param in ["brain.neuron_count", "brain.synapse_density", "plasticity.stdp.learning_rate"]:
+    value = config.getOr(param, 0)
+    print(f"{param}: {value}")
+```
+
+#### 2. Configuration Validation
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# Test parameter validation
+error_msg = ""
+if not config.validateParameter("brain.neuron_count", 1000, error_msg):
+    print(f"Validation failed: {error_msg}")
+else:
+    print("Parameter validation passed")
+
+# List all valid parameters
+print("\nValid configuration parameters:")
+for param in config.getParameterInfo(param).name for param in config.getKeys()]:
+    info = config.getParameterInfo(param)
+    print(f"  {param}: {info.type} - {info.description}")
+```
+
+### Migration Guide
+
+#### From Phase 1 to Phase 2
+
+If you're migrating from NLM Phase 1:
+
+1. **Configuration Changes**: 
+   - Old: `config.set("synapse_density", 0.1)`
+   - New: `config.set("brain.synapse_density", 0.1)`
+
+2. **Brain Initialization**:
+   - Old: `brain.initialize()`
+   - New: Same, but more robust error handling
+
+3. **Parameter Names**:
+   - Changed to dot notation for clarity
+   - Added parameter metadata for validation
+
+### Troubleshooting Common Issues
+
+#### Build Issues
 ```bash
+# CMake cannot find Python
 pip install scikit-build-core pybind11
 cmake .. -DPython_EXECUTABLE=$(which python)
-```
 
-**Compilation errors:**
+# Compilation errors
 - Ensure C++20 compiler support
 - Check CMake version >= 3.16
 - Verify all source files are present
-
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+#### Runtime Issues
+```python
+# ImportError: No module named 'pynlm'
+pip install --force-reinstall .
+
+# Segmentation faults
+- Check that initialize() is called before step()
+- Ensure reset() is called before re-running simulation
+- Validate parameter ranges before creating brain
+```
 
 ---
 

@@ -23,8 +23,24 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Configurable parameters
+    float membraneCapacitance;       // Variable membrane capacitance
+    float membraneTimeConstant;      // Variable time constant
+    float adaptationDecayRate;       // Adaptation variable decay rate
+    float adaptationIncrement;       // Adaptation increment per spike
+    float modulatoryInputScaling;    // Modulatory input scaling factor
+    MembranePotential minMembranePotential;  // Minimum membrane potential clamp
+    MembranePotential maxMembranePotential;  // Maximum membrane potential clamp
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             membraneCapacitance(MEMBRANE_CAPACITANCE),
+             membraneTimeConstant(TIME_CONSTANT),
+             adaptationDecayRate(0.95f),
+             adaptationIncrement(1.0f),
+             modulatoryInputScaling(0.1f),
+             minMembranePotential(-100.0f),
+             maxMembranePotential(50.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -109,6 +125,31 @@ MembranePotential Neuron::getRestingPotential() const {
 
 void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
+}
+
+void Neuron::setMembraneCapacitance(float capacitance) {
+    pImpl->membraneCapacitance = capacitance;
+}
+
+float Neuron::getMembraneCapacitance() const {
+    return pImpl->membraneCapacitance;
+}
+
+void Neuron::setMembraneTimeConstant(float timeConstant) {
+    pImpl->membraneTimeConstant = timeConstant;
+}
+
+float Neuron::getMembraneTimeConstant() const {
+    return pImpl->membraneTimeConstant;
+}
+
+void Neuron::setMembranePotentialClamp(MembranePotential min, MembranePotential max) {
+    pImpl->minMembranePotential = min;
+    pImpl->maxMembranePotential = max;
+}
+
+std::pair<MembranePotential, MembranePotential> Neuron::getMembranePotentialClamp() const {
+    return {pImpl->minMembranePotential, pImpl->maxMembranePotential};
 }
 
 bool Neuron::checkThreshold() const {
@@ -210,8 +251,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Use configurable parameters instead of hardcoded constants
+    float tau = pImpl->membraneTimeConstant;  // ms - configurable
+    float C = pImpl->membraneCapacitance;  // nF - configurable
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -225,11 +268,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        pImpl->state.adaptationVariable *= pImpl->adaptationDecayRate;  // configurable decay
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential using configurable bounds
+    V = std::clamp(V, pImpl->minMembranePotential, pImpl->maxMembranePotential);
     
     // Check for spike
     if (V >= threshold) {
@@ -247,8 +290,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Update adaptation for spike-frequency adaptation using configurable increment
+        pImpl->state.adaptationVariable += pImpl->adaptationIncrement;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }

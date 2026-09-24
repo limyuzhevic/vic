@@ -78,6 +78,13 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Batch operations for performance
+    void setBatch(const std::vector<std::pair<std::string, ConfigValue>>& values);
+    
+    // Parameter validation and bounds checking
+    bool validateParameter(const std::string& key, const ConfigValue& value, std::string& error) const;
+    static std::vector<std::pair<std::string, std::string>> getValidParameters();
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -92,6 +99,19 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration parameter metadata for validation and documentation
+    struct ParameterInfo {
+        std::string name;
+        std::string type;
+        std::string description;
+        std::optional<double> minValue;
+        std::optional<double> maxValue;
+        std::vector<std::string> validValues;
+    };
+    
+    // Get parameter metadata
+    static ParameterInfo getParameterInfo(const std::string& key);
     
 private:
     struct Impl;
