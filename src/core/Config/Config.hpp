@@ -64,19 +64,17 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Get all keys
+    std::vector<std::string> getKeys() const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Get all entries (for Python bindings and internal use)
+    std::vector<ConfigEntry> getAllEntries() const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Clear all
+    void clear();
+    
+    // Get configuration summary
+    std::string summary() const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -84,14 +82,30 @@ public:
     // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
     
-    // Clear all
-    void clear();
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Set values with source tracking
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set with description
+    void set(const std::string& key, const ConfigValue& value, const std::string& description, ConfigSource source = ConfigSource::Runtime);
+    
+    // Utility methods
+    bool hasKey(const std::string& key) const;
+    std::optional<ConfigValue> getRaw(const std::string& key) const;
+    void update(const ConfigEntry& entry);
+    void removeSource(ConfigSource source);
+    std::string toString(const ConfigValue& value) const;
     
 private:
     struct Impl;

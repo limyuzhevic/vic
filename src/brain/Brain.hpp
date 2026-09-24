@@ -2,16 +2,14 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for integration systems
+// These are now moved to Brain.cpp implementation file to reduce header complexity
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -30,19 +28,8 @@ class Novelty;
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
+// Moved to Brain.cpp implementation file to reduce header coupling
+struct InterRegionConnection;
 
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
@@ -172,30 +159,40 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // Neuromodulation access
     Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
     Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
     Novelty* getNovelty();
-    
-    // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
+    // Configuration and utility
     std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
+    // Logging and diagnostics
     void logStatus() const;
     
 private:
     struct Impl;
     Impl* pImpl;
+};
+
+// ========== STRUCT DEFINITIONS ==========
+
+// Inter-regional connection (long-range connectivity)
+// This struct is defined in the header for forward declaration support
+struct InterRegionConnection {
+    RegionId sourceRegion;
+    RegionId targetRegion;
+    float weight;
+    Delay delay;
+    PlasticityFlags plasticityFlags;
+    
+    InterRegionConnection()
+        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
+    
+    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
+        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
 } // namespace nlm

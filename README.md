@@ -82,6 +82,224 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+## Advanced Debugging Capabilities
+
+The NLM Python package includes comprehensive debugging and logging capabilities to help with development, analysis, and troubleshooting:
+
+### 1. Advanced Logging System
+
+The logging module provides:
+
+- **Multi-level logging**: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- **Context-aware logging**: Brain regions, simulation steps, agent IDs
+- **Log file rotation**: Automatic rotation based on file size
+- **Structured logging**: JSON format for machine-readable logs
+- **Specialized loggers**: Separate loggers for brain, memory, simulation, plasticity, visualization, and checkpoint components
+
+**Usage Example:**
+```python
+from pynlm.logging import setup_logging, get_brain_logger, log_simulation_step
+
+# Setup logging with JSON format
+logger = setup_logging("simulation.log", "DEBUG")
+
+# Get specialized loggers
+brain_logger = get_brain_logger()
+sim_logger = get_simulation_logger()
+
+# Context-aware logging
+log_simulation_step("simulation", step=100, message="Completed time step", temperature=0.7)
+```
+
+### 2. Debug Utilities
+
+The debug module provides tools for debugging and troubleshooting:
+
+- **Brain state inspection**: Create and compare brain state snapshots
+- **Simulation step debugging**: Add breakpoints and watch variables
+- **Connection validation**: Validate neural connectivity
+- **Memory usage monitoring**: Track memory consumption and detect leaks
+- **Performance profiling**: Profile component performance and identify bottlenecks
+
+**Usage Example:**
+```python
+from pynlm.debug import (
+    get_brain_state_inspector, get_simulation_debugger,
+    get_connection_validator, get_memory_monitor
+)
+
+# Inspect brain states
+inspector = get_brain_state_inspector()
+snapshot = inspector.create_snapshot(step=10, neurons=neuron_data)
+comparison = inspector.compare_snapshots(5, 10)
+
+# Debug simulation
+debugger = get_simulation_debugger()
+debugger.add_breakpoint(50)  # Stop at step 50
+debugger.add_watch_var("error_rate")  # Watch error rate variable
+```
+
+### 3. State Inspection
+
+Tools for inspecting brain state and simulation state:
+
+- **Brain state snapshots**: Capture complete brain state at any step
+- **Connection inspection**: Analyze neural connectivity patterns
+- **Memory content inspection**: Examine memory contents and access patterns
+- **Neural activity visualization**: Create heatmaps and connectivity plots
+
+**Usage Example:**
+```python
+from pynlm.state_inspection import (
+    get_brain_state_snapshotter, get_connection_inspector,
+    get_memory_content_inspector
+)
+
+# Snapshot brain state
+snapshotter = get_brain_state_snapshotter()
+snapshot = snapshotter.inspect_state()
+
+# Inspect connections
+inspector = get_connection_inspector()
+connectivity_analysis = inspector.inspect_connectivity(connectivity_data)
+```
+
+### 4. Visualization Debugging
+
+Debugging tools for visualization components:
+
+- **Visualization state inspection**: Track visualization state changes
+- **Rendering debugging**: Debug rendering issues with hooks and capture mode
+- **Data validation**: Validate visualization data structures
+- **Interactive debugging**: Start debug sessions for interactive visualization debugging
+
+**Usage Example:**
+```python
+from pynlm.visualization_debug import (
+    get_visualization_debugger, get_rendering_debugger, get_data_validator
+)
+
+# Debug visualization
+viz_debugger = get_visualization_debugger()
+viz_debugger.start_debug_session("session1", {"type": "heatmap"})
+validation = viz_debugger.validate_visualization_data("session1", data)
+```
+
+### 5. Error Reporting
+
+Enhanced error reporting and diagnostics:
+
+- **Detailed error messages**: Include context, stack traces, and recovery suggestions
+- **Error categorization**: Classify errors by type and severity
+- **Error recovery suggestions**: Provide actionable recovery suggestions
+- **Error pattern analysis**: Analyze error patterns over time
+
+**Usage Example:**
+```python
+from pynlm.error_reporting import (
+    get_error_reporter, report_brain_state_error,
+    ErrorSeverity, ErrorCategory
+)
+
+# Report errors with context
+error_reporter = get_error_reporter()
+error = report_brain_state_error(
+    ValueError("Neurons exceeded firing rate threshold"),
+    brain_region="hippocampus",
+    simulation_step=50,
+    recovery_suggestion="Reduce neural excitability"
+)
+```
+
+### 6. Export Debugging
+
+Tools for exporting debug information:
+
+- **Debug report generation**: Generate comprehensive debug reports
+- **State export**: Export brain state for analysis
+- **Configuration export**: Export configuration settings
+- **Performance reports**: Generate detailed performance reports
+
+**Usage Example:**
+```python
+from pynlm.export_debug import (
+    get_debug_report_generator, get_state_exporter,
+    get_configuration_exporter
+)
+
+# Generate debug report
+report_generator = get_debug_report_generator()
+report = report_generator.generate_comprehensive_report("session1", data_sources)
+
+# Export state
+state_exporter = get_state_exporter()
+exported_files = state_exporter.export_simulation_state(simulation_data)
+```
+
+### 7. Performance Monitoring
+
+Performance tracking and profiling capabilities:
+
+- **CPU and memory tracking**: Monitor resource usage
+- **Simulation timing metrics**: Track simulation performance
+- **Component-level monitoring**: Profile individual components
+- **Bottleneck identification**: Identify performance bottlenecks
+
+**Usage Example:**
+```python
+from pynlm.debug import get_performance_profiler
+
+# Profile performance
+profiler = get_performance_profiler()
+profiler.start_profiling("simulation", interval=0.1)
+
+# Run some work...
+
+# Stop profiling
+results = profiler.stop_profiling("simulation")
+bottlenecks = profiler.analyze_bottlenecks()
+```
+
+## Comprehensive Debugging Workflows
+
+### Workflow 1: Debugging Simulation Issues
+
+1. **Setup logging** with appropriate levels and context
+2. **Start debug session** for the simulation
+3. **Add breakpoints** at specific steps for manual debugging
+4. **Watch critical variables** that might indicate issues
+5. **Monitor performance** to identify bottlenecks
+6. **Capture render frames** if debugging visualization
+7. **Generate debug reports** for analysis
+
+### Workflow 2: Analyzing Brain State Evolution
+
+1. **Take brain state snapshots** at regular intervals
+2. **Compare snapshots** to identify changes
+3. **Analyze neuron states** for abnormalities
+4. **Validate connectivity** health
+5. **Inspect memory contents** for corruption
+6. **Export analysis** results
+
+### Workflow 3: Performance Optimization
+
+1. **Profile all components** using performance profiler
+2. **Identify bottlenecks** using analysis tools
+3. **Monitor memory usage** for leaks
+4. **Validate data integrity** for performance issues
+5. **Generate performance reports** with recommendations
+
+## Command Line Tools
+
+The debugging modules provide command-line interfaces for common tasks:
+
+- `nlm-debug-report`: Generate debug reports
+- `nlm-state-export`: Export simulation state
+- `nlm-performance-report`: Generate performance reports
+- `nlm-log-analyzer`: Analyze log files
+
+For detailed usage information, refer to the documentation in the `docs/` directory.
+
 ## Project Structure
 
 ```
