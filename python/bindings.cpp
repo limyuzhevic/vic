@@ -416,6 +416,207 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Convenience factory methods for easy brain creation
+    m.def("createSimpleBrain", [](py::kwargs kwargs) {
+        size_t neuronCount = kwargs.contains("neuronCount") ? kwargs["neuronCount"].cast<size_t>() : 1000;
+        size_t regionCount = kwargs.contains("regionCount") ? kwargs["regionCount"].cast<size_t>() : 1;
+        float connectionProbability = kwargs.contains("connectionProbability") ? kwargs["connectionProbability"].cast<float>() : 0.1f;
+        
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), nlm::ConfigSource::Default);
+        config->set("connection_probability", connectionProbability, nlm::ConfigSource::Default);
+        config->set("random_seed", uint64_t(42), nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize simple brain");
+        }
+        return brain;
+    }, py::kw_only(),
+       py::arg("neuronCount") = 1000,
+       py::arg("regionCount") = 1,
+       py::arg("connectionProbability") = 0.1f,
+       "Create a simple brain with default configuration"
+    );
+
+    m.def("createLearningBrain", [](py::kwargs kwargs) {
+        size_t neuronCount = kwargs.contains("neuronCount") ? kwargs["neuronCount"].cast<size_t>() : 500;
+        bool enableCuriosity = kwargs.contains("enableCuriosity") ? kwargs["enableCuriosity"].cast<bool>() : true;
+        bool enableNovelty = kwargs.contains("enableNovelty") ? kwargs["enableNovelty"].cast<bool>() : true;
+        bool enableReward = kwargs.contains("enableReward") ? kwargs["enableReward"].cast<bool>() : true;
+        
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.12f, nlm::ConfigSource::Default);
+        config->set("random_seed", uint64_t(456), nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize learning brain");
+        }
+        
+        // Enable neuromodulation systems
+        if (enableCuriosity) {
+            if (auto* curiosity = brain->getCuriosity()) curiosity->enable(true);
+        }
+        if (enableNovelty) {
+            if (auto* novelty = brain->getNovelty()) novelty->enable(true);
+        }
+        if (enableReward) {
+            if (auto* dopamine = brain->getDopamine()) dopamine->enable(true);
+        }
+        
+        return brain;
+    }, py::kw_only(),
+       py::arg("neuronCount") = 500,
+       py::arg("enableCuriosity") = true,
+       py::arg("enableNovelty") = true,
+       py::arg("enableReward") = true,
+       "Create a learning brain with neuromodulation"
+    );
+
+    m.def("createSensoryMotorBrain", [](py::kwargs kwargs) {
+        size_t sensoryNeurons = kwargs.contains("sensoryNeurons") ? kwargs["sensoryNeurons"].cast<size_t>() : 20;
+        size_t motorNeurons = kwargs.contains("motorNeurons") ? kwargs["motorNeurons"].cast<size_t>() : 10;
+        size_t internalNeurons = kwargs.contains("internalNeurons") ? kwargs["internalNeurons"].cast<size_t>() : 200;
+        
+        size_t totalNeurons = sensoryNeurons + motorNeurons + internalNeurons;
+        
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(totalNeurons), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+        config->set("random_seed", uint64_t(123), nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize sensory-motor brain");
+        }
+        return brain;
+    }, py::kw_only(),
+       py::arg("sensoryNeurons") = 20,
+       py::arg("motorNeurons") = 10,
+       py::arg("internalNeurons") = 200,
+       "Create a sensory-motor brain for simple tasks"
+    );
+
+    // Convenience methods for brain control
+    m.def("enableLearning", [](std::shared_ptr<Brain> brain, bool enable) {
+        if (auto* curiosity = brain->getCuriosity()) curiosity->enable(enable);
+        if (auto* novelty = brain->getNovelty()) novelty->enable(enable);
+        if (auto* dopamine = brain->getDopamine()) dopamine->enable(enable);
+    }, py::arg("brain"), py::arg("enable"),
+       "Enable or disable learning neuromodulation");
+
+    m.def("setLearningRate", [](std::shared_ptr<Brain> brain, float rate) {
+        if (auto* stdp = brain->getSTDP()) {
+            stdp->setLTPWeight(rate);
+        }
+        if (auto* hebbian = brain->getHebbian()) {
+            hebbian->setLearningRate(rate);
+        }
+    }, py::arg("brain"), py::arg("rate"),
+       "Set learning rate for STDP and Hebbian plasticity");
+
+    // Action convenience methods
+    m.def("moveForward", [](std::shared_ptr<Brain> brain) {
+        if (auto* brainPtr = brain.get()) {
+            // Create a simple motor neuron injection
+            // This would normally inject current into motor neurons
+            // For now, we just create a move forward action
+            return Action(ActionType::MoveForward);
+        }
+        return Action(ActionType::Wait);
+    }, py::arg("brain"),
+       "Create a move forward action");
+
+    m.def("turnLeft", [](std::shared_ptr<Brain> brain) {
+        return Action(ActionType::TurnLeft);
+    }, py::arg("brain"),
+       "Create a turn left action");
+
+    m.def("turnRight", [](std::shared_ptr<Brain> brain) {
+        return Action(ActionType::TurnRight);
+    }, py::arg("brain"),
+       "Create a turn right action");
+
+    m.def("wait", [](std::shared_ptr<Brain> brain) {
+        return Action(ActionType::Wait);
+    }, py::arg("brain"),
+       "Create a wait action");
+
+    // Statistics and status methods
+    m.def("getStatisticsString", [](std::shared_ptr<Brain> brain) {
+        return brain->getStatisticsString();
+    }, py::arg("brain"),
+       "Get formatted brain statistics as string");
+
+    m.def("getActionString", [](std::shared_ptr<Brain> brain) {
+        return brain->getActionString();
+    }, py::arg("brain"),
+       "Get current action as string");
+
+    m.def("isLearning", [](std::shared_ptr<Brain> brain) {
+        return brain->isLearning();
+    }, py::arg("brain"),
+       "Check if brain is currently in learning mode");
+
+    // Experimental methods
+    m.def("runExperiment", [](std::shared_ptr<Brain> brain, const std::string& experimentName) {
+        brain->runExperiment(experimentName);
+    }, py::arg("brain"), py::arg("experimentName"),
+       "Run a predefined experiment");
+
+    m.def("getExperimentalState", [](std::shared_ptr<Brain> brain) {
+        return brain->getExperimentalState();
+    }, py::arg("brain"),
+       "Get current experimental state as string");
+
+    m.def("resetExperimentalState", [](std::shared_ptr<Brain> brain) {
+        brain->resetExperimentalState();
+    }, py::arg("brain"),
+       "Reset experimental state and brain");
+
+    // Configuration convenience methods
+    m.def("createDefaultConfig", []() {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    // Create a config from file
+    m.def("loadConfigFromFile", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"),
+       "Load configuration from a file");
+
+    // Create a config from dictionary
+    m.def("createConfig", [](py::kwargs kwargs) {
+        auto config = std::make_shared<Config>();
+        // Add common configuration options
+        if (kwargs.contains("neuronCount")) {
+            config->set("neuron_count", static_cast<int64_t>(kwargs["neuronCount"].cast<size_t>()), nlm::ConfigSource::Default);
+        }
+        if (kwargs.contains("regionCount")) {
+            config->set("region_count", static_cast<int64_t>(kwargs["regionCount"].cast<size_t>()), nlm::ConfigSource::Default);
+        }
+        if (kwargs.contains("connectionProbability")) {
+            config->set("connection_probability", kwargs["connectionProbability"].cast<float>(), nlm::ConfigSource::Default);
+        }
+        return config;
+    }, py::kw_only(),
+       "Create a configuration from keyword arguments",
+       "neuronCount" = 1000,
+       "regionCount" = 1,
+       "connectionProbability" = 0.1f);
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

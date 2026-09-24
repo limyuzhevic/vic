@@ -184,14 +184,97 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+// Configuration validation and error handling
+    bool validateConfiguration() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Region creation and management
+    bool createRegions(size_t regionCount);
+    bool createNeurons(size_t neuronCount, size_t regionCount);
+    bool initializeConnectivity(float connectionProbability);
     
-    // Logging
+    // System initialization
+    bool initializeMemorySystems();
+    bool initializeCognitionSystems();
+    bool initializeNeuromodulationSystems();
+    void configureCheckpointManager();
+    void registerSpikeHandlers();
+
+    // Spike event processing
+    void processSpikeEvents(SimulationStep currentStep, Timestamp currentTime);
+    
+    // System update methods (Phase 6: Integrated Brain Loop)
+    void updateAllNeurons(Timestamp currentTime);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayImportantMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void consolidateMemories(SimulationStep currentStep);
+    void manageCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    void logStepStatistics();
+
+    // Logging and status reporting
     void logStatus() const;
+
+    // ========== USER-FRIENDLY CONVENIENCE METHODS ==========
+
+    // Create a simple brain with default configuration
+    static std::unique_ptr<Brain> createSimpleBrain(size_t neuronCount = 1000, 
+                                                      size_t regionCount = 1,
+                                                      float connectionProbability = 0.1f);
+
+    // Create a sensory-motor brain for simple tasks
+    static std::unique_ptr<Brain> createSensoryMotorBrain(size_t sensoryNeurons = 20,
+                                                           size_t motorNeurons = 10,
+                                                           size_t internalNeurons = 200);
+
+    // Create a learning-enabled brain (with neuromodulation)
+    static std::unique_ptr<Brain> createLearningBrain(size_t neuronCount = 500,
+                                                       bool enableCuriosity = true,
+                                                       bool enableNovelty = true,
+                                                       bool enableReward = true);
+
+    // Quick start methods for rapid prototyping
+    bool initializeDefault(size_t neuronCount = 100);
+    bool initializeLearning(size_t neuronCount = 200);
+    bool initializeSimple(size_t neuronCount = 50);
+
+    // High-level control methods
+    void enableLearning(bool enable = true);
+    void setLearningRate(float rate);
+    void enableNeuromodulation(bool enable = true);
+    void enableDevelopment(bool enable = true);
+
+    // Convenience actions
+    void moveForward();
+    void turnLeft();
+    void turnRight();
+    void wait();
+
+    // Get current action as string
+    std::string getActionString() const;
+
+    // Check if brain is learning
+    bool isLearning() const;
+
+    // Get brain statistics as formatted string
+    std::string getStatisticsString() const;
+
+    // ========== EXPERIMENTATION HELPERS ==========
+
+    // Run a simple experiment (placeholder for future)
+    void runExperiment(const std::string& experimentName);
+
+    // Get current experimental state
+    std::string getExperimentalState() const;
+
+    // Reset experimental state
+    void resetExperimentalState();
     
 private:
     struct Impl;
