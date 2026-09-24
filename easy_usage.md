@@ -85,7 +85,7 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## The Simplest Possible Example
+## Simplest Brain
 
 ```python
 import pynlm
@@ -100,6 +100,48 @@ brain.initialize()
 brain.step(0)
 
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
+### Advanced: Custom Configuration
+
+```python
+import pynlm
+
+# Create brain with custom settings
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 500)
+config.set("region_count", 5)
+config.set("connection_probability", 0.2)
+config.set("stdp_ltp_weight", 0.015)
+config.set("random_seed", 42)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+### Advanced: Large-Scale Brain Simulation
+
+```python
+import pynlm
+import time
+
+# Create a large, sophisticated brain
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2000)
+config.set("region_count", 10)
+config.set("connection_probability", 0.15)
+
+brain = pynlm.createBrain(config)
+if brain.initialize():
+    print(f"Initialized large brain with {brain.getTotalNeuronCount()} neurons")
+    
+    start_time = time.time()
+    for i in range(100):
+        brain.step(i)
+    
+    end_time = time.time()
+    print(f"Completed 100 simulation steps in {end_time - start_time:.2f} seconds")
 ```
 
 ---
@@ -286,6 +328,240 @@ print("Agent simulation complete!")
 - Some neurons need input to fire - make sure sensory input is connected
 
 ---
+
+## Advanced Usage
+
+### Advanced: Custom Configuration
+
+```python
+import pynlm
+
+# Create brain with custom settings
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 500)
+config.set("region_count", 5)
+config.set("connection_probability", 0.2)
+config.set("stdp_ltp_weight", 0.015)
+config.set("random_seed", 42)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+### Advanced: Large-Scale Brain Simulation
+
+```python
+import pynlm
+import time
+
+# Create a large, sophisticated brain
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2000)
+config.set("region_count", 10)
+config.set("connection_probability", 0.15)
+
+brain = pynlm.createBrain(config)
+if brain.initialize():
+    print(f"Initialized large brain with {brain.getTotalNeuronCount()} neurons")
+    
+    start_time = time.time()
+    for i in range(100):
+        brain.step(i)
+    
+    end_time = time.time()
+    print(f"Completed 100 simulation steps in {end_time - start_time:.2f} seconds")
+```
+
+### Advanced: Memory System Analysis
+
+```python
+import pynlm
+
+# Create brain with memory systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("=== Memory System Analysis ===")
+print(f"Working memory capacity: {brain.getWorkingMemory().getCapacity() if brain.getWorkingMemory() else 'N/A'} traces")
+print(f"Episodic memory max episodes: {brain.getEpisodicMemory().getMaxEpisodes() if brain.getEpisodicMemory() else 'N/A'}")
+print(f"Associative memory active associations: {brain.getAssociativeMemory() is not None}")
+
+# Run simulation to populate memory
+for i in range(50):
+    brain.step(i)
+
+print("\n=== Memory Statistics ===")
+if brain.getWorkingMemory():
+    print(f"Working memory active traces: {brain.getWorkingMemory().getActiveTraces()}")
+if brain.getEpisodicMemory():
+    print(f"Episodic memory episodes: {brain.getEpisodicMemory().getEpisodeCount()}")
+```
+
+### Advanced: Neuromodulation Analysis
+
+```python
+import pynlm
+
+# Create brain and agent with full neuromodulation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableNovelty(True)
+
+print("=== Neuromodulation Analysis ===")
+for i in range(30):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(i)
+    
+    if brain.getDopamine():
+        print(f"Step {i}: Dopamine level = {brain.getDopamine().getLevel():.3f}")
+    if brain.getCuriosity():
+        print(f"Step {i}: Curiosity level = {agent.getCuriosityLevel():.3f}")
+    if brain.getNovelty():
+        print(f"Step {i}: Novelty level = {agent.getNoveltyLevel():.3f}")
+```
+
+### Advanced: Development and Learning
+
+```python
+import pynlm
+
+# Create brain with development enabled
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=8, height=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableDevelopment(True)
+agent.enableRewardModulation(True)
+
+print("=== Developmental Learning ===")
+print(f"Initial developmental stage: {brain.getDevelopmentalStage()}")
+
+for i in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(i)
+    agent.updateDevelopment(0.1)
+    
+    if i % 20 == 0:
+        print(f"Step {i}: Stage = {brain.getDevelopmentalStage()}, " +
+              f"Firing rate = {brain.getAverageFiringRate():.3f}")
+```
+
+### Advanced: Planning and Prediction
+
+```python
+import pynlm
+
+# Create brain with advanced cognition
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("=== Cognitive Systems ===")
+print(f"Neural planner available: {brain.getPlanner() is not None}")
+print(f"Concept formation available: {brain.getConceptFormation() is not None}")
+print(f"Attention system available: {brain.getAttention() is not None}")
+print(f"Prediction system available: {brain.getPredictionSystem() is not None}")
+
+# Run simulation to allow cognition to process
+for i in range(40):
+    brain.step(i)
+
+print(f"Brain status log:")
+brain.logStatus()
+```
+
+### Advanced: Agent with All Features
+
+```python
+import pynlm
+import time
+import tempfile
+import os
+
+# Create complete agent with all Phase 6 features
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 800)
+config.set("region_count", 6)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=12, visionHeight=12)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableAllFeatures(True)
+
+print("=== Complete Phase 6 Agent ===")
+print("Enabled features:")
+print(f"  - Reward modulation: {agent.isRewardModulationEnabled()}")
+print(f"  - Structural plasticity: {agent.isStructuralPlasticityEnabled()}")
+print(f"  - Development: {agent.isDevelopmentEnabled()}")
+print(f"  - Curiosity: {agent.isCuriosityEnabled()}")
+
+# Run extended simulation
+start_time = time.time()
+for i in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    agent.updateDevelopment(0.1)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+end_time = time.time()
+
+print(f"\nSimulation completed in {end_time - start_time:.2f} seconds")
+print(f"Final firing rate: {brain.getAverageFiringRate():.3f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
+
+if brain.getWorkingMemory():
+    print(f"Working memory activity: {brain.getWorkingMemory().getMemoryActivity():.3f}")
+if brain.getEpisodicMemory():
+    print(f"Episodic memory episodes: {brain.getEpisodicMemory().getEpisodeCount()}")
+
+# Save and load demonstration
+with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as tmp:
+    checkpoint_path = tmp.name
+
+if brain.save(checkpoint_path):
+    print(f"\nCheckpoint saved to {checkpoint_path}")
+    
+    # Create new brain and load checkpoint
+    new_brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    new_brain.initialize()
+    
+    if new_brain.load(checkpoint_path):
+        print("Checkpoint loaded successfully")
+        os.unlink(checkpoint_path)
+```
 
 ## Next Steps
 
