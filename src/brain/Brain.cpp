@@ -677,8 +677,11 @@ float Brain::getExcitationInhibitionRatio() const {
     
     if (totalInhibitory > 0.0f) {
         return totalExcitatory / totalInhibitory;
+    } else if (totalExcitatory > 0.0f) {
+        return std::numeric_limits<float>::infinity();
+    } else {
+        return 0.0f;
     }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {
@@ -744,19 +747,34 @@ void Brain::reset() {
     pImpl->totalSpikesTotal = 0;
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
+    pImpl->developmentalStage = DevelopmentalStage::Initial;
     
+    // Reset all regions
     for (auto& region : pImpl->regions) {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    // Reset spike system
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
     
-    // Reset memory systems
+    // Reset all integrated systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    if (pImpl->developmentSystem) pImpl->developmentSystem->reset();
+    if (pImpl->dopamine) pImpl->dopamine->setLevel(0.0f);
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    
+    // Reset structural plasticity
+    if (pImpl->structuralPlasticity) pImpl->structuralPlasticity->reset();
+    if (pImpl->spikeSystem) pImpl->spikeSystem->reset();
+    if (pImpl->stdp) pImpl->stdp->reset();
+    if (pImpl->hebbian) pImpl->hebbian->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -895,9 +913,9 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // For now, log the count without complex synapse reconstruction
+        // TODO: Implement proper synapse reconstruction for complete state restoration
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
