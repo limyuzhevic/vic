@@ -40,17 +40,22 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        // neuron should already be stored in memory
+        NeuronId neuron = memoryNeurons_[i];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        // Set neuron activation - find neuron by ID across all regions
+        bool found = false;
+        for (const auto& region : brain_->getRegions()) {
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
+                    found = true;
                     break;
                 }
             }
+            if (found) break;
         }
         
         // Update stored activation
@@ -136,6 +141,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             memoryActivations_[i] = activation;
         }
     }
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
     
     // Decay weak traces
     decayWeakTraces();
