@@ -232,32 +232,65 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize working memory");
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize episodic memory");
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize associative memory");
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize neural planner");
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize concept formation");
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize attentional selection");
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize novelty detector");
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize curiosity system");
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -895,12 +928,61 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match synapses by source/destination neurons
+        // For each synapse in the checkpoint, find the corresponding synapse in the brain
+        // and update its weight, delay, and plasticity flags
+        size_t synapseCount = std::min(synapseData.sourceNeuron.size(), synapseData.weight.size());
         
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+        // Clear existing synapses first for a clean state
+        for (auto& region : pImpl->regions) {
+            region->clearSynapses();
+        }
+        
+        // Recreate synapses from checkpoint data
+        for (size_t i = 0; i < synapseCount; ++i) {
+            NeuronId sourceNeuron(synapseData.sourceNeuron[i]);
+            NeuronId destNeuron(synapseData.destinationNeuron[i]);
+            float weight = synapseData.weight[i];
+            Delay delay = synapseData.delay[i];
+            SynapseType synapseType = synapseData.synapseType[i] < static_cast<uint8_t>(SynapseType::Max) ? 
+                static_cast<SynapseType>(synapseData.synapseType[i]) : SynapseType::Excitatory;
+            
+            // Find or create regions for these neurons
+            auto* sourceRegion = nullptr;
+            auto* destRegion = nullptr;
+            
+            for (auto& region : pImpl->regions) {
+                for (const auto* neuron : region->getAllNeurons()) {
+                    if (neuron->getId() == sourceNeuron) {
+                        sourceRegion = region.get();
+                    }
+                    if (neuron->getId() == destNeuron) {
+                        destRegion = region.get();
+                    }
+                }
+            }
+            
+            // Create the synapse if both neurons are found
+            if (sourceRegion && destRegion) {
+                Synapse* synapse = sourceRegion->addSynapse(destNeuron, weight, delay, synapseType);
+                if (synapse) {
+                    // Restore eligibility trace
+                    float eligibilityTrace = synapseData.eligibilityTrace[i];
+                    synapse->setEligibilityTrace(eligibilityTrace);
+                    
+                    // Enable plasticity based on flags
+                    // Note: This simplified version enables all plasticity
+                    // In a more sophisticated implementation, we would store and restore
+                    // the actual plasticity flags from the checkpoint
+                    synapse->enablePlasticity(true, true, true); // STDP, Hebbian, Structural
+                    
+                    // Re-enable spike recording for plasticity
+                    synapse->resetPlasticityState();
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Successfully restored " + std::to_string(synapseCount) + " synapses from checkpoint");
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());

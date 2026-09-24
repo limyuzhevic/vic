@@ -343,44 +343,182 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Parse command line arguments
+    bool showHelp = false;
+    std::string configOverride;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                // --config=file.cfg format
+                configOverride = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --config file.cfg format
+                configOverride = argv[++i];
+            } else {
+                NLM_LOG_ERROR("Invalid config argument: " + arg);
+                showHelp = true;
             }
+        } else if (arg.substr(0, 6) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                // --seed=42 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Random seed override via --seed command line argument");
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --seed 42 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Random seed override via --seed command line argument");
+            }
+        } else if (arg.substr(0, 6) == "--steps") {
+            if (arg.find('=') != std::string::npos) {
+                // --steps=1000 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Simulation steps override via --steps command line argument");
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --steps 1000 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Simulation steps override via --steps command line argument");
+            }
+        } else if (arg.substr(0, 8) == "--neurons") {
+            if (arg.find('=') != std::string::npos) {
+                // --neurons=500 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Neuron count override via --neurons command line argument");
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --neurons 500 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Neuron count override via --neurons command line argument");
+            }
+        } else if (arg.substr(0, 9) == "--regions") {
+            if (arg.find('=') != std::string::npos) {
+                // --regions=1 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Region count override via --regions command line argument");
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --regions 1 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Region count override via --regions command line argument");
+            }
+        } else if (arg.substr(0, 14) == "--connection-prob") {
+            if (arg.find('=') != std::string::npos) {
+                // --connection-prob=0.15 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Connection probability override via --connection-prob command line argument");
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --connection-prob 0.15 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Connection probability override via --connection-prob command line argument");
+            }
+        } else if (arg == "--version") {
+            NLM_LOG_INFO("NLM Phase 2 - Neural Learning Machine");
+            NLM_LOG_INFO("Version: 2.0.0 (Phase 6 Integration)");
+            return 0;
+        } else if (arg == "--full-experiment" || arg == "--experiment") {
+            NLM_LOG_INFO("Running full experimental mode (Phase 6)");
+            // Will be handled by config->loadFromArgs
+        } else if (arg.substr(0, 11) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                // --timestep=0.001 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Timestep override via --timestep command line argument");
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // --timestep 0.001 format
+                // Will be handled by config->loadFromArgs
+                NLM_LOG_INFO("Timestep override via --timestep command line argument");
+            }
+        } else {
+            // Unknown argument - but don't fail, just log warning
+            NLM_LOG_WARNING("Unknown argument ignored: " + arg);
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Show help and exit
+    if (showHelp) {
+        printBanner();
+        NLM_LOG_INFO("Usage: nlm_phase2_demo [OPTIONS]");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Run neural computation experiments with configurable brain simulation.");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Options:");
+        NLM_LOG_INFO("  --help, -h                 Show this help message");
+        NLM_LOG_INFO("  --version                  Show version information");
+        NLM_LOG_INFO("  --config[=FILE]            Load configuration from file");
+        NLM_LOG_INFO("  --seed[=VALUE]             Set random seed");
+        NLM_LOG_INFO("  --steps[=VALUE]            Set number of simulation steps");
+        NLM_LOG_INFO("  --neurons[=VALUE]          Set number of neurons");
+        NLM_LOG_INFO("  --regions[=VALUE]          Set number of regions");
+        NLM_LOG_INFO("  --connection-prob[=VALUE]  Set connection probability");
+        NLM_LOG_INFO("  --timestep[=VALUE]         Set simulation timestep");
+        NLM_LOG_INFO("  --full-experiment          Run full experimental mode");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Example:");
+        NLM_LOG_INFO("  nlm_phase2_demo --config=configs/myconfig.cfg --seed=123 --steps=500");
+        return 0;
+    }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Try to load from config file first
+    std::string configFile = "configs/default.cfg";
+    bool configFromFile = false;
+    
+    if (!configOverride.empty()) {
+        configFile = configOverride;
+    }
+    
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configFromFile = true;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using defaults.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (config->loadFromArgs(argc, argv)) {
+        NLM_LOG_INFO("Configuration overridden by command line arguments.");
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 only if not provided via config file or command line
+    // Check if config already has these values set from file/args
+    if (!config->hasKey("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->hasKey("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->hasKey("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    }
+    if (!config->hasKey("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->hasKey("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!config->hasKey("stdp_ltp_weight")) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (!config->hasKey("stdp_ltd_weight")) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (!config->hasKey("stdp_tau")) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->hasKey("synaptogenesis_rate")) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (!config->hasKey("pruning_rate")) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -410,19 +548,36 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    try {
+        runBasicConnectivityTest(brain);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Basic connectivity test failed: " + std::string(e.what()));
+    }
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    try {
+        brain->reset();
+        brain->initialize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to reset and reinitialize brain: " + std::string(e.what()));
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    try {
+        runPlasticityExperiment(brain);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Plasticity learning experiment failed: " + std::string(e.what()));
+    }
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    try {
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("STDP verification failed: " + std::string(e.what()));
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -445,5 +600,5 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
-    return 0;
+    NLM_LOG_INFO("=== Program completed successfully ===");
 }

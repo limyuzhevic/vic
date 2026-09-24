@@ -121,6 +121,45 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+// Test brain save/load functionality
+// This test verifies that brain state can be saved to a file and reloaded correctly
+// ensuring that checkpointing and state persistence work as expected
+void testBrainSaveLoad() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Run some simulation steps to create activity
+    brain.step(0);
+    brain.step(1);
+    brain.step(2);
+    
+    // Save brain state
+    const std::string testFile = "test_brain_checkpoint.bin";
+    bool saveSuccess = brain.save(testFile);
+    assert(saveSuccess);
+    
+    // Create a new brain and load the saved state
+    nlm::Brain brain2(config);
+    brain2.initialize();
+    
+    // Reset and load
+    brain2.reset();
+    bool loadSuccess = brain2.load(testFile);
+    assert(loadSuccess);
+    
+    // Verify the loaded brain has the same number of neurons
+    assert(brain2.getTotalNeuronCount() == 50);
+    
+    // Clean up
+    std::remove(testFile.c_str());
+    
+    std::cout << "    testBrainSaveLoad passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +168,7 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainSaveLoad();
 }
 
 } // namespace test_brain

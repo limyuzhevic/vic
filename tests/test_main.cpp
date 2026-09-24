@@ -34,6 +34,14 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void testBrainCreation();
+    void testBrainInitialization();
+    void testBrainStep();
+    void testBrainReset();
+    void testBrainRegions();
+    void testBrainActionProduction();
+    void testBrainStatus();
+    void testBrainSaveLoad();
     void runAll();
 }
 
