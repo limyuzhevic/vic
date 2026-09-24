@@ -142,6 +142,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Convenience methods for brain creation and configuration
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -149,7 +150,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -160,6 +161,35 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // New convenience methods
+        .def("setFloat", &Config::set<float>, py::arg("key"), py::arg("value"),
+             "Set a float configuration value")
+        .def("setInt", &Config::set<int64_t>, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("setString", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set a string configuration value")
+        .def("setBool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            auto value = self.get<float>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f,
+            "Get a float configuration value with default")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto value = self.get<int64_t>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+            "Get an integer configuration value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+            "Get a string configuration value with default")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = false,
+            "Get a boolean configuration value with default")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -400,10 +430,59 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Convenience methods for brain creation and configuration
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+            "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        // New convenience methods
+        .def("setFloat", &Config::set<float>, py::arg("key"), py::arg("value"),
+             "Set a float configuration value")
+        .def("setInt", &Config::set<int64_t>, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("setString", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set a string configuration value")
+        .def("setBool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            auto value = self.get<float>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f,
+            "Get a float configuration value with default")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto value = self.get<int64_t>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+            "Get an integer configuration value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+            "Get a string configuration value with default")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = false,
+            "Get a boolean configuration value with default")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
 
+    // Convenience functions for brain creation
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
@@ -415,6 +494,30 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Configuration factory functions
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration with sensible defaults");
+
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(100));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", static_cast<int64_t>(42));
+        return config;
+    }, "Create a minimal configuration with basic settings");
+
+    // Convenience wrapper for creating a complete agent setup
+    m.def("createAgentSystem", []() -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete agent system (brain, world, agent) with default config");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

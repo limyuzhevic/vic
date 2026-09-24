@@ -27,18 +27,31 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.8",
+    "pandas>=1.5",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
+    "matplotlib>=3.5",
+    "jupyter>=1.0",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
 ]
+
+[project.scripts]
+pynlm = "pynlm.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issue-Tracker = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -55,3 +68,40 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.pytest]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_files = ["tests/*.py"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["pynlm"]
+exclude_lines = [
+    pragma: no cover,
+    def __repr__,
+    raise AssertionError,
+    raise NotImplementedError,
+    if __name__ == __main__,
+    if TYPE_CHECKING,
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    pragma: no cover,
+    def __repr__,
+    raise AssertionError,
+    raise NotImplementedError,
+    if __name__ == __main__,
+    if TYPE_CHECKING,
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.isort]
+profile = "black"
+import_heading_stdlib = "Standard Library"
+import_heading_thirdparty = "Third Party"
+import_heading_firstparty = "First Party"

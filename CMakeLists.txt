@@ -15,11 +15,40 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Optimization flags
+add_compile_options(
+    $<$<CONFIG:Release>:-O3 -march=native -fopenmp>
+    $<$<CONFIG:Debug>:-O0 -g -DDEBUG>
+)
+
+# Python bindings support
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+# Create pybind11 target
+pybind11_add_module(pynlm
+    python/bindings.cpp
+)
+
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION ${Python3_SITEARCH}
+    RUNTIME DESTINATION bin
+    ARCHIVE DESTINATION lib
+)
+
+# Install Python package files
+install(DIRECTORY python/ DESTINATION .
+    FILES_MATCHING PATTERN "*.py"
+)
 
 # Core library
 add_library(nlm_core STATIC
