@@ -30,7 +30,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
-        line = trim(line);
+        line = trim(line);  // Fixed: add trim() call
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
@@ -43,7 +43,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }

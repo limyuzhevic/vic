@@ -94,10 +94,7 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
+        uint64_t seed = config->getOr<uint64_t>("random_seed", 42);  // Use config or default 42
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
@@ -153,8 +150,7 @@ struct Brain::Impl {
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+    // Note: developmentalStage and nextRegionId are already initialized in constructor
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
