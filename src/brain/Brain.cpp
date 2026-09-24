@@ -69,6 +69,30 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
+    // Performance optimization: cache for all neurons to avoid repeated searches
+    mutable std::unique_ptr<std::vector<Neuron*>> allNeurons;
+    
+    // Memory pools for better performance
+    std::unique_ptr<MemoryPool<NeuronState>> neuronStatePool;
+    std::unique_ptr<MemoryPool<SpikeEvent>> spikeEventPool;
+    std::unique_ptr<MemoryPool<DelayedSpikeEvent>> delayedSpikeEventPool;
+    
+    // Performance counters
+    struct PerformanceCounters {
+        size_t neuronUpdates;
+        size_t spikeEventsProcessed;
+        size_t plasticityEventsApplied;
+        float totalProcessingTime;
+        
+        PerformanceCounters() : neuronUpdates(0), spikeEventsProcessed(0), 
+                               plasticityEventsApplied(0), totalProcessingTime(0.0f) {}
+    };
+    
+    std::unique_ptr<PerformanceCounters> perfCounters;
+    
+    // Timestamp for performance tracking
+    Timestamp lastStepTime;
+    
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
@@ -92,6 +116,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , allNeurons(nullptr)  // Initialize cache pointer to null
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -151,6 +176,20 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize performance optimizations
+        allNeurons.reset();  // Will be populated during first step
+        neuronStatePool = std::make_unique<MemoryPool<NeuronState>>();
+        spikeEventPool = std::make_unique<MemoryPool<SpikeEvent>>();
+        delayedSpikeEventPool = std::make_unique<MemoryPool<DelayedSpikeEvent>>();
+        perfCounters = std::make_unique<PerformanceCounters>();
+        
+        // Initialize performance tracking
+        lastStepTime = 0.0;
+        perfCounters->neuronUpdates = 0;
+        perfCounters->spikeEventsProcessed = 0;
+        perfCounters->plasticityEventsApplied = 0;
+        perfCounters->totalProcessingTime = 0.0f;
     }
     
     DevelopmentalStage developmentalStage;
@@ -177,13 +216,35 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Get configuration values with validation
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Parameter validation
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("neuron_count must be greater than 0, using default: 1000");
+        neuronCount = 1000;
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("region_count must be greater than 0, using default: 1");
+        regionCount = 1;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("connection_probability must be between 0.0 and 1.0, using default: 0.1");
+        connectionProbability = 0.1f;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Ensure at least one neuron per region
+    if (neuronCount < regionCount) {
+        NLM_LOG_WARNING("Not enough neurons for specified regions, adjusting region count to match neurons");
+        regionCount = neuronCount;
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -192,6 +253,8 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion == 0) neuronsPerRegion = 1; // Ensure at least one neuron per region
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
@@ -204,13 +267,19 @@ bool Brain::initialize() {
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                auto neurons = sensoryPop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron) {  // Safety check
+                        pImpl->sensoryNeurons.push_back(neuron);
+                    }
                 }
             }
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                auto neurons = motorPop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron) {  // Safety check
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
                 }
             }
             
@@ -304,6 +373,22 @@ void Brain::step(SimulationStep currentStep) {
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
+    // Validate step parameters
+    if (currentStep < 0) {
+        NLM_LOG_WARNING("Step number is negative, using absolute value");
+        currentStep = static_cast<SimulationStep>(std::abs(currentStep));
+    }
+    
+    if (currentTime < 0.0) {
+        NLM_LOG_WARNING("Current time is negative, using absolute value");
+        currentTime = std::abs(currentTime);
+    }
+    
+    if (pImpl->timestep <= 0.0) {
+        NLM_LOG_ERROR("Timestep must be positive, using default: 0.001");
+        pImpl->timestep = 0.001;
+    }
+    
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
@@ -425,15 +510,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        if (dopamineLevel > 0.0f) {
+            float excitabilityMod = dopamineLevel * 0.5f;
+            
+            // Optimized: Pre-compute all neurons into a single vector to avoid nested loops
+            if (!pImpl->allNeurons) {
+                pImpl->allNeurons = std::make_unique<std::vector<Neuron*>>();
+                pImpl->allNeurons->reserve(pImpl->regions.size() * 50);  // Estimate
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron) {  // Safety check
+                                pImpl->allNeurons->push_back(neuron);
+                            }
+                        }
                     }
+                }
+            }
+            
+            // Apply to all neurons
+            for (auto* neuron : *pImpl->allNeurons) {
+                if (neuron) {  // Additional safety check
+                    neuron->injectCurrent(excitabilityMod);
                 }
             }
         }
@@ -593,50 +691,67 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // This is a simple mapping - sensory encoding
     
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_WARNING("Received empty sensory input");
+        return;
+    }
     
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
-    
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+    if (!pImpl->sensoryNeurons.empty()) {
+        // Distribute input across sensory neurons
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            // Normalize input value to range [-10, 10] mV
+            float normalizedValue = 0.0f;
+            if (i < values.size()) {
+                normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            }
+            
+            // Inject current into this sensory neuron
+            if (pImpl->sensoryNeurons[i]) {  // Safety check
+                pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            }
+            
+            // Also store in working memory
+            if (pImpl->workingMemory && normalizedValue > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            }
         }
-        
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
-        
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
-        }
+    } else {
+        NLM_LOG_WARNING("No sensory neurons available for input processing");
     }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
+    if (!pImpl->sensoryNeurons.empty()) {
+        for (auto* n : pImpl->sensoryNeurons) {
+            if (n && n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }
         }
+        NLM_LOG_WARNING("Neuron not found for current injection: " + std::to_string(neuron.index()));
+    } else {
+        NLM_LOG_WARNING("No neurons available for current injection");
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    bool found = false;
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                    if (neuron) {  // Safety check
+                        neuron->injectCurrent(current);
+                        found = true;
+                    }
                 }
             }
         }
+    }
+    
+    if (!found) {
+        NLM_LOG_WARNING("No neurons of type " + std::to_string(static_cast<int>(type)) + " found for current injection");
     }
 }
 
@@ -694,13 +809,14 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // The motor neuron population with highest average activity determines action
     
     if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_WARNING("No motor neurons available for action production");
         return std::make_unique<Action>(ActionType::Wait);
     }
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
+        if (neuron && neuron->isFiring()) {  // Safety check
             ++firingMotor;
         }
     }
