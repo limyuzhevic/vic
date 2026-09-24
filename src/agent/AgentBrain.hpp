@@ -9,6 +9,63 @@
 
 namespace nlm {
 
+/**
+ * Motor command configuration for customizing motor neuron categorization
+ */
+struct MotorCommandConfig {
+    // Number of motor action groups
+    int numMotorActions = 6;
+    
+    // Action names for better debugging and logging
+    std::vector<std::string> actionNames;
+    
+    // Custom action distribution ratios (sum to 1.0)
+    std::vector<float> actionRatios;
+    
+    // Enable/disable specific actions
+    bool enableForward = true;
+    bool enableBackward = true;
+    bool enableTurnLeft = true;
+    bool enableTurnRight = true;
+    bool enableInteract = true;
+    bool enableWait = true;
+    
+    // Custom action mapping from neuron indices
+    // If empty, use default round-robin distribution
+    std::vector<int> customActionMapping;
+    
+    MotorCommandConfig() {
+        // Default action names
+        actionNames = {"Forward", "Backward", "TurnLeft", "TurnRight", "Interact", "Wait"};
+        
+        // Default equal distribution
+        actionRatios = {0.167f, 0.167f, 0.167f, 0.167f, 0.167f, 0.167f};
+        
+        // Validate
+        if (actionNames.size() != numMotorActions) {
+            actionNames.resize(numMotorActions, "Action");
+        }
+        if (actionRatios.size() != numMotorActions) {
+            actionRatios.resize(numMotorActions, 1.0f / numMotorActions);
+        }
+        
+        // Normalize ratios to sum to 1.0
+        float total = 0.0f;
+        for (float ratio : actionRatios) {
+            total += ratio;
+        }
+        if (total > 0.0f) {
+            for (float& ratio : actionRatios) {
+                ratio /= total;
+            }
+        } else {
+            for (size_t i = 0; i < actionRatios.size(); ++i) {
+                actionRatios[i] = 1.0f / numMotorActions;
+            }
+        }
+    }
+};
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -69,6 +126,14 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Motor configuration
+    void setMotorConfig(const MotorCommandConfig& config) {
+        motorConfig_ = config;
+        applyMotorConfiguration();
+    }
+    
+    const MotorCommandConfig& getMotorConfig() const { return motorConfig_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -85,6 +150,12 @@ private:
     std::vector<Neuron*> motorTurnRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
+    
+    // Motor command categorization settings
+    MotorCommandConfig motorConfig_;
+    
+    // Apply motor configuration
+    void applyMotorConfiguration();
     
     // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;

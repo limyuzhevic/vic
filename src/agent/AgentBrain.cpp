@@ -2,8 +2,188 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
+
+/**
+ * Motor command configuration implementation
+ */
+void AgentBrain::applyMotorConfiguration() {
+    // Clear existing groups
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    if (!brain_) return;
+    
+    // Get all motor neurons
+    std::vector<Neuron*> allMotorNeurons;
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == NeuronType::Motor) {
+                for (Neuron* n : pop->getNeurons()) {
+                    allMotorNeurons.push_back(n);
+                }
+            }
+        }
+    }
+    
+    if (allMotorNeurons.empty()) {
+        NLM_LOG_WARN("No motor neurons found for configuration");
+        return;
+    }
+    
+    // Apply motor configuration
+    size_t motorCount = allMotorNeurons.size();
+    size_t actionCount = motorConfig_.numMotorActions;
+    
+    if (actionCount == 0) {
+        NLM_LOG_WARN("No motor actions configured, using default");
+        actionCount = 6; // Default
+    }
+    
+    // Check if custom mapping is provided
+    if (!motorConfig_.customActionMapping.empty() && 
+        motorConfig_.customActionMapping.size() >= motorCount) {
+        
+        // Use custom mapping
+        for (size_t i = 0; i < motorCount; ++i) {
+            int actionIndex = motorConfig_.customActionMapping[i];
+            if (actionIndex >= 0 && actionIndex < static_cast<int>(actionCount)) {
+                if (actionIndex < 6) { // Default actions
+                    switch (actionIndex) {
+                        case 0:
+                            if (motorConfig_.enableForward) motorForward_.push_back(allMotorNeurons[i]);
+                            break;
+                        case 1:
+                            if (motorConfig_.enableBackward) motorBackward_.push_back(allMotorNeurons[i]);
+                            break;
+                        case 2:
+                            if (motorConfig_.enableTurnLeft) motorTurnLeft_.push_back(allMotorNeurons[i]);
+                            break;
+                        case 3:
+                            if (motorConfig_.enableTurnRight) motorTurnRight_.push_back(allMotorNeurons[i]);
+                            break;
+                        case 4:
+                            if (motorConfig_.enableInteract) motorInteract_.push_back(allMotorNeurons[i]);
+                            break;
+                        case 5:
+                            if (motorConfig_.enableWait) motorWait_.push_back(allMotorNeurons[i]);
+                            break;
+                    }
+                }
+            }
+        }
+    } else {
+        // Use distribution-based allocation
+        std::vector<size_t> actionCounts(actionCount, 0);
+        
+        // For each motor neuron, decide which action group it belongs to
+        // based on action ratios and random assignment for distribution
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        
+        for (size_t i = 0; i < motorCount; ++i) {
+            float r = dist(gen);
+            float cumulative = 0.0f;
+            size_t selectedAction = 0;
+            
+            // Find action based on cumulative distribution
+            for (size_t j = 0; j < actionCount; ++j) {
+                if (j < motorConfig_.actionRatios.size()) {
+                    cumulative += motorConfig_.actionRatios[j];
+                    if (r <= cumulative) {
+                        selectedAction = j;
+                        break;
+                    }
+                } else {
+                    cumulative += 1.0f / actionCount;
+                    if (r <= cumulative) {
+                        selectedAction = j;
+                        break;
+                    }
+                }
+            }
+            
+            actionCounts[selectedAction]++;
+        }
+        
+        // Allocate neurons to action groups based on counts
+        size_t currentNeuron = 0;
+        for (size_t action = 0; action < actionCount; ++action) {
+            size_t count = actionCounts[action];
+            
+            // Map action index to default action types (first 6 actions)
+            if (action < 6) {
+                switch (action) {
+                    case 0: // Forward
+                        if (motorConfig_.enableForward) {
+                            for (size_t i = 0; i < count && currentNeuron < motorCount; ++i) {
+                                motorForward_.push_back(allMotorNeurons[currentNeuron++]);
+                            }
+                        }
+                        break;
+                    case 1: // Backward
+                        if (motorConfig_.enableBackward) {
+                            for (size_t i = 0; i < count && currentNeuron < motorCount; ++i) {
+                                motorBackward_.push_back(allMotorNeurons[currentNeuron++]);
+                            }
+                        }
+                        break;
+                    case 2: // TurnLeft
+                        if (motorConfig_.enableTurnLeft) {
+                            for (size_t i = 0; i < count && currentNeuron < motorCount; ++i) {
+                                motorTurnLeft_.push_back(allMotorNeurons[currentNeuron++]);
+                            }
+                        }
+                        break;
+                    case 3: // TurnRight
+                        if (motorConfig_.enableTurnRight) {
+                            for (size_t i = 0; i < count && currentNeuron < motorCount; ++i) {
+                                motorTurnRight_.push_back(allMotorNeurons[currentNeuron++]);
+                            }
+                        }
+                        break;
+                    case 4: // Interact
+                        if (motorConfig_.enableInteract) {
+                            for (size_t i = 0; i < count && currentNeuron < motorCount; ++i) {
+                                motorInteract_.push_back(allMotorNeurons[currentNeuron++]);
+                            }
+                        }
+                        break;
+                    case 5: // Wait
+                        if (motorConfig_.enableWait) {
+                            for (size_t i = 0; i < count && currentNeuron < motorCount; ++i) {
+                                motorWait_.push_back(allMotorNeurons[currentNeuron++]);
+                            }
+                        }
+                        break;
+                }
+            } else {
+                // Additional actions beyond the standard 6
+                // Create new generic action groups
+                std::string actionName = "Action" + std::to_string(action);
+                // Note: Additional actions beyond the standard 6 aren't implemented
+                // as they would require extending the MotorCommand enum
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Motor configuration applied:");
+    NLM_LOG_INFO("  Total motor neurons: " + std::to_string(motorCount));
+    NLM_LOG_INFO("  Motor action groups: " + std::to_string(actionCount));
+    NLM_LOG_INFO("  Forward: " + std::to_string(motorForward_.size()));
+    NLM_LOG_INFO("  Backward: " + std::to_string(motorBackward_.size()));
+    NLM_LOG_INFO("  TurnLeft: " + std::to_string(motorTurnLeft_.size()));
+    NLM_LOG_INFO("  TurnRight: " + std::to_string(motorTurnRight_.size()));
+    NLM_LOG_INFO("  Interact: " + std::to_string(motorInteract_.size()));
+    NLM_LOG_INFO("  Wait: " + std::to_string(motorWait_.size()));
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -20,58 +200,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-AgentBrain::~AgentBrain() = default;
-
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Initialize with default motor configuration
+    applyMotorConfiguration();
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
