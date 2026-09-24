@@ -1,88 +1,301 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
-
 namespace nlm {
 
-// Agent body state - contains physical properties and internal state
-// This is part of the environment, not the brain
-struct AgentBody {
-    // Position in world
-    float x;
-    float y;
+/**
+ * AgentBody - Represents the agent's physical body and state in the world
+ * 
+ * The body contains position, orientation, energy, health, and other physical properties
+ * that determine how the agent interacts with the environment.
+ */
+class AgentBody {
+public:
+    AgentBody();
+    ~AgentBody();
     
-    // Orientation (radians)
-    float orientation;
+    /**
+     * Configure body parameters
+     * 
+     * @param maxEnergy Maximum energy capacity
+     * @param visionWidth Vision width in pixels
+     * @param visionHeight Vision height in pixels
+     */
+    void configure(float maxEnergy, size_t visionWidth, size_t visionHeight);
     
-    // Velocity
-    float velocityX;
-    float velocityY;
-    float angularVelocity;
+    /**
+     * Set random seed for reproducible initialization
+     * 
+     * @param seed Random seed value
+     */
+    void setRandomSeed(uint64_t seed);
     
-    // Internal state
-    float energy;          // Energy level (0-1)
-    float health;          // Health (0-1)
-    float age;             // Developmental age in simulation steps
+    /**
+     * Reset body to initial state
+     * 
+     * Places agent at random valid position with full energy
+     */
+    void reset();
     
-    // Movement state
-    bool isMoving;
-    bool isTurning;
-    float lastActionTime;
+    /**
+     * Update body state over time
+     * 
+     * @param timestep Time elapsed since last update
+     */
+    void update(double timestep);
     
-    AgentBody()
-        : x(0.0f), y(0.0f), orientation(0.0f)
-        , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
-        , energy(1.0f), health(1.0f), age(0.0f)
-        , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
+    /**
+     * Apply motor command to body
+     * 
+     * @param motorCommand Command to execute
+     * @param currentTime Current simulation time
+     * @return ActionResult describing outcome
+     */
+    ActionResult applyMotorCommand(MotorCommand motorCommand, double currentTime);
     
-    void reset() {
-        x = 0.0f;
-        y = 0.0f;
-        orientation = 0.0f;
-        velocityX = 0.0f;
-        velocityY = 0.0f;
-        angularVelocity = 0.0f;
-        energy = 1.0f;
-        health = 1.0f;
-        age = 0.0f;
-        isMoving = false;
-        isTurning = false;
-        lastActionTime = 0.0f;
-    }
-};
-
-// Low-level motor commands that the brain can produce
-// These are innate muscle-like signals, not semantic actions
-enum class MotorCommand {
-    MoveForward = 0,   // Propel forward
-    MoveBackward = 1,  // Propel backward  
-    TurnLeft = 2,      // Rotate left
-    TurnRight = 3,     // Rotate right
-    LookLeft = 4,      // Pan sensor left
-    LookRight = 5,     // Pan sensor right
-    Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
-};
-
-// Action result from the world's perspective
-struct ActionResult {
-    float reward;
-    bool success;
-    std::string message;
+    /**
+     * Get current X coordinate
+     */
+    float getX() const { return x_; }
     
-    ActionResult() : reward(0.0f), success(false), message("") {}
-    ActionResult(float r, bool s, const std::string& m = "") 
-        : reward(r), success(s), message(m) {}
-};
-
-// Object types in the world (for rendering/debug only, NOT given to brain)
-enum class WorldObjectType {
-    Empty = 0,
-    Resource = 1,      // Positive reward
-    Hazard = 2,        // Negative reward
-    Wall = 3,         // Boundary
-    Marker = 4        // Navigation aid
+    /**
+     * Get current Y coordinate
+     */
+    float getY() const { return y_; }
+    
+    /**
+     * Get current orientation (radians)
+     */
+    float getOrientation() const { return orientation_; }
+    
+    /**
+     * Get current energy level
+     */
+    float getEnergy() const { return energy_; }
+    
+    /**
+     * Get current health level
+     */
+    float getHealth() const { return health_; }
+    
+    /**
+     * Get simulation time
+     */
+    double getSimulationTime() const { return simTime_; }
+    
+    /**
+     * Get maximum energy capacity
+     */
+    float getMaxEnergy() const { return maxEnergy_; }
+    
+    /**
+     * Get world width
+     */
+    float getWidth() const { return width_; }
+    
+    /**
+     * Get world height
+     */
+    float getHeight() const { return height_; }
+    
+    /**
+     * Get vision width
+     */
+    size_t getVisionWidth() const { return visionWidth_; }
+    
+    /**
+     * Get vision height
+     */
+    size_t getVisionHeight() const { return visionHeight_; }
+    
+    /**
+     * Set agent starting position
+     */
+    void setAgentStart(float x, float y);
+    
+    /**
+     * Get current position
+     * 
+     * @return X coordinate
+     */
+    float getX() const { return x_; }
+    
+    /**
+     * Get current Y coordinate
+     * 
+     * @return Y coordinate
+     */
+    float getY() const { return y_; }
+    
+    /**
+     * Get current orientation (radians)
+     * 
+     * @return Orientation in radians [-PI, PI]
+     */
+    float getOrientation() const { return orientation_; }
+    
+    /**
+     * Get current energy level
+     * 
+     * @return Energy (0.0 to maxEnergy_)
+     */
+    float getEnergy() const { return energy_; }
+    
+    /**
+     * Get current health level
+     * 
+     * @return Health (typically 1.0 = healthy, decreasing with damage)
+     */
+    float getHealth() const { return health_; }
+    
+    /**
+     * Get simulation time
+     * 
+     * @return Total time elapsed since reset
+     */
+    double getSimulationTime() const { return simTime_; }
+    
+    /**
+     * Get maximum energy capacity
+     * 
+     * @return Maximum energy
+     */
+    float getMaxEnergy() const { return maxEnergy_; }
+    
+    /**
+     * Get world width
+     * 
+     * @return World width
+     */
+    float getWidth() const { return width_; }
+    
+    /**
+     * Get world height
+     * 
+     * @return World height
+     */
+    float getHeight() const { return height_; }
+    
+    /**
+     * Get vision width
+     * 
+     * @return Vision width in pixels
+     */
+    size_t getVisionWidth() const { return visionWidth_; }
+    
+    /**
+     * Get vision height
+     * 
+     * @return Vision height in pixels
+     */
+    size_t getVisionHeight() const { return visionHeight_; }
+    
+    /**
+     * Set agent starting position
+     * 
+     * @param x X coordinate
+     * @param y Y coordinate
+     */
+    void setAgentStart(float x, float y);
+    
+    /**
+     * Get sensory percept from body's current state
+     * 
+     * Generates vision, touch, and internal signals based on body state
+     * 
+     * @return Sensory percept representing current state
+     */
+    SensoryPercept getSensoryPercept() const;
+    
+    /**
+     * Check if position is valid (within world bounds)
+     * 
+     * @param x X coordinate
+     * @param y Y coordinate
+     * @return True if position is valid
+     */
+    bool isValidPosition(float x, float y) const;
+    
+    /**
+     * Add object to world
+     * 
+     * @param obj Object to add
+     */
+    void addObject(const WorldObject& obj);
+    
+    /**
+     * Remove object from world
+     * 
+     * @param x X coordinate
+     * @param y Y coordinate
+     */
+    void removeObject(float x, float y);
+    
+    /**
+     * Get object at position
+     * 
+     * @param x X coordinate
+     * @param y Y coordinate
+     * @return Pointer to object or nullptr if none
+     */
+    WorldObject* getObjectAt(float x, float y);
+    
+    /**
+     * Check for passive collisions (damage)
+     */
+    void checkCollisions();
+    
+    /**
+     * Generate vision for agent
+     * 
+     * Casts rays in front of agent to detect objects and walls
+     */
+    void generateVision();
+    
+    /**
+     * Get next random number from agent's RNG
+     * 
+     * @return Random number
+     */
+    uint64_t nextRandom();
+    
+private:
+    // World dimensions
+    float width_;                // World width
+    float height_;               // World height
+    size_t visionWidth_;         // Vision width in pixels
+    size_t visionHeight_;        // Vision height in pixels
+    
+    // Body properties
+    float maxEnergy_;            // Maximum energy capacity
+    float energyDecayRate_;      // Energy decay per timestep
+    float resourceEnergyGain_;   // Energy gained from resources
+    
+    // State
+    double simTime_;            // Total simulation time
+    uint64_t rngSeed_;           // Random seed for reproducible behavior
+    uint64_t rngState_;          // Current RNG state
+    
+    // Agent position and motion
+    float x_;                    // X coordinate
+    float y_;                    // Y coordinate
+    float orientation_;          // Orientation in radians
+    float velocityX_;            // X velocity
+    float velocityY_;            // Y velocity
+    float angularVelocity_;      // Angular velocity
+    bool isMoving_;              // Moving flag
+    bool isTurning_;             // Turning flag
+    
+    // Biological state
+    float energy_;               // Current energy
+    float health_;               // Current health
+    double age_;                 // Age in simulation time
+    double lastActionTime_;      // Time of last action
+    
+    // World objects
+    std::vector<WorldObject> objects_;  // Objects in world
+    
+    // Vision system
+    std::vector<float> vision_;  // Vision intensities (visionWidth_ * visionHeight_)
 };
 
 } // namespace nlm
