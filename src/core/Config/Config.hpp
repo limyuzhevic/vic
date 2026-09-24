@@ -5,11 +5,15 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include <sstream>
+#include <iostream>
+#include <cctype>
+#include <algorithm>
+#include <fstream>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -43,6 +47,9 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Validation function type
+using ValidationFunc = std::function<bool(const ConfigValue&)>;
+
 // Main configuration class
 class Config {
 public:
@@ -55,8 +62,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (simple key=value or JSON format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from string (simple key=value format)
+    bool loadFromString(const std::string& content);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -77,6 +87,9 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validation
+    void addValidator(const std::string& key, const ValidationFunc& validator);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -100,6 +113,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Simple JSON parsing helpers (if needed)
+    static bool isJson(const std::string& content);
+    static bool parseSimpleJson(const std::string& json, std::unordered_map<std::string, std::string>& out);
+    static bool parseKeyValue(const std::string& line, std::string& key, std::string& value);
 };
 
 } // namespace nlm
