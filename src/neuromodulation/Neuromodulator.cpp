@@ -1,4 +1,12 @@
 #include "Neuromodulator.hpp"
+#include "Dopamine.hpp"
+#include "Curiosity.hpp"
+#include "Novelty.hpp"
+#include "PredictionError.hpp"
+#include "Acetylcholine.hpp"
+#include "Norepinephrine.hpp"
+#include "Serotonin.hpp"
+#include "Reward.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -15,7 +23,9 @@ struct Dopamine::Impl {
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
 
-Dopamine::~Dopamine() = default;
+Dopamine::~Dopamine() {
+    delete pImpl;
+}
 
 const char* Dopamine::getName() const {
     return "DA";
@@ -52,5 +62,15 @@ void Dopamine::signalRewardPredictionError(float error) {
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
+
+// Implement other neuromodulators
+#include "Dopamine.cpp"
+#include "Curiosity.cpp"
+#include "Novelty.cpp"
+#include "PredictionError.cpp"
+#include "Acetylcholine.cpp"
+#include "Norepinephrine.cpp"
+#include "Serotonin.cpp"
+#include "Reward.cpp"
 
 } // namespace nlm
