@@ -307,20 +307,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
-     * This implements the complete integrated brain simulation:
-     * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
+     * Complete integrated brain simulation with 14 steps:
+     * 1. Process delayed spikes
+     * 2. Update neuron dynamics (LIF)
+     * 3. Detect and schedule spikes
+     * 4. Update working memory
+     * 5. Apply neuromodulation
      * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
+     * 7. Update episodic memory
      * 8. Update prediction system
      * 9. Update attention system
      * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
+     * 11. Apply structural plasticity
+     * 12. Replay important memories
      * 13. Apply development effects
      * 14. Collect statistics
      */
@@ -353,6 +352,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
+
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
