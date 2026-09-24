@@ -64,10 +64,14 @@ struct LearningExperiment {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        // Record initial weights from first region (or any available region)
+        auto regionIds = brain->getRegionIds();
+        if (!regionIds.empty()) {
+            auto* region = brain->getRegion(regionIds[0]);
+            if (region) {
+                for (const auto& syn : region->getSynapses()) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -83,10 +87,14 @@ struct LearningExperiment {
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Record final weights from first region (or any available region)
+        auto regionIds = brain->getRegionIds();
+        if (!regionIds.empty()) {
+            auto* region = brain->getRegion(regionIds[0]);
+            if (region) {
+                for (const auto& syn : region->getSynapses()) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -164,8 +172,17 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    auto regionIds = brain->getRegionIds();
+    if (regionIds.empty()) {
+        NLM_LOG_ERROR("No regions found in brain!");
+        return;
+    }
+    
+    auto* region = brain->getRegion(regionIds[0]);
+    if (!region) {
+        NLM_LOG_ERROR("Could not access region!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -211,10 +228,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+    // Enable plasticity on synapses - use first available region
+    auto regionIds = brain->getRegionIds();
+    if (!regionIds.empty()) {
+        auto* region = brain->getRegion(regionIds[0]);
+        if (region) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
         }
     }
     
@@ -249,8 +270,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    // Use first available region instead of hardcoded RegionId(1)
+    auto regionIds = brain->getRegionIds();
+    if (regionIds.empty()) {
+        NLM_LOG_ERROR("No regions found in brain for STDP test!");
+        return;
+    }
+    
+    auto* region = brain->getRegion(regionIds[0]);
+    if (!region) {
+        NLM_LOG_ERROR("Could not access region for STDP test!");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();

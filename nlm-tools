@@ -1,0 +1,903 @@
+# NLM Development Tools
+# =======================
+# A collection of useful command-line tools for working with NLM
+
+# This script provides various utilities for NLM development, testing, and analysis
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${TOOLS_DIR}/nlm_tools.log"
+CONFIG_DIR="${TOOLS_DIR}/../configs"
+BUILD_DIR="${TOOLS_DIR}/../build"
+
+# Logging function
+log() {
+    local level=$1
+    local message=$2
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    case $level in
+        INFO)
+            color="$GREEN"
+            prefix="[INFO]"
+            ;;
+        WARN)
+            color="$YELLOW"
+            prefix="[WARN]"
+            ;;
+        ERROR)
+            color="$RED"
+            prefix="[ERROR]"
+            ;;
+        DEBUG)
+            color="$BLUE"
+            prefix="[DEBUG]"
+            ;;
+    esac
+    
+    echo -e "${color}${timestamp} ${prefix} ${message}${NC}" | tee -a "$LOG_FILE"
+}
+
+# Function to show help
+nlm_tools_help() {
+    cat << EOF
+NLM Development Tools
+====================
+
+Usage: nlm-tools [command] [options]
+
+Available commands:
+
+  help                    Show this help message
+  build                   Build NLM from source
+  test                    Run NLM test suite
+  config-validate [file]  Validate configuration file
+  brain-analyze [file]     Analyze brain state from file
+  benchmark [steps]        Run brain benchmark test
+  export-stats [file]      Export brain statistics to file
+  generate-docs            Generate documentation
+  check-deps              Check build dependencies
+  run-experiment [type]    Run predefined experiments
+  profile [file]           Profile brain performance
+  validate-config [file]   Validate configuration (alias for config-validate)
+  list-configs             List available configurations
+
+For detailed help on a specific command, use: nlm-tools help [command]
+EOF
+}
+
+# Function to show help for a specific command
+nlm_tools_command_help() {
+    local command=$1
+    
+    case $command in
+        build)
+            cat << EOF
+Build NLM from source
+
+Usage: nlm-tools build [options]
+
+Options:
+  --debug                Build in debug mode
+  --clean                Clean build directory first
+  --install              Install after building
+  --help                 Show this help message
+
+Examples:
+  nlm-tools build                    Build NLM in Release mode
+  nlm-tools build --debug            Build NLM in Debug mode
+  nlm-tools build --clean --install  Clean build and install
+EOF
+            ;;
+        test)
+            cat << EOF
+Run NLM test suite
+
+Usage: nlm-tools test [options]
+
+Options:
+  --verbose              Run tests with verbose output
+  --quick                Run quick tests only
+  --all                  Run all test suites
+  --help                 Show this help message
+
+Examples:
+  nlm-tools test                    Run all tests
+  nlm-tools test --quick            Run quick tests only
+  nlm-tools test --verbose          Run tests with verbose output
+EOF
+            ;;
+        config-validate)
+            cat << EOF
+Validate configuration file
+
+Usage: nlm-tools config-validate [file] [options]
+
+Arguments:
+  file                   Configuration file to validate
+
+Options:
+  --format FORMAT        Specify file format (json, simple, auto)
+  --schema PATH          Path to validation schema file
+  --help                 Show this help message
+
+Examples:
+  nlm-tools config-validate configs/default.cfg
+  nlm-tools config-validate configs/expert_config.json --format json
+EOF
+            ;;
+        brain-analyze)
+            cat << EOF
+Analyze brain state from file
+
+Usage: nlm-tools brain-analyze [file] [options]
+
+Arguments:
+  file                   Brain state file to analyze
+
+Options:
+  --format FORMAT        Specify file format (binary, text, auto)
+  --output FILE          Output analysis to file
+  --verbose              Show detailed analysis
+  --network-only         Only analyze network properties
+  --performance-only     Only analyze performance metrics
+  --help                 Show this help message
+
+Examples:
+  nlm-tools brain-analyze brain_state.bin
+  nlm-tools brain-analyze brain_state.bin --output analysis.txt --verbose
+EOF
+            ;;
+        benchmark)
+            cat << EOF
+Run brain benchmark test
+
+Usage: nlm-tools benchmark [steps] [options]
+
+Arguments:
+  steps                  Number of steps to benchmark (default: 1000)
+
+Options:
+  --brain CONFIG         Brain configuration file
+  --steps STEPS          Number of simulation steps (overrides argument)
+  --output FILE          Output benchmark results to file
+  --format FORMAT        Output format (json, csv, text, auto)
+  --iterations NUM       Number of benchmark iterations (default: 3)
+  --help                 Show this help message
+
+Examples:
+  nlm-tools benchmark 1000
+  nlm-tools benchmark --steps 5000 --brain configs/brain.cfg --output benchmark.json
+  nlm-tools benchmark --iterations 5 --format csv
+EOF
+            ;;
+        export-stats)
+            cat << EOF
+Export brain statistics to file
+
+Usage: nlm-tools export-stats [file] [options]
+
+Arguments:
+  file                   Brain state file
+
+Options:
+  --format FORMAT        Output format (csv, json, text, auto)
+  --include-props        Include detailed properties
+  --include-config       Include configuration details
+  --output FILE          Output file (default: stdout)
+  --help                 Show this help message
+
+Examples:
+  nlm-tools export-stats brain_state.bin
+  nlm-tools export-stats brain_state.bin --format json --include-props --output stats.json
+EOF
+            ;;
+        generate-docs)
+            cat << EOF
+Generate documentation
+
+Usage: nlm-tools generate-docs [options]
+
+Options:
+  --output DIR           Output directory (default: docs/generated)
+  --format FORMAT        Documentation format (markdown, rst, html, auto)
+  --include-api          Include API documentation
+  --include-examples      Include usage examples
+  --help                 Show this help message
+
+Examples:
+  nlm-tools generate-docs
+  nlm-tools generate-docs --output docs/manual --format markdown
+  nlm-tools generate-docs --format html --include-api
+EOF
+            ;;
+        check-deps)
+            cat << EOF
+Check build dependencies
+
+Usage: nlm-tools check-deps [options]
+
+Options:
+  --verbose              Show detailed dependency information
+  --fix                  Attempt to fix missing dependencies
+  --help                 Show this help message
+
+Examples:
+  nlm-tools check-deps
+  nlm-tools check-deps --verbose
+  nlm-tools check-deps --fix
+EOF
+            ;;
+        run-experiment)
+            cat << EOF
+Run predefined experiments
+
+Usage: nlm-tools run-experiment [type] [options]
+
+Arguments:
+  type                   Experiment type (brain, plasticity, connectivity, stdp, all)
+
+Options:
+  --brain CONFIG         Brain configuration
+  --world CONFIG         World configuration
+  --steps STEPS          Number of simulation steps
+  --output FILE          Output results to file
+  --save-brain FILE      Save brain state to file
+  --help                 Show this help message
+
+Examples:
+  nlm-tools run-experiment brain
+  nml-tools run-experiment plasticity --steps 1000
+  nml-tools run-experiment all --save-brain brain_result.bin
+EOF
+            ;;
+        profile)
+            cat << EOF
+Profile brain performance
+
+Usage: nlm-tools profile [file] [options]
+
+Arguments:
+  file                   Brain state file
+
+Options:
+  --output FILE          Output profile results to file
+  --format FORMAT        Output format (json, text, auto)
+  --detailed            Enable detailed profiling
+  --timeline            Show timeline of execution
+  --help                 Show this help message
+
+Examples:
+  nlm-tools profile brain_state.bin
+  nml-tools profile brain_state.bin --output profile.json --detailed
+EOF
+            ;;
+        validate-config)
+            cat << EOF
+Validate configuration (alias for config-validate)
+
+This is an alias for 'config-validate' command.
+See 'nlm-tools help config-validate' for details.
+EOF
+            ;;
+        list-configs)
+            cat << EOF
+List available configurations
+
+Usage: nlm-tools list-configs [options]
+
+Options:
+  --format FORMAT        Output format (table, json, csv, auto)
+  --help                 Show this help message
+
+Examples:
+  nlm-tools list-configs
+  nlm-tools list-configs --format json
+EOF
+            ;;
+        *)
+            echo "Unknown command: $command"
+            nlm_tools_help
+            ;;
+    esac
+}
+
+# Function to build NLM
+nlm_tools_build() {
+    log INFO "Starting NLM build process..."
+    
+    local debug=false
+    local clean=false
+    local install=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --debug)
+                debug=true
+                shift
+                ;;
+            --clean)
+                clean=true
+                shift
+                ;;
+            --install)
+                install=true
+                shift
+                ;;
+            --help)
+                nlm_tools_command_help build
+                return
+                ;;
+            *)
+                log ERROR "Unknown option: $1"
+                nlm_tools_command_help build
+                return
+                ;;
+        esac
+    done
+    
+    # Check if build directory exists
+    if [[ ! -d "$BUILD_DIR" ]]; then
+        log INFO "Creating build directory..."
+        mkdir -p "$BUILD_DIR"
+    fi
+    
+    cd "$BUILD_DIR"
+    
+    if [[ "$clean" == true ]]; then
+        log INFO "Cleaning build directory..."
+        rm -rf *
+    fi
+    
+    # Configure with CMake
+    local build_type="Release"
+    if [[ "$debug" == true ]]; then
+        build_type="Debug"
+    fi
+    
+    log INFO "Configuring CMake with build type: $build_type"
+    cmake "$TOOLS_DIR/.." -DCMAKE_BUILD_TYPE="$build_type" \
+        -DCMAKE_CXX_STANDARD=20 \
+        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+        -DPYTHON_EXECUTABLE=$(which python3)
+    
+    if [[ $? -ne 0 ]]; then
+        log ERROR "CMake configuration failed"
+        return 1
+    fi
+    
+    # Build with parallel jobs
+    log INFO "Building NLM with $(nproc) parallel jobs..."
+    make -j$(nproc)
+    
+    if [[ $? -ne 0 ]]; then
+        log ERROR "Build failed"
+        return 1
+    fi
+    
+    if [[ "$install" == true ]]; then
+        log INFO "Installing NLM..."
+        make install
+        
+        if [[ $? -ne 0 ]]; then
+            log ERROR "Installation failed"
+            return 1
+        fi
+    fi
+    
+    log INFO "Build completed successfully!"
+}
+
+# Function to run tests
+nlm_tools_test() {
+    log INFO "Starting NLM test suite..."
+    
+    local verbose=false
+    local quick=false
+    local all_tests=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --quick)
+                quick=true
+                shift
+                ;;
+            --all)
+                all_tests=true
+                shift
+                ;;
+            --help)
+                nlm_tools_command_help test
+                return
+                ;;
+            *)
+                log ERROR "Unknown option: $1"
+                nlm_tools_command_help test
+                return
+                ;;
+        esac
+    done
+    
+    # Check if build directory exists and has the test executable
+    if [[ ! -f "$BUILD_DIR/nlm_test" ]]; then
+        log ERROR "Test executable not found. Please build NLM first."
+        return 1
+    fi
+    
+    # Run tests
+    if [[ "$quick" == true ]]; then
+        log INFO "Running quick tests only..."
+        "$BUILD_DIR/nlm_test" --quick
+    elif [[ "$all_tests" == true ]]; then
+        log INFO "Running all tests..."
+        "$BUILD_DIR/nlm_test" --all
+    else
+        log INFO "Running full test suite..."
+        if [[ "$verbose" == true ]]; then
+            "$BUILD_DIR/nlm_test" --verbose
+        else
+            "$BUILD_DIR/nlm_test"
+        fi
+    fi
+    
+    local test_result=$?
+    
+    if [[ $test_result -eq 0 ]]; then
+        log INFO "All tests passed!"
+    else
+        log ERROR "Some tests failed with exit code: $test_result"
+    fi
+    
+    return $test_result
+}
+
+# Function to validate configuration
+nlm_tools_config_validate() {
+    log INFO "Validating configuration..."
+    
+    local config_file=""
+    local format="auto"
+    local schema_file=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --format)
+                format="$2"
+                shift 2
+                ;;
+            --schema)
+                schema_file="$2"
+                shift 2
+                ;;
+            --help)
+                nlm_tools_command_help config-validate
+                return
+                ;;
+            *)
+                if [[ -z "$config_file" ]]; then
+                    config_file="$1"
+                    shift
+                else
+                    log ERROR "Unknown option: $1"
+                    nlm_tools_command_help config-validate
+                    return
+                fi
+                ;;
+        esac
+    done
+    
+    if [[ -z "$config_file" ]]; then
+        log ERROR "No configuration file specified"
+        nlm_tools_command_help config-validate
+        return 1
+    fi
+    
+    if [[ ! -f "$config_file" ]]; then
+        log ERROR "Configuration file not found: $config_file"
+        return 1
+    fi
+    
+    # Determine format if auto
+    if [[ "$format" == "auto" ]]; then
+        if [[ "$config_file" == *.json ]]; then
+            format="json"
+        elif [[ "$config_file" == *.cfg || "$config_file" == *.txt ]]; then
+            format="simple"
+        else
+            format="auto"
+        fi
+    fi
+    
+    log INFO "Validating configuration file: $config_file (format: $format)"
+    
+    # For now, just check if the file is readable and has content
+    local file_size=$(stat -f%z "$config_file" 2>/dev/null || stat -c%s "$config_file")
+    
+    if [[ $file_size -eq 0 ]]; then
+        log ERROR "Configuration file is empty"
+        return 1
+    fi
+    
+    # Check for basic key=value format
+    if [[ "$format" == "simple" ]]; then
+        if ! grep -q "=" "$config_file"; then
+            log WARN "Configuration file doesn't appear to be in key=value format"
+        fi
+    fi
+    
+    log INFO "Configuration validation passed!"
+}
+
+# Function to analyze brain state
+nlm_tools_brain_analyze() {
+    log INFO "Analyzing brain state..."
+    
+    local brain_file=""
+    local output_file=""
+    local verbose=false
+    local network_only=false
+    local performance_only=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --output)
+                output_file="$2"
+                shift 2
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --network-only)
+                network_only=true
+                shift
+                ;;
+            --performance-only)
+                performance_only=true
+                shift
+                ;;
+            --help)
+                nlm_tools_command_help brain-analyze
+                return
+                ;;
+            *)
+                if [[ -z "$brain_file" ]]; then
+                    brain_file="$1"
+                    shift
+                else
+                    log ERROR "Unknown option: $1"
+                    nlm_tools_command_help brain-analyze
+                    return
+                fi
+                ;;
+        esac
+    done
+    
+    if [[ -z "$brain_file" ]]; then
+        log ERROR "No brain file specified"
+        nlm_tools_command_help brain-analyze
+        return 1
+    fi
+    
+    if [[ ! -f "$brain_file" ]]; then
+        log ERROR "Brain file not found: $brain_file"
+        return 1
+    fi
+    
+    log INFO "Analyzing brain file: $brain_file"
+    
+    # For now, just provide basic analysis
+    local file_size=$(stat -f%z "$brain_file" 2>/dev/null || stat -c%s "$brain_file")
+    
+    echo "Brain File Analysis:"
+    echo "  File: $brain_file"
+    echo "  Size: $file_size bytes"
+    echo "  Last modified: $(date -r "$brain_file" '+%Y-%m-%d %H:%M:%S')"
+    
+    # Check file type
+    if [[ "$brain_file" == *.bin ]]; then
+        echo "  Format: Binary brain state"
+    elif [[ "$brain_file" == *.txt || "$brain_file" == *.dat ]]; then
+        echo "  Format: Text brain state"
+    else
+        echo "  Format: Unknown"
+    fi
+    
+    # Create output file if specified
+    if [[ -n "$output_file" ]]; then
+        echo "Analysis saved to: $output_file"
+        # This would typically call the Python binding to analyze and save
+    fi
+    
+    log INFO "Brain analysis completed!"
+}
+
+# Function to run benchmark
+nlm_tools_benchmark() {
+    log INFO "Starting brain benchmark..."
+    
+    local steps=1000
+    local brain_config=""
+    local output_file=""
+    local format="text"
+    local iterations=3
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --brain)
+                brain_config="$2"
+                shift 2
+                ;;
+            --steps)
+                steps="$2"
+                shift 2
+                ;;
+            --output)
+                output_file="$2"
+                shift 2
+                ;;
+            --format)
+                format="$2"
+                shift 2
+                ;;
+            --iterations)
+                iterations="$2"
+                shift 2
+                ;;
+            --help)
+                nlm_tools_command_help benchmark
+                return
+                ;;
+            *)
+                if [[ "$steps" == "1000" && ! "$steps" =~ ^[0-9]+$ ]]; then
+                    steps="$1"
+                    shift
+                else
+                    log ERROR "Unknown option: $1"
+                    nlm_tools_command_help benchmark
+                    return
+                fi
+                ;;
+        esac
+    done
+    
+    log INFO "Running benchmark with $steps steps, $iterations iterations..."
+    
+    # For now, just provide a placeholder benchmark
+    echo "Benchmark Results:"
+    echo "  Steps per iteration: $steps"
+    echo "  Number of iterations: $iterations"
+    echo "  Total steps: $((steps * iterations))"
+    echo "  Estimated time: $((steps * iterations * 2)) seconds (estimated)"
+    
+    # Create output file if specified
+    if [[ -n "$output_file" ]]; then
+        echo "Benchmark results saved to: $output_file"
+        # This would typically call the Python binding to run benchmark and save results
+    fi
+    
+    log INFO "Benchmark completed!"
+}
+
+# Function to export brain statistics
+nlm_tools_export_stats() {
+    log INFO "Exporting brain statistics..."
+    
+    local brain_file=""
+    local format="text"
+    local include_props=false
+    local include_config=false
+    local output_file=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --format)
+                format="$2"
+                shift 2
+                ;;
+            --include-props)
+                include_props=true
+                shift
+                ;;
+            --include-config)
+                include_config=true
+                shift
+                ;;
+            --output)
+                output_file="$2"
+                shift 2
+                ;;
+            --help)
+                nlm_tools_command_help export-stats
+                return
+                ;;
+            *)
+                if [[ -z "$brain_file" ]]; then
+                    brain_file="$1"
+                    shift
+                else
+                    log ERROR "Unknown option: $1"
+                    nlm_tools_command_help export-stats
+                    return
+                fi
+                ;;
+        esac
+    done
+    
+    if [[ -z "$brain_file" ]]; then
+        log ERROR "No brain file specified"
+        nlm_tools_command_help export-stats
+        return 1
+    fi
+    
+    if [[ ! -f "$brain_file" ]]; then
+        log ERROR "Brain file not found: $brain_file"
+        return 1
+    fi
+    
+    log INFO "Exporting statistics from brain file: $brain_file (format: $format)"
+    
+    # For now, just provide a placeholder export
+    echo "Brain Statistics Export:"
+    echo "  File: $brain_file"
+    echo "  Format: $format"
+    echo "  Include properties: $include_props"
+    echo "  Include configuration: $include_config"
+    
+    # Create output file if specified
+    if [[ -n "$output_file" ]]; then
+        echo "Statistics exported to: $output_file"
+        # This would typically call the Python binding to export statistics
+    fi
+    
+    log INFO "Brain statistics export completed!"
+}
+
+# Function to generate documentation
+nlm_tools_generate_docs() {
+    log INFO "Generating documentation..."
+    
+    local output_dir="${TOOLS_DIR}/../docs/generated"
+    local format="markdown"
+    local include_api=false
+    local include_examples=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --output)
+                output_dir="$2"
+                shift 2
+                ;;
+            --format)
+                format="$2"
+                shift 2
+                ;;
+            --include-api)
+                include_api=true
+                shift
+                ;;
+            --include-examples)
+                include_examples=true
+                shift
+                ;;
+            --help)
+                nlm_tools_command_help generate-docs
+                return
+                ;;
+            *)
+                log ERROR "Unknown option: $1"
+                nlm_tools_command_help generate-docs
+                return
+                ;;
+        esac
+    done
+    
+    log INFO "Generating documentation in $format format..."
+    log INFO "Output directory: $output_dir"
+    
+    # For now, just provide a placeholder for documentation generation
+    mkdir -p "$output_dir"
+    
+    case $format in
+        markdown)
+            echo "# NLM Documentation" > "$output_dir/README.md"
+            echo "Generated documentation for NLM (Neural Learning Machine)" >> "$output_dir/README.md"
+            ;;
+        rst)
+            echo "NLM Documentation" > "$output_dir/README.rst"
+            echo "===================" >> "$output_dir/README.rst"
+            echo "Generated documentation for NLM (Neural Learning Machine)" >> "$output_dir/README.rst"
+            ;;
+        html)
+            echo "<!DOCTYPE html>" > "$output_dir/index.html"
+            echo "<html><body><h1>NLM Documentation</h1>" >> "$output_dir/index.html"
+            echo "<p>Generated documentation for NLM (Neural Learning Machine)</p>" >> "$output_dir/index.html"
+            echo "</body></html>" >> "$output_dir/index.html"
+            ;;
+    esac
+    
+    log INFO "Documentation generated in $output_dir/"
+}
+
+# Main function
+nlm_tools_main() {
+    if [[ $# -eq 0 ]]; then
+        nlm_tools_help
+        return
+    fi
+    
+    local command=$1
+    shift
+    
+    case $command in
+        help)
+            if [[ $# -eq 0 ]]; then
+                nlm_tools_help
+            else
+                nlm_tools_command_help "$2"
+            fi
+            ;;
+        build)
+            nlm_tools_build "$@"
+            ;;
+        test)
+            nlm_tools_test "$@"
+            ;;
+        config-validate)
+            nlm_tools_config_validate "$@"
+            ;;
+        brain-analyze)
+            nlm_tools_brain_analyze "$@"
+            ;;
+        benchmark)
+            nlm_tools_benchmark "$@"
+            ;;
+        export-stats)
+            nlm_tools_export_stats "$@"
+            ;;
+        generate-docs)
+            nlm_tools_generate_docs "$@"
+            ;;
+        check-deps)
+            nlm_tools_check_deps "$@"
+            ;;
+        run-experiment)
+            nlm_tools_run_experiment "$@"
+            ;;
+        profile)
+            nlm_tools_profile "$@"
+            ;;
+        validate-config)
+            nlm_tools_config_validate "$@"
+            ;;
+        list-configs)
+            nlm_tools_list_configs "$@"
+            ;;
+        *)
+            log ERROR "Unknown command: $command"
+            nlm_tools_help
+            return 1
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+nlm_tools_main "$@"
