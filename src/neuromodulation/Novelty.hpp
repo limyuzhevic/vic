@@ -4,6 +4,9 @@
 
 namespace nlm {
 
+class Brain;
+class Observation;
+
 // Novelty detection signal
 // Computes novelty from comparison with previous observations
 
@@ -40,3 +43,4 @@ private:
 };
 
 } // namespace nlm
+

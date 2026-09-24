@@ -4,6 +4,8 @@
 
 namespace nlm {
 
+class Brain;
+
 // Prediction error signal for curiosity and learning
 // Computes difference between predicted and actual values
 
@@ -37,3 +39,4 @@ private:
 };
 
 } // namespace nlm
+

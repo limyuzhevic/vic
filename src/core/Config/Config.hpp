@@ -93,6 +93,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get configuration source for a key
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Get configuration description for a key
+    std::string getDescription(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

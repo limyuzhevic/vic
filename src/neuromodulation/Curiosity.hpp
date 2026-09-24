@@ -4,6 +4,8 @@
 
 namespace nlm {
 
+class Brain;
+
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
 
@@ -37,3 +39,4 @@ private:
 };
 
 } // namespace nlm
+

@@ -193,6 +193,25 @@ public:
     // Logging
     void logStatus() const;
     
+// Step helper methods
+    void initializeStepState(SimulationStep currentStep, Timestamp currentTime);
+    void stepNeurons(SimulationStep currentStep, Timestamp currentTime);
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void applySynapticPlasticity(SimulationStep currentStep);
+    void updateWorkingMemory();
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updateNeuromodulation();
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void collectStatistics(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem(SimulationStep currentStep);
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void consolidateMemories(SimulationStep currentStep);
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    
 private:
     struct Impl;
     Impl* pImpl;
