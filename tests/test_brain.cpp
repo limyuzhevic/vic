@@ -129,6 +129,7 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainCheckpointing();
 }
 
 } // namespace test_brain

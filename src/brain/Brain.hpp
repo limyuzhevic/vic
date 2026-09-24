@@ -20,8 +20,13 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
+class InternalSignals;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
@@ -155,12 +160,24 @@ public:
     
     // ========== COGNITION SYSTEMS ==========
     
-    // Neural planner for action planning
+// Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
+
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
+
+    // Self model for internal representation
+    SelfModel* getSelfModel();
+
+    // Social learning for observation
+    SocialLearning* getSocialLearning();
+
+    // Spatial representation for spatial relationships
+    SpatialRepresentation* getSpatialRepresentation();
+
+    // Temporal relations for sequence learning
+    TemporalRelation* getTemporalRelation();
+
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
