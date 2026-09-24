@@ -354,24 +354,27 @@ PYBIND11_MODULE(pynlm, m) {
              "Log brain status");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+             "Create AgentBrain with default configuration")
+        .def(py::init<std::shared_ptr<Brain>, AgentBrain::Config>(), py::arg("brain"), py::arg("config"),
+             "Create AgentBrain with custom configuration")
+        .def("initialize", py::overload_cast<const SimpleWorld&, const AgentBrain::Config&>(&AgentBrain::initialize),
+             py::arg("world"), py::arg("config"), "Initialize with world and configuration")
+        .def("initialize", py::overload_cast<const SimpleWorld&>(&AgentBrain::initialize),
+             py::arg("world"), "Initialize with world (uses default config)")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             py::arg("percept"), "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+             py::arg("timestep"), "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -398,11 +401,66 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced configuration methods
+        .def("setVisionScaleFactor", &AgentBrain::setVisionScaleFactor,
+             py::arg("factor"), "Set vision scale factor")
+        .def("setCuriosityThreshold", &AgentBrain::setCuriosityThreshold,
+             py::arg("threshold"), "Set curiosity threshold")
+        .def("setExplorationChance", &AgentBrain::setExplorationChance,
+             py::arg("chance"), "Set exploration chance")
+        .def("setRewardClamping", &AgentBrain::setRewardClamping,
+             py::arg("min"), py::arg("max"), "Set reward clamping range")
+        
+        // Configuration getters
+        .def("getVisionScaleFactor", &AgentBrain::getVisionScaleFactor,
+             "Get vision scale factor")
+        .def("getCuriosityThreshold", &AgentBrain::getCuriosityThreshold,
+             "Get curiosity threshold")
+        .def("getExplorationChance", &AgentBrain::getExplorationChance,
+             "Get exploration chance")
+        .def("getRewardClampingMin", &AgentBrain::getRewardClampingMin,
+             "Get minimum reward clamp")
+        .def("getRewardClampingMax", &AgentBrain::getRewardClampingMax,
+             "Get maximum reward clamp")
+        
+        // Callback setup
+        .def("setCuriosityCalculator", &AgentBrain::setCuriosityCalculator,
+             py::arg("calculator"), "Set custom curiosity calculator")
+        .def("setActionSelector", &AgentBrain::setActionSelector,
+             py::arg("selector"), "Set custom action selector")
+        .def("setRewardProcessor", &AgentBrain::setRewardProcessor,
+             py::arg("processor"), "Set custom reward processor")
+        
+        // Status and diagnostics
+        .def("getStatusString", &AgentBrain::getStatusString,
+             "Get detailed status string")
+        .def("getSensoryNeuronCount", &AgentBrain::getSensoryNeuronCount,
+             "Get number of sensory neurons")
+        .def("getMotorNeuronCount", &AgentBrain::getMotorNeuronCount,
+             "Get number of motor neurons")
+        .def("getStepCount", &AgentBrain::getStepCount,
+             "Get simulation step count")
+        
+        // Safety and validation
+        .def("validateConfiguration", &AgentBrain::validateConfiguration,
+             "Validate configuration settings")
+        .def("validateNeuralConnectivity", &AgentBrain::validateNeuralConnectivity,
+             "Validate neural connectivity")
+        
+        // Advanced getters
+        .def("getStepCount", &AgentBrain::getStepCount,
+             "Get step count")
+        .def("getConfig", &AgentBrain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get neuromodulation level (alias)");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("createDefaultConfig", []() -> AgentBrain::Config {
+        return AgentBrain::Config();
+    }, "Create a default AgentBrain configuration");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
@@ -414,7 +472,11 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface with default config");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain, AgentBrain::Config config) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain, config);
+    }, py::arg("brain"), py::arg("config"), "Create a new agent brain interface with custom config");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
