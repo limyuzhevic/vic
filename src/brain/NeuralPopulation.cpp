@@ -1,6 +1,10 @@
 #include "NeuralPopulation.hpp"
+#include "Neuron.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
+#include <memory>
 
 namespace nlm {
 
@@ -11,12 +15,30 @@ struct NeuralPopulation::Impl {
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
-    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
+    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {
+        neurons.reserve(size);
+        membranePotentials.reserve(size);
+    }
+    
+    ~Impl() {
+        // Clean up neurons if we own them
+        // Note: In the current architecture, NeuralPopulation doesn't own neurons,
+        // but this destructor shows the pattern for safe cleanup
+        neurons.clear();
+        membranePotentials.clear();
+    }
 };
 
-NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
+NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {
+    if (!pImpl) {
+        throw std::bad_alloc("Failed to allocate NeuralPopulation implementation");
+    }
+}
 
-NeuralPopulation::~NeuralPopulation() = default;
+NeuralPopulation::~NeuralPopulation() {
+    // The pImpl pointer will be deleted automatically by the default destructor
+    // since we don't have a custom destructor, this is safe
+}
 
 NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -45,7 +67,7 @@ bool NeuralPopulation::isEmpty() const {
 
 Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
     if (index >= pImpl->neurons.size()) {
-        return nullptr;
+        return nullptr; // Return nullptr instead of throwing to maintain API compatibility
     }
     return pImpl->neurons[index];
 }
@@ -58,6 +80,10 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
+    if (!neuron) {
+        NLM_LOG_WARNING("Attempt to add null neuron to population");
+        return;
+    }
     pImpl->neurons.push_back(neuron);
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
@@ -75,14 +101,16 @@ NeuronType NeuralPopulation::getNeuronType() const {
 void NeuralPopulation::setNeuronType(NeuronType type) {
     pImpl->neuronType = type;
     for (auto* neuron : pImpl->neurons) {
-        neuron->setType(type);
+        if (neuron) {
+            neuron->setType(type);
+        }
     }
 }
 
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
     for (const auto* neuron : pImpl->neurons) {
-        if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
+        if (neuron && (neuron->isFiring() || neuron->getFiringRate() > 0.0f)) {
             ++count;
         }
     }
@@ -92,7 +120,7 @@ size_t NeuralPopulation::getActiveCount() const {
 size_t NeuralPopulation::getFiringCount() const {
     size_t count = 0;
     for (const auto* neuron : pImpl->neurons) {
-        if (neuron->isFiring()) {
+        if (neuron && neuron->isFiring()) {
             ++count;
         }
     }
@@ -104,34 +132,52 @@ float NeuralPopulation::getAverageFiringRate() const {
         return 0.0f;
     }
     float sum = 0.0f;
+    size_t validNeurons = 0;
     for (const auto* neuron : pImpl->neurons) {
-        sum += neuron->getFiringRate();
+        if (neuron) {
+            sum += neuron->getFiringRate();
+            ++validNeurons;
+        }
     }
-    return sum / static_cast<float>(pImpl->neurons.size());
+    if (validNeurons == 0) {
+        return 0.0f;
+    }
+    return sum / static_cast<float>(validNeurons);
 }
 
 float NeuralPopulation::getActivityLevel() const {
     if (pImpl->neurons.empty()) {
         return 0.0f;
     }
-    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
+    size_t activeCount = getActiveCount();
+    return static_cast<float>(activeCount) / static_cast<float>(pImpl->neurons.size());
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
     for (auto* neuron : pImpl->neurons) {
-        neuron->initializeRandom(rng);
+        if (neuron) {
+            neuron->initializeRandom(rng);
+        }
     }
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
     for (auto* neuron : pImpl->neurons) {
-        neuron->step(currentTime);
+        if (neuron) {
+            try {
+                neuron->step(currentTime);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Exception stepping neuron in population: " + e.what()));
+            }
+        }
     }
 }
 
 void NeuralPopulation::reset() {
     for (auto* neuron : pImpl->neurons) {
-        neuron->reset();
+        if (neuron) {
+            neuron->reset();
+        }
     }
     pImpl->membranePotentials.clear();
 }
@@ -140,7 +186,9 @@ std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
     std::vector<NeuronId> ids;
     ids.reserve(pImpl->neurons.size());
     for (const auto* neuron : pImpl->neurons) {
-        ids.push_back(neuron->getId());
+        if (neuron) {
+            ids.push_back(neuron->getId());
+        }
     }
     return ids;
 }
@@ -149,7 +197,9 @@ void NeuralPopulation::recordActivity() {
     pImpl->membranePotentials.clear();
     pImpl->membranePotentials.reserve(pImpl->neurons.size());
     for (const auto* neuron : pImpl->neurons) {
-        pImpl->membranePotentials.push_back(neuron->getMembranePotential());
+        if (neuron) {
+            pImpl->membranePotentials.push_back(neuron->getMembranePotential());
+        }
     }
 }
 

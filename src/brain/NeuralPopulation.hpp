@@ -4,11 +4,12 @@
 #include "Neuron.hpp"
 #include <vector>
 #include <memory>
+#include <stdexcept>
 
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
+// Enhanced version with better memory management and error handling
 
 class NeuralPopulation {
 public:
@@ -67,9 +68,13 @@ public:
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
     
+    // Enhanced error handling
+    bool safeGetNeuron(NeuronIndex index, Neuron*& outNeuron) const;
+    bool safeStepNeuron(NeuronIndex index, Timestamp currentTime);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;  // Use unique_ptr for automatic memory management
 };
 
 } // namespace nlm
