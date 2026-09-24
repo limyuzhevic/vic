@@ -398,6 +398,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 4: Update working memory ==========
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->update(pImpl->timestep);
+    }
+    
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
