@@ -287,11 +287,325 @@ print("Agent simulation complete!")
 
 ---
 
-## Next Steps
+## Advanced Examples
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+When you're ready to use more advanced NLM features:
 
-That's it! You're now ready to use NLM.
+### Example 4: Complete Agent with Learning and Development
+
+```python
+import pynlm
+
+# Create custom configuration for advanced features
+config = pynlm.createDefaultConfig()
+
+# Enable advanced learning features
+config.set("enable_reward_modulation", True)
+config.set("enable_structural_plasticity", True)
+config.set("enable_development", True)
+config.set("enable_curiosity", True)
+
+# Create brain with custom parameters
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create world with visual and audio sensors
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8, 
+               audioChannels=4, audioRadius=5.0)
+world.reset()
+
+# Create agent with advanced capabilities
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableStructuralPlasticity(True)   # Grow new connections
+agent.enableDevelopment(True)            # Brain matures over time
+agent.enableCuriosity(True)              # Explore new things
+
+# Run long-term learning simulation
+for step in range(500):
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain processes and learns
+    brain.step(step)
+    
+    # Agent makes decisions
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward modulation
+    if step % 50 == 0:
+        agent.applyRewardModulation(1.0, 0.5)  # Give reward
+    
+    # Print progress every 100 steps
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+              f"{brain.getTotalSpikeCount()} total spikes, "
+              f"curiosity={agent.getCuriosityLevel():.2f}")
+
+print("Advanced simulation complete!")
+print(f"Final brain developed to stage {brain.getDevelopmentalStage()}")
+print(f"Total connections created: {brain.getTotalSynapseCount()}")
+```
+
+### Example 5: Brain Checkpointing and Persistence
+
+```python
+import pynlm
+import os
+
+# Create and run a brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run for 100 steps
+for i in range(100):
+    brain.step(i)
+    
+    # Save checkpoint every 25 steps
+    if i % 25 == 0 and i > 0:
+        checkpoint_file = f"checkpoint_step_{i}.bin"
+        if brain.save(checkpoint_file):
+            print(f"Checkpoint saved: {checkpoint_file}")
+        else:
+            print(f"Failed to save checkpoint: {checkpoint_file}")
+
+# Test loading from checkpoint
+print("\n--- Testing checkpoint loading ---")
+if os.path.exists("checkpoint_step_50.bin"):
+    # Create new brain
+    loadedBrain = pynlm.createBrain(pynlm.createDefaultConfig())
+    
+    # Load from checkpoint
+    if loadedBrain.load("checkpoint_step_50.bin"):
+        print("Successfully loaded brain from checkpoint")
+        print(f"Loaded brain has {loadedBrain.getTotalNeuronCount()} neurons and "
+              f"{loadedBrain.getTotalSynapseCount()} synapses")
+        print(f"Last spike time: {loadedBrain.getTotalSpikeCount()} total spikes")
+    else:
+        print("Failed to load brain from checkpoint")
+else:
+    print("Checkpoint file not found")
+
+# Cleanup
+for i in [0, 25, 50, 75]:
+    checkpoint_file = f"checkpoint_step_{i}.bin"
+    if os.path.exists(checkpoint_file):
+        os.remove(checkpoint_file)
+        print(f"Cleaned up: {checkpoint_file}")
+```
+
+### Example 6: Multi-Region Brain Architecture
+
+```python
+import pynlm
+
+# Create a multi-region brain
+config = pynlm.createDefaultConfig()
+config.set("region_count", 3)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create three regions with different characteristics
+region0 = brain.addRegion("Sensory")  # Primary sensory processing
+region1 = brain.addRegion("Motor")    # Motor control
+region2 = brain.addRegion("Association")  # Higher-level associations
+
+print("Multi-region brain created:")
+print(f"Total regions: {brain.getRegionCount()}")
+print(f"Region 0 (Sensory): {region0->getTotalNeuronCount()} neurons")
+print(f"Region 1 (Motor): {region1->getTotalNeuronCount()} neurons")
+print(f"Region 2 (Association): {region2->getTotalNeuronCount()} neurons")
+
+# Create inter-region connections
+brain.addInterRegionConnection(0, 1, weight=0.5)   # Sensory -> Motor
+brain.addInterRegionConnection(1, 2, weight=0.3)   # Motor -> Association
+brain.addInterRegionConnection(2, 0, weight=0.2)   # Association -> Sensory
+
+print(f"Inter-region connections: {brain.getTotalSynapseCount()}")
+
+# Run simulation with inter-region communication
+for step in range(50):
+    brain.step(step)
+    
+    if step % 10 == 0:
+        print(f"Step {step}:")
+        for i in range(brain.getRegionCount()):
+            region = brain.getRegion(i);
+            print(f"  Region {i}: {region->getTotalNeuronCount()} neurons, "
+                  f"{region->getFiringNeuronCount()} firing")
+```
+
+### Example 7: Performance Testing and Benchmarking
+
+```python
+import pynlm
+import time
+
+def benchmark_brain_performance(neuron_counts, steps_per_test):
+    """Benchmark brain performance with different sizes"""
+    results = []
+    
+    for neuron_count in neuron_counts:
+        print(f"\nBenchmarking brain with {neuron_count} neurons...")
+        
+        # Create brain
+        config = pynlm.createDefaultConfig()
+        config.set("neuron_count", neuron_count)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run benchmark
+        start_time = time.time()
+        start_spikes = brain.getTotalSpikeCount()
+        
+        for step in range(steps_per_test):
+            brain.step(step)
+        
+        end_time = time.time()
+        end_spikes = brain.getTotalSpikeCount()
+        
+        elapsed = end_time - start_time
+        spikes_generated = end_spikes - start_spikes
+        spikes_per_second = spikes_generated / elapsed if elapsed > 0 else 0
+        
+        result = {
+            "neuron_count": neuron_count,
+            "steps": steps_per_test,
+            "elapsed_time": elapsed,
+            "spikes_generated": spikes_generated,
+            "spikes_per_second": spikes_per_second,
+            "efficiency": spikes_generated / neuron_count
+        }
+        
+        results.append(result)
+        
+        print(f"  Time: {elapsed:.3f}s")
+        print(f"  Spikes generated: {spikes_generated}")
+        print(f"  Performance: {spikes_per_second:.1f} spikes/sec")
+        print(f"  Efficiency: {result['efficiency']:.3f} spikes/neuron")
+    
+    return results
+
+# Run benchmarks
+neuron_counts = [100, 500, 1000, 2000]
+steps_per_test = 100
+
+print("NLM Brain Performance Benchmark")
+print("=" * 40)
+
+results = benchmark_brain_performance(neuron_counts, steps_per_test)
+
+print("\nBenchmark Summary:")
+print("-" * 40)
+print(f"{'Neurons':>10} {'Steps':>8} {'Time (s)':>10} {'Spikes/s':>12} {'Efficiency':>12}")
+print("-" * 40)
+
+for r in results:
+    print(f"{r['neuron_count']:>10} {r['steps']:>8} {r['elapsed_time']:>10.3f} "
+          f"{r['spikes_per_second']:>12.1f} {r['efficiency']:>12.3f}")
+```
+
+### Example 8: Advanced Configuration Management
+
+```python
+import pynlm
+
+# Create brain with JSON configuration
+config_content = '''{
+    "neuron_count": 500,
+    "region_count": 2,
+    "connection_probability": 0.15,
+    "enable_reward_modulation": true,
+    "enable_structural_plasticity": true,
+    "enable_development": true,
+    "enable_curiosity": true,
+    "stdp_ltp_weight": 0.02,
+    "stdp_ltd_weight": 0.015,
+    "learning_rate": 0.01
+}'''
+
+# Save to file
+with open("advanced_config.json", "w") as f:
+    f.write(config_content)
+
+# Load configuration from file
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Load from JSON file
+if brain.load("advanced_config.json"):
+    print("Successfully loaded configuration from JSON file")
+    print(f"Configuration entries: {brain.getTotalSynapseCount()} synapses configured")
+else:
+    print("Failed to load configuration from JSON file")
+
+# Override with command line arguments
+brain.loadFromArgs(["--neuron_count=1000", "--connection_probability=0.2"])
+print(f"After command line override: {brain.getTotalSynapseCount()} synapses configured")
+
+# Save updated configuration
+if brain.save("updated_config.json"):
+    print("Successfully saved updated configuration")
+
+# Clean up
+import os
+if os.path.exists("advanced_config.json"):
+    os.remove("advanced_config.json")
+if os.path.exists("updated_config.json"):
+    os.remove("updated_config.json")
+```
+
+## Quick Reference for Advanced Features
+
+| Feature | Method | Description |
+|---------|--------|-------------|
+| **Reward Learning** | `enableRewardModulation(True)` | Enable reward-based learning |
+| **Structural Growth** | `enableStructuralPlasticity(True)` | Allow creation/removal of synapses |
+| **Brain Development** | `enableDevelopment(True)` | Brain matures over time |
+| **Curiosity** | `enableCuriosity(True)` | Drives exploration behavior |
+| **Checkpointing** | `brain.save("file.bin")` | Save brain state to file |
+| **Loading** | `brain.load("file.bin")` | Load brain state from file |
+| **Multi-Region** | `brain.addRegion("name")` | Create brain region |
+| **Inter-Region** | `brain.addInterRegionConnection(src, dst, weight)` | Connect regions |
+| **Performance** | `brain.getTotalSynapseCount()` | Get total synapses |
+| **Activity** | `brain.getTotalSpikeCount()` | Get total spikes |
+
+## Troubleshooting Advanced Usage
+
+**"My brain isn't learning anything"**
+- Check that `enableRewardModulation(True)` is called
+- Verify rewards are being applied with `applyRewardModulation()`
+- Ensure `enableCuriosity(True)` is enabled for exploration
+
+**"Brain memory usage is too high"**
+- Reduce `neuron_count` in configuration
+- Disable `enableDevelopment(True)` if not needed
+- Use smaller world dimensions
+
+**"Checkpoint files are not being saved"**
+- Check file permissions in current directory
+- Ensure sufficient disk space
+- Verify brain has actually processed some steps before saving
+
+**"Multi-region brain isn't working"**
+- Make sure regions are properly initialized
+- Check inter-region connection setup
+- Verify region connectivity is working
+
+That's it! You now have the advanced usage guide with examples for:
+1. Complete learning agents with development
+2. Brain checkpointing and persistence
+3. Multi-region brain architecture
+4. Performance testing and benchmarking
+5. Advanced configuration management
+
+You're ready to build sophisticated neural systems with NLM! 🚀
