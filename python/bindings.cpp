@@ -416,6 +416,65 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced configuration methods
+    m.def("configure_for_performance", [](std::shared_ptr<Config> config, int threadCount, bool enableSIMD) {
+        config->configureForPerformance(threadCount, enableSIMD);
+    }, py::arg("config"), py::arg("threadCount"), py::arg("enableSIMD"),
+        "Configure system for high performance");
+
+    m.def("configure_for_accuracy", [](std::shared_ptr<Config> config, bool enableHighPrecision) {
+        config->configureForAccuracy(enableHighPrecision);
+    }, py::arg("config"), py::arg("enableHighPrecision"),
+        "Configure system for high accuracy");
+
+    m.def("configure_for_exploration", [](std::shared_ptr<Config> config) {
+        config->configureForExploration();
+    }, py::arg("config"), "Configure for exploration behavior");
+
+    m.def("configure_for_learning", [](std::shared_ptr<Config> config) {
+        config->configureForLearning();
+    }, py::arg("config"), "Configure for learning behavior");
+
+    m.def("configure_for_simulation", [](std::shared_ptr<Config> config) {
+        config->configureForSimulation();
+    }, py::arg("config"), "Configure for simulation mode");
+
+    m.def("configure_for_realtime", [](std::shared_ptr<Config> config) {
+        config->configureForRealTime();
+    }, py::arg("config"), "Configure for real-time operation");
+
+    m.def("is_performance_mode", [](const std::shared_ptr<Config>& config) {
+        return config->isPerformanceMode();
+    }, py::arg("config"), "Check if configuration is in performance mode");
+
+    m.def("is_high_precision_mode", [](const std::shared_ptr<Config>& config) {
+        return config->isHighPrecisionMode();
+    }, py::arg("config"), "Check if configuration is in high precision mode");
+
+    m.def("is_realtime_mode", [](const std::shared_ptr<Config>& config) {
+        return config->isRealTimeMode();
+    }, py::arg("config"), "Check if configuration is in real-time mode");
+
+    m.def("validate_configuration", [](const std::shared_ptr<Config>& config) {
+        return config->validateConfiguration();
+    }, py::arg("config"), "Validate configuration");
+
+    m.def("get_validation_errors", [](const std::shared_ptr<Config>& config) {
+        return config->getValidationErrors();
+    }, py::arg("config"), "Get configuration validation errors");
+
+    m.def("save_configuration_snapshot", [](const std::shared_ptr<Config>& config, const std::string& name) {
+        return config->saveConfigurationSnapshot(name);
+    }, py::arg("config"), py::arg("name"), "Save configuration snapshot");
+
+    m.def("load_configuration_snapshot", [](std::shared_ptr<Config> config, const std::string& name) {
+        return config->loadConfigurationSnapshot(name);
+    }, py::arg("config"), py::arg("name"), "Load configuration snapshot");
+
+    m.def("get_available_snapshots", [](const std::shared_ptr<Config>& config) {
+        return config->getAvailableSnapshots();
+    }, py::arg("config"), "Get available configuration snapshots");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

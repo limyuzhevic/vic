@@ -93,6 +93,34 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced configuration methods
+    
+    // Configure for performance
+    void configureForPerformance(int threadCount, bool enableSIMD);
+    
+    // Configure for accuracy
+    void configureForAccuracy(bool enableHighPrecision);
+    
+    // Configure for specific use cases
+    void configureForExploration();
+    void configureForLearning();
+    void configureForSimulation();
+    void configureForRealTime();
+    
+    // Get system capabilities
+    bool isPerformanceMode() const;
+    bool isHighPrecisionMode() const;
+    bool isRealTimeMode() const;
+    
+    // Configuration validation
+    bool validateConfiguration() const;
+    std::string getValidationErrors() const;
+    
+    // Configuration snapshots
+    bool saveConfigurationSnapshot(const std::string& name);
+    bool loadConfigurationSnapshot(const std::string& name);
+    std::vector<std::string> getAvailableSnapshots() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

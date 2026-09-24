@@ -206,10 +206,189 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Advanced configuration method implementations
+
+// Configure for performance
+void Config::configureForPerformance(int threadCount, bool enableSIMD) {
+    set("performance.thread_count", static_cast<int64_t>(threadCount));
+    set("performance.enable_simd", enableSIMD);
+    set("performance.mode", "high_performance");
+}
+
+// Configure for accuracy
+void Config::configureForAccuracy(bool enableHighPrecision) {
+    set("accuracy.enable_high_precision", enableHighPrecision);
+    set("accuracy.mode", "high_accuracy");
+    // Increase simulation steps for better accuracy
+    if (has("neuron_count")) {
+        set("neuron_count", getOr<size_t>("neuron_count", 1000) * 2);
+    }
+}
+
+// Configure for specific use cases
+void Config::configureForExploration() {
+    set("exploration.enabled", true);
+    set("exploration.curiosity_threshold", 0.5f);
+    set("exploration.novelty_threshold", 0.3f);
+    set("mode", "exploration");
+}
+
+void Config::configureForLearning() {
+    set("learning.enabled", true);
+    set("learning.reward_modulation", true);
+    set("learning.plasticity_rate", 0.01f);
+    set("mode", "learning");
+}
+
+void Config::configureForSimulation() {
+    set("simulation.fast_mode", true);
+    set("simulation.save_checkpoints", true);
+    set("simulation.checkpoint_interval", 1000);
+    set("mode", "simulation");
+}
+
+void Config::configureForRealTime() {
+    set("realtime.enabled", true);
+    set("realtime.update_rate", 60.0f);
+    set("performance.enable_simd", true);
+    set("performance.enable_multithreading", true);
+    set("mode", "realtime");
+}
+
+// Get system capabilities
+bool Config::isPerformanceMode() const {
+    return getOr<std::string>("mode", "") == "high_performance";
+}
+
+bool Config::isHighPrecisionMode() const {
+    return getOr<std::string>("mode", "") == "high_accuracy";
+}
+
+bool Config::isRealTimeMode() const {
+    return getOr<std::string>("mode", "") == "realtime";
+}
+
+// Configuration validation
+bool Config::validateConfiguration() const {
+    std::string errors = getValidationErrors();
+    return errors.empty();
+}
+
+std::string Config::getValidationErrors() const {
+    std::ostringstream oss;
+    
+    // Check for required basic settings
+    if (!has("random_seed")) {
+        oss << "Missing required configuration: random_seed\n";
+    }
+    
+    if (!has("simulation_timestep")) {
+        oss << "Missing required configuration: simulation_timestep\n";
+    } else {
+        try {
+            double timestep = getOr<double>("simulation_timestep", 0.0);
+            if (timestep <= 0.0) {
+                oss << "Invalid simulation_timestep: must be positive\n";
+            }
+        } catch (...) {
+            oss << "Invalid simulation_timestep format\n";
+        }
+    }
+    
+    if (!has("neuron_count")) {
+        oss << "Missing required configuration: neuron_count\n";
+    } else {
+        try {
+            size_t neuronCount = getOr<size_t>("neuron_count", 0);
+            if (neuronCount == 0) {
+                oss << "Invalid neuron_count: must be greater than 0\n";
+            }
+        } catch (...) {
+            oss << "Invalid neuron_count format\n";
+        }
+    }
+    
+    // Check for potential inconsistencies
+    if (has("neuron_count") && has("region_count")) {
+        try {
+            size_t neuronCount = getOr<size_t>("neuron_count", 0);
+            size_t regionCount = getOr<size_t>("region_count", 0);
+            if (regionCount > neuronCount) {
+                oss << "region_count cannot be greater than neuron_count\n";
+            }
+        } catch (...) {
+            // Ignore parsing errors for consistency check
+        }
+    }
+    
+    return oss.str();
+}
+
+// Configuration snapshots
+bool Config::saveConfigurationSnapshot(const std::string& name) {
+    // Simple snapshot implementation - in a real system, this would
+    // serialize the configuration to a file or database
+    try {
+        std::string snapshotFile = "./config_snapshots/" + name + ".cfg";
+        std::filesystem::create_directories("./config_snapshots");
+        return saveToFile(snapshotFile);
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::loadConfigurationSnapshot(const std::string& name) {
+    // Simple snapshot implementation
+    try {
+        std::string snapshotFile = "./config_snapshots/" + name + ".cfg";
+        return loadFromFile(snapshotFile);
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+std::vector<std::string> Config::getAvailableSnapshots() const {
+    std::vector<std::string> snapshots;
+    try {
+        if (std::filesystem::exists("./config_snapshots")) {
+            for (const auto& entry : std::filesystem::directory_iterator("./config_snapshots")) {
+                if (entry.is_regular_file()) {
+                    std::string filename = entry.path().filename().string();
+                    if (filename.size() > 4 && filename.substr(filename.size() - 4) == ".cfg") {
+                        snapshots.push_back(filename.substr(0, filename.size() - 4));
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        // If we can't read snapshots, return empty list
+    }
+    return snapshots;
+}
+
+// Explicit template instantiations
+
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+// Configuration template methods that need to be fully defined
+template bool Config::validateConfiguration() const;
+template std::string Config::getValidationErrors() const;
+template bool Config::saveConfigurationSnapshot(const std::string& name);
+template bool Config::loadConfigurationSnapshot(const std::string& name);
+template std::vector<std::string> Config::getAvailableSnapshots() const;
 
 } // namespace nlm

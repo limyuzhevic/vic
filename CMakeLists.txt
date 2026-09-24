@@ -121,11 +121,57 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Phase 2: Brain modular components
+add_library(nlm_brain_step STATIC
+    src/brain/BrainStep.cpp
+)
+target_include_directories(nlm_brain_step PUBLIC src)
+target_link_libraries(nlm_brain_step PUBLIC nlm_core)
+
+add_library(nlm_brain_integration STATIC
+    src/brain/BrainIntegration.cpp
+)
+target_include_directories(nlm_brain_integration PUBLIC src)
+target_link_libraries(nlm_brain_integration PUBLIC nlm_core)
+
+add_library(nlm_brain_memory STATIC
+    src/brain/BrainMemory.cpp
+)
+target_include_directories(nlm_brain_memory PUBLIC src)
+target_link_libraries(nlm_brain_memory PUBLIC nlm_core)
+
+add_library(nlm_brain_neuromodulation STATIC
+    src/brain/BrainNeuromodulation.cpp
+)
+target_include_directories(nlm_brain_neuromodulation PUBLIC src)
+target_link_libraries(nlm_brain_neuromodulation PUBLIC nlm_core)
+
+add_library(nlm_brain_development STATIC
+    src/brain/BrainDevelopment.cpp
+)
+target_include_directories(nlm_brain_development PUBLIC src)
+target_link_libraries(nlm_brain_development PUBLIC nlm_core)
+
+add_library(nlm_brain_plasticity STATIC
+    src/brain/BrainPlasticity.cpp
+)
+target_include_directories(nlm_brain_plasticity PUBLIC src)
+target_link_libraries(nlm_brain_plasticity PUBLIC nlm_core)
+
+add_library(nlm_brain_checkpoint STATIC
+    src/brain/BrainCheckpoint.cpp
+)
+target_include_directories(nlm_brain_checkpoint PUBLIC src)
+target_link_libraries(nlm_brain_checkpoint PUBLIC nlm_core)
+
+# Main executable (now links to all brain modular components)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
+                          nlm_brain_step nlm_brain_integration nlm_brain_memory
+                          nlm_brain_neuromodulation nlm_brain_development
+                          nlm_brain_plasticity nlm_brain_checkpoint)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

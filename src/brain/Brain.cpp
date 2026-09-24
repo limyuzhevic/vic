@@ -300,7 +300,10 @@ bool Brain::initialize() {
 }
 
 void Brain::step(SimulationStep currentStep) {
-    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+    // Convenience method: calculate currentTime based on timestep
+    // This method delegates to the two-argument version for actual processing
+    Timestamp currentTime = static_cast<Timestamp>(currentStep) * pImpl->timestep;
+    step(currentStep, currentTime);
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
