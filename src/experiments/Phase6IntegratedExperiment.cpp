@@ -41,13 +41,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
-    // Create simple world
+// Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(20.0f, 20.0f, 16, 16);
+    world.setRandomSeed(42);
     
     // Create agent
-    AgentBrain agent(brain);
-    agent.initialize(world);
+    AgentBrain agent(brain, world);
     agent.enableRewardModulation(true);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
@@ -62,7 +62,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        const SensoryPercept& percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +74,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = result.reward;
         totalReward += reward;
         
         // Apply reward modulation
@@ -115,7 +115,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
+    result.predictionIntegrated = (brain->getNeuralPrediction() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
@@ -205,11 +205,11 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 3: Prediction system exists
-    if (brain->getPredictionSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Prediction system is integrated");
+    // Test 3: Neural prediction exists
+    if (brain->getNeuralPrediction() != nullptr) {
+        NLM_LOG_INFO("[PASS] Neural prediction is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Neural prediction is NOT integrated");
         success = false;
     }
     

@@ -13,11 +13,11 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, SimpleWorld& world);
     ~AgentBrain();
     
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
+    // Initialize with world (via constructor)
+    void initialize(SimpleWorld& world);
     
     // Get sensory input size expected by brain
     size_t getSensoryInputSize() const;

@@ -38,9 +38,8 @@ public:
         auto brain = std::make_shared<Brain>(config);
         brain->initialize();
         
-        // Create agent brain interface
-        AgentBrain agentBrain(brain);
-        agentBrain.initialize(world);
+// Create agent brain interface
+        AgentBrain agentBrain(brain, world);
         
         // Configure agent brain
         agentBrain.enableRewardModulation(true);

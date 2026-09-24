@@ -42,15 +42,35 @@ struct MemPoolNode {
  * Template parameter T specifies the object type to allocate.
  * All objects have the same fixed size determined at construction.
  */
-template<typename T>
-class MemoryPool {
+// Object factory type for custom initialization/destruction
+    template<typename U>
+    using ObjectFactory = std::function<void(U*)>;
+
+    template<typename T>
+    class MemoryPool {
 public:
     /**
      * Create a memory pool
      * @param blockSize Number of objects per memory block
      * @param initialBlocks Number of blocks to pre-allocate
+     * @param factory Optional factory function for object initialization
      */
-    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4);
+    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4,
+                       const ObjectFactory<T>& factory = nullptr)
+        : factory_(factory) {
+        // Align slab size to cache line (64 bytes) for false sharing prevention
+        constexpr size_t cacheLineSize = 64;
+        if (sizeof(T) % cacheLineSize != 0) {
+            slabSize_ = ((sizeof(T) / cacheLineSize) + 1) * cacheLineSize;
+        } else {
+            slabSize_ = sizeof(T);
+        }
+        
+        // Pre-allocate initial blocks
+        for (size_t i = 0; i < initialBlocks; ++i) {
+            addBlock();
+        }
+    }
     
     ~MemoryPool();
     
@@ -62,13 +82,62 @@ public:
      * Allocate an object from the pool
      * Lock-free operation
      */
-    T* allocate();
+    T* allocate() {
+        // Try to get from free list first (lock-free pop)
+        MemPoolNode* node = freeList_.load(std::memory_order_acquire);
+        
+        while (node != nullptr) {
+            MemPoolNode* next = node->next.load(std::memory_order_relaxed);
+            if (freeList_.compare_exchange_weak(node, next, 
+                                                 std::memory_order_release, 
+                                                 std::memory_order_relaxed)) {
+                allocatedCount_.fetch_add(1, std::memory_order_relaxed);
+                availableCount_.fetch_sub(1, std::memory_order_relaxed);
+                
+                T* obj = reinterpret_cast<T*>(node);
+                
+                // Initialize object using factory if provided
+                if (factory_) {
+                    factory_(obj);
+                }
+                
+                return obj;
+            }
+            // node was updated by CAS, reload next
+        }
+        
+        // Free list empty, add a new block
+        addBlock();
+        
+        // Try again
+        return allocate();
+    }
     
     /**
      * Return an object to the pool
      * Lock-free operation
      */
-    void deallocate(T* obj);
+    void deallocate(T* obj) {
+        if (obj == nullptr) return;
+        
+        MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
+        
+        // Call destructor if factory is provided (object was constructed)
+        if (factory_) {
+            obj->~T();
+        }
+        
+        // Lock-free push to free list
+        MemPoolNode* current = freeList_.load(std::memory_order_relaxed);
+        do {
+            node->next.store(current, std::memory_order_relaxed);
+        } while (!freeList_.compare_exchange_weak(current, node,
+                                                 std::memory_order_release,
+                                                 std::memory_order_relaxed));
+        
+        allocatedCount_.fetch_sub(1, std::memory_order_relaxed);
+        availableCount_.fetch_add(1, std::memory_order_relaxed);
+    }
     
     /**
      * Check if pool is empty
@@ -95,13 +164,30 @@ public:
      */
     void reserve(size_t count);
     
+    /**
+     * Set object factory for initialization/destruction
+     */
+    void setObjectFactory(const ObjectFactory<T>& factory) { factory_ = factory; }
+    
+    /**
+     * Clear all objects and reset pool
+     */
+    void clear() {
+        reserve(0);
+    }
+    
 private:
     // Memory block containing objects
     struct Block {
         std::vector<uint8_t> data;
         Block* nextBlock;
         
-        explicit Block(size_t objectSize, size_t count);
+        explicit Block(size_t objectSize, size_t count) {
+            data.resize(objectSize * count);
+            nextBlock = nullptr;
+            // Memory is initialized to zeros for better debugging
+            std::fill(data.begin(), data.end(), 0);
+        }
         
         T* getObject(size_t index, size_t objectSize) {
             return reinterpret_cast<T*>(data.data() + index * objectSize);
@@ -132,6 +218,9 @@ private:
     // Statistics
     std::atomic<size_t> allocatedCount_;
     std::atomic<size_t> availableCount_;
+    
+    // Object factory for initialization/destruction
+    ObjectFactory<T> factory_;
 };
 
 // Template implementation must be in header for generic types
@@ -145,7 +234,8 @@ MemoryPool<T>::Block::Block(size_t objectSize, size_t count)
 }
 
 template<typename T>
-MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
+MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks,
+                         const ObjectFactory<T>& factory)
     : slabSize_(sizeof(T))
     , blockSize_(blockSize)
     , freeList_(nullptr)
@@ -153,6 +243,7 @@ MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
     , currentIndex_(0)
     , allocatedCount_(0)
     , availableCount_(0)
+    , factory_(factory)
 {
     // Align slab size to cache line (64 bytes) for false sharing prevention
     constexpr size_t cacheLineSize = 64;
@@ -209,7 +300,15 @@ T* MemoryPool<T>::allocate() {
                                              std::memory_order_relaxed)) {
             allocatedCount_.fetch_add(1, std::memory_order_relaxed);
             availableCount_.fetch_sub(1, std::memory_order_relaxed);
-            return reinterpret_cast<T*>(node);
+            
+            T* obj = reinterpret_cast<T*>(node);
+            
+            // Initialize object using factory if provided
+            if (factory_) {
+                factory_(obj);
+            }
+            
+            return obj;
         }
         // node was updated by CAS, reload next
     }
@@ -226,6 +325,11 @@ void MemoryPool<T>::deallocate(T* obj) {
     if (obj == nullptr) return;
     
     MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
+    
+    // Call destructor if factory is provided (object was constructed)
+    if (factory_) {
+        obj->~T();
+    }
     
     // Lock-free push to free list
     MemPoolNode* current = freeList_.load(std::memory_order_relaxed);
