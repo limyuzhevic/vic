@@ -5,11 +5,17 @@
 #include <vector>
 #include <variant>
 #include <optional>
-
-namespace nlm {
+#include <nlohmann/json.hpp>
 
 // Forward declarations
 class Config;
+
+// Forward declare YAML::Node for the implementation
+namespace YAML {
+    class Node;
+}
+
+namespace nlm {
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -41,9 +47,11 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // JSON serialization support
+    nlohmann::json toJson() const;
+    static std::optional<ConfigEntry> fromJson(const nlohmann::json& j);
 };
-
-// Main configuration class
 class Config {
 public:
     Config();
@@ -55,7 +63,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +101,27 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON/YAML support
+    nlohmann::json toJson() const;
+    bool fromJson(const nlohmann::json& j);
+    
+    // File format detection
+    static bool isJsonFile(const std::string& filepath);
+    static bool isYamlFile(const std::string& filepath);
+    
+    // Validation methods
+    void setValidationOptions(const ValidationOptions& options);
+    ValidationOptions getValidationOptions() const;
+    std::vector<ValidationResult> validate() const;
+    bool validateParameter(const std::string& key) const;
+    bool isValid() const;
+    std::string getAnalysisReport() const;
+    std::vector<std::string> getWarnings() const;
+    std::string getParameterDocumentation(const std::string& key) const;
+    std::vector<std::string> getAllParameterNames() const;
+    std::vector<std::string> getParametersByCategory(const std::string& category) const;
+    bool migrateFromLegacy(const std::unordered_map<std::string, ConfigValue>& legacyConfig);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +129,27 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const ConfigValue& value);
+    
+    // Type conversion helpers
+    static std::optional<ConfigValue> jsonToConfigValue(const nlohmann::json& j);
+    static nlohmann::json configValueToJson(const ConfigValue& cv);
+    
+    // Validation integration
+    ValidationResult validateParameterInternal(const std::string& key, const ConfigValue& value) const;
+    std::vector<std::string> collectWarnings() const;
+    bool validateConsistency() const;
 };
 
 } // namespace nlm
+
+// JSON value to ConfigValue conversion (declared outside namespace for template specialization)
+template<typename T>
+std::optional<T> convertJsonToConfigValue(const nlohmann::json& j);
+
+// ConfigValue to JSON value conversion
+template<typename T>
+nlohmann::json convertConfigValueToJson(const T& value);

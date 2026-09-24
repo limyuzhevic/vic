@@ -1,0 +1,82 @@
+# Neural Learning Machine Configuration - YAML Example
+# yaml-language-server: $schema=example_config.json
+
+nlm_version: '2.0.0'
+description: Neural Learning Machine Configuration - YAML Example
+schema_version: '1.0'
+
+brain:
+  neuron_count: 1000
+  synapse_density: 0.1
+  connection_probability: 0.05
+  initial_weight_mean: 0.5
+  initial_weight_std: 0.1
+  v_thresh: -50.0
+  v_rest: -70.0
+  v_reset: -75.0
+  tau_mem: 20.0
+  tau_ref: 2.0
+
+plasticity:
+  stdp:
+    enable: true
+    learning_rate: 0.001
+    tau_plus: 20.0
+    tau_minus: 20.0
+  hebbian:
+    enable: true
+    learning_rate: 0.001
+  structural:
+    enable: true
+    synaptogenesis_rate: 0.001
+    pruning_rate: 0.0001
+
+neuromod:
+  dopamine:
+    scale: 1.0
+  curiosity:
+    enable: true
+    learning_rate: 0.01
+  novelty:
+    enable: true
+    threshold: 0.5
+
+development:
+  synaptogenesis_rate: 0.001
+  pruning_rate: 0.0001
+  critical_period: 10.0
+  maturation_rate: 0.1
+
+environment:
+  name: GridWorld
+  width: 10
+  height: 10
+  vision_width: 8
+  vision_height: 8
+  max_energy: 100.0
+
+simulation:
+  timestep: 0.001
+  max_steps: 10000
+  time_limit: 0.0
+  random_seed: 42
+  discount_factor: 0.99
+
+logging:
+  level: INFO
+  to_file: false
+  filename: nlm.log
+  max_size_mb: 100
+  max_files: 5
+
+visualization:
+  enabled: false
+  update_rate: 30.0
+  window_width: 1024
+  window_height: 768
+
+performance:
+  checkpoint_interval: 1000
+  save_checkpoints: true
+  checkpoint_path: ./checkpoints
+  validation_enabled: true
