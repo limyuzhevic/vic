@@ -86,7 +86,79 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize the variant value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Escape quotes and newlines in strings
+                std::string escaped = arg;
+                size_t pos = 0;
+                while ((pos = escaped.find('"', pos)) != std::string::npos) {
+                    escaped.replace(pos, 1, "\\\"");
+                    pos += 2;
+                }
+                pos = 0;
+                while ((pos = escaped.find('\n', pos)) != std::string::npos) {
+                    escaped.replace(pos, 1, "\\n");
+                    pos += 2;
+                }
+                file << "\"" << escaped << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Use consistent precision for doubles
+                file.precision(10);
+                file << std::fixed << arg;
+                file.unsetf(std::ios::fixed);
+                file.precision(6);
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file.precision(10);
+                    file << std::fixed << arg[i];
+                    file.unsetf(std::ios::fixed);
+                    file.precision(6);
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    // Escape quotes and newlines in strings
+                    std::string escaped = arg[i];
+                    size_t pos = 0;
+                    while ((pos = escaped.find('"', pos)) != std::string::npos) {
+                        escaped.replace(pos, 1, "\\\"");
+                        pos += 2;
+                    }
+                    pos = 0;
+                    while ((pos = escaped.find('\n', pos)) != std::string::npos) {
+                        escaped.replace(pos, 1, "\\n");
+                        pos += 2;
+                    }
+                    file << "\"" << escaped << "\"";
+                }
+                file << "]";
+            } else {
+                // For unknown types, convert to string using stream
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
