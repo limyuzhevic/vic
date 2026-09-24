@@ -90,16 +90,76 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation result
+struct ConfigValidationResult {
+    bool valid;
+    std::string error;
+    std::vector<std::string> warnings;
+    
+    ConfigValidationResult() : valid(true) {}
+    ConfigValidationResult(bool v, const std::string& err) : valid(v), error(err) {}
+};
+
+// Configuration validation rules
+struct ValidationRule {
+    std::string key;
+    std::string ruleType;  // "range", "enum", "positive", "nonnegative", "pattern", etc.
+    std::string ruleParams;
+    std::string errorMessage;
+    
+    ValidationRule() {}
+    ValidationRule(const std::string& k, const std::string& type, 
+                  const std::string& params, const std::string& error)
+        : key(k), ruleType(type), ruleParams(params), errorMessage(error) {}
+};
+
+// Configuration validation
+class ConfigValidator {
+public:
+    static ConfigValidationResult validate(const Config& config);
+    static ConfigValidationResult validateKey(const Config& config, const std::string& key);
+    static void addValidationRule(const std::string& key, const std::string& type, 
+                                 const std::string& params, const std::string& error);
+    static void clearValidationRules();
+    
+    static const std::vector<ValidationRule>& getValidationRules() { return validationRules_; }
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    static std::vector<ValidationRule> validationRules_;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    static bool validateRange(const ConfigValue& value, const std::string& params);
+    static bool validateEnum(const ConfigValue& value, const std::string& params);
+    static bool validatePattern(const ConfigValue& value, const std::string& params);
+    static bool validatePositive(const ConfigValue& value);
+    static bool validateNonNegative(const ConfigValue& value);
+    static bool validateStringLength(const ConfigValue& value, const std::string& params);
 };
+
+// Better error handling
+namespace ConfigError {
+    enum class ErrorType {
+        FileNotFound,
+        ParseError,
+        InvalidValue,
+        MissingRequired,
+        ValidationError,
+        FileWriteError,
+        MemoryError
+    };
+    
+    struct Error {
+        ErrorType type;
+        std::string message;
+        std::string key;
+        std::string context;
+        
+        Error(ErrorType t, const std::string& msg) : type(t), message(msg) {}
+        Error(ErrorType t, const std::string& msg, const std::string& key) 
+            : type(t), message(msg), key(key) {}
+    };
+    
+    std::string toString(ErrorType type);
+    std::string formatError(const Error& error);
+}
 
 } // namespace nlm

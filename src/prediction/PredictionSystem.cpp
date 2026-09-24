@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -13,6 +14,10 @@ struct PredictionSystem::Impl {
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    // TODO: Store brain reference if needed
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
