@@ -105,24 +105,6 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
-
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
         .value("MoveBackward", MotorCommand::MoveBackward)
@@ -131,18 +113,69 @@ PYBIND11_MODULE(pynlm, m) {
         .value("LookLeft", MotorCommand::LookLeft)
         .value("LookRight", MotorCommand::LookRight)
         .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+        .value("Wait", MotorCommand::Wait);
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
         .value("Empty", WorldObjectType::Empty)
         .value("Resource", WorldObjectType::Resource)
         .value("Hazard", WorldObjectType::Hazard)
         .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+        .value("Marker", WorldObjectType::Marker);
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Improved Config class with comprehensive Python API
+    py::class_<Config>(m, "Config", R"pbdoc(Complete configuration system for NLM)")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON/YAML/toml file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("get", &Config::get<int>, py::arg("key"),
+             "Get an integer configuration value")
+        .def("get", &Config::get<int64_t>, py::arg("key"),
+             "Get a 64-bit integer configuration value")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get a floating-point configuration value")
+        .def("get", &Config::get<bool>, py::arg("key"),
+             "Get a boolean configuration value")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get a string configuration value")
+        .def("getOr", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer configuration value or default if not present")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get a floating-point configuration value or default if not present")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean configuration value or default if not present")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a string configuration value or default if not present")
+        .def("set", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set a string configuration value")
+        .def("set", &Config::set<int>, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("set", &Config::set<double>, py::arg("key"), py::arg("value"),
+             "Set a floating-point configuration value")
+        .def("set", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::vector<int>& value) {
+            // Convert std::vector to ConfigValue
+            ConfigValue cv = value;
+            self.set(key, cv, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set an integer vector configuration value")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")

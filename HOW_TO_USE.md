@@ -184,76 +184,151 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Python-Specific Improvements
+
+The Python bindings have been enhanced with more comprehensive API features:
+
+#### Enhanced Configuration API
+
+```python
+# Get typed configuration values with error handling
+try:
+    neuron_count = config.getOr("brain.neuron_count", 1000)
+    print(f"Using {neuron_count} neurons")
+except Exception as e:
+    print(f"Configuration error: {e}")
+
+# Set multiple values at once
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
+config.set("plasticity.stdp.enable", True)
+```
+
+#### Advanced Brain Control
+
+```python
+# Create brain with custom configuration
+from pynlm import Config
+
+config = Config()
+config.set("brain.neuron_count", 500)
+config.set("brain.synapse_density", 0.05)
+config.set("plasticity.stdp.learning_rate", 0.002)
+config.set("neuromod.dopamine.scale", 1.5)
+
+brain = Brain(config)
+brain.initialize()
+
+# Enhanced brain statistics
+print(f"=== Brain Statistics ===")
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Synapses: {brain.getTotalSynapseCount()}")
+print(f"Firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"E/I ratio: {brain.getExcitationInhibitionRatio():.3f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
+```
+
+#### Complete Agent with Enhanced Features
 
 ```python
 import pynlm
+from pynlm import Brain, Config, createAgentBrain, createSimpleWorld
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_advanced_agent_simulation(num_steps=2000, with_features=True):
+    """Run advanced agent simulation with all features enabled."""
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
+    # Create configuration with Phase 6 settings
+    config = Config()
     
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
+    # Configure for Phase 6 integration
+    config.set("brain.neuron_count", 800)
+    config.set("brain.synapse_density", 0.08)
+    config.set("neuromod.dopamine.scale", 1.0)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.novelty.enable", True)
+    config.set("plasticity.structural.enable", True)
+    config.set("development.rate", 0.001)
+    
+    # Create components
+    brain = Brain(config)
     brain.initialize()
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    agent = createAgentBrain(brain)
+    world = createSimpleWorld()
     
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    # Configure world
+    world.configure(width=25, height=25, visionWidth=12, visionHeight=12)
     world.reset()
-    world.setAgentStart(10.0, 10.0)
+    world.setAgentStart(12.5, 12.5)
     
-    # 5. Initialize agent with world
+    # Initialize agent with advanced features
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # Enable all learning mechanisms
+    if with_features:
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
     
-    # 7. Run simulation loop
+    # Store metrics for analysis
+    metrics = {
+        'firing_rates': [],
+        'curiosity_levels': [],
+        'novelty_levels': [],
+        'development_stages': [],
+        'rewards': []
+    }
+    
+    # Run advanced simulation
     for step in range(num_steps):
         # Update world
         world.update(timestep=0.1)
         
-        # Get sensory input from world
+        # Get sensory input
         percept = world.getSensoryPercept()
         
-        # Process sensory input in brain
+        # Process with advanced brain features
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Run brain with enhanced capabilities
         brain.step(step)
         
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
+        # Get action with curiosity-driven exploration
+        action = agent.decodeMotorCommand()
         
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        # Apply action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
         
-        # Apply reward modulation
+        # Apply multiple neuromodulation types
         reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
+        predicted_reward = 0.0
+        agent.applyRewardModulation(reward, predicted_reward)
         
-        # Update development
-        agent.updateDevelopment(0.1)
+        # Update development and learning
+        if with_features:
+            agent.updateDevelopment(0.1)
         
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+        # Collect enhanced metrics
+        if step % 50 == 0:
+            metrics['firing_rates'].append(brain.getAverageFiringRate())
+            metrics['curiosity_levels'].append(agent.getCuriosityLevel())
+            metrics['novelty_levels'].append(agent.getNoveltyLevel())
+            metrics['development_stages'].append(brain.getDevelopmentalStage())
+            metrics['rewards'].append(reward)
+    
+    return metrics
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run advanced simulation with detailed analysis
+print("Running advanced agent simulation...")
+metrics = run_advanced_agent_simulation(2000, with_features=True)
+
+print("\n=== Advanced Simulation Results ===")
+print(f"Average firing rate: {sum(metrics['firing_rates'])/len(metrics['firing_rates']):.2f} Hz")
+print(f"Average curiosity: {sum(metrics['curiosity_levels'])/len(metrics['curiosity_levels']):.3f}")
+print(f"Average novelty: {sum(metrics['novelty_levels'])/len(metrics['novelty_levels']):.3f}")
+print(f"Final development stage: {metrics['development_stages'][-1]}")
 ```
 
 ### Key Classes and Methods

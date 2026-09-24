@@ -1,3 +1,9 @@
+// NLM - Neural Learning Machine
+// Neuron Implementation
+//
+// Implements Leaky Integrate-and-Fire (LIF) neuron dynamics for Phase 6
+// Complete artificial brain with real spiking behavior
+
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
@@ -18,7 +24,7 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters - biologically plausible constants
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
