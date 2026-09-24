@@ -125,6 +125,7 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         pImpl->entries.emplace_back(key, value, source);
     }
 }
+}
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
     set(key, ConfigValue(value), source);

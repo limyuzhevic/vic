@@ -15,8 +15,34 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
-    // Initialize logging
+    // Initialize logger
     Logger::getInstance().setLevel(Logger::Level::Info);
+    
+    // Parse command line arguments for config file
+    std::string configFile = "configs/default.cfg";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    
+    // Load configuration from file
+    auto config = std::make_shared<Config>();
+    if (config->loadFromFile(configFile)) {
+        std::cout << "Loaded configuration from: " << configFile << std::endl;
+    } else {
+        std::cout << "Warning: Failed to load configuration from: " << configFile << std::endl;
+        std::cout << "Using default configuration." << std::endl;
+    }
+    
+    // Set experiment-specific configuration
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
@@ -34,7 +60,7 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Integration verification passed!" << std::endl << std::endl;
     
-    // Test individual systems
+    // Run individual system tests
     std::cout << "--- Memory Integration Test ---" << std::endl;
     experiment.testMemoryIntegration();
     std::cout << std::endl;
@@ -53,14 +79,14 @@ int main(int argc, char* argv[]) {
     
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    Phase6Config phase6Config;
+    phase6Config.neuronCount = 500;
+    phase6Config.maxSteps = 2000;
+    phase6Config.enableCheckpointing = true;
+    phase6Config.enableReplay = true;
+    phase6Config.enableDevelopment = true;
     
-    auto result = experiment.run(config);
+    auto result = experiment.run(phase6Config);
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

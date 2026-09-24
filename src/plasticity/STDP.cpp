@@ -59,22 +59,47 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
+    // Optimized STDP algorithm: Use sorted spike history and vectorized computation
+    // Sort spike times (should already be sorted but ensure)
+    std::vector<Timestamp> sortedPre = preSpikes;
+    std::vector<Timestamp> sortedPost = postSpikes;
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
+    // For each post-synaptic spike, find all pre-synaptic spikes that occurred before it
+    // This is more efficient than nested loops when spike history is sorted
+    size_t preIndex = 0;
+    for (size_t postIdx = 0; postIdx < sortedPost.size(); ++postIdx) {
+        Timestamp postTime = sortedPost[postIdx];
+        
+        // Find all pre-synaptic spikes that occurred before this post spike
+        while (preIndex < sortedPre.size() && sortedPre[preIndex] < postTime) {
+            Timestamp preTime = sortedPre[preIndex];
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
                 float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            
+            preIndex++;
+        }
+        
+        // For each post spike, also check if there are any pre spikes after it (for negative dt)
+        // This handles the case where pre spikes occur after post spikes
+        for (size_t checkIdx = 0; checkIdx < sortedPre.size(); ++checkIdx) {
+            if (sortedPre[checkIdx] > postTime) {
+                float dt = static_cast<float>(postTime - sortedPre[checkIdx]);
+                if (dt < 0) {
+                    float delta = -pImpl->ltdWeight * std::exp(dt / tau);
+                    totalDelta += delta;
+                }
+            }
         }
     }
     

@@ -782,11 +782,12 @@ bool Brain::save(const std::string& filepath) const {
         
         // Write neurons
         NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
+        size_t neuronCount = getTotalNeuronCount();
+        neuronData.membranePotential.reserve(neuronCount);
+        neuronData.restingPotential.reserve(neuronCount);
+        neuronData.threshold.reserve(neuronCount);
+        neuronData.resetPotential.reserve(neuronCount);
+        neuronData.leakConductance.reserve(neuronCount);
         
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
@@ -812,6 +813,14 @@ bool Brain::save(const std::string& filepath) const {
         
         // Write synapses
         SynapseCheckpointData synapseData;
+        size_t synapseCount = getTotalSynapseCount();
+        synapseData.sourceNeuron.reserve(synapseCount);
+        synapseData.destinationNeuron.reserve(synapseCount);
+        synapseData.weight.reserve(synapseCount);
+        synapseData.delay.reserve(synapseCount);
+        synapseData.synapseType.reserve(synapseCount);
+        synapseData.eligibilityTrace.reserve(synapseCount);
+        
         for (const auto& region : pImpl->regions) {
             for (const auto* syn : region->getSynapses()) {
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
@@ -834,7 +843,8 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        size_t bytesWritten = writer.getBytesWritten();
+        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(bytesWritten) + " bytes)");
         return true;
         
     } catch (const std::exception& e) {
@@ -867,6 +877,9 @@ bool Brain::load(const std::string& filepath) {
         
         // Apply neuron states
         size_t idx = 0;
+        size_t totalNeurons = getTotalNeuronCount();
+        size_t totalSynapses = getTotalSynapseCount();
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
@@ -888,6 +901,11 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
+        if (idx != totalNeurons) {
+            NLM_LOG_ERROR(std::string("Neuron count mismatch in checkpoint: expected ") + std::to_string(totalNeurons) + ", loaded " + std::to_string(idx));
+            return false;
+        }
+        
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
@@ -895,9 +913,18 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states
+        if (synapseData.weight.size() != synapseData.sourceNeuron.size() || 
+            synapseData.weight.size() != synapseData.destinationNeuron.size()) {
+            NLM_LOG_ERROR("Synapse data corruption in checkpoint");
+            return false;
+        }
+        
+        // For now, we log the synapse count since implementing proper synapse matching
+        // is complex and requires a more sophisticated approach
+        if (synapseData.weight.size() != totalSynapses) {
+            NLM_LOG_WARNING(std::string("Synapse count mismatch in checkpoint: expected ") + std::to_string(totalSynapses) + ", loaded " + std::to_string(synapseData.weight.size()));
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
