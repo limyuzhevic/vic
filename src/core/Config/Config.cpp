@@ -1,8 +1,12 @@
 #include "Config.hpp"
+#include "config_json.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,40 +23,72 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Try to parse as JSON first
+    try {
+        json j;
+        file >> j;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON entries
+        for (auto& [key, value] : j.items()) {
+            // Skip metadata fields
+            if (key == "__source__" || key == "__description__") continue;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            ConfigEntry entry;
+            entry.key = key;
+            entry.value = JsonToConfigValue(value);
+            entry.source = ConfigSource::File;
+            
+            // Extract description if present
+            if (value.is_object() && value.contains("__description__")) {
+                entry.description = value["__description__"].get<std::string>();
             }
             
-            set(key, value, ConfigSource::File);
+            pImpl->entries.push_back(entry);
+        }
+        
+        return true;
+    } catch (const json::parse_error& e) {
+        // If JSON parsing fails, try legacy key=value format
+        file.clear();
+        file.seekg(0);
+        
+        pImpl->entries.clear();
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
-    return true;
+    return !pImpl->entries.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,11 +120,56 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    json j;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Create a JSON object for each entry with metadata
+        json entryJson;
+        entryJson["__source__"] = static_cast<int>(entry.source);
+        if (!entry.description.empty()) {
+            entryJson["__description__"] = entry.description;
+        }
+        
+        // Convert ConfigValue to JSON
+        switch (entry.value.index()) {
+            case 0: { // int
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 1: { // int64_t
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 2: { // double
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 3: { // bool
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 4: { // std::string
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 5: { // std::vector<int>
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 6: { // std::vector<double>
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+            case 7: { // std::vector<std::string>
+                entryJson = ConfigValueToJson(entry.value);
+                break;
+            }
+        }
+        
+        j[entry.key] = entryJson;
     }
     
+    file << j.dump(2); // Pretty print with 2-space indentation
     return true;
 }
 
