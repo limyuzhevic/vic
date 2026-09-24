@@ -8,6 +8,50 @@
 
 namespace nlm {
 
+// Configuration validation system
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    enum class ErrorType { Value, Range, Type, Missing } type;
+};
+
+class ConfigValidation {
+public:
+    // Validate a configuration key's value
+    static bool validateKey(const std::string& key, const ConfigValue& value, 
+                          std::vector<ConfigValidationError>& errors);
+    
+    // Validate all configuration values
+    static bool validateAll(const Config& config, std::vector<ConfigValidationError>& errors);
+    
+    // Check if key exists with required type
+    static bool requiresKey(const std::string& key, const std::type_index& type);
+    
+    // Check value range
+    static bool withinRange(const ConfigValue& value, double min, double max);
+    
+    // Get list of all valid configuration keys
+    static std::vector<std::string> getValidKeys();
+    
+    // Get key type constraints
+    static std::type_index getKeyType(const std::string& key);
+    
+    // Get key validation constraints
+    static bool hasRangeConstraint(const std::string& key, double& min, double& max);
+    static bool hasValueConstraint(const std::string& key, const std::string& constraint);
+};
+
+// Configuration schema for validation
+struct ConfigSchema {
+    std::string key;
+    std::type_index type;
+    bool required;
+    double minValue;
+    double maxValue;
+    std::string description;
+    bool experimental;
+};
+
 // Forward declarations
 class Config;
 
