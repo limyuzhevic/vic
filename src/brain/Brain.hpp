@@ -11,23 +11,24 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+// Forward declarations for event handlers
+class SpikeHandler;
+class MemoryUpdatedHandler;
+class NeuromodulatorUpdatedHandler;
+
+// Debug level enumeration
+enum class DebugLevel {
+    None = 0,
+    Basic = 1,
+    Detailed = 2,
+    Verbose = 3,
+    Profiling = 4
+};
+
+// Type definitions for event handlers
+using SpikeHandler = std::function<void(const SpikeEvent&)>;
+using MemoryUpdatedHandler = std::function<void(const std::vector<NeuronId>& neurons, float totalActivity)>;
+using NeuromodulatorUpdatedHandler = std::function<void(const std::string& neuromodulator, float level, float plasticityFactor)>;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -190,8 +191,45 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Simulation control
+    void pause();
+    void resume();
+    bool isRunning() const;
+    
+    // Simulation time
+    Timestamp getCurrentTime() const;
+    SimulationStep getCurrentStep() const;
+    double getCurrentTimestep() const;
+    
+    // Performance monitoring
+    size_t getActiveNeuronCount() const;
+    size_t getTotalSpikeCount() const;
+    size_t getPendingSpikeEventCount() const;
+    float getAverageFiringRate() const;
+    float getExcitationInhibitionRatio() const;
+    
+    // Configuration validation
+    bool validateConfiguration() const;
+    
+    // Event handlers for advanced users
+    void registerSpikeHandler(SpikeHandler handler);
+    void registerMemoryUpdatedHandler(MemoryUpdatedHandler handler);
+    void registerNeuromodulatorUpdatedHandler(NeuromodulatorUpdatedHandler handler);
+    
+    // Performance tuning
+    void setMaxSimulationSteps(size_t maxSteps);
+    void setMemoryLimit(size_t memoryBytes);
+    void setThreadCount(size_t threads);
+    
+    // Checkpoint and save management
+    bool saveCheckpoint(const std::string& name = "");
+    bool saveSnapshot(const std::string& filename) const;
+    
+    // Development and debugging tools
+    void enableDebugMode();
+    void setDebugLevel(DebugLevel level);
+    void enablePerformanceProfiling();
+    std::string getPerformanceStats() const;
     
 private:
     struct Impl;

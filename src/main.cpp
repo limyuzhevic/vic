@@ -7,17 +7,29 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
+// NLM (熙然) - Neural Learning Machine
+// Phase 2: Real Neural Computation
+//
+// This phase implements real spiking neural computation with:
+// - Leaky Integrate-and-Fire (LIF) neurons
+// - Event-driven spike propagation with synaptic delays
+// - STDP and Hebbian plasticity
+// - Structural plasticity (synaptogenesis/pruning)
+
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "brain/SpikeSystem.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "cognition/NeuralPlanner.hpp"
+#include "neuromodulation/Dopamine.hpp"
+#include "neuromodulation/Curiosity.hpp"
+#include "neuromodulation/Novelty.hpp"
+#include "neuromodulation/PredictionError.hpp"
+#include "development/DevelopmentSystem.hpp"
+#include "plasticity/StructuralPlasticity.hpp"
+#include "performance/CheckpointSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,8 +37,146 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <unordered_map>
+#include <functional>
+#include <algorithm>
+#include <chrono>
 
 using namespace nlm;
+
+// Global NLM instance for callbacks
+static std::shared_ptr<nlm::Brain> globalBrainInstance;
+
+// Performance profiling
+struct PerformanceProfiler {
+    std::chrono::steady_clock::time_point startTime;
+    std::map<std::string, double> stageTimes;
+    bool enabled = false;
+    
+    void start(const std::string& stage) {
+        if (enabled) {
+            startTime = std::chrono::steady_clock::now();
+        }
+    }
+    
+    void end(const std::string& stage) {
+        if (enabled) {
+            auto endTime = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000.0;
+            stageTimes[stage] = duration;
+        }
+    }
+    
+    std::string getReport() const {
+        std::stringstream ss;
+        ss << "=== Performance Profile ===\n";
+        ss << "Total time: " << stageTimes.empty() ? 0.0 : std::accumulate(stageTimes.begin(), stageTimes.end(), 0.0,
+                          [](double sum, const auto& p) { return sum + p.second; }) << " ms\n";
+        for (const auto& [stage, time] : stageTimes) {
+            ss << stage << ": " << time << " ms\n";
+        }
+        return ss.str();
+    }
+};
+
+static PerformanceProfiler profiler;
+
+// Custom event handlers
+void defaultSpikeHandler(const SpikeEvent& event) {
+    // Default handler that logs spikes periodically
+    static int spikeCount = 0;
+    if (++spikeCount % 1000 == 0) {
+        NLM_LOG_DEBUG("Spike event: neuron " + std::to_string(event.neuronId.index()) +
+                     " at time " + std::to_string(event.time) + "ms");
+    }
+}
+
+void defaultMemoryUpdatedHandler(const std::vector<NeuronId>& neurons, float totalActivity) {
+    // Default handler that logs memory updates
+    if (totalActivity > 0.5f) {
+        NLM_LOG_DEBUG("Memory updated: " + std::to_string(neurons.size()) + " neurons, " +
+                     std::to_string(totalActivity) + " activity");
+    }
+}
+
+void defaultNeuromodulatorUpdatedHandler(const std::string& neuromodulator, float level, float plasticityFactor) {
+    // Default handler that logs neuromodulator updates
+    NLM_LOG_DEBUG("Neuromodulator " + neuromodulator + ": level=" + std::to_string(level) +
+                 " plasticity_factor=" + std::to_string(plasticityFactor));
+}
+
+void setupAdvancedFeatures(nlm::Brain* brain) {
+    // Register custom handlers
+    brain->registerSpikeHandler(defaultSpikeHandler);
+    brain->registerMemoryUpdatedHandler(defaultMemoryUpdatedHandler);
+    brain->registerNeuromodulatorUpdatedHandler(defaultNeuromodulatorUpdatedHandler);
+    
+    // Enable performance profiling
+    brain->enablePerformanceProfiling();
+    
+    // Set up advanced configuration
+    auto config = brain->getConfig();
+    if (config) {
+        // Validate configuration
+        if (!brain->validateConfiguration()) {
+            NLM_LOG_WARNING("Configuration validation failed - using defaults");
+        }
+        
+        // Set advanced parameters if not already set
+        if (!config->get<bool>("enable_performance_profiling")) {
+            config->set("enable_performance_profiling", true, ConfigSource::Default);
+        }
+    }
+}
+
+void parseAdvancedArgs(int argc, char** argv, bool& enableProfiling,
+                         std::string& debugLevel, std::string& checkpointName,
+                         std::string& performanceMode, size_t& maxSteps,
+                         size_t& memoryLimit, std::vector<std::string>& features,
+                         bool& validateConfig, bool& enableSIMD,
+                         size_t& threadCount, bool& enableMemoryPools,
+                         int& memoryCompression) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--profile") {
+            enableProfiling = true;
+        } else if (arg == "--help" || arg == "-h") {
+            printBanner();
+            printAdvancedHelp();
+            exit(0);
+        } else if (arg.find("--debug-level=") == 0) {
+            debugLevel = arg.substr(15);
+        } else if (arg.find("--checkpoint=") == 0) {
+            checkpointName = arg.substr(12);
+        } else if (arg.find("--performance-mode=") == 0) {
+            performanceMode = arg.substr(20);
+        } else if (arg.find("--max-steps=") == 0) {
+            maxSteps = static_cast<size_t>(std::stoi(arg.substr(11)));
+        } else if (arg.find("--memory-limit=") == 0) {
+            memoryLimit = static_cast<size_t>(std::stoull(arg.substr(16)));
+        } else if (arg.find("--enable-features=") == 0) {
+            std::string featuresStr = arg.substr(18);
+            size_t pos = 0;
+            while ((pos = featuresStr.find(',')) != std::string::npos) {
+                features.push_back(featuresStr.substr(0, pos));
+                featuresStr.erase(0, pos + 1);
+            }
+            features.push_back(featuresStr);
+        } else if (arg == "--validate-config") {
+            validateConfig = true;
+        } else if (arg == "--enable-simd") {
+            enableSIMD = true;
+        } else if (arg.find("--thread-count=") == 0) {
+            threadCount = static_cast<size_t>(std::stoi(arg.substr(15)));
+        } else if (arg == "--enable-memory-pools") {
+            enableMemoryPools = true;
+        } else if (arg.find("--memory-compression=") == 0) {
+            memoryCompression = std::stoi(arg.substr(22));
+        }
+    }
+}
 
 void printBanner() {
     std::cout << R"(
@@ -356,11 +506,58 @@ int main(int argc, char** argv) {
         }
     }
     
+    // Parse advanced command line arguments
+    bool enableProfiling = false;
+    std::string debugLevel = "info";
+    std::string checkpointName = "";
+    std::string performanceMode = "balanced";
+    size_t maxSteps = 0;  // 0 = unlimited
+    size_t memoryLimit = 0;  // 0 = unlimited
+    std::vector<std::string> features;
+    bool validateConfig = false;
+    bool enableSIMD = false;
+    size_t threadCount = 1;
+    bool enableMemoryPools = false;
+    int memoryCompression = 0;
+    
+    parseAdvancedArgs(argc, argv, enableProfiling, debugLevel, checkpointName, 
+                     performanceMode, maxSteps, memoryLimit, features, validateConfig,
+                     enableSIMD, threadCount, enableMemoryPools, memoryCompression);
+    
+    // Configure logging based on debug level
+    LogLevel logLevel = LogLevel::Info;
+    if (debugLevel == "debug" || debugLevel == "verbose" || debugLevel == "profiling") {
+        logLevel = LogLevel::Debug;
+    }
+    consoleLogger->setLevel(logLevel);
+    
+    // Apply advanced configuration to brain
+    config->set("enable_profiling", enableProfiling, ConfigSource::CommandLine);
+    config->set("debug_level", debugLevel, ConfigSource::CommandLine);
+    config->set("performance_mode", performanceMode, ConfigSource::CommandLine);
+    config->set("max_steps", static_cast<int64_t>(maxSteps), ConfigSource::CommandLine);
+    config->set("memory_limit", static_cast<int64_t>(memoryLimit), ConfigSource::CommandLine);
+    config->set("enable_simd", enableSIMD, ConfigSource::CommandLine);
+    config->set("thread_count", static_cast<int64_t>(threadCount), ConfigSource::CommandLine);
+    config->set("enable_memory_pools", enableMemoryPools, ConfigSource::CommandLine);
+    config->set("memory_compression", static_cast<int64_t>(memoryCompression), ConfigSource::CommandLine);
+    
+    // Validate configuration if requested
+    if (validateConfig) {
+        NLM_LOG_INFO("Validating configuration...");
+        if (!globalBrainInstance->validateConfiguration()) {
+            NLM_LOG_WARNING("Configuration validation failed - continuing with defaults");
+        }
+    }
+    
+    // Store global brain instance for callbacks
+    globalBrainInstance = std::make_shared<Brain>(config);
+    
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Failed to load configuration from " + configFile + ". Using default configuration.");
     }
     
     // Override with command line args
@@ -400,10 +597,13 @@ int main(int argc, char** argv) {
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Failed to initialize brain! Configuration:");
+        NLM_LOG_ERROR("  neurons: " + std::to_string(config->getOr<size_t>("neuron_count", 0)));
+        NLM_LOG_ERROR("  regions: " + std::to_string(config->getOr<size_t>("region_count", 0)));
+        NLM_LOG_ERROR("  timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.0)));
         return 1;
     }
     

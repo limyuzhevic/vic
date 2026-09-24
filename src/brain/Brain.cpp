@@ -159,7 +159,12 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    if (pImpl != nullptr) {
+        delete pImpl;
+        pImpl = nullptr;
+    }
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -167,7 +172,10 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Properly handle null pointer case
+        if (pImpl != nullptr) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
