@@ -71,8 +71,13 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Implements real synaptic dynamics with short-term plasticity and eligibility traces
+    // Uses default timestep (typically 1ms)
     void step(Timestamp currentTime);
+    
+    // Update synapse for one simulation step with custom timestep
+    // Enables more precise synaptic dynamics control
+    void step(Timestamp currentTime, TimestepDuration dt);
     
     // Reset to initial state
     void reset();

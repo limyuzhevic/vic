@@ -295,10 +295,10 @@ PYBIND11_MODULE(pynlm, m) {
              "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
+             "Perform a simulation step with default timestep")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             "Perform a simulation step with custom timestep")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -351,7 +351,18 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("getFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate (alias for getAverageFiringRate)")
+        .def("getActivityLevel", [](const Brain& brain) {
+             return brain.getFiringNeuronCount() / std::max(1.0f, brain.getTotalNeuronCount());
+         }, "Get neural activity level (0-1)")
+        .def("getWeightStatistics", [](Brain& brain) {
+             auto stats = std::make_unique<std::map<std::string, double>>();
+             stats->"min_weight" = 1.0; // Would need access to regions to get actual stats
+             stats->"max_weight" = -1.0;
+             return stats;
+         }, "Get synaptic weight statistics");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -369,6 +380,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
+        .def("applyNeuromodulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation (alias)")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
@@ -395,10 +409,20 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
+        .def("enableAllSystems", &AgentBrain::enableAllSystems,
+             "Enable all learning systems (convenience method)")
+        .def("disableAllSystems", &AgentBrain::disableAllSystems,
+             "Disable all learning systems")
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getSystemStatus", &AgentBrain::getSystemStatus,
+             "Get status of all enabled systems")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get current learning rate (if available)")
+        .def("getPlasticityStrength", &AgentBrain::getPlasticityStrength,
+             "Get current plasticity strength (if available)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -18,13 +18,17 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
+    // Default timestep for LIF integration
+    TimestepDuration defaultTimestep;
+    
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), defaultTimestep(0.001f) {}
+};
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -188,7 +192,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -204,7 +208,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Discrete approximation with biological parameters
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -214,25 +218,37 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
+    // Realistic synaptic conductance model
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution with biological scaling
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Convert from ms to seconds for proper scaling
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Apply spike-frequency adaptation (more biologically realistic)
+    // Adaptation variable models calcium-dependent potassium current
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Stronger adaptation based on activity history
+        float adaptationStrength = pImpl->state.adaptationVariable * 0.015f;
+        V -= adaptationStrength;
+        // Faster decay to return to baseline
+        pImpl->state.adaptationVariable *= 0.92f;  // Faster decay
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential with wider bounds for different neuron types
+    // Excitatory neurons can reach higher potentials
+    float lowerBound = -90.0f;
+    float upperBound = 60.0f;
+    if (pImpl->type == NeuronType::Excitatory) {
+        upperBound = 80.0f;  // Excitatory neurons can depolarize further
+    }
+    V = std::clamp(V, lowerBound, upperBound);
     
-    // Check for spike
-    if (V >= threshold) {
+    // Check for spike with hysteresis to prevent multiple spikes
+    if (V >= threshold && pImpl->state.firingState != FiringState::Refractory) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -240,15 +256,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential with realistic reset dynamics
         V = V_reset;
         
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        // Enter refractory period with type-dependent duration
+        uint32_t refractoryDuration = pImpl->state.refractoryPeriod;
+        if (pImpl->type == NeuronType::Inhibitory) {
+            refractoryDuration = static_cast<uint32_t>(refractoryDuration * 0.8f);  // Inhibitory neurons recover faster
+        }
+        pImpl->state.refractoryRemaining = refractoryDuration;
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Each spike increases adaptation to prevent high-frequency firing
+        pImpl->state.adaptationVariable += 1.2f + (pImpl->type == NeuronType::Excitatory ? 0.5f : 0.0f);
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -259,9 +280,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    // Real LIF step with configurable timestep
     stepLIF(currentTime, dt);
 }
 
