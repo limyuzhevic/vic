@@ -2,6 +2,8 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 namespace test_config {
 
@@ -78,12 +80,95 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigErrorHandling() {
+    nlm::Config config;
+    
+    // Set a string value
+    config.set("str_value", std::string("hello"), nlm::ConfigSource::Runtime);
+    
+    // Try to get it as an int - should return nullopt without crashing
+    auto intVal = config.get<int>("str_value");
+    assert(!intVal.has_value());  // Should be null
+    
+    // Set an int value
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    
+    // Try to get it as a string - should return nullopt without crashing
+    auto stringVal = config.get<std::string>("int_value");
+    assert(!stringVal.has_value());  // Should be null
+    
+    std::cout << "    testConfigErrorHandling passed" << std::endl;
+}
+
+void testConfigSaveLoadFile() {
+    nlm::Config config;
+    
+    // Set various types of values
+    config.set("int_val", 42, nlm::ConfigSource::Runtime);
+    config.set("double_val", 3.14159, nlm::ConfigSource::Runtime);
+    config.set("string_val", std::string("test_string"), nlm::ConfigSource::Runtime);
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    config.set("int_vec", std::vector<int>{1, 2, 3}, nlm::ConfigSource::Runtime);
+    config.set("double_vec", std::vector<double>{1.1, 2.2, 3.3}, nlm::ConfigSource::Runtime);
+    
+    // Create a temporary file path
+    const std::string tempFile = "test_config_temp.cfg";
+    
+    // Save to file
+    assert(config.saveToFile(tempFile));
+    
+    // Create a new config and load from file
+    nlm::Config config2;
+    assert(config2.loadFromFile(tempFile));
+    
+    // Verify all values were loaded correctly
+    auto intVal = config2.get<int>("int_val");
+    assert(intVal.has_value() && *intVal == 42);
+    
+    auto doubleVal = config2.get<double>("double_val");
+    assert(doubleVal.has_value());
+    assert(*doubleVal > 3.1415 && *doubleVal < 3.1416);
+    
+    auto stringVal = config2.get<std::string>("string_val");
+    assert(stringVal.has_value() && *stringVal == "test_string");
+    
+    auto boolVal = config2.get<bool>("bool_val");
+    assert(boolVal.has_value() && *boolVal == true);
+    
+    auto intVecVal = config2.get<std::vector<int>>("int_vec");
+    assert(intVecVal.has_value() && intVecVal->size() == 3);
+    assert((*intVecVal)[0] == 1 && (*intVecVal)[1] == 2 && (*intVecVal)[2] == 3);
+    
+    // Clean up
+    std::remove(tempFile.c_str());
+    
+    std::cout << "    testConfigSaveLoadFile passed" << std::endl;
+}
+
+void testConfigSummary() {
+    nlm::Config config;
+    
+    config.set("key1", 42, nlm::ConfigSource::Default);
+    config.set("key2", std::string("test"), nlm::ConfigSource::File);
+    config.set("key3", 3.14, nlm::ConfigSource::CommandLine);
+    
+    std::string summary = config.summary();
+    assert(summary.find("key1") != std::string::npos);
+    assert(summary.find("key2") != std::string::npos);
+    assert(summary.find("key3") != std::string::npos);
+    
+    std::cout << "    testConfigSummary passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigErrorHandling();
+    testConfigSaveLoadFile();
+    testConfigSummary();
 }
 
 } // namespace test_config

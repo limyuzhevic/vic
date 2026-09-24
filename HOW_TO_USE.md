@@ -422,35 +422,28 @@ pynlm.WorldObjectType.Marker
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `random_seed` | int64 | 42 | Random seed for reproducible experiments |
+| `simulation_timestep` | double | 0.001 | Simulation timestep in seconds |
+| `neuron_count` | int64 | 1000 | Number of neurons in the brain |
+| `region_count` | int64 | 2 | Number of brain regions |
+| `connection_probability` | float | 0.1 | Connection probability for random connectivity |
+| `stdp_ltp_weight` | float | 0.01 | STDP Long-Term Potentiation weight |
+| `stdp_ltd_weight` | float | 0.012 | STDP Long-Term Depression weight |
+| `stdp_tau` | float | 20.0 | STDP time constant |
+| `synaptogenesis_rate` | float | 0.001 | Development synaptogenesis rate |
+| `pruning_rate` | float | 0.0001 | Development pruning rate |
+| `dopamine_baseline` | float | 0.1 | Dopamine neuromodulation baseline |
+| `reward_discount_factor` | float | 0.99 | Reward discount factor |
+| `environment_name` | string | GridWorld | Environment name |
+| `environment_width` | int | 10 | Environment width |
+| `environment_height` | int | 10 | Environment height |
+| `log_level` | string | INFO | Logging level |
+| `log_to_file` | bool | false | Log to file |
+| `log_filename` | string | nlm.log | Log filename |
+| `max_simulation_steps` | int | 10000 | Maximum simulation steps |
+| `simulation_time_limit` | double | 0.0 | Simulation time limit |
+| `visualization_enabled` | bool | false | Enable visualization |
+| `visualization_update_rate` | float | 30.0 | Visualization update rate |
 
 ---
 
