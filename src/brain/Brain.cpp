@@ -509,12 +509,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// Update prediction system error and confidence
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // This enables predictive coding and error minimization
+        
+        // For now, implement basic prediction error tracking
+        // TODO: Integrate with sensory input for real prediction
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a simple prediction based on recent neural activity
+            float predictionError = 0.0f;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                const auto& state = neuron->getState();
+                if (state.firingState == FiringState::Active) {
+                    // Predict continued firing
+                    predictionError += 0.1f;
+                } else {
+                    // Predict reduced firing
+                    predictionError += 0.05f;
+                }
+            }
+            pImpl->predictionSystem->updatePredictions(predictionError, predictionError);
+        }
+        
+        // Update prediction system confidence based on prediction error
+        float error = pImpl->predictionSystem->getPredictionError();
+        if (error > 0.5f) {
+            // High error reduces confidence
+            pImpl->predictionSystem->updateConfidence(-0.05f);
+        } else if (error < 0.1f) {
+            // Low error increases confidence
+            pImpl->predictionSystem->updateConfidence(0.02f);
+        }
+        
+        // Use prediction error to modulate neuromodulation systems
+        if (pImpl->predictionError && pImpl->dopamine) {
+            // Prediction error drives dopamine release
+            float predError = pImpl->predictionSystem->getPredictionError();
+            pImpl->predictionError->updatePredictionError(predError);
+            
+            // Dopamine modulates prediction error learning rate
+            float learningRate = pImpl->predictionError->getLearningRate();
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLearningRate(learningRate * dopamineLevel);
+        }
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -523,13 +563,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Store attended neurons in attention system for concept formation
+            for (const auto& neuronId : pImpl->attention->getWinners()) {
+                float salience = 0.5f; // Base salience, could be calculated from activity
+                pImpl->attention->applyBottomUpSalience(neuronId, salience);
+            }
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form and update concepts
+        
+        // Get current neural activation patterns
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentPattern.push_back(activation);
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Extract features from neural pattern
+            std::vector<float> features = extractNeuralFeatures(currentPattern);
+            
+            // Present pattern to concept formation system
+            SimulationStep currentTime = pImpl->currentStep;
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentTime
+            );
+            
+            // If new concept formed, record in episodic memory
+            if (conceptId > 0) {
+                // Store concept formation event in episodic memory
+                EpisodicMemoryItem conceptEvent;
+                conceptEvent.timestamp = currentStep;
+                conceptEvent.conceptId = conceptId;
+                conceptEvent.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                conceptEvent.neuronActivations = currentPattern;
+                
+                if (pImpl->episodicMemory) {
+                    pImpl->episodicMemory->storeEpisode(conceptEvent);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
