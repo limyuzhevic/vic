@@ -52,6 +52,14 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get action cost factor
+    float getActionCost() const;
+    void setActionCost(float cost);
+    
+    // Get exploration temperature for action selection
+    float getExplorationTemperature() const;
+    void setExplorationTemperature(float temp);
+    
     // Reset agent for new episode
     void reset();
     
@@ -98,6 +106,10 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    
+    // Action selection parameters
+    float actionCost_;
+    float explorationTemperature_;
     
     // Development state
     double developmentalAge_;

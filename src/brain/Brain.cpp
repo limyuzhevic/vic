@@ -685,8 +685,30 @@ size_t Brain::getTotalSpikeCount() const {
     return pImpl->totalSpikesTotal;
 }
 
-size_t Brain::getPendingSpikeEventCount() const {
-    return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
+float Brain::getNeuromodulationFactor() const {
+    float totalFactor = 1.0f;
+    
+    if (pImpl->dopamine) {
+        float level = pImpl->dopamine->getLevel();
+        totalFactor *= (1.0f + std::abs(level));
+    }
+    
+    if (pImpl->novelty) {
+        float level = pImpl->novelty->getLevel();
+        totalFactor *= (1.0f + level);
+    }
+    
+    if (pImpl->curiosity) {
+        float level = pImpl->curiosity->getLevel();
+        totalFactor *= (1.0f + level);
+    }
+    
+    if (pImpl->predictionError) {
+        float level = pImpl->predictionError->getLevel();
+        totalFactor *= (1.0f + std::abs(level));
+    }
+    
+    return totalFactor;
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {

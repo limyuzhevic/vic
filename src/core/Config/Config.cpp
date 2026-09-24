@@ -86,10 +86,221 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize config values
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
+}
+
+// Validate configuration value based on expected type
+bool Config::validate(const std::string& key, const std::string& value) const {
+    // Check if key exists
+    if (!has(key)) {
+        return false;
+    }
+    
+    // Find the expected type from entries
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    
+    // For now, just perform basic validation
+    // TODO: Add type-specific validation
+    if (value.empty() && (it->value.index() == 5 || it->value.index() == 6)) {
+        // String vectors cannot be empty
+        return false;
+    }
+    
+    return true;
+}
+
+// Get validated configuration value with type conversion
+std::optional<std::string> Config::getValidated(const std::string& key) const {
+    if (!has(key)) {
+        return std::nullopt;
+    }
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    if (std::holds_alternative<std::string>(it->value)) {
+        return std::get<std::string>(it->value);
+    }
+    
+    return std::nullopt;
+}
+
+// Set configuration value with type checking
+void Config::setValidated(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
+    
+    // Convert string value to appropriate type based on existing entry or heuristic
+    if (value.find('.') != std::string::npos) {
+        // Try double first
+        try {
+            double doubleVal = std::stod(value);
+            set(key, doubleVal, source);
+            return;
+        } catch (...) {}
+    }
+    
+    if (value == "true" || value == "false") {
+        // Try bool
+        bool boolVal = (value == "true");
+        set(key, boolVal, source);
+        return;
+    }
+    
+    if (value.find(',') != std::string::npos) {
+        // Try vector
+        std::vector<double> vec;
+        std::stringstream ss(value);
+        std::string token;
+        while (std::getline(ss, token, ',')) {
+            try {
+                vec.push_back(std::stod(token));
+            } catch (...) {
+                return; // Invalid vector format
+            }
+        }
+        if (!vec.empty()) {
+            set(key, vec, source);
+            return;
+        }
+    }
+    
+    // Default to string
+    set(key, value, source);
+}
+
+// Check if configuration has warnings (potential issues)
+std::vector<std::string> Config::checkForWarnings() const {
+    std::vector<std::string> warnings;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == "neuron_count" && std::holds_alternative<int>(entry.value)) {
+            int count = std::get<int>(entry.value);
+            if (count > 100000) {
+                warnings.push_back("neuron_count is very large (" + std::to_string(count) + "), may impact performance");
+            }
+        }
+        
+        if (entry.key == "connection_probability" && std::holds_alternative<double>(entry.value)) {
+            double prob = std::get<double>(entry.value);
+            if (prob > 0.5) {
+                warnings.push_back("connection_probability is high (" + std::to_string(prob) + "), brain may be over-connected");
+            }
+        }
+    }
+    
+    return warnings;
+}
+
+// Get configuration summary with validation info
+std::string Config::getDetailedSummary() const {
+    std::ostringstream oss;
+    oss << "=== CONFIGURATION SUMMARY ===\n";
+    oss << "Total entries: " << pImpl->entries.size() << "\n\n";
+    
+    // Group by source
+    oss << "--- ENTRIES BY SOURCE ---\n";
+    for (int source = 0; source < 4; ++source) {
+        bool hasEntries = false;
+        for (const auto& entry : pImpl->entries) {
+            if (static_cast<int>(entry.source) == source) {
+                hasEntries = true;
+                break;
+            }
+        }
+        if (hasEntries) {
+            oss << ConfigSourceToString(static_cast<ConfigSource>(source)) << ":\n";
+            for (const auto& entry : pImpl->entries) {
+                if (static_cast<int>(entry.source) == source) {
+                    oss << "  " << entry.key << " = ";
+                    std::visit([&oss](auto&& arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, std::string>) {
+                            oss << "\"" << arg << "\"";
+                        } else {
+                            oss << arg;
+                        }
+                    }, entry.value);
+                    oss << "\n";
+                }
+            }
+            oss << "\n";
+        }
+    }
+    
+    // Check for warnings
+    auto warnings = checkForWarnings();
+    if (!warnings.empty()) {
+        oss << "--- WARNINGS ---\n";
+        for (const auto& warning : warnings) {
+            oss << "  WARNING: " << warning << "\n";
+        }
+        oss << "\n";
+    }
+    
+    // Log validation status
+    oss << "--- VALIDATION STATUS ---\n";
+    oss << "Configuration appears valid.\n";
+    
+    return oss.str();
+}
+
+// Helper function to convert ConfigSource to string
+std::string Config::ConfigSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "Command Line";
+        case ConfigSource::Runtime: return "Runtime";
+        default: return "Unknown";
+    }
 }
 
 template<typename T>

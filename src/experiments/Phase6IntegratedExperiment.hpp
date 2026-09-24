@@ -46,6 +46,9 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float activeTraceCount;
+    float totalSpikeCount;
+    float spikingNeurons;
     
     // Timestamps
     time_t startTime;
@@ -67,6 +70,9 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , activeTraceCount(0.0f)
+        , totalSpikeCount(0.0f)
+        , spikingNeurons(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}

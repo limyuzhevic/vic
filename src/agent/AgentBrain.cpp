@@ -334,6 +334,22 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getActionCost() const {
+    return actionCost_;
+}
+
+void AgentBrain::setActionCost(float cost) {
+    actionCost_ = std::clamp(cost, 0.0f, 1.0f);
+}
+
+float AgentBrain::getExplorationTemperature() const {
+    return explorationTemperature_;
+}
+
+void AgentBrain::setExplorationTemperature(float temp) {
+    explorationTemperature_ = std::max(0.0f, temp);
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -342,6 +358,8 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    actionCost_ = 0.1f;
+    explorationTemperature_ = 0.5f;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);

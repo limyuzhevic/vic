@@ -81,6 +81,20 @@ public:
     // Check existence
     bool has(const std::string& key) const;
     
+    // Enhanced configuration methods
+    bool validate(const std::string& key, const std::string& value) const;
+    std::optional<std::string> getValidated(const std::string& key) const;
+    void setValidated(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration analysis
+    std::vector<std::string> checkForWarnings() const;
+    std::string getDetailedSummary() const;
+    
+    // Helper functions
+    static std::string ConfigSourceToString(ConfigSource source);
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
     // Remove key
     void remove(const std::string& key);
     
@@ -96,10 +110,6 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm

@@ -340,8 +340,53 @@ PYBIND11_MODULE(pynlm, m) {
              "Get average firing rate across all neurons")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
              "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+.def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+              "Get total spike count")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+              "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+              "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+              "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+              "Get excitation/inhibition balance ratio")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+              py::return_value_policy::reference_internal,
+              "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+              py::return_value_policy::reference_internal,
+              "Get episodic memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+              py::return_value_policy::reference_internal,
+              "Get prediction system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+              py::return_value_policy::reference_internal,
+              "Get development system")
+        .def("getPlanner", &Brain::getPlanner,
+              py::return_value_policy::reference_internal,
+              "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+              py::return_value_policy::reference_internal,
+              "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+              py::return_value_policy::reference_internal,
+              "Get attentional selection system")
+        .def("getDopamine", &Brain::getDopamine,
+              py::return_value_policy::reference_internal,
+              "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+              py::return_value_policy::reference_internal,
+              "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+              py::return_value_policy::reference_internal,
+              "Get novelty detection system")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+              py::return_value_policy::reference_internal,
+              "Get spike system")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+              "Get count of pending spike events")
+        .def("getNeuromodulationFactor", &Brain::getNeuromodulationFactor,
+              "Get overall neuromodulation factor")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -350,6 +395,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
@@ -398,28 +446,74 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getActionCost", &AgentBrain::getActionCost,
+             "Get action cost factor")
+        .def("setActionCost", &AgentBrain::setActionCost,
+             py::arg("cost"),
+             "Set action cost factor")
+        .def("getExplorationTemperature", &AgentBrain::getExplorationTemperature,
+             "Get exploration temperature for action selection")
+        .def("setExplorationTemperature", &AgentBrain::setExplorationTemperature,
+             py::arg("temp"),
+             "Set exploration temperature for action selection");
 
+    // Convenience functions
+    
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(std::make_shared<Config>());
+    }, "Create a brain with default configuration");
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
+    m.def("createSimpleWorld", [](float width, float height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create and configure a simple world");
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, int steps) {
+        brain->reset();
+        world->reset();
+        brain->initialize();
+        world->setAgentStart(world->getWidth() / 2.0f, world->getHeight() / 2.0f);
+        
+        for (int i = 0; i < steps; ++i) {
+            world->update(0.1);  // 100ms timestep
+            auto percept = world->getSensoryPercept();
+            brain->receiveSensoryInput(percept);
+            auto action = brain->produceAction();
+            world->applyMotorCommand(action->getType(), 0.1);
+        }
+        
+        return brain->produceAction();
+    }, py::arg("brain"), py::arg("world"), py::arg("steps"),
+       "Run a simulation for specified number of steps");
+    
+    // Version checking and utility functions
+    
+    m.def("getVersion", []() {
+        return "NLM Python Bindings v1.0.0";
+    }, "Get the version of the NLM Python bindings");
+    
+    m.def("getPlatformInfo", []() {
+        return "Python " + std::string(Py_GetVersion()) + 
+               " | Compiled with pybind11 " PYBIND11_VERSION;
+    }, "Get platform information");
 
 } // namespace nlm

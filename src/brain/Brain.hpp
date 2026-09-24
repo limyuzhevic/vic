@@ -89,8 +89,10 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
-    // Statistics
-    float getExcitationInhibitionRatio() const;
+    // Compute overall neuromodulation factor
+    float getNeuromodulationFactor() const;
+    
+    // Get total spike statistics
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
