@@ -21,6 +21,12 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Python bindings support
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+# Set Python module output directory
+set(PYTHON_MODULE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/python")
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -97,6 +103,7 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +111,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +119,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,6 +127,7 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -125,27 +135,181 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Python bindings
+# Find pybind11
+find_package(pybind11 REQUIRED)
+
+# Python bindings for NLM
+pybind11_add_module(pynlm python/bindings.cpp)
+target_include_directories(pynlm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${PYTHON_INCLUDE_DIRS}
+)
+target_link_libraries(pynlm PRIVATE nlm_core)
+set_target_properties(pynlm PROPERTIES
+    OUTPUT_NAME "pynlm"
+    PREFIX ""
+    SUFFIX ".so"
+)
+
+# Copy Python module to build directory
+add_custom_command(TARGET pynlm POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PYTHON_MODULE_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pynlm> ${PYTHON_MODULE_OUTPUT_DIR}/
+    COMMENT "Copying Python module to build directory"
+)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Documentation generation
+find_program(DOT doxygen PATHS /usr/bin /usr/local/bin REQUIRED)
+
+# Configure documentation
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile
+    @ONLY
+)
+
+# Add custom targets for documentation
+add_custom_target(docs
+    COMMAND ${DOT} docs/Doxyfile
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Generating documentation"
+    VERBATIM
+)
+
+# Add custom targets for Python module installation
+add_custom_target(python_module
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PYTHON_MODULE_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:pynlm> ${PYTHON_MODULE_OUTPUT_DIR}/
+    COMMENT "Creating Python module distribution"
+    DEPENDS pynlm
+)
+
+# Install Python module
+install(FILES ${PYTHON_MODULE_OUTPUT_DIR}/pynlm.so
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/python3.8/site-packages
+    OPTIONAL
+)
+
+# Install configuration files
+install(DIRECTORY configs/
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm
+    FILES_MATCHING PATTERN "*.cfg"
+)
+
+# Install documentation
+install(DIRECTORY docs/
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm/doc
+    FILES_MATCHING PATTERN "*.md"
+)
+
+# Install convenience module documentation
+install(FILES python/NLM_CONVENIENCE.md
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm/doc
+)
+
+# Install improvements summary
+install(FILES IMPROVEMENTS_SUMMARY.md
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm/doc
+)
+
+# Add test targets for Python bindings
+enable_testing()
+
+# Find Python for testing
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+# Add Python test target
+add_test(NAME python_bindings_test
+    COMMAND ${Python3_EXECUTABLE} -c "
+import sys
+sys.path.insert(0, '${PYTHON_MODULE_OUTPUT_DIR}')
+try:
+    import pynlm
+    print('Python bindings test PASSED')
+    sys.exit(0)
+except Exception as e:
+    print(f'Python bindings test FAILED: {e}')
+    sys.exit(1)
+"
+)
+
+# Set test properties
+
+# Add custom target for running all tests
+add_custom_target(runtests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    COMMENT "Running all tests"
+    VERBATIM
+)
+
+# Summary
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Python bindings: ${Python3_EXECUTABLE}")
+message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Core library: nlm_core")
+message(STATUS "  Agent library: nlm_agent")
+message(STATUS "  World library: nlm_world")
+message(STATUS "  Python module: pynlm")
+message(STATUS "  Documentation target: docs")
+message(STATUS "  Python module target: python_module")
+message(STATUS "  Test target: runtests")
+
+# Create a summary file with build information
+file(WRITE ${CMAKE_BINARY_DIR}/BUILD_INFO.txt
+    "NLM Build Summary:\n"
+    "==================\n\n"
+    "Build type: ${CMAKE_BUILD_TYPE}\n"
+    "C++ standard: ${CMAKE_CXX_STANDARD}\n"
+    "Python interpreter: ${Python3_EXECUTABLE}\n"
+    "\n"
+    "Targets:\n"
+    "  - nlm (main executable)\n"
+    "  - nlm_core (core library)\n"
+    "  - nlm_agent (agent library)\n"
+    "  - nlm_world (world library)\n"
+    "  - nlm_phase3 (phase 3 experiments)\n"
+    "  - nlm_phase4 (phase 4 experiments)\n"
+    "  - nlm_phase3_demo (phase 3 demo)\n"
+    "  - nlm_phase4_demo (phase 4 demo)\n"
+    "  - pynlm (Python bindings)\n"
+    "\n"
+    "Install targets:\n"
+    "  - bin/nlm\n"
+    "  - lib/libnlm_core.a\n"
+    "  - lib/libnlm_agent.a\n"
+    "  - lib/libnlm_world.a\n"
+    "  - lib/libnlm_phase3.a\n"
+    "  - lib/libnlm_phase4.a\n"
+    "  - python/pynlm.so\n"
+)
+
+# Add a custom target to show build information
+add_custom_target(show_build_info
+    COMMAND echo "Build information written to ${CMAKE_BINARY_DIR}/BUILD_INFO.txt"
+    COMMAND cat ${CMAKE_BINARY_DIR}/BUILD_INFO.txt
+    COMMENT "Showing build information"
+    VERBATIM
 )

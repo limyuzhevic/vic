@@ -1,21 +1,23 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "numpy>=1.20", "matplotlib>=3.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework - Enhanced with advanced convenience module and learning features"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience", "machine-learning"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +27,60 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "matplotlib>=3.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.0",
+    "scipy>=1.5",
+    "jupyter>=1.0",
+    "ipython>=7.0",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "myst-parser>=0.15",
+]
+
+research = [
+    "numpy>=1.20",
+    "matplotlib>=3.0",
+    "scipy>=1.5",
+    "jupyter>=1.0",
+    "ipython>=7.0",
+    "pandas>=1.0",
+    "seaborn>=0.11",
+    "plotly>=5.0",
+]
+
+advanced = [
+    "numpy>=1.20",
+    "matplotlib>=3.0",
+    "scipy>=1.5",
+    "jupyter>=1.0",
+    "ipython>=7.0",
+    "tensorflow>=2.0",
+    "torch>=1.9",
+    "scikit-learn>=1.0",
+    "opencv-python>=4.5",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issue Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Demo Gallery" = "https://github.com/nlm-project/nlm/wiki/Demos"
+"API Reference" = "https://nlm.readthedocs.io/en/latest/api/"
+"Examples" = "https://github.com/nlm-project/nlm/tree/main/examples"
+"Tutorials" = "https://nlm.readthedocs.io/en/latest/tutorials/"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +89,149 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DBUILD_TESTING=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+PYTHON_MODULE_OUTPUT_DIR = "build/python"
+ENABLE_PYTHON_ADVANCED_FEATURES = "ON"
+ENABLE_CONVENIENCE_MODULE = "ON"
+ENABLE_EXPERIMENTAL_FEATURES = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = "ignore::DeprecationWarning"
+
+[tool.pylint.messages_control]
+"missing-docstring" = "ignore"
+"too-few-public-methods" = "ignore"
+"too-many-arguments" = "ignore"
+"too-many-instance-attributes" = "ignore"
+"too-many-locals" = "ignore"
+"too-many-branches" = "ignore"
+"too-many-statements" = "ignore"
+"line-too-long" = "ignore"
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+skip-string-normalization = false
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ['tests/', 'examples/']
+
+[project.scripts]
+# Convenience commands
+nlm = "pynlm.__main__:main"
+nlm-demo = "pynlm.examples:run_demo"
+nlm-learn = "pynlm.examples:run_learning_example"
+nlm-batch = "pynlm.examples:run_batch_example"
+
+[project.gui-scripts]
+# Not applicable for this library
+
+[tool.nlm]
+# NLM-specific configuration
+version = "0.1.0"
+description = "Enhanced neural learning machine with advanced Python bindings"
+
+[build-system.pybind11]
+include_dir = "/usr/local/include/pybind11"
+smart_version_suffix = false
+
+[build-system.cmake]
+cmake_args = [
+    "-DBUILD_TESTING=ON",
+    "-DENABLE_TESTING=ON",
+    "-DENABLE_PYTHON_BINDINGS=ON",
+    "-DENABLE_ADVANCED_FEATURES=ON",
+    "-DENABLE_CONVENIENCE_MODULE=ON",
+]
+
+[metadata]
+name = "pynlm"
+version = "0.1.0"
+description = "Enhanced Python bindings for NLM neural simulation framework"
+long_description = """
+NLM (Neural Learning Machine) is an experimental computational brain project that creates virtual brains capable of learning, memory, and decision-making.
+
+## Key Features
+
+- **Enhanced Python Bindings**: Comprehensive API with convenience methods
+- **Learning Systems**: Reward modulation, curiosity, development, and structural plasticity
+- **Advanced Statistics**: Neural network analysis and performance monitoring
+- **Configuration Templates**: Quick setup for different use cases (demo, production, research)
+- **Batch Operations**: Efficient processing of multiple neurons and steps
+- **Error Handling**: Comprehensive validation and error recovery
+- **Educational Examples**: Ready-to-run examples for learning and testing
+- **Convenience Module**: High-level utilities for common tasks
+
+## Quick Start
+
+```python
+import pynlm
+
+# Create brain with enhanced features
+brain = pynlm.createBrain(pynlm.conv.create_demo_config())
+brain.initialize()
+
+# Enable learning systems
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+
+# Analyze results
+stats = brain.compute_neural_statistics()
+print(f"Network density: {stats['network_density']:.4f}")
+```
+
+## Advanced Usage
+
+```python
+import pynlm
+
+# Use research-grade configuration
+config = pynlm.conv.create_research_config()
+brain = pynlm.createBrain(config)
+
+# Run batch processing
+brain.runSteps(5000)
+
+# Create advanced agent with world
+world = pynlm.create_enriched_world(50, 50, 16, 16, True, True)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run training
+results = agent.run_episode(world, maxSteps=10000, verbose=True)
+```
+"""
+long_description_content_type = "text/markdown"
+
+[tool.nlm.features]
+# Feature flags for different capabilities
+python_bindings = true
+advanced_learning = true
+convenience_module = true
+configuration_templates = true
+batch_operations = true
+error_handling = true
+educational_examples = true
+debugging_tools = true
+performance_monitoring = true
+visualization = true
+experiment_management = true
+
