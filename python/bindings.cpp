@@ -401,25 +401,121 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        // Set sensible defaults for Python users
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        return config;
+    }, "Create a default configuration with sensible values for Python users");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+        auto brain = std::make_shared<Brain>(config);
+        // Initialize the brain automatically for easier Python use
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create and initialize a new brain with configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+        auto world = std::make_shared<SimpleWorld>();
+        // Configure with reasonable defaults
+        world->configure(20, 20, 16, 16); // width, height, vision_width, vision_height
+        world->reset();
+        return world;
+    }, "Create a new simple world with default settings");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Add helper functions for Python convenience
+    m.def("createCompleteAgentSystem", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 16, 16);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a complete agent system (brain, world, agent) with default settings");
 
-} // namespace nlm
+    // Add error handling utilities
+    m.def("safeStep", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) throw std::runtime_error("Brain pointer is null");
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);  // Use default timestep
+        }
+    }, py::arg("brain"), py::arg("steps"), "Safely step the brain for a given number of steps");
+
+    // Add utility functions
+    m.def("simulateAgentEpisode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, size_t maxSteps) {
+        if (!agent || !world) throw std::runtime_error("Invalid agent or world");
+        
+        for (size_t step = 0; step < maxSteps; ++step) {
+            world->update(0.1); // Standard timestep
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            auto brain = agent->getBrain();
+            brain->step(step, step * 0.1);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("maxSteps"),
+       "Run a complete agent episode with world interaction");
+
+    // Export the action type for easy use
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("Interact", ActionType::Interact)
+        .value("Wait", ActionType::Wait)
+        .export_values();
+
+    // Export the motor command type
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    // Export development stage for easy access
+    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
+        .value("Initial", DevelopmentalStage::Initial)
+        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
+        .value("Maturation", DevelopmentalStage::Maturation)
+        .value("Adult", DevelopmentalStage::Adult)
+        .value("Aging", DevelopmentalStage::Aging)
+        .export_values();
+
+    // Export world object type
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();

@@ -664,21 +664,22 @@ float Brain::getExcitationInhibitionRatio() const {
     float totalExcitatory = 0.0f;
     float totalInhibitory = 0.0f;
     
-    for (const auto& region : pImpl->regions) {
-        for (const auto& syn : region->getSynapses()) {
-            float weight = syn->getWeight();
-            if (weight > 0) {
-                totalExcitatory += weight;
-            } else {
-                totalInhibitory += std::abs(weight);
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                float weight = syn->getWeight();
+                if (weight > 0) {
+                    totalExcitatory += weight;
+                } else {
+                    totalInhibitory += std::abs(weight);
+                }
             }
         }
-    }
-    
-    if (totalInhibitory > 0.0f) {
-        return totalExcitatory / totalInhibitory;
-    }
-    return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+        
+        if (totalInhibitory > 0.0f) {
+            return totalExcitatory / totalInhibitory;
+        }
+        // Handle division by zero - return infinity if excitatory present, otherwise zero
+        return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
 }
 
 size_t Brain::getTotalSpikeCount() const {

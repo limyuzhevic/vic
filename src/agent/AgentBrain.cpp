@@ -138,8 +138,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
-        // Store for next time
-        previousVision_ = vision;
+        // Move semantics to avoid copy
+        previousVision_ = std::move(vision);
     }
     
     // Update curiosity based on novelty
