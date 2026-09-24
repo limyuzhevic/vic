@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -43,7 +44,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Advanced configuration class with JSON/YAML support
 class Config {
 public:
     Config();
@@ -60,6 +61,9 @@ public:
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from string (JSON or YAML)
+    bool loadFromString(const std::string& content, const std::string& format = "json");
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -78,6 +82,9 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Advanced setters with validation
+    bool setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -93,6 +100,28 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get all entries
+    const std::vector<ConfigEntry>& getEntries() const { return pImpl->entries; }
+    
+    // File I/O utilities
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLFile(const std::string& filepath);
+    static bool isTextFile(const std::string& filepath);
+    
+    // Validation
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const ConfigValue& value);
+    
+    // Get configuration statistics
+    size_t entryCount() const { return pImpl->entries.size(); }
+    std::vector<ConfigSource> getSources() const;
+    
+    // Merge configurations
+    void merge(const Config& other);
+    
+    // Get default configuration values
+    static Config getDefaultConfig();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +129,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    static std::string configValueToJSON(const ConfigValue& value);
+    static bool jsonToConfigValue(const nlohmann::json& json, ConfigValue& value);
+    
+    // Validation helpers
+    static bool isValidPrimitiveType(const ConfigValue& value);
+    static bool isValidVectorType(const ConfigValue& value);
 };
 
 } // namespace nlm
+
+#include "Config.cpp"
