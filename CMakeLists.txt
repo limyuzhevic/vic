@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Error/Error.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -55,11 +56,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -78,7 +75,7 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
+    src/motor/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp

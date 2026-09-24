@@ -3,11 +3,21 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
+#include <string>
+#include <system_error>
+#include "../Error/Error.hpp"
 
 namespace nlm {
 
 // Deterministic random number generator
 // Supports explicit seeds for reproducible experiments
+
+class RandomGeneratorException : public NLMException {
+public:
+    RandomGeneratorException(ErrorCode code, const std::string& message, const ErrorContext& context = ErrorContext())
+        : NLMException(ErrorCategory::System, code, ErrorSeverity::Error, message, context) {}
+};
 
 class RandomGenerator {
 public:
@@ -92,19 +102,81 @@ private:
 };
 
 // Template implementations
+namespace detail {
+    // Common exception helper for random operations
+    template<typename ExceptionType = RandomGeneratorException>
+    void throwRandomException(ErrorCode code, const std::string& message, const ErrorContext& context = ErrorContext()) {
+        throw ExceptionType(code, message, context);
+    }
+    
+    // Check and throw if value is out of range
+    template<typename T>
+    void checkRange(const T& value, const T& min, const T& max, const std::string& operation) {
+        if (value < min || value > max) {
+            throwRandomException(ErrorCode::OutOfRange, "Random value " + std::to_string(value) + " is out of range for " + operation + " [" + 
+                                std::to_string(min) + ", " + std::to_string(max) + "]");
+        }
+    }
+    
+    // Check container validity
+    template<typename Container>
+    void checkContainer(const Container& container, const std::string& operation) {
+        if (container.empty()) {
+            throwRandomException(ErrorCode::InvalidArgument, "Cannot " + operation + " empty container");
+        }
+    }
+    
+    // Safe random index selection with bounds checking
+    template<typename Iterator>
+    Iterator safeRandomSelect(Iterator begin, Iterator end) {
+        if (begin == end) {
+            throwRandomException(ErrorCode::InvalidArgument, "Cannot select from empty range");
+        }
+        size_t distance = std::distance(begin, end);
+        if (distance == 0) {
+            throwRandomException(ErrorCode::InvalidArgument, "Cannot select from empty range");
+        }
+        uint64_t index = pickRandomIndex(distance - 1);
+        std::advance(begin, index);
+        return begin;
+    }
+}
+
+// Template implementations
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
+    try {
+        if (container.empty()) {
+            throw detail::throwRandomException(ErrorCode::InvalidArgument, "Cannot shuffle empty container");
+        }
+        std::shuffle(container.begin(), container.end(), engine());
+    } catch (const RandomGeneratorException& e) {
+        nlm::ErrorHandling::handleException(e);
+        throw;
+    } catch (const std::exception& e) {
+        ErrorContext context(__FILE__, __func__, __LINE__);
+        RandomGeneratorException genericEx(ErrorCode::UnknownError, std::string("Shuffle error: ") + e.what(), context);
+        nlm::ErrorHandling::handleException(genericEx);
+        throw genericEx;
+    }
 }
 
 template<typename Container>
 auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
+    try {
+        detail::checkContainer(container, "pickRandom");
+        auto it = container.begin();
+        std::advance(it, pickRandomIndex(container.size() - 1));
+        return *it;
+    } catch (const RandomGeneratorException& e) {
+        nlm::ErrorHandling::handleException(e);
+        throw;
+    } catch (const std::exception& e) {
+        ErrorContext context(__FILE__, __func__, __LINE__);
+        RandomGeneratorException genericEx(ErrorCode::InvalidArgument, std::string("Pick random error: ") + e.what(), context);
+        nlm::ErrorHandling::handleException(genericEx);
+        throw genericEx;
     }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
 }
 
 } // namespace nlm

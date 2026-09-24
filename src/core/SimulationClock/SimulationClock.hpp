@@ -1,12 +1,19 @@
 #pragma once
 
-#include "Types.hpp"
+#include "../Types/Types.hpp"
+#include "../Error/Error.hpp"
 
 namespace nlm {
 
+// Simulation clock exception class
+class SimulationClockException : public NLMException {
+public:
+    SimulationClockException(ErrorCode code, const std::string& message, const ErrorContext& context = ErrorContext())
+        : NLMException(ErrorCategory::System, code, ErrorSeverity::Error, message, context) {}
+};
+
 // Simulation clock for managing time in the neural simulation
 // Provides deterministic time tracking separate from wall-clock time
-
 class SimulationClock {
 public:
     // Create with specific timestep

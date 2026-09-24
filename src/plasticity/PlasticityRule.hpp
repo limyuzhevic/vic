@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include "../core/Error/Error.hpp"
 
 namespace nlm {
 

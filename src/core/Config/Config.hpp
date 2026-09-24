@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "../Error/Error.hpp"
 
 namespace nlm {
 
@@ -58,11 +59,23 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file (new method)
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Merge from another config file
+    bool mergeFromFile(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Validate configuration against schema
+    void validate(const std::string& schemaFile);
+    
+    // Export current configuration to JSON
+    std::string exportJSON() const;
     
     // Get values
     template<typename T>

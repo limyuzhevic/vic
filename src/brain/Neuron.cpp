@@ -189,74 +189,90 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    auto errorContext = NLM_CURRENT_ERROR_CONTEXT;
     bool fired = false;
     
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
+    try {
+        // Handle refractory period
+        if (pImpl->state.refractoryRemaining > 0) {
+            --pImpl->state.refractoryRemaining;
+            // During refractory period, clear synaptic input but don't integrate
+            pImpl->synapticInput = 0.0f;
+            if (pImpl->state.refractoryRemaining == 0) {
+                pImpl->state.firingState = FiringState::Resting;
+            }
+            return false;
         }
+        
+        // LIF dynamics: Leaky Integrate-and-Fire
+        // dV/dt = (V_rest - V)/tau + I/C
+        // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+        
+        MembranePotential& V = pImpl->state.membranePotential;
+        MembranePotential V_rest = pImpl->state.restingPotential;
+        MembranePotential V_reset = pImpl->state.resetPotential;
+        MembranePotential threshold = pImpl->state.threshold;
+        float tau = Impl::TIME_CONSTANT;  // ms
+        float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+        
+        // Validate parameters to prevent instability
+        if (std::isinf(V) || std::isnan(V) || std::isinf(tau) || std::isnan(tau) || C <= 0.0f) {
+            NLM_THROW_NETWORK_ERROR(ErrorCode::NeuronStateInvalid, "Invalid neuron state parameters in stepLIF");
+        }
+        
+        // Synaptic input contributes to membrane potential change
+        float synapticContribution = pImpl->synapticInput / C;
+        
+        // Leak contribution
+        float leakContribution = (V_rest - V) / tau;
+        
+        // Update membrane potential using exponential Euler integration
+        V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+        
+        // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+        if (pImpl->state.adaptationVariable > 0.0f) {
+            V -= pImpl->state.adaptationVariable * 0.01f;
+            pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        }
+        
+        // Clamp membrane potential to prevent instability
+        V = std::clamp(V, -100.0f, 50.0f);
+        
+        // Check for spike
+        if (V >= threshold) {
+            fired = true;
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Record spike
+            recordSpike(currentTime);
+            
+            // Reset membrane potential
+            V = V_reset;
+            
+            // Enter refractory period
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
+            
+            // Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+        } else {
+            pImpl->state.firingState = FiringState::Active;
+        }
+        
+        // Clear synaptic input for next step
+        pImpl->synapticInput = 0.0f;
+        
+        return fired;
+    } catch (const NLMException& e) {
+        nlm::ErrorHandling::handleException(e);
+        return false;
+    } catch (const std::exception& e) {
+        ErrorContext context(__FILE__, __func__, __LINE__);
+        NeuronException genericEx(ErrorCode::NeuronStateInvalid, std::string("LIF simulation error: ") + e.what(), context);
+        nlm::ErrorHandling::handleException(genericEx);
         return false;
     }
-    
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
-    
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
-    
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
-    
-    return fired;
 }
 
 void Neuron::step(Timestamp currentTime) {

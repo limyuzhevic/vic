@@ -192,34 +192,53 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    auto errorContext = NLM_CURRENT_ERROR_CONTEXT;
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+    try {
+        // Real synaptic dynamics:
+        // 1. Decay short-term plasticity state
+        // 2. Decay eligibility trace
+        // 3. Update efficacy based on use
+        
+        TimestepDuration dt = 0.001;  // 1ms timestep
+        
+        // Validate parameters
+        if (pImpl->delay < 1) {
+            NLM_THROW_NETWORK_ERROR(ErrorCode::InvalidArgument, "Invalid synapse delay: " + std::to_string(pImpl->delay));
+        }
+        
+        // Decay short-term facilitation (Tsodyks-Markram model)
+        if (pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+            pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        }
+        
+        // Decay short-term depression
+        if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+            float timeSinceActivity = std::max(
+                pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+                pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+            );
+            // Recovery from depression toward 1.0
+            pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        }
+        
+        // Decay eligibility trace for reward-modulated learning
+        decayEligibilityTrace(0.001f);  // Fast decay
+        
+        // Clamp weight bounds
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        
+        // Validate efficacy
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
+        
+    } catch (const NLMException& e) {
+        nlm::ErrorHandling::handleException(e);
+    } catch (const std::exception& e) {
+        ErrorContext context(__FILE__, __func__, __LINE__);
+        SynapseException genericEx(ErrorCode::SynapseFormationFailed, std::string("Synaptic dynamics error: ") + e.what(), context);
+        nlm::ErrorHandling::handleException(genericEx);
     }
-    
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
-    
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
-    
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
