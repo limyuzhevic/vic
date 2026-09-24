@@ -1,9 +1,12 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Synapse.hpp"
+#include <vector>
 
 namespace nlm {
+
+// Forward declaration - PlasticityRule only needs Synapse*, not full Synapse class
+class Synapse;
 
 // Abstract base class for plasticity rules
 // PLACEHOLDER - Phase 2 will implement real plasticity rules

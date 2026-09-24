@@ -2,16 +2,16 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for classes that Brain only uses pointers to
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 class Config;
 class RandomGenerator;
 class SimulationClock;

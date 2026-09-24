@@ -1,13 +1,15 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Neuron.hpp"
 #include <vector>
 #include <queue>
 #include <functional>
 #include <unordered_map>
 
 namespace nlm {
+
+// Forward declaration - SpikeSystem only needs NeuronId, not full Neuron class
+class Neuron;
 
 // SpikeEvent with additional metadata
 struct DetailedSpikeEvent {

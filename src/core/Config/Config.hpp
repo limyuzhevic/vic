@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+
+// JSON support via pybind11
+namespace pybind11 {
+    template<typename T>
+    class class_
 
 namespace nlm {
 
@@ -31,6 +37,19 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration schema entry for type safety
+struct ConfigSchemaEntry {
+    std::string key;
+    std::string type;  // "int", "double", "bool", "string", "array<int>", etc.
+    std::string description;
+    std::variant<int, double, bool, std::string> defaultValue;
+    bool required = false;
+    
+    ConfigSchemaEntry() = default;
+    ConfigSchemaEntry(const std::string& k, const std::string& t, const std::string& desc = "")
+        : key(k), type(t), description(desc), required(false) {}
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -55,16 +74,25 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or simple key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON string
+    bool loadFromJson(const std::string& jsonStr);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Convert to JSON string
+    std::string toJson() const;
+    
+    // Parse JSON string and load
+    bool parseJson(const std::string& jsonStr);
+    
+    // Get values with type safety
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
@@ -77,6 +105,10 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Type-safe setters
+    template<typename T>
+    void setTyped(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -93,13 +125,33 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON validation and conversion
+    static bool isValidJson(const std::string& jsonStr);
+    static std::string toJson(const ConfigEntry& entry);
+    static bool fromJson(const std::string& jsonStr, ConfigEntry& entry);
+    
+    // Schema management
+    void addSchema(const ConfigSchemaEntry& schema);
+    bool validateSchema() const;
+    std::vector<std::string> getValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::vector<ConfigSchemaEntry> schema;
+    mutable std::vector<std::string> validationErrors;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string jsonValueToString(const ConfigValue& value);
+    static bool stringToJsonValue(const std::string& str, ConfigValue& value);
+    
+    // JSON helpers
+    static nlohmann::json configToJson(const ConfigEntry& entry);
+    static bool jsonToConfig(const nlohmann::json& json, ConfigEntry& entry);
 };
+
+} // namespace nlm
 
 } // namespace nlm
