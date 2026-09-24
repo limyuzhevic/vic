@@ -347,4 +347,171 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+// Enable/disable features for advanced users
+void AgentBrain::enableRewardModulation(bool enable) {
+    rewardModulationEnabled_ = enable;
+    NLM_LOG_INFO("Reward modulation " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::enableStructuralPlasticity(bool enable) {
+    structuralPlasticityEnabled_ = enable;
+    NLM_LOG_INFO("Structural plasticity " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::enableDevelopment(bool enable) {
+    developmentEnabled_ = enable;
+    NLM_LOG_INFO("Development system " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::enableCuriosity(bool enable) {
+    curiosityEnabled_ = enable;
+    NLM_LOG_INFO("Curiosity system " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::enablePredictionSystem(bool enable) {
+    // Note: Prediction system is always enabled in the current implementation
+    // but this provides a configurable interface for advanced users
+    NLM_LOG_INFO("Prediction system " + std::string(enable ? "enabled" : "disabled") +
+                " (always enabled in this implementation)");
+}
+
+void AgentBrain::enableMemorySystems(bool enable) {
+    // Memory systems are always enabled in the current implementation
+    // but this provides a configurable interface for advanced users
+    NLM_LOG_INFO("Memory systems " + std::string(enable ? "enabled" : "disabled") +
+                " (always enabled in this implementation)");
+}
+
+void AgentBrain::enableCognitiveSystems(bool enable) {
+    // Cognitive systems are always enabled in the current implementation
+    // but this provides a configurable interface for advanced users
+    NLM_LOG_INFO("Cognitive systems " + std::string(enable ? "enabled" : "disabled") +
+                " (always enabled in this implementation)");
+}
+
+void AgentBrain::setDevelopmentStage(DevelopmentalStage stage) {
+    if (brain_) {
+        brain_->setDevelopmentalStage(stage);
+        NLM_LOG_INFO("Development stage set to: " + std::to_string(static_cast<int>(stage)));
+    }
+}
+
+void AgentBrain::setPlasticityModifier(float modifier) {
+    plasticityModifier_ = std::clamp(modifier, 0.1f, 2.0f);
+    NLM_LOG_INFO("Plasticity modifier set to: " + std::to_string(plasticityModifier_));
+}
+
+void AgentBrain::setNeuromodulationLevel(float level) {
+    dopamineLevel_ = std::clamp(level, -1.0f, 1.0f);
+    NLM_LOG_INFO("Neuromodulation level set to: " + std::to_string(dopamineLevel_));
+}
+
+void AgentBrain::setCuriosityLevel(float level) {
+    curiosityLevel_ = std::clamp(level, 0.0f, 1.0f);
+    NLM_LOG_INFO("Curiosity level set to: " + std::to_string(curiosityLevel_));
+}
+
+void AgentBrain::setPredictionError(float error) {
+    predictionError_ = error;
+    NLM_LOG_INFO("Prediction error set to: " + std::to_string(predictionError_));
+}
+
+void AgentBrain::setExpectedReward(float reward) {
+    expectedReward_ = reward;
+    NLM_LOG_INFO("Expected reward set to: " + std::to_string(expectedReward_));
+}
+
+// Advanced debugging and inspection methods
+void AgentBrain::dumpMemoryState() {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("=== AGENT BRAIN MEMORY DUMP ===");
+    
+    auto* workingMem = brain_->getWorkingMemory();
+    auto* episodicMem = brain_->getEpisodicMemory();
+    
+    if (workingMem) {
+        NLM_LOG_INFO("Working Memory:");
+        NLM_LOG_INFO("  Active traces: " + std::to_string(workingMem->getActiveTraces()));
+        NLM_LOG_INFO("  Capacity: " + std::to_string(workingMem->getCapacity()));
+        NLM_LOG_INFO("  Memory activity: " + std::to_string(workingMem->getMemoryActivity()));
+        NLM_LOG_INFO("  Memory neurons: " + std::to_string(workingMem->getMemoryNeurons().size()));
+    }
+    
+    if (episodicMem) {
+        NLM_LOG_INFO("Episodic Memory:");
+        NLM_LOG_INFO("  Episode count: " + std::to_string(episodicMem->getEpisodeCount()));
+        NLM_LOG_INFO("  Replay enabled: " + std::string(episodicMem->isReplayEnabled() ? "YES" : "NO"));
+        
+        if (episodicMem->getEpisodeCount() > 0) {
+            NLM_LOG_INFO("  Recent episode reward: " + 
+                        std::to_string(episodicMem->getEpisode(0)->reward));
+        }
+    }
+    
+    NLM_LOG_INFO("==============================");
+}
+
+void AgentBrain::dumpNetworkState() {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("=== AGENT BRAIN NETWORK DUMP ===");
+    
+    NLM_LOG_INFO("Neural Statistics:");
+    NLM_LOG_INFO("  Total neurons: " + std::to_string(brain_->getTotalNeuronCount()));
+    NLM_LOG_INFO("  Total synapses: " + std::to_string(brain_->getTotalSynapseCount()));
+    NLM_LOG_INFO("  Active neurons: " + std::to_string(brain_->getActiveNeuronCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain_->getFiringNeuronCount()));
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(brain_->getTotalSpikeCount()));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(brain_->getAverageFiringRate()));
+    
+    NLM_LOG_INFO("Neuromodulation State:");
+    NLM_LOG_INFO("  Dopamine level: " + std::to_string(dopamineLevel_));
+    NLM_LOG_INFO("  Curiosity level: " + std::to_string(curiosityLevel_));
+    NLM_LOG_INFO("  Novelty level: " + std::to_string(noveltyLevel_));
+    NLM_LOG_INFO("  Prediction error: " + std::to_string(predictionError_));
+    
+    NLM_LOG_INFO("Development State:");
+    NLM_LOG_INFO("  Developmental stage: " + std::to_string(static_cast<int>(getDevelopmentalStage())));
+    NLM_LOG_INFO("  Developmental age: " + std::to_string(developmentalAge_));
+    NLM_LOG_INFO("  Plasticity modifier: " + std::to_string(plasticityModifier_));
+    
+    NLM_LOG_INFO("==============================");
+}
+
+void AgentBrain::exportBrainState(const std::string& filename) {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("Exporting brain state to: " + filename);
+    
+    // Save the brain state using the built-in checkpoint system
+    bool success = brain->save(filename);
+    
+    if (success) {
+        NLM_LOG_INFO("Brain state saved successfully to: " + filename);
+    } else {
+        NLM_LOG_ERROR("Failed to save brain state to: " + filename);
+    }
+}
+
+void AgentBrain::importBrainState(const std::string& filename) {
+    if (!brain_) return;
+    
+    NLM_LOG_INFO("Importing brain state from: " + filename);
+    
+    // Load the brain state
+    bool success = brain->load(filename);
+    
+    if (success) {
+        NLM_LOG_INFO("Brain state loaded successfully from: " + filename);
+        
+        // Update agent state after loading
+        reset();
+        
+        NLM_LOG_INFO("Agent state reset after import");
+    } else {
+        NLM_LOG_ERROR("Failed to load brain state from: " + filename);
+    }
+}
+
 } // namespace nlm

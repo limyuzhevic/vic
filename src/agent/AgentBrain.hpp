@@ -1,14 +1,3 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
-
-namespace nlm {
-
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -57,6 +46,37 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Configuration - enable/disable features for advanced users
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
+    void enablePredictionSystem(bool enable);
+    void enableMemorySystems(bool enable);
+    void enableCognitiveSystems(bool enable);
+    
+    // Check if features are enabled
+    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+    bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Advanced configuration methods
+    void setDevelopmentStage(DevelopmentalStage stage);
+    void setPlasticityModifier(float modifier);
+    void setNeuromodulationLevel(float level);
+    void setCuriosityLevel(float level);
+    void setPredictionError(float error);
+    void setExpectedReward(float reward);
+    
+    // Debugging and inspection methods
+    void dumpMemoryState();
+    void dumpNetworkState();
+    
+    // Brain state persistence
+    void exportBrainState(const std::string& filename);
+    void importBrainState(const std::string& filename);
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -113,5 +133,3 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
-
-} // namespace nlm

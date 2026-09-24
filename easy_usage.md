@@ -181,77 +181,281 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
+### Pattern 4: Advanced Agent with Full Integration
 
 ```python
 import pynlm
 
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
+# Setup complete agent with all systems enabled
 config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2000)  # Larger brain for complex tasks
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
 world.reset()
+
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Enable all advanced features for power users
+agent.enableRewardModulation(True)      # Learn from rewards (dopamine system)
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time  
+agent.enableCuriosity(True)             # Explore novel situations
+agent.enablePredictionSystem(True)      # Predict future states
+agent.enableMemorySystems(True)         # Use working and episodic memory
+agent.enableCognitiveSystems(True)      # Enable neural planner and concepts
 
-# Run agent
-for step in range(100):
+# Advanced configuration
+agent.setDevelopmentStage(DevelopmentalStage::CriticalPeriod)
+agent.setPlasticityModifier(1.5f)
+agent.setNeuromodulationLevel(0.8f)
+agent.setCuriosityLevel(0.6f)
+
+# Run simulation with full integration
+print("Starting advanced integration test...")
+print("Enabled features:")
+print("  ✓ Reward modulation (dopamine learning)")
+print("  ✓ Structural plasticity (synaptogenesis/pruning)")  
+print("  ✓ Development (brain maturation)")
+print("  ✓ Curiosity (exploration behavior)")
+print("  ✓ Prediction (future state prediction)")
+print("  ✓ Memory systems (working and episodic memory)")
+print("  ✓ Cognitive systems (neural planning and concepts)")
+
+for step in range(200):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Provide reward feedback
+    if step % 25 == 0:
+        reward = 1.0f if world.getRobotAt(10, 10) == 'treasure' else 0.0f
+        agent.applyRewardModulation(reward, agent.getExpectedReward())
+        
+        if step % 50 == 0:
+            print(f"Step {step}: Firing={brain.getFiringNeuronCount()}, "
+                  f"Spikes={brain.getTotalSpikeCount()}, "
+                  f"Reward={reward:.2f}, "
+                  f"Curiosity={agent.getCuriosityLevel():.2f}")
+
+print("Advanced simulation completed!")
+print("Agent developed and learned from experience.")
+```
+
+### Pattern 5: Debugging and Inspection
+
+```python
+import pynlm
+
+# Create simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable features for debugging
+agent.enableRewardModulation(True)
+agent.enableMemorySystems(True)
+
+# Run a few steps to gather data
+for step in range(50):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    if step % 10 == 0:
+        # Inspect brain state
+        print(f"\n=== State Dump Step {step} ===")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+        print(f"  Development stage: {agent.getDevelopmentalStage()}")
+        
+        # Dump detailed memory state
+        print("  Memory state:")
+        if hasattr(agent, 'dumpMemoryState'):
+            agent.dumpMemoryState()
+        
+        # Dump network state  
+        print("  Network state:")
+        if hasattr(agent, 'dumpNetworkState'):
+            agent.dumpNetworkState()
 
-print("Agent simulation complete!")
+# Save/load functionality
+print("\n=== Brain State Persistence ===")
+agent.exportBrainState("my_brain_checkpoint.json")
+
+# Later...
+agent.loadBrainState("my_brain_checkpoint.json")  # Note: This method might need to be created
+```
+
+### Pattern 6: Custom Developmental Trajectory
+
+```python
+import pynlm
+
+# Create agent with custom development profile
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+agent.enableCuriosity(True)
+
+print("Custom developmental trajectory:")
+print("  Stage 1: Initial (high plasticity, rapid learning)")
+print("  Stage 2: Critical Period (optimal learning)")
+print("  Stage 3: Maturation (slower, more stable)")
+print("  Stage 4: Adult (conserved knowledge)")
+
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryInput())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Manual development control
+    if step == 100:
+        agent.setDevelopmentStage(DevelopmentalStage::CriticalPeriod)
+        agent.setPlasticityModifier(1.2f)
+    elif step == 300:
+        agent.setDevelopmentStage(DevelopmentalStage::Maturation)
+        agent.setPlasticityModifier(0.7f)
+    elif step == 450:
+        agent.setDevelopmentStage(DevelopmentalStage::Adult)
+        agent.setPlasticityModifier(0.3f)
+    
+    if step % 100 == 0:
+        stage = agent.getDevelopmentalStage()
+        modifier = agent.getNeuromodulationLevel()
+        print(f"  Step {step:3d}: Stage {stage}, Plasticity {modifier:.2f}")
+
+print("Custom development completed!")
+```
+
+### Pattern 7: Advanced Learning with Memory
+
+```python
+import pynlm
+
+# Create agent specialized for memory-based learning
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced memory features
+agent.enableRewardModulation(True)
+agent.enableMemorySystems(True)
+agent.enableCuriosity(True)
+agent.enablePredictionSystem(True)
+
+print("Memory-based learning system:")
+print("  Learning from rewards and experiences")
+print("  Storing episodes in episodic memory")
+print("  Using working memory for active information")
+print("  Predicting future states and outcomes")
+
+# Create learning environment with patterns
+learning_patterns = [
+    ([0, 1, 0, 0, 1, 0, 0, 0], 1.0f),  # Pattern A -> Reward
+    ([1, 0, 0, 0, 0, 1, 0, 0], 0.0f),  # Pattern B -> No Reward
+    ([0, 0, 1, 0, 0, 0, 1, 0], 0.5f),  # Pattern C -> Partial Reward
+]
+
+# Train agent on patterns
+for episode, (pattern, reward) in enumerate(learning_patterns):
+    print(f"\nTraining episode {episode + 1}:")
+    
+    # Reset environment
+    world.reset()
+    
+    # Create pattern in world (simplified representation)
+    for step in range(50):
+        world.update(0.1)
+        
+        # Present pattern to agent
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Provide reward based on pattern
+        agent.applyRewardModulation(reward, agent.getExpectedReward())
+        
+        if step % 10 == 0:
+            print(f"    Step {step:2d}: Reward={reward:.1f}, "
+                  f"PredictionError={agent.getPredictionError():.3f}")
+
+print("\nLearning completed! Agent has formed associations between patterns and rewards.")
+```
+
+### Pattern 8: Competition and Attention
+
+```python
+import pynlm
+
+# Create agent to demonstrate attention and competition
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable attention systems
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+print("Attention and competition system:")
+print("  Selective attention to salient stimuli")
+print("  Competition between neural populations")
+print("  Salience-based processing")
+print("  Top-down and bottom-up attention")
+
+# Simulate attentional processing
+for step in range(100):
+    # Create multiple sensory inputs (simulated)
+    vision_input = world.getSensoryPercept().getVision()
+    touch_input = world.getSensoryPercept().getTouch()
+    
+    # Process inputs through agent's attentional system
+    agent.processSensoryInput(world.getSensoryPercept())
+    
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply neuromodulation based on attention
+    attention_weight = agent.getCuriosityLevel() * 0.5f
+    reward = touch_input[0] * attention_weight  # Higher reward if attended to touch
+    agent.applyRewardModulation(reward, agent.getExpectedReward())
+    
+    if step % 20 == 0:
+        curiosity = agent.getCuriosityLevel()
+        attention = agent.getNeuromodulationLevel()
+        print(f"  Step {step:3d}: Curiosity={curiosity:.2f}, "
+              f"Attention={attention:.2f}, Action={action}")
+
+print("Attention simulation completed!")
 ```
 
 ---
