@@ -89,6 +89,8 @@ bool Config::saveToFile(const std::string& filepath) const {
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    // Explicitly flush and close to ensure all data is written
+    file.flush();
     return true;
 }
 
@@ -114,33 +116,54 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Config entry structure with description
+    struct ConfigEntry {
+        std::string key;
+        ConfigValue value;
+        ConfigSource source;
+        std::string description;
+        
+        ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+        ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s,
+                   const std::string& desc = "")
+            : key(k), value(v), source(s), description(desc) {}
+    };
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    // Add description parameter to set methods
+    void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source,
+                    const std::string& description = "") {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = value;
+            it->source = source;
+            it->description = description;  // Update description even if key exists
+        } else {
+            pImpl->entries.emplace_back(key, value, source, description);
+        }
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
+    
+    // Set methods with descriptions
+    void Config::set(const std::string& key, const std::string& value, ConfigSource source,
+                    const std::string& description) {
+        set(key, ConfigValue(value), source, description);
+    }
+    
+    void Config::set(const std::string& key, int value, ConfigSource source,
+                    const std::string& description) {
+        set(key, ConfigValue(value), source, description);
+    }
+    
+    void Config::set(const std::string& key, double value, ConfigSource source,
+                    const std::string& description) {
+        set(key, ConfigValue(value), source, description);
+    }
+    
+    void Config::set(const std::string& key, bool value, ConfigSource source,
+                    const std::string& description) {
+        set(key, ConfigValue(value), source, description);
+    }
 
 bool Config::has(const std::string& key) const {
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),

@@ -56,18 +56,8 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
-    
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Thread safety for neural population access
+    mutable std::mutex neuralPopulationMutex;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -203,14 +193,17 @@ bool Brain::initialize() {
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+            {
+                std::lock_guard<std::mutex> lock(pImpl->neuralPopulationMutex);
+                if (sensoryPop) {
+                    for (auto* neuron : sensoryPop->getNeurons()) {
+                        pImpl->sensoryNeurons.push_back(neuron);
+                    }
                 }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                if (motorPop) {
+                    for (auto* neuron : motorPop->getNeurons()) {
+                        pImpl->motorNeurons.push_back(neuron);
+                    }
                 }
             }
             
@@ -232,28 +225,40 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -359,33 +364,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     // Record post-synaptic spike for incoming synapses (plasticity)
                     auto incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+                        if (syn) {  // Add null check
+                            syn->recordPostSpike(currentTime);
+                        }
                     }
-
+                    
                     // Get outgoing synapses and schedule delayed spike events
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
-
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
+                        if (syn) {  // Add null check
+                            // Create delayed spike event
+                            Delay delay = syn->getDelay();
+                            SimulationStep deliveryStep = currentStep + delay;
+                            Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+                            
+                            DelayedSpikeEvent delayedEvent(
+                                neuron->getId(),
+                                syn->getDestinationNeuron(),
+                                syn->getId(),
+                                syn->getWeight(),
+                                syn->getType(),
+                                currentTime,
+                                deliveryTime,
+                                currentStep,
+                                deliveryStep
+                            );
+                            
+                            pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                            
+                            // Record pre-synaptic spike for plasticity
+                            syn->recordPreSpike(currentTime);
+                        }
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
@@ -912,6 +921,11 @@ RegionId Brain::addRegion(const std::string& name) {
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));
+    
+    // Log region creation
+    NLM_LOG_INFO("Added brain region " + std::to_string(id.index()) + 
+                " ('" + name + "') with " + std::to_string(pImpl->regions.back()->getTotalNeuronCount()) + " neurons");
+    
     return id;
 }
 
@@ -921,6 +935,7 @@ NeuralRegion* Brain::getRegion(RegionId id) {
             return region.get();
         }
     }
+    NLM_LOG_WARNING("Region not found: " + std::to_string(id.index()));
     return nullptr;
 }
 
@@ -930,6 +945,7 @@ const NeuralRegion* Brain::getRegion(RegionId id) const {
             return region.get();
         }
     }
+    NLM_LOG_WARNING("Region not found: " + std::to_string(id.index()));
     return nullptr;
 }
 
@@ -951,7 +967,22 @@ const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
 }
 
 void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {
+    // Validate regions exist
+    auto* sourceRegion = getRegion(source);
+    auto* targetRegion = getRegion(target);
+    
+    if (!sourceRegion) {
+        NLM_LOG_ERROR("Cannot add connection: source region " + std::to_string(source.index()) + " not found");
+        return;
+    }
+    if (!targetRegion) {
+        NLM_LOG_ERROR("Cannot add connection: target region " + std::to_string(target.index()) + " not found");
+        return;
+    }
+    
     pImpl->interRegionConnections.emplace_back(source, target, weight, delay);
+    NLM_LOG_INFO("Added inter-region connection from region " + std::to_string(source.index()) + 
+                " to region " + std::to_string(target.index()) + " with weight " + std::to_string(weight));
 }
 
 void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
@@ -963,6 +994,15 @@ void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
                       }),
         pImpl->interRegionConnections.end()
     );
+    
+    if (pImpl->interRegionConnections.end() != std::find_if(pImpl->interRegionConnections.begin(),
+                                                          pImpl->interRegionConnections.end(),
+                                                          [source, target](const InterRegionConnection& conn) {
+                                                              return conn.sourceRegion == source && conn.targetRegion == target;
+                                                          })) {
+        NLM_LOG_WARNING("Failed to remove inter-region connection from region " + std::to_string(source.index()) + 
+                       " to region " + std::to_string(target.index()));
+    }
 }
 
 size_t Brain::getTotalNeuronCount() const {

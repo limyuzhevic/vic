@@ -61,8 +61,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - check if brain has regions
+        auto regions = brain->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No regions found in brain for observation");
+            return experimentResult;
+        }
+        SensoryPercept percept = world.observe(regions[0].get());
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -70,11 +75,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Brain step
         brain->step(step, step * 0.001);
         
-        // Get motor command
+        // Get motor command - check if brain has regions
+        regions = brain->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No regions found in brain for action");
+            return experimentResult;
+        }
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(regions[0].get(), cmd);
         
         // Compute reward
         float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
@@ -341,6 +351,8 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     std::string path = "/tmp/nlm_checkpoint_test.bin";
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
+        // Clean up any partially created file
+        std::remove(path.c_str());
         return false;
     }
     
@@ -350,11 +362,16 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
+        // Clean up the checkpoint file
+        std::remove(path.c_str());
         return false;
     }
     
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
+    
+    // Clean up checkpoint file
+    std::remove(path.c_str());
     
     // Note: Due to the nature of neural simulation, exact state restoration
     // is complex. The load should restore the structure at minimum.

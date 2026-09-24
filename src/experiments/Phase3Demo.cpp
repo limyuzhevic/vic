@@ -248,10 +248,20 @@ int main(int argc, char* argv[]) {
     int stepsPerEpisode = 200;
     
     if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+        try {
+            numEpisodes = std::stoi(argv[1]);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid value for numEpisodes: '" << argv[1] << "' - " << e.what() << std::endl;
+            std::cerr << "Using default value: " << numEpisodes << std::endl;
+        }
     }
     if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+        try {
+            stepsPerEpisode = std::stoi(argv[2]);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid value for stepsPerEpisode: '" << argv[2] << "' - " << e.what() << std::endl;
+            std::cerr << "Using default value: " << stepsPerEpisode << std::endl;
+        }
     }
     
     nlm::Phase3Demo demo;
