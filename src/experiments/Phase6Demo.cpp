@@ -15,6 +15,38 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
+    // Parse command line arguments with validation
+    uint64_t numNeurons = 500;
+    uint64_t maxSteps = 2000;
+    
+    if (argc > 1) {
+        try {
+            numNeurons = static_cast<uint64_t>(std::stoull(argv[1]));
+            if (numNeurons == 0 || numNeurons > 1000000) {
+                std::cerr << "ERROR: Neuron count must be between 1 and 1,000,000" << std::endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid neuron count: " << argv[1] << std::endl;
+            return 1;
+        }
+    }
+    if (argc > 2) {
+        try {
+            maxSteps = static_cast<uint64_t>(std::stoull(argv[2]));
+            if (maxSteps == 0 || maxSteps > 100000000) {
+                std::cerr << "ERROR: Max steps must be between 1 and 100,000,000" << std::endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid max steps: " << argv[2] << std::endl;
+            return 1;
+        }
+    }
+    
+    std::cout << "Configuration: " << numNeurons << " neurons, " << maxSteps << " steps" << std::endl;
+    std::cout << std::endl;
+    
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
@@ -51,11 +83,11 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with provided settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = numNeurons;
+    config.maxSteps = maxSteps;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;

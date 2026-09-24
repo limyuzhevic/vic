@@ -115,48 +115,382 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+    # High-Level API
 
-### Basic Usage
+The NLM Python bindings include a comprehensive high-level API in `python/nlm_python.py` that provides:
 
-#### Creating a Brain
+## What the High-Level API Provides
+
+1. **Easy Simulation Setup**: One-line creation of complete simulation environments
+2. **High-Level Abstractions**: Concept-based APIs instead of low-level operations
+3. **Built-in Monitoring**: Progress tracking, statistics collection, and reporting
+4. **Experiment Management**: Run and compare multiple experiments
+5. **Progress Tracking**: Callback systems and progress reporting
+6. **Configuration Templates**: Pre-configured settings for common scenarios
+
+## Quick Start with High-Level API
 
 ```python
-import pynlm
+import nlm_python
+from nlm_python import create_simulation, SimulationRunner, ExperimentManager
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
+# Create a simulation with simple configuration
+sim = create_simulation(neuron_count=1000, max_steps=5000)
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Run the simulation
+runner = SimulationRunner(sim)
+results = runner.run(num_episodes=10, steps_per_episode=500)
 
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+# View results
+print(f"Learning achieved: {results.get('learning_detected', False)}")
+print(f"Total reward: {results.get('total_reward', 0):.2f}")
 ```
 
-#### Running a Simulation
+## Key Classes
+
+### NLMConfig
+Configuration manager for NLM simulations with sensible defaults:
 
 ```python
-import pynlm
+# Basic configuration
+config = nlm_python.NLMConfig(neuron_count=500)
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Enable advanced features
+config.enable_features(
+    reward_modulation=True,
+    structural_plasticity=True,
+    development=True,
+    curiosity=True
+)
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
+# Configure plasticity rules
+config.with_plasticity_rules(hebbian=True, stdp=True)
+
+# Set development stages
+config.with_development_stages(stages=5)
+```
+
+### NeuralNetworkSimulator
+High-level interface for running neural network simulations:
+
+```python
+# Create simulator
+simulator = nlm_python.NeuralNetworkSimulator(config)
+
+# Run simulation
+simulator.run_episode(1000, verbose=True)
+
+# Get statistics
+stats = simulator.get_simulation_stats()
+print(f"Firing rate: {stats['avg_firing_rate']:.3f}")
+print(f"Curiosity: {stats['curiosity']:.3f}")
+```
+
+### SimulationRunner
+Simulation execution with monitoring and reporting:
+
+```python
+# Create runner with simulation
+runner = nlm_python.SimulationRunner(simulator)
+
+# Run with monitoring
+results = runner.run(
+    num_episodes=5,
+    steps_per_episode=200,
+    verbose=True
+)
+
+# Results include:
+print(f"Learning achieved: {results.get('learning_detected', False)}")
+print(f"Average reward: {results.get('avg_reward', 0):.3f}")
+print(f"Final firing rate: {results.get('final_firing_rate', 0):.3f}")
+```
+
+### ExperimentManager
+Manage and compare multiple experiments:
+
+```python
+# Create experiment manager
+manager = nlm_python.ExperimentManager()
+
+# Create different experiments
+config1 = nlm_python.NLMConfig(neuron_count=100, connection_probability=0.1)
+config2 = nlm_python.NLMConfig(neuron_count=200, connection_probability=0.2)
+
+exp1 = manager.create_experiment("Small Network", config1, num_episodes=3, steps_per_episode=100)
+exp2 = manager.create_experiment("Large Network", config2, num_episodes=3, steps_per_episode=100)
+
+# Run experiments
+results1 = exp1.run()
+results2 = exp2.run()
+
+# Compare experiments
+comparison = manager.compare_experiments(["Small Network", "Large Network"])
+```
+
+## Common Use Case Patterns
+
+### 1. Learning Simulation
+```python
+def run_learning_simulation(neuron_count=500, episodes=10):
+    """Run a learning simulation with reward modulation."""
     
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+    # Create configuration optimized for learning
+    config = (nlm_python.NLMConfig(neuron_count=neuron_count)
+              .enable_features(
+                  reward_modulation=True,
+                  structural_plasticity=True,
+                  development=True,
+                  curiosity=True
+              )
+              .with_plasticity_rules(hebbian=True, stdp=True, reward_modulated=True))
+    
+    # Create simulation
+    sim = nlm_python.NeuralNetworkSimulator(config)
+    
+    # Run simulation
+    runner = nlm_python.SimulationRunner(sim)
+    results = runner.run(num_episodes=episodes, steps_per_episode=500, verbose=True)
+    
+    # Analyze learning
+    learning_detected = (results.get('learning_detected', False) and 
+                        results.get('avg_reward', 0) > 0)
+    
+    return {
+        'learning_detected': learning_detected,
+        'total_reward': results.get('total_reward', 0),
+        'final_firing_rate': results.get('final_firing_rate', 0),
+        'config': config.__dict__
+    }
 ```
+
+### 2. Development Simulation
+```python
+def run_development_simulation(start_stage="Initial", stages=5):
+    """Run a simulation focused on developmental stages."""
+    
+    # Create configuration for development
+    config = (nlm_python.NLMConfig(neuron_count=300)
+              .enable_features(
+                  reward_modulation=False,
+                  structural_plasticity=True,
+                  development=True,
+                  curiosity=True
+              )
+              .with_development_stages(stages=stages))
+    
+    # Create and run simulation
+    sim = nlm_python.NeuralNetworkSimulator(config)
+    
+    # Custom runner with development tracking
+    def development_callback(episode, episode_metrics):
+        stage = sim.agent.getDevelopmentalStage()
+        print(f"Episode {episode}: Development stage = {stage}")
+    
+    runner = nlm_python.SimulationRunner(sim)
+    results = runner.run(
+        num_episodes=10,
+        steps_per_episode=300,
+        verbose=False,
+        callback=development_callback
+    )
+    
+    return results
+```
+
+### 3. Comparison Experiment
+```python
+def compare_configurations():
+    """Compare different network configurations."""
+    
+    # Different configurations to compare
+    configs = [
+        nlm_python.NLMConfig(neuron_count=100, connection_probability=0.05)
+            .enable_features(reward_modulation=True, development=True),
+        nlm_python.NLMConfig(neuron_count=500, connection_probability=0.15)
+            .enable_features(reward_modulation=True, development=True),
+        nlm_python.NLMConfig(neuron_count=1000, connection_probability=0.25)
+            .enable_features(reward_modulation=True, development=True)
+    ]
+    
+    # Run all experiments
+    results = []
+    for i, config in enumerate(configs):
+        print(f"Running configuration {i+1}/3...")
+        sim = nlm_python.NeuralNetworkSimulator(config)
+        runner = nlm_python.SimulationRunner(sim)
+        result = runner.run(num_episodes=2, steps_per_episode=200, verbose=False)
+        results.append({
+            'config_index': i,
+            'neuron_count': config.neuron_count,
+            'connection_probability': config.connection_probability,
+            'result': result
+        })
+    
+    # Analyze and compare
+    print("\n=== Configuration Comparison ===")
+    for result in results:
+        print(f"Config {result['config_index']}: {result['neuron_count']} neurons, "
+              f"conn_prob={result['connection_probability']}")
+        print(f"  Learning: {result['result'].get('learning_detected', False)}")
+        print(f"  Total reward: {result['result'].get('total_reward', 0):.2f}")
+        print(f"  Final firing rate: {result['result'].get('final_firing_rate', 0):.3f}")
+        print()
+    
+    return results
+```
+
+### 4. Simple Simulation Template
+```python
+def create_simple_simulation(**kwargs):
+    """Create a simple simulation with minimal configuration."""
+    
+    # Use high-level create_simulation function
+    return nlm_python.create_simulation(**kwargs)
+
+def run_simple_test(neurons=100, steps=50):
+    """Run a simple test for verification."""
+    
+    return nlm_python.run_simple_test(neurons, steps)
+
+# Usage example
+if __name__ == "__main__":
+    # Create simple simulation
+    sim = nlm_python.create_simulation(neuron_count=200, timestep=0.01)
+    
+    # Run steps
+    for i in range(100):
+        metrics = sim.step()
+        if i % 25 == 0:
+            print(f"Step {i}: Reward={metrics['reward']:.3f}")
+    
+    # Get final statistics
+    stats = sim.get_simulation_stats()
+    print(f"\nFinal statistics:")
+    print(f"Firing neurons: {stats['neurons_firing']}")
+    print(f"Average firing rate: {stats['avg_firing_rate']:.3f}")
+    print(f"Curiosity level: {stats['curiosity']:.3f}")
+    print(f"Development stage: {stats['development_stage']}")
+```
+
+## Integration with Low-Level API
+
+The high-level API seamlessly integrates with the low-level `pynlm` bindings. You can:
+
+1. **Access low-level components**: Use `sim.brain`, `sim.agent`, `sim.world` to access low-level functionality
+2. **Mix high-level and low-level APIs**: Use high-level setup but low-level control where needed
+3. **Custom experiments**: Build custom simulation scenarios using both APIs
+
+```python
+# High-level setup, low-level control
+sim = nlm_python.create_simulation(neuron_count=500)
+
+# Access low-level components
+brain = sim.brain
+agent = sim.agent
+world = sim.world
+
+# Use low-level API directly
+brain.step(0)
+agent.processSensoryInput(world.getSensoryPercept())
+```
+
+## Performance Considerations
+
+### For Small Networks (< 500 neurons)
+```python
+sim = nlm_python.create_simulation(neuron_count=100)
+```
+
+### For Medium Networks (500-2000 neurons)
+```python
+sim = nlm_python.create_simulation(
+    neuron_count=1000,
+    connection_probability=0.1
+)
+```
+
+### For Large Networks (> 2000 neurons)
+```python
+sim = nlm_python.create_simulation(
+    neuron_count=5000,
+    connection_probability=0.05,
+    enable_features(
+        reward_modulation=False,  # Can be expensive
+        development=True
+    )
+)
+```
+
+### For Real-time Applications
+```python
+sim = nlm_python.create_simulation(
+    neuron_count=200,
+    timestep=0.001
+)
+# Run with short episodes and frequent checkpoints
+```
+
+## Error Handling
+
+The high-level API includes comprehensive error handling:
+
+```python
+try:
+    sim = nlm_python.create_simulation(neuron_count=500)
+    results = runner.run(num_episodes=10)
+except RuntimeError as e:
+    print(f"Simulation error: {e}")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+```
+
+## Best Practices
+
+1. **Always validate configuration**: Use the built-in validation
+2. **Monitor progress**: Use callbacks for long-running simulations
+3. **Use appropriate timestep**: Smaller timesteps are more accurate but slower
+4. **Enable features judiciously**: Some features can significantly impact performance
+5. **Use simulation checkpoints**: For long-running experiments
+6. **Analyze results systematically**: Compare multiple configurations
+
+The high-level API makes it easy to create, run, and analyze NLM simulations while maintaining access to low-level control when needed.
+
+## Further Examples
+
+See the `python/` directory for additional example scripts and documentation.
+
+---
+
+## Next Steps
+
+1. **Read the examples**: Check the `python/` directory for additional use case patterns
+2. **Try the demonstrations**: Run the example scripts to see the API in action
+3. **Experiment**: Modify configurations and observe effects on learning and behavior
+4. **Integrate**: Combine the high-level API with custom simulation scenarios
+5. **Performance tune**: Adjust parameters for your specific use case
+
+The high-level Python API provides a powerful, intuitive interface for working with NLM simulations while maintaining flexibility for advanced use cases.
+
+## References
+
+- [Low-Level API Documentation](https://github.com/nlm-project/nlm/blob/main/HOW_TO_USE.md) - For advanced usage
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [Phase 6 Integration Demo](src/experiments/Phase6Demo.cpp) - Real-world integration example
+- [Example Scripts](python/) - Additional examples and templates
+
+---
+
+When you're comfortable with the basics, consider exploring:
+
+1. **Creating custom environments** using the low-level world API
+2. **Implementing custom plasticity rules** for specialized learning
+3. **Running Phase 6 integration experiments** using the high-level API
+4. **Building advanced agent behaviors** with neuromodulation
+5. **Performance optimization** for large-scale simulations
+
+The high-level Python API is designed to scale from simple tutorials to complex research experiments while maintaining a consistent, easy-to-use interface.
+
 
 #### Creating a Simple World
 

@@ -14,17 +14,36 @@ Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
-    Phase6IntegrationResult result;
-    result.startTime = time(nullptr);
-    
-    auto startWall = std::chrono::high_resolution_clock::now();
-    
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
-    auto cfg = std::make_shared<Config>();
+    // Validate configuration
+    if (config.neuronCount == 0 || config.neuronCount > 1000000) {
+        NLM_LOG_ERROR("Neuron count must be between 1 and 1,000,000");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    if (config.maxSteps == 0 || config.maxSteps > 100000000) {
+        NLM_LOG_ERROR("Max steps must be between 1 and 100,000,000");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    if (config.connectionProbability < 0.0f || config.connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Connection probability must be between 0.0 and 1.0");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    if (config.regionCount == 0 || config.regionCount > 100) {
+        NLM_LOG_ERROR("Region count must be between 1 and 100");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    NLM_LOG_INFO("Configuration validated successfully");
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);

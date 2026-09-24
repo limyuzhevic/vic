@@ -363,15 +363,45 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Configuration validation
+    auto validateConfig = [](const auto& config) -> bool {
+        if (config->getOr<int64_t>("random_seed", 0) < 0) {
+            NLM_LOG_ERROR("Random seed must be non-negative");
+            return false;
+        }
+        
+        double timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            NLM_LOG_ERROR("Simulation timestep must be positive and <= 1.0");
+            return false;
+        }
+        
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+        if (neuronCount <= 0 || neuronCount > 1000000) {
+            NLM_LOG_ERROR("Neuron count must be between 1 and 1,000,000");
+            return false;
+        }
+        
+        int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+        if (regionCount <= 0 || regionCount > 100) {
+            NLM_LOG_ERROR("Region count must be between 1 and 100");
+            return false;
+        }
+        
+        float connectionProb = config->getOr<float>("connection_probability", 0.1f);
+        if (connectionProb < 0.0f || connectionProb > 1.0f) {
+            NLM_LOG_ERROR("Connection probability must be between 0.0 and 1.0");
+            return false;
+        }
+        
+        return true;
+    };
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Validate configuration
+    if (!validateConfig(config)) {
+        NLM_LOG_ERROR("Configuration validation failed!");
+        return 1;
+    }
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
