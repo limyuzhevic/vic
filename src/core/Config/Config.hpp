@@ -90,16 +90,14 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration validation
+    bool validate(const std::vector<std::string>& requiredKeys = {}) const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Check if configuration is valid
+    bool isValid(const std::vector<std::string>& requiredKeys = {}) const;
 };
 
 } // namespace nlm

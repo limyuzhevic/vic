@@ -19,16 +19,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Log error but return false (file not found is not critical)
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,12 +45,18 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key format
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                continue;  // Skip malformed lines
+            }
+            
             set(key, value, ConfigSource::File);
+            validEntries++;
         }
     }
     
@@ -186,17 +194,95 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::validate(const std::vector<std::string>& requiredKeys) const {
+    std::vector<std::string> errors = getValidationErrors();
+    
+    // Check required keys
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.push_back("Missing required configuration key: " + key);
+        }
+    }
+    
+    // Log errors if any
+    for (const auto& error : errors) {
+        // TODO: Add proper logging
+    }
+    
+    return errors.empty();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Validate required keys have valid values
+    auto validateKeyValue = [this, &errors](const std::string& key) {
+        if (!has(key)) return;
+        
+        std::optional<int> intVal = get<int>(key);
+        std::optional<int64_t> int64Val = get<int64_t>(key);
+        std::optional<double> doubleVal = get<double>(key);
+        std::optional<bool> boolVal = get<bool>(key);
+        std::optional<std::string> stringVal = get<std::string>(key);
+        
+        if (!intVal && !int64Val && !doubleVal && !boolVal && !stringVal) {
+            errors.push_back("Invalid value type for key: " + key);
+        }
+    };
+    
+    // Validate specific keys
+    validateKeyValue("neuron_count");
+    validateKeyValue("region_count");
+    validateKeyValue("connection_probability");
+    validateKeyValue("simulation_timestep");
+    validateKeyValue("random_seed");
+    
+    // Validate numeric ranges
+    if (has("neuron_count")) {
+        int64_t neurons = getOr<int64_t>("neuron_count", 1);
+        if (neurons < 1) {
+            errors.push_back("neuron_count must be at least 1, got: " + std::to_string(neurons));
+        }
+        if (neurons > 1000000) {
+            errors.push_back("neuron_count is too large (max 1,000,000), got: " + std::to_string(neurons));
+        }
+    }
+    
+    if (has("region_count")) {
+        int64_t regions = getOr<int64_t>("region_count", 1);
+        if (regions < 1) {
+            errors.push_back("region_count must be at least 1, got: " + std::to_string(regions));
+        }
+        if (regions > 1000) {
+            errors.push_back("region_count is too large (max 1000), got: " + std::to_string(regions));
+        }
+    }
+    
+    if (has("connection_probability")) {
+        float prob = getOr<float>("connection_probability", 0.0f);
+        if (prob < 0.0f) {
+            errors.push_back("connection_probability cannot be negative, got: " + std::to_string(prob));
+        }
+        if (prob > 1.0f) {
+            errors.push_back("connection_probability cannot exceed 1.0, got: " + std::to_string(prob));
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        double timestep = getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0) {
+            errors.push_back("simulation_timestep must be positive, got: " + std::to_string(timestep));
+        }
+        if (timestep > 1.0) {
+            errors.push_back("simulation_timestep is too large (max 1.0s), got: " + std::to_string(timestep));
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::isValid(const std::vector<std::string>& requiredKeys) const {
+    return validate(requiredKeys);
 }
 
 // Explicit template instantiations
