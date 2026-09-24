@@ -15,15 +15,30 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 
 WorkingMemory::~WorkingMemory() = default;
 
+void WorkingMemory::initialize(size_t capacity) {
+    pImpl->capacity = capacity;
+    // Evict items if over new capacity
+    while (pImpl->items.size() > pImpl->capacity) {
+        pImpl->items.erase(pImpl->items.begin());
+    }
+}
+
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Check if neuron already exists
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
+    
+    // Add new item if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
+        pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Implement FIFO eviction when at capacity
+        // Remove oldest item (first in vector)
+        pImpl->items.erase(pImpl->items.begin());
         pImpl->items.emplace_back(neuron, value);
     }
 }
@@ -56,6 +71,14 @@ size_t WorkingMemory::getCapacity() const {
 
 size_t WorkingMemory::getCurrentSize() const {
     return pImpl->items.size();
+}
+
+void WorkingMemory::setCapacity(size_t capacity) {
+    pImpl->capacity = capacity;
+    // Evict items if over new capacity
+    while (pImpl->items.size() > pImpl->capacity) {
+        pImpl->items.erase(pImpl->items.begin());
+    }
 }
 
 void WorkingMemory::decay(float decayRate) {

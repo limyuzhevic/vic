@@ -55,26 +55,37 @@ void ConsoleLogger::log(const LogEntry& entry) {
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    // Close current file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
