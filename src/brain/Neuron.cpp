@@ -237,20 +237,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for STDP and other spike-timing dependent processes
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential after spike to threshold for recovery
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period to prevent immediate re-firing
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
+        // Update adaptation variable for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Only set Active state if not in refractory period and not already refractory
+        // This prevents conflicting state transitions and ensures correct neuron state
+        if (pImpl->state.refractoryRemaining == 0 && pImpl->state.firingState != FiringState::Refractory) {
+            pImpl->state.firingState = FiringState::Active;
+        }
     }
     
     // Clear synaptic input for next step
@@ -286,7 +290,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(static_cast<uint32_t>(2), static_cast<uint32_t>(10)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
