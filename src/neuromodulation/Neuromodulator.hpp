@@ -53,37 +53,68 @@ private:
     Impl* pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Acetylcholine: Attention modulation and working memory
+// Based on computational models of ACh signaling (Sarter & Bruno 2001)
 class Acetylcholine : public Neuromodulator {
 public:
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // ACh modulates attention and sensory processing
+    void signalAttention(float attentionLevel);
+    void signalWorkingMemoryLoad(float load);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Norepinephrine: Arousal and vigilance (LLC model, Sara & Bouret 2017)
 class Norepinephrine : public Neuromodulator {
 public:
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
     const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // NE signals task salience and promotes cognitive flexibility
+    void signalTaskSalience(float salience);
+    void signalNoveltySurprise(float surprise);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Serotonin: Mood, punishment, and learning rate modulation (Sharp et al. 2015)
 class Serotonin : public Neuromodulator {
 public:
+    Serotonin();
+    ~Serotonin() override;
+    
     const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Serotonin modulates learning rate and punishment sensitivity
+    void signalPunishment(float punishment);
+    void signalSocialFeedback(float feedback);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

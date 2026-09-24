@@ -46,4 +46,11 @@ void Reward::clearHistory() {
     pImpl->history.clear();
 }
 
-} // namespace nlm
+void Reward::initialize(class Brain* brain) {
+    // Initialize reward system with brain reference
+    if (brain) {
+        // TODO: Store brain reference if needed for future extensions
+        // Reward operates as a reinforcement learning signal that can be integrated
+        // with brain systems through the Neuromodulation interface
+    }
+}

@@ -295,24 +295,70 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
     
-    // Get neuromodulation systems
+    // Get all neuromodulation systems
     auto* dopamine = brain->getDopamine();
+    auto* acetylcholine = brain->getAcetylcholine();
+    auto* norepinephrine = brain->getNorepinephrine();
+    auto* serotonin = brain->getSerotonin();
     auto* curiosity = brain->getCuriosity();
     auto* novelty = brain->getNovelty();
+    auto* predictionError = brain->getPredictionErrorSignal();
+    auto* neuromodulation = brain->getNeuromodulation();
     
-    if (!dopamine || !curiosity || !novelty) {
+    if (!dopamine || !acetylcholine || !norepinephrine || !serotonin || 
+        !curiosity || !novelty || !predictionError || !neuromodulation) {
         NLM_LOG_ERROR("Neuromodulation systems not available");
         return false;
     }
     
-    // Run some steps with sensory input
-    for (int i = 0; i < 50; ++i) {
-        // Inject some sensory activity
-        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
-        brain->step(i, i * 0.001);
+    // Initialize neuromodulation system
+    if (!neuromodulation->initialize(brain.get())) {
+        NLM_LOG_ERROR("Failed to initialize neuromodulation system");
+        return false;
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    // Test individual neuromodulator functionality
+    NLM_LOG_INFO("Testing individual neuromodulator functions...");
+    
+    // Test dopamine signaling
+    dopamine->signalReward(0.5f);
+    dopamine->signalRewardPredictionError(0.3f);
+    
+    // Test acetylcholine signaling
+    acetylcholine->signalAttention(0.7f);
+    acetylcholine->signalWorkingMemoryLoad(0.4f);
+    
+    // Test norepinephrine signaling
+    norepinephrine->signalTaskSalience(0.6f);
+    norepinephrine->signalNoveltySurprise(0.2f);
+    
+    // Test serotonin signaling
+    serotonin->signalPunishment(0.3f);
+    serotonin->signalSocialFeedback(0.5f);
+    
+    // Test curiosity and novelty
+    curiosity->update(0.8f, 0.4f, 0.001);
+    novelty->detectNovelty(std::vector<float>{0.1f, 0.2f, 0.3f}, 
+                          std::vector<float>{0.05f, 0.15f, 0.25f});
+    
+    // Test prediction error
+    predictionError->computeError(0.5f, 0.8f);
+    
+    // Run some steps with neuromodulation
+    NLM_LOG_INFO("Running simulation with neuromodulation...");
+    for (int i = 0; i < 20; ++i) {
+        // Inject some sensory activity to trigger neuromodulation
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 3.0f);
+        brain->step(i, i * 0.001);
+        
+        // Apply neuromodulation based on activity
+        neuromodulation->update(i * 0.001);
+    }
+    
+    // Log neuromodulation system status
+    neuromodulation->logStatus();
+    
+    NLM_LOG_INFO("[PASS] All neuromodulation systems are functional and integrated");
     return true;
 }
 

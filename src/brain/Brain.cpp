@@ -7,8 +7,14 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Neuromodulation.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -46,9 +52,13 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Neuromodulation> neuromodulation;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -126,9 +136,13 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        neuromodulation = std::make_unique<Neuromodulation>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -717,12 +731,61 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Apply neuromodulation effects on plasticity based on signal type
     float modulation = signal.getLevel();
+    const char* signalName = signal.getName();
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Scale STDP learning rates based on specific neuromodulator
+    if (std::string(signalName) == "DA") {
+        // Dopamine modulates plasticity strength and learning rate
+        float plasticityFactor = 0.5f + 0.5f * modulation;  // Linear scaling
+        pImpl->stdp->setLTPWeight(0.01f * plasticityFactor);
+        pImpl->stdp->setLTDWeight(0.012f * plasticityFactor);
+        
+        // Modify Hebbian learning
+        pImpl->hebbian->setLearningRate(0.05f * modulation);
+        
+    } else if (std::string(signalName) == "ACh") {
+        // Acetylcholine modulates attention-dependent plasticity
+        float attentionModulation = modulation * 0.8f;
+        pImpl->stdp->setLTPWeight(0.01f * (1.0f + attentionModulation));
+        pImpl->stdp->setLTDWeight(0.012f * (1.0f - attentionModulation * 0.5f));
+        
+    } else if (std::string(signalName) == "NE") {
+        // Norepinephrine modulates arousal-dependent plasticity
+        float arousalModulation = modulation * 0.6f;
+        pImpl->stdp->setLTPWeight(0.01f * (1.0f + arousalModulation * 0.5f));
+        pImpl->stdp->setLTDWeight(0.012f * (1.0f - arousalModulation * 0.3f));
+        
+        // Enhance structural plasticity
+        pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f + modulation * 0.0004f);
+        
+    } else if (std::string(signalName) == "5-HT") {
+        // Serotonin modulates learning rate for stability
+        float stabilityModulation = 1.0f - modulation * 0.7f;  // High serotonin reduces learning rate
+        pImpl->stdp->setLTPWeight(0.01f * stabilityModulation);
+        pImpl->stdp->setLTDWeight(0.012f * stabilityModulation);
+        
+    } else if (std::string(signalName) == "Curiosity") {
+        // Curiosity modulates exploration-driven plasticity
+        float explorationModulation = modulation * 0.9f;
+        pImpl->stdp->setLTPWeight(0.01f * (1.0f + explorationModulation * 0.5f));
+        
+    } else if (std::string(signalName) == "Novelty") {
+        // Novelty modulates sensory plasticity
+        float noveltyModulation = modulation * 0.7f;
+        pImpl->stdp->setLTDWeight(0.012f * (1.0f - noveltyModulation * 0.4f));
+        
+    } else if (std::string(signalName) == "PredictionError") {
+        // Prediction error modulates reward prediction plasticity
+        float errorModulation = modulation * 1.2f;  // Error can enhance learning
+        pImpl->stdp->setLTPWeight(0.01f * (1.0f + errorModulation * 0.8f));
+        
+    } else {
+        // Default modulation for unknown signals
+        pImpl->stdp->setLTPWeight(0.01f * modulation);
+        pImpl->stdp->setLTDWeight(0.012f * modulation);
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -1057,6 +1120,18 @@ Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
 Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
@@ -1067,6 +1142,10 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+Neuromodulation* Brain::getNeuromodulation() {
+    return pImpl->neuromodulation.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {

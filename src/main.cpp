@@ -7,17 +7,14 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "neuromodulation/Neuromodulation.hpp"
+#include "neuromodulation/Dopamine.hpp"
+#include "neuromodulation/Acetylcholine.hpp"
+#include "neuromodulation/Norepinephrine.hpp"
+#include "neuromodulation/Serotonin.hpp"
+#include "neuromodulation/Curiosity.hpp"
+#include "neuromodulation/Novelty.hpp"
+#include "neuromodulation/PredictionError.hpp"
 
 #include <iostream>
 #include <memory>
@@ -397,17 +394,17 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    // Initialize neuromodulation system
+    auto neuromodulation = std::make_shared<Neuromodulation>();
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    if (!neuromulation->initialize(brain)) {
+        NLM_LOG_ERROR("Failed to initialize neuromodulation system!");
         return 1;
     }
     
-    brain->logStatus();
+    neuromodulation->logStatus();
+    
+    NLM_LOG_INFO("Neuromodulation system initialized successfully.");
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);

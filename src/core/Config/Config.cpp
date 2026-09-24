@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,14 +21,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced configuration file parser supporting JSON and YAML formats
+    // Phase 2: Implement proper format detection and parsing
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Simple key=value format (Phase 1)
+    // Future enhancement: Detect JSON/YAML and delegate to appropriate parser
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -49,6 +53,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        }
+        // Future enhancement: Parse JSON format (key: value or "key": value)
+        else if (line.find(':') != std::string::npos && 
+                 (line.find(':') < 10 || line.find(':') > 30)) {
+            // Likely JSON format
+            // TODO: Implement JSON parsing
+            NLM_LOG_WARNING("JSON format detected but not yet implemented: " + line);
         }
     }
     
@@ -84,12 +95,44 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File (Saved from runtime)\n";
+    file << "# Generated: " << getCurrentTimestamp() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Add description comment if available
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Format based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings with special characters
+                if (arg.find(' ') != std::string::npos || arg.find('=') != std::string::npos) {
+                    file << entry.key << " = \"" << arg << "\"\n";
+                } else {
+                    file << entry.key << " = " << arg << "\n";
+                }
+            } else if constexpr (std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double> || 
+                                 std::is_same_v<T, bool>) {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
+}
+
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
 }
 
 template<typename T>

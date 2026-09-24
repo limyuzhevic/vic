@@ -45,6 +45,11 @@ struct Phase6IntegrationResult {
     float memoryEpisodesStored;
     float noveltyLevel;
     float curiosityLevel;
+    float acetylcholineLevel;
+    float norepinephrineLevel;
+    float acetylcholineLevel;
+    float norepinephrineLevel;
+    float serotoninLevel;
     float dopamineLevel;
     
     // Timestamps
@@ -66,6 +71,9 @@ struct Phase6IntegrationResult {
         , memoryEpisodesStored(0.0f)
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
+        , acetylcholineLevel(0.0f)
+        , norepinephrineLevel(0.0f)
+        , serotoninLevel(0.0f)
         , dopamineLevel(0.0f)
         , startTime(0)
         , endTime(0)

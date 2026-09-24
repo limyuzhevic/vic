@@ -68,6 +68,11 @@ int main(int argc, char* argv[]) {
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Acetylcholine level: " << result.acetylcholineLevel << std::endl;
+    std::cout << "Norepinephrine level: " << result.norepinephrineLevel << std::endl;
+    std::cout << "Serotonin level: " << result.serotoninLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
+    std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
