@@ -1,16 +1,96 @@
 #include "Config.hpp"
+#include "ConfigConstants.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <stdexcept>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+// Simple JSON-like parser for configuration files
+class SimpleJSONParser {
+public:
+    static bool parse(const std::string& content, std::vector<ConfigEntry>& entries) {
+        // Simple line-based JSON-like parser
+        std::istringstream stream(content);
+        std::string line;
+        int lineNumber = 0;
+        
+        while (std::getline(stream, line)) {
+            ++lineNumber;
+            line = trim(line);
+            
+            if (line.empty() || line[0] == '/') {
+                continue; // Skip empty lines and comments
+            }
+            
+            if (line[0] == '{') {
+                // Skip opening brace
+                continue;
+            }
+            
+            if (line == "}") {
+                // Skip closing brace
+                continue;
+            }
+            
+            // Parse key-value pairs (simplified JSON)
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string valueStr = trim(line.substr(colonPos + 1));
+                
+                // Parse value
+                ConfigEntry entry;
+                entry.key = key;
+                entry.source = ConfigSource::File;
+                entry.description = "";
+                
+                // Parse based on value format
+                if (valueStr.front() == '"' && valueStr.back() == '"') {
+                    // String value
+                    entry.value = valueStr.substr(1, valueStr.size() - 2);
+                } else if (valueStr == "true" || valueStr == "false") {
+                    // Boolean value
+                    entry.value = (valueStr == "true");
+                } else if (valueStr.find('.') != std::string::npos) {
+                    // Float value
+                    entry.value = std::stof(valueStr);
+                } else {
+                    // Integer value
+                    try {
+                        entry.value = std::stoi(valueStr);
+                    } catch (...) {
+                        // If integer fails, try double
+                        try {
+                            entry.value = std::stod(valueStr);
+                        } catch (...) {
+                            // If both fail, treat as string
+                            entry.value = valueStr;
+                        }
+                    }
+                }
+                
+                entries.push_back(entry);
+            }
+        }
+        
+        return true;
+    }
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+    // For fast lookup, we'll maintain a map as well
+    std::unordered_map<std::string, size_t> keyToIndex;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Apply default configuration
+    applyDefaultConfiguration(std::shared_ptr<Config>(this, [](Config*) {}));
+}
 
 Config::~Config() = default;
 
@@ -19,17 +99,37 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Clear existing entries
+    pImpl->entries.clear();
+    pImpl->keyToIndex.clear();
+    
+    // Try to parse as JSON-like format first
+    std::vector<ConfigEntry> parsedEntries;
+    if (SimpleJSONParser::parse(content, parsedEntries)) {
+        // Successfully parsed JSON-like format
+        pImpl->entries = std::move(parsedEntries);
+        
+        // Build index for fast lookup
+        for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+            pImpl->keyToIndex[pImpl->entries[i].key] = i;
+        }
+        
+        return true;
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;

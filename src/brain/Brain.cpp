@@ -1,5 +1,6 @@
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigConstants.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
@@ -95,7 +96,7 @@ struct Brain::Impl {
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        if (auto seedOpt = config->getOr<uint64_t>(ConfigConstants::RANDOM_SEED, seed)) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
@@ -131,23 +132,23 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float ltpWeight = config->getOr<float>(ConfigConstants::STDP_LTP_WEIGHT, 0.01f);
+        float ltdWeight = config->getOr<float>(ConfigConstants::STDP_LTD_WEIGHT, 0.012f);
+        float tau = config->getOr<float>(ConfigConstants::STDP_TIME_CONSTANT, 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>(ConfigConstants::SYNAPTAGENESIS_RATE, 0.0001f);
+        float pruningRate = config->getOr<float>(ConfigConstants::PRUNING_RATE, 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = config->getOr<double>(ConfigConstants::SIMULATION_TIMESTEP, 0.001);
         
         // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        replayInterval = config->getOr<size_t>(ConfigConstants::EPISODIC_MEMORY_REPLAY_INTERVAL, 100);
+        consolidationInterval = config->getOr<size_t>(ConfigConstants::EPISODIC_MEMORY_CONSOLIDATION_INTERVAL, 1000);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -287,15 +288,18 @@ bool Brain::initialize() {
     });
     
     // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
+    std::string checkpointDir = config->getOr<std::string>(ConfigConstants::CHECKPOINT_DIR, "./checkpoints");
+    pImpl->checkpointManager->configure(checkpointDir, 
+                                       getIntParam(config, ConfigConstants::CHECKPOINT_MAX_FILES, 10000),
+                                       getIntParam(config, ConfigConstants::CHECKPOINT_COMPRESSION_LEVEL, 1),
+                                       getBoolParam(config, ConfigConstants::CHECKPOINT_AUTO_SAVE_INTERVAL, true));
+
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
+
     return true;
 }
 
