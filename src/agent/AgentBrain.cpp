@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "AgentConfig.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -19,7 +20,22 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , sensoryProcessCount_(0)
+    , motorDecodeCount_(0)
 {
+    // Load configuration from global config manager
+    const auto& config = ConfigManager::getInstance().getConfig();
+    
+    // Apply configuration settings
+    rewardModulationEnabled_ = config.enableRewardModulation;
+    structuralPlasticityEnabled_ = config.enableStructuralPlasticity;
+    developmentEnabled_ = config.enableDevelopment;
+    curiosityEnabled_ = config.enableCuriosity;
+    
+    // Set configuration-dependent parameters
+    plasticityModifier_ = config.plasticityRate;
+    sensoryNoveltyDecay_ = config.visionSmoothing;
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -27,13 +43,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
+                    // Distribute motor neurons to different action groups using a counter
+                    int motorCount = 0;
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
+                        switch (motorCount % 6) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -41,19 +54,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                             case 4: motorInteract_.push_back(n); break;
                             case 5: motorWait_.push_back(n); break;
                         }
+                        motorCount++;
                     }
                 } else if (type == NeuronType::Sensory) {
+                    // Distribute sensory neurons using a counter
+                    int sensoryCount = 0;
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
+                        switch (sensoryCount % 4) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
                             case 3: sensoryProprioception_.push_back(n); break;
                         }
+                        sensoryCount++;
                     }
                 }
             }
@@ -144,7 +157,13 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        float curiositySource = noveltyLevel_ * 2.0f;
+        if (brain_) {
+            // Use prediction error if brain is available, otherwise use a default
+            float predictionError = predictionError_;
+            curiositySource += std::abs(predictionError) * 0.5f;
+        }
+        curiosityLevel_ = curiositySource;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -215,19 +234,21 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+        if (brain_ && brain_->getRandomGenerator()) {
+            float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+            if (r < exploreChance) {
+                // Random motor command
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 6);  // Fixed: 0-6 instead of 0-7
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
             }
         }
     }
