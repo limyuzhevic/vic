@@ -6,14 +6,22 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <map>
+#include <string>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Enhanced with configurable parameters and extensibility
 class AgentBrain {
 public:
+    // Enhanced constructor with configuration support
+    AgentBrain(std::shared_ptr<Brain> brain, const AgentBrainConfig& config);
+    
+    // Default constructor for backward compatibility
     AgentBrain(std::shared_ptr<Brain> brain);
+    
     ~AgentBrain();
     
     // Initialize with world
@@ -63,11 +71,44 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableCuriosityExploration(bool enable) { curiosityExplorationEnabled_ = enable; }
+    void enableDetailedLogging(bool enable) { detailedLoggingEnabled_ = enable; }
+    void enableStatisticalAnalysis(bool enable) { statisticalAnalysisEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isCuriosityExplorationEnabled() const { return curiosityExplorationEnabled_; }
+    bool isDetailedLoggingEnabled() const { return detailedLoggingEnabled_; }
+    bool isStatisticalAnalysisEnabled() const { return statisticalAnalysisEnabled_; }
+    
+    // Configuration access
+    const AgentBrainConfig& getConfig() const { return config_; }
+    
+    // Statistics access
+    const AgentBrainStatistics& getStatistics() const { return statistics_; }
+    
+    // Update statistics
+    void updateStatistics();
+    
+    // Save configuration to file
+    bool saveConfiguration(const std::string& filename) const;
+    
+    // Load configuration from file
+    bool loadConfiguration(const std::string& filename);
+    
+    // Reset to default configuration
+    void resetToDefaults();
+    
+    // Parameter sweep support
+    bool enableParameterSweep(const std::string& sweepName);
+    bool hasNextParameterSet() const;
+    void nextParameterSet();
+    
+    // Research mode
+    void enableResearchMode(bool enable) { researchModeEnabled_ = enable; }
+    bool isResearchModeEnabled() const { return researchModeEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -76,7 +117,21 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Enhanced neuron group initialization
+    void initializeNeuronGroups(const AgentBrainConfig& config);
+    
+    // Enhanced sensory processing
+    void processSensoryInputEnhanced(const SensoryPercept& percept);
+    
+    // Enhanced neuromodulation
+    void applyNeuromodulationEnhanced(float reward, float predictedReward);
+    
+    // Enhanced development system
+    void updateDevelopmentEnhanced(double timestep);
+    
+    // Configuration
     std::shared_ptr<Brain> brain_;
+    AgentBrainConfig config_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -108,10 +163,33 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool curiosityExplorationEnabled_;
+    bool detailedLoggingEnabled_;
+    bool statisticalAnalysisEnabled_;
+    bool researchModeEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    
+    // Statistics
+    AgentBrainStatistics statistics_;
+    
+    // Parameter sweep
+    std::map<std::string, std::vector<float>> parameterSweepValues_;
+    std::vector<std::string> parameterSweepKeys_;
+    size_t currentParameterIndex_;
+    
+    // Timing for research
+    double lastUpdateTime_;
+    double accumulatedTime_;
+    
+    // Research mode data
+    std::map<std::string, std::vector<double>> researchData_;
+    
+    // Helper methods
+    void updateResearchData(const std::string& key, double value);
+    std::vector<float> getCurrentParameterValues() const;
+    void applyParameterSet(const std::vector<float>& values);
 };
 
 } // namespace nlm
