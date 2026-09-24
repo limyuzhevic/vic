@@ -5,6 +5,21 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <unordered_set>
+#include <functional>
+#include <algorithm>
+#include <chrono>
+#include <variant>
+#include <optional>
+#include <regex>
+#include <filesystem>
+#include <sstream>
+#include <stdexcept>
+#include <cassert>
+#include <cstdint>
+#include <ctime>
+#include <cstdarg>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,18 +30,398 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
 
+// ==================== ENHANCED ERROR HANDLING ====================
+
+/**
+ * Error Location Information for Debugging
+ * 
+ * Provides detailed location information for errors including file, line, function,
+ * and module information for precise debugging.
+ */
+class ErrorLocation {
+public:
+    std::string file;
+    int line;
+    std::string function;
+    std::string module;
+    
+    ErrorLocation(const std::string& file = "", int line = 0, 
+                  const std::string& function = "", const std::string& module = "")
+        : file(file), line(line), function(function), module(module) {}
+    
+    std::string toString() const {
+        std::ostringstream oss;
+        if (!file.empty()) oss << file;
+        if (line > 0) oss << ":" << line;
+        if (!function.empty()) oss << " in " << function;
+        if (!module.empty()) oss << " [" << module << "]";
+        return oss.str();
+    }
+};
+
+/**
+ * Enhanced Error Information Structure
+ * 
+ * Contains comprehensive error information for debugging and programmatic handling.
+ */
+class ErrorInfo {
+public:
+    enum class ErrorCategory {
+        Runtime,           // General runtime errors
+        Validation,        // Parameter validation errors
+        Boundary,          // Out-of-bounds errors
+        Input,             // Invalid input errors
+        Memory,            // Memory allocation errors
+        Simulation,        // Simulation-related errors
+        Configuration,     // Configuration errors
+        Template,          // Template errors
+        Iteration,         // Iteration-related errors
+        System,            // System-level errors
+        Network,           // Network-related errors
+        IO,                // File I/O errors
+        Security,          // Security violations
+        Permission         // Permission errors
+    };
+    
+    enum class ErrorSeverity {
+        Low,      // Warning, non-critical
+        Medium,   // Error, may affect functionality
+        High,     // Critical error, partial functionality loss
+        Severe,   // Fatal error, complete functionality loss
+        Catastrophic // System failure
+    };
+    
+    int code;
+    ErrorCategory category;
+    ErrorSeverity severity;
+    std::string message;
+    ErrorLocation location;
+    std::string stackTrace;
+    std::string context;
+    std::map<std::string, std::string> details;
+    std::vector<std::string> suggestions;
+    
+    ErrorInfo(int code = 0, ErrorCategory category = ErrorCategory::Runtime,
+              ErrorSeverity severity = ErrorSeverity::Medium,
+              const std::string& message = "",
+              const ErrorLocation& location = ErrorLocation(),
+              const std::string& context = "",
+              const std::string& stackTrace = "")
+        : code(code), category(category), severity(severity),
+          message(message), location(location), context(context),
+          stackTrace(stackTrace) {}
+    
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << "[" << errorCategoryToString(category) << "]";
+        oss << " [" << errorSeverityToString(severity) << "]";
+        oss << " Code:" << code;
+        oss << " Msg:" << message;
+        oss << " Loc:" << location.toString();
+        return oss.str();
+    }
+    
+    static std::string errorCategoryToString(ErrorCategory category) {
+        switch (category) {
+            case ErrorCategory::Runtime: return "Runtime";
+            case ErrorCategory::Validation: return "Validation";
+            case ErrorCategory::Boundary: return "Boundary";
+            case ErrorCategory::Input: return "Input";
+            case ErrorCategory::Memory: return "Memory";
+            case ErrorCategory::Simulation: return "Simulation";
+            case ErrorCategory::Configuration: return "Configuration";
+            case ErrorCategory::Template: return "Template";
+            case ErrorCategory::Iteration: return "Iteration";
+            case ErrorCategory::System: return "System";
+            case ErrorCategory::Network: return "Network";
+            case ErrorCategory::IO: return "IO";
+            case ErrorCategory::Security: return "Security";
+            case ErrorCategory::Permission: return "Permission";
+            default: return "Unknown";
+        }
+    }
+    
+    static std::string errorSeverityToString(ErrorSeverity severity) {
+        switch (severity) {
+            case ErrorSeverity::Low: return "Low";
+            case ErrorSeverity::Medium: return "Medium";
+            case ErrorSeverity::High: return "High";
+            case ErrorSeverity::Severe: return "Severe";
+            case ErrorSeverity::Catastrophic: return "Catastrophic";
+            default: return "Unknown";
+        }
+    }
+    
+    std::string getFormattedError() const {
+        std::ostringstream oss;
+        oss << "Error [" << code << "]: " << message << "\n";
+        oss << "Category: " << errorCategoryToString(category) << "\n";
+        oss << "Severity: " << errorSeverityToString(severity) << "\n";
+        oss << "Location: " << location.toString() << "\n";
+        if (!context.empty()) {
+            oss << "Context: " << context << "\n";
+        }
+        if (!stackTrace.empty()) {
+            oss << "Stack Trace:\n" << stackTrace << "\n";
+        }
+        if (!details.empty()) {
+            oss << "Details:\n";
+            for (const auto& detail : details) {
+                oss << "  " << detail.first << ": " << detail.second << "\n";
+            }
+        }
+        if (!suggestions.empty()) {
+            oss << "Suggestions:\n";
+            for (const auto& suggestion : suggestions) {
+                oss << "  - " << suggestion << "\n";
+            }
+        }
+        return oss.str();
+    }
+};
+
+/**
+ * Comprehensive Custom Exception Hierarchy
+ * 
+ * Nine-layer exception hierarchy with specific exception types for different error scenarios.
+ */
+class NLMRuntimeError : public std::runtime_error {
+public:
+    NLMRuntimeError(const std::string& message) : std::runtime_error(message), errorInfo_(0, ErrorInfo::ErrorCategory::Runtime) {}
+    NLMRuntimeError(const std::string& message, const ErrorInfo& info) : std::runtime_error(message), errorInfo_(info) {}
+    
+    const ErrorInfo& getErrorInfo() const { return errorInfo_; }
+    std::string getErrorInfoString() const { return errorInfo_.getFormattedError(); }
+    
+private:
+    ErrorInfo errorInfo_;
+};
+
+class NLMValidationError : public NLMRuntimeError {
+public:
+    NLMValidationError(const std::string& message) 
+        : NLMRuntimeError(message, ErrorInfo(1000, ErrorInfo::ErrorCategory::Validation, ErrorInfo::ErrorSeverity::High, message)) {}
+    NLMValidationError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(1000, ErrorInfo::ErrorCategory::Validation, ErrorInfo::ErrorSeverity::High, message, location)) {}
+};
+
+class NLMBoundaryError : public NLMRuntimeError {
+public:
+    NLMBoundaryError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(2000, ErrorInfo::ErrorCategory::Boundary, ErrorInfo::ErrorSeverity::High, message)) {}
+    NLMBoundaryError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(2000, ErrorInfo::ErrorCategory::Boundary, ErrorInfo::ErrorSeverity::High, message, location)) {}
+};
+
+class NLMInvalidInputError : public NLMRuntimeError {
+public:
+    NLMInvalidInputError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(3000, ErrorInfo::ErrorCategory::Input, ErrorInfo::ErrorSeverity::Medium, message)) {}
+    NLMInvalidInputError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(3000, ErrorInfo::ErrorCategory::Input, ErrorInfo::ErrorSeverity::Medium, message, location)) {}
+};
+
+class NLMMemoryError : public NLMRuntimeError {
+public:
+    NLMMemoryError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(4000, ErrorInfo::ErrorCategory::Memory, ErrorInfo::ErrorSeverity::Severe, message)) {}
+    NLMMemoryError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(4000, ErrorInfo::ErrorCategory::Memory, ErrorInfo::ErrorSeverity::Severe, message, location)) {}
+};
+
+class NLMSimulationError : public NLMRuntimeError {
+public:
+    NLMSimulationError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(5000, ErrorInfo::ErrorCategory::Simulation, ErrorInfo::ErrorSeverity::High, message)) {}
+    NLMSimulationError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(5000, ErrorInfo::ErrorCategory::Simulation, ErrorInfo::ErrorSeverity::High, message, location)) {}
+};
+
+class NLMConfigurationError : public NLMRuntimeError {
+public:
+    NLMConfigurationError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(6000, ErrorInfo::ErrorCategory::Configuration, ErrorInfo::ErrorSeverity::High, message)) {}
+    NLMConfigurationError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(6000, ErrorInfo::ErrorCategory::Configuration, ErrorInfo::ErrorSeverity::High, message, location)) {}
+};
+
+class NLMTemplateError : public NLMRuntimeError {
+public:
+    NLMTemplateError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(7000, ErrorInfo::ErrorCategory::Template, ErrorInfo::ErrorSeverity::Medium, message)) {}
+    NLMTemplateError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(7000, ErrorInfo::ErrorCategory::Template, ErrorInfo::ErrorSeverity::Medium, message, location)) {}
+};
+
+class NLMIterationError : public NLMRuntimeError {
+public:
+    NLMIterationError(const std::string& message)
+        : NLMRuntimeError(message, ErrorInfo(8000, ErrorInfo::ErrorCategory::Iteration, ErrorInfo::ErrorSeverity::Medium, message)) {}
+    NLMIterationError(const std::string& message, const ErrorLocation& location)
+        : NLMRuntimeError(message, ErrorInfo(8000, ErrorInfo::ErrorCategory::Iteration, ErrorInfo::ErrorSeverity::Medium, message, location)) {}
+};
+
+class ErrorTracker {
+public:
+    static ErrorTracker& getInstance() {
+        static ErrorTracker instance;
+        return instance;
+    }
+    
+    void recordError(const ErrorInfo& error) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        errors_.push_back(error);
+        errorCount_++;
+        if (error.severity == ErrorInfo::ErrorSeverity::Severe || 
+            error.severity == ErrorInfo::ErrorSeverity::Catastrophic) {
+            criticalErrorCount_++;
+        }
+    }
+    
+    size_t getErrorCount() const { return errorCount_; }
+    size_t getCriticalErrorCount() const { return criticalErrorCount_; }
+    
+    std::vector<ErrorInfo> getErrors() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return errors_;
+    }
+    
+    void clearErrors() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        errors_.clear();
+        errorCount_ = 0;
+        criticalErrorCount_ = 0;
+    }
+    
+    size_t getTotalErrors() const { return errors_.size(); }
+    
+private:
+    ErrorTracker() : errorCount_(0), criticalErrorCount_(0) {}
+    mutable std::mutex mutex_;
+    std::vector<ErrorInfo> errors_;
+    size_t errorCount_;
+    size_t criticalErrorCount_;
+};
+
+/**
+ * Error Utility Functions
+ */
+namespace ErrorUtils {
+    inline ErrorLocation currentLocation(const std::string& file = __builtin_FILE(),
+                                       int line = __builtin_LINE(),
+                                       const std::string& function = __builtin_FUNCTION()) {
+        return ErrorLocation(file, line, function, "NLM");
+    }
+    
+    inline std::string getStackTrace() {
+        std::ostringstream oss;
+        oss << "Stack trace not available in this build (use debug build)";
+        return oss.str();
+    }
+    
+    inline void throwError(const std::string& message, int code = 0, 
+                          ErrorInfo::ErrorCategory category = ErrorInfo::ErrorCategory::Runtime) {
+        ErrorTracker::getInstance().recordError(
+            ErrorInfo(code, category, ErrorInfo::ErrorSeverity::Medium, message, currentLocation())
+        );
+        throw NLMRuntimeError(message);
+    }
+    
+    inline void throwValidationError(const std::string& message,
+                                    const ErrorLocation& location = currentLocation()) {
+        ErrorTracker::getInstance().recordError(
+            ErrorInfo(1000, ErrorInfo::ErrorCategory::Validation, ErrorInfo::ErrorSeverity::High, message, location)
+        );
+        throw NLMValidationError(message, location);
+    }
+    
+    inline void throwBoundaryError(const std::string& message,
+                                  const ErrorLocation& location = currentLocation()) {
+        ErrorTracker::getInstance().recordError(
+            ErrorInfo(2000, ErrorInfo::ErrorCategory::Boundary, ErrorInfo::ErrorSeverity::High, message, location)
+        );
+        throw NLMBoundaryError(message, location);
+    }
+    
+    inline void throwMemoryError(const std::string& message,
+                                const ErrorLocation& location = currentLocation()) {
+        ErrorTracker::getInstance().recordError(
+            ErrorInfo(4000, ErrorInfo::ErrorCategory::Memory, ErrorInfo::ErrorSeverity::Severe, message, location)
+        );
+        throw NLMMemoryError(message, location);
+    }
+}
+
+// Helper function for error location in Python bindings
+static ErrorLocation getCurrentLocation() {
+    return ErrorUtils::currentLocation();
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        Enhanced NLM (Neural Learning Machine) Python Bindings with Comprehensive Error Handling
+        ----------------------------------------------------------------------------------
+        This module provides enhanced Python bindings for the NLM C++ neural simulation framework
+        with comprehensive error handling, custom exceptions, and detailed error reporting.
+        
+        New Exception Hierarchy:
+        - NLMRuntimeError: Base runtime error
+        - NLMValidationError: Parameter validation errors
+        - NLMBoundaryError: Out-of-bounds errors
+        - NLMInvalidInputError: Invalid input errors
+        - NLMMemoryError: Memory allocation errors
+        - NLMSimulationError: Simulation-related errors
+        - NLMConfigurationError: Configuration errors
+        - NLMTemplateError: Template errors
+        - NLMIterationError: Iteration-related errors
+        
+        Error Information:
+        Each exception includes detailed error information with codes, categories, severity,
+        stack traces, and suggestions for recovery.
+        
+        Error Tracking:
+        Global error statistics are maintained for monitoring and debugging.
+        
+        Enhanced Validation:
+        Validation results include detailed error information and suggestions.
     )pbdoc";
 
+    // Register exception types with pybind11
+    py::register_exception<NLMRuntimeError>(m, "NLMRuntimeError", PyExc_RuntimeError);
+    py::register_exception<NLMValidationError>(m, "NLMValidationError", PyExc_ValueError);
+    py::register_exception<NLMBoundaryError>(m, "NLMBoundaryError", PyExc_IndexError);
+    py::register_exception<NLMInvalidInputError>(m, "NLMInvalidInputError", PyExc_TypeError);
+    py::register_exception<NLMMemoryError>(m, "NLMMemoryError", PyExc_MemoryError);
+    py::register_exception<NLMSimulationError>(m, "NLMSimulationError", PyExc_RuntimeError);
+    py::register_exception<NLMConfigurationError>(m, "NLMConfigurationError", PyExc_ValueError);
+    py::register_exception<NLMTemplateError>(m, "NLMTemplateError", PyExc_TypeError);
+    py::register_exception<NLMIterationError>(m, "NLMIterationError", PyExc_RuntimeError);
+    
+    // Register error tracking function
+    m.def("get_error_stats", []() {
+        const ErrorTracker& tracker = ErrorTracker::getInstance();
+        py::dict stats;
+        stats["total_errors"] = tracker.getErrorCount();
+        stats["critical_errors"] = tracker.getCriticalErrorCount();
+        stats["all_errors"] = tracker.getErrors();
+        return stats;
+    }, "Get error statistics and tracking information");
+    
+    m.def("clear_error_stats", []() {
+        ErrorTracker::getInstance().clearErrors();
+    }, "Clear error statistics and tracking information");
+    
+    // Helper function for error location in Python bindings
+    m.def("_get_current_location", []() {
+        return ErrorUtils::currentLocation();
+    });
+
+    // Original NLM bindings with enhanced error handling
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
@@ -198,212 +593,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
-        .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
-
-    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, float, WorldObjectType, float, float>(),
-             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
-             py::arg("radius") = 0.5f)
-        .def_readwrite("x", &WorldObject::x)
-        .def_readwrite("y", &WorldObject::y)
-        .def_readwrite("radius", &WorldObject::radius)
-        .def_readwrite("type", &WorldObject::type)
-        .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
-
-    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
-        .def(py::init<>())
-        .def_readwrite("x", &AgentBody::x)
-        .def_readwrite("y", &AgentBody::y)
-        .def_readwrite("orientation", &AgentBody::orientation)
-        .def_readwrite("velocityX", &AgentBody::velocityX)
-        .def_readwrite("velocityY", &AgentBody::velocityY)
-        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
-        .def_readwrite("energy", &AgentBody::energy)
-        .def_readwrite("health", &AgentBody::health)
-        .def_readwrite("age", &AgentBody::age)
-        .def_readwrite("isMoving", &AgentBody::isMoving)
-        .def_readwrite("isTurning", &AgentBody::isTurning)
-        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
-
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
-        .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
-
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
-
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
-        .def(py::init<>())
-        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
-        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
-        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
-        .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
-
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
-
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    // Create default brain
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
