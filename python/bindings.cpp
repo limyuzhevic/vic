@@ -398,7 +398,116 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced AgentBrain methods for expert users
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get current curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get current novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get current prediction error")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getPlasticityModifier", &AgentBrain::getPlasticityModifier,
+             "Get current plasticity modifier")
+        .def("getSensoryVisionNeurons", &AgentBrain::getSensoryVisionNeurons,
+             "Get vision sensory neurons (advanced usage)")
+        .def("getSensoryTouchNeurons", &AgentBrain::getSensoryTouchNeurons,
+             "Get touch sensory neurons (advanced usage)")
+        .def("getSensoryInternalNeurons", &AgentBrain::getSensoryInternalNeurons,
+             "Get internal sensory neurons (advanced usage)")
+        .def("getMotorForwardNeurons", &AgentBrain::getMotorForwardNeurons,
+             "Get forward motor neurons (advanced usage)")
+        .def("getMotorBackwardNeurons", &AgentBrain::getMotorBackwardNeurons,
+             "Get backward motor neurons (advanced usage)")
+        .def("getMotorTurnLeftNeurons", &AgentBrain::getMotorTurnLeftNeurons,
+             "Get turn left motor neurons (advanced usage)")
+        .def("getMotorTurnRightNeurons", &AgentBrain::getMotorTurnRightNeurons,
+             "Get turn right motor neurons (advanced usage)")
+.def("getMotorInteractNeurons", &AgentBrain::getMotorInteractNeurons,
+              "Get interact motor neurons (advanced usage)")
+        .def("getMotorWaitNeurons", &AgentBrain::getMotorWaitNeurons,
+              "Get wait motor neurons (advanced usage)")
+        
+        // Additional utility functions for advanced usage
+        .def("batchInjectCurrent", [](std::shared_ptr<Brain> brain, 
+                                     const std::vector<NeuronId>& neuronIds,
+                                     float current, bool isExcitatory) {
+            for (const auto& neuronId : neuronIds) {
+                if (isExcitatory) {
+                    brain->injectCurrent(neuronId, current);
+                } else {
+                    brain->injectCurrent(neuronId, -current);
+                }
+            }
+        }, py::arg("brain"), py::arg("neuronIds"), py::arg("current"), py::arg("isExcitatory" = true),
+           "Inject current into multiple neurons at once (advanced usage)")
+
+        .def("createBrainWithRandomConnectivity", [](std::shared_ptr<Config> config,
+                                                      float connectivityProbability,
+                                                      float excitatoryProportion) {
+            config->set("connection_probability", connectivityProbability);
+            config->set("excitatory_proportion", excitatoryProportion);
+            return std::make_shared<Brain>(config);
+        }, py::arg("config"), py::arg("connectivityProbability"), py::arg("excitatoryProportion" = 0.8f),
+           "Create a brain with specific connectivity patterns (advanced usage)")
+
+        .def("getAllActiveNeurons", [](std::shared_ptr<Brain> brain) {
+            std::vector<NeuronId> activeNeurons;
+            for (auto& region : brain->getRegions()) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getState().firingState != FiringState::Resting) {
+                        activeNeurons.push_back(neuron->getId());
+                    }
+                }
+            }
+            return activeNeurons;
+        }, py::arg("brain"), "Get all currently active neurons (advanced usage)")
+
+        .def("getWorkingMemoryTraces", [](std::shared_ptr<Brain> brain) {
+            if (auto* wm = brain->getWorkingMemory()) {
+                return wm->getActiveTraces();
+            }
+            return size_t(0);
+        }, py::arg("brain"), "Get working memory trace count (advanced usage)")
+
+        .def("getEpisodicMemoryCount", [](std::shared_ptr<Brain> brain) {
+            if (auto* em = brain->getEpisodicMemory()) {
+                return em->getEpisodeCount();
+            }
+            return size_t(0);
+        }, py::arg("brain"), "Get episodic memory episode count (advanced usage)")
+
+        .def("getPredictionErrorMetrics", [](std::shared_ptr<Brain> brain) {
+            std::map<std::string, float> metrics;
+            if (auto* pred = brain->getPredictionSystem()) {
+                metrics["prediction_error"] = pred->getPredictionError();
+                metrics["prediction_confidence"] = pred->getPredictionConfidence();
+                metrics["novelty_score"] = pred->getNoveltyScore();
+            }
+            return metrics;
+        }, py::arg("brain"), "Get prediction system metrics (advanced usage)")
+
+        .def("getCognitionMetrics", [](std::shared_ptr<Brain> brain) {
+            std::map<std::string, float> metrics;
+            if (auto* planner = brain->getPlanner()) {
+                metrics["planning_depth"] = planner->getPlanningDepth();
+                metrics["planning_efficiency"] = planner->getPlanningEfficiency();
+            }
+            if (auto* concept = brain->getConceptFormation()) {
+                metrics["concept_confidence"] = concept->getConceptConfidence();
+                metrics["concept_coherence"] = concept->getConceptCoherence();
+            }
+            if (auto* attention = brain->getAttention()) {
+                metrics["attention_focus"] = attention->getAttentionFocus();
+                metrics["attention_gating_strength"] = attention->getGatingStrength();
+            }
+            return metrics;
+        }, py::arg("brain"), "Get cognition system metrics (advanced usage)")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
