@@ -289,6 +289,54 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Agent brain interface
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,7 +399,74 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Advanced operations for power users
+        .def("batchStep", [](Brain& self, size_t steps, double dt) {
+            for (size_t i = 0; i < steps; ++i) {
+                self.step(i, i * dt);
+            }
+        }, py::arg("steps"), py::arg("dt") = 0.001,
+             "Perform multiple simulation steps efficiently")
+        .def("batchInjectCurrent", [](Brain& self, NeuronType type, double current, size_t repetitions, double dt) {
+            for (size_t i = 0; i < repetitions; ++i) {
+                self.injectCurrentToNeurons(type, current);
+                self.step(i, i * dt);
+            }
+        }, py::arg("type"), py::arg("current"), py::arg("repetitions") = 100, py::arg("dt") = 0.001,
+             "Inject current multiple times for pattern generation")
+        .def("getNeuronStats", [](Brain& self) {
+            std::unordered_map<std::string, size_t> stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("getSimulationTime", [](Brain& self) {
+            if (auto* spikeSystem = self.getSpikeSystem()) {
+                return spikeSystem->getSimulationTime();
+            }
+            return 0.0;
+        }, "Get current simulation time")
+        .def("stimulatePattern", [](Brain& self, const std::vector<NeuronId>& neurons, double current, size_t steps) {
+            auto* spikeSystem = self.getSpikeSystem();
+            if (!spikeSystem) return;
+            
+            for (size_t step = 0; step < steps; ++step) {
+                for (const auto& neuronId : neurons) {
+                    self.injectCurrent(neuronId, current);
+                }
+                self.step(step, step * 0.001);
+            }
+        }, py::arg("neurons"), py::arg("current") = 50.0, py::arg("steps") = 100,
+             "Stimulate specific neurons with a pattern")
+        .def("recordSpikes", [](Brain& self, size_t duration, double dt) {
+            std::vector<std::vector<NeuronId>> spikeHistory;
+            spikeHistory.reserve(duration);
+            
+            for (size_t step = 0; step < duration; ++step) {
+                self.step(step, step * dt);
+                if (auto* spikeSystem = self.getSpikeSystem()) {
+                    spikeHistory.push_back(spikeSystem->getLastSpikes(10));
+                }
+            }
+            return spikeHistory;
+        }, py::arg("duration") = 1000, py::arg("dt") = 0.001,
+             "Record spike activity over time")
+        .def("resetWithPattern", [](Brain& self, double current, size_t steps) {
+            self.reset();
+            if (auto config = self.getConfig()) {
+                config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Runtime);
+            }
+            self.initialize();
+            for (size_t i = 0; i < steps; ++i) {
+                self.injectCurrentToNeurons(NeuronType::Excitatory, current);
+                self.step(i, i * 0.001);
+            }
+        }, py::arg("current") = 10.0, py::arg("steps") = 50,
+             "Reset brain with controlled initialization pattern");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,26 +515,269 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("validateConfig", [](const Config& config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        // Basic validation
+        if (!config.has("neuron_count")) {
+            errors.push_back("Missing required parameter: neuron_count");
+        }
+        
+        if (config.has("neuron_count")) {
+            auto count = config.getOr<int64_t>("neuron_count", 0);
+            if (count <= 0 || count > 1000000) {
+                errors.push_back("neuron_count out of valid range (1-1,000,000)");
+            }
+        }
+        
+        if (!config.has("region_count")) {
+            warnings.push_back("region_count not specified, using default");
+        }
+        
+        if (!config.has("simulation_timestep") || config.getOr<double>("simulation_timestep", 0.001) <= 0.0) {
+            errors.push_back("Invalid simulation_timestep value");
+        }
+        
+        return std::make_pair(errors, warnings);
+    }, py::arg("config"), "Validate configuration and return errors/warnings");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("exportToJSON", [](const Brain& brain, const std::string& filename) {
+        auto config = brain.getConfig();
+        return config->saveToFile(filename);
+    }, py::arg("brain"), py::arg("filename"), "Export brain configuration to JSON");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("importFromJSON", [](const std::string& filename) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filename);
+        return config;
+    }, py::arg("filename"), "Import brain configuration from JSON file");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("getAllConfigKeys", []() {
+        std::vector<std::string> allKeys;
+        // Add common configuration keys
+        allKeys.insert(allKeys.end(), {
+            "neuron_count",
+            "region_count", 
+            "connection_probability",
+            "simulation_timestep",
+            "random_seed",
+            "stdp_ltp_weight",
+            "stdp_ltd_weight",
+            "stdp_tau",
+            "synaptogenesis_rate",
+            "pruning_rate",
+            "enable_reward_modulation",
+            "enable_curiosity",
+            "enable_development",
+            "enable_structural_plasticity"
+        });
+        return allKeys;
+    }, "Get list of all available configuration keys");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("getConfigFromJSON", [](const std::string& filename) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filename)) {
+            throw std::runtime_error("Failed to load configuration from JSON file: " + filename);
+        }
+        return config;
+    }, py::arg("filename"), "Load configuration from JSON file with error handling");
+
+    m.def("createConfigWithValidation", [](const std::string& filename) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filename)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filename);
+        }
+        
+        // Validate configuration
+        auto errors = validateConfig(config);
+        if (!errors.empty()) {
+            std::string errorMsg = "Configuration validation failed:\n";
+            for (const auto& error : errors.first) {
+                errorMsg += "ERROR: " + error + "\n";
+            }
+            for (const auto& warning : errors.second) {
+                errorMsg += "WARNING: " + warning + "\n";
+            }
+            throw std::runtime_error(errorMsg);
+        }
+        
+        return config;
+    }, py::arg("filename"), "Create configuration with validation and error handling");
+
+    m.def("performanceMonitor", [](Brain& brain, std::function<void(const std::string&)> callback, double interval) {
+        std::thread monitorThread([&]() {
+            auto startTime = std::chrono::high_resolution_clock::now();
+            size_t stepCount = 0;
+            
+            while (true) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(interval * 1000)));
+                
+                auto stats = brain.getNeuronStats();
+                auto endTime = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+                
+                std::stringstream ss;
+                ss << "Performance Monitor - Step " << stepCount 
+                   << " | Neurons: " << stats["total_neurons"]
+                   << " | Synapses: " << stats["total_synapses"]
+                   << " | Spikes: " << stats["total_spikes"]
+                   << " | Duration: " << duration.count() << "ms"
+                   << " | Rate: " << (stats["total_spikes"] / (duration.count() / 1000.0)) << " spikes/sec";
+                
+                callback(ss.str());
+                stepCount++;
+            }
+        });
+        
+        monitorThread.detach();
+        return std::thread([&]() {
+            std::this_thread::sleep_for(std::chrono::hours(24)); // Run indefinitely
+        });
+    }, py::arg("brain"), py::arg("callback"), py::arg("interval") = 5.0, "Start performance monitoring thread with configurable interval");
+
+    m.def("safeLoadBrain", [](const std::string& configFile, const std::string& brainFile) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load configuration from: " + configFile);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        if (!brainFile.empty() && brain->load(brainFile)) {
+            NLM_LOG_INFO("Successfully loaded brain state from: " + brainFile);
+        }
+        
+        return brain;
+    }, py::arg("configFile"), py::arg("brainFile") = "", "Safely load brain with configuration and error handling");
+
+    m.def("batchLoadBrains", [](const std::vector<std::string>& configFiles) {
+        std::vector<std::shared_ptr<Brain>> brains;
+        brains.reserve(configFiles.size());
+        
+        for (const auto& filename : configFiles) {
+            auto config = std::make_shared<Config>();
+            if (config->loadFromFile(filename)) {
+                auto brain = std::make_shared<Brain>(config);
+                if (brain->initialize()) {
+                    brains.push_back(brain);
+                    NLM_LOG_INFO("Successfully loaded brain from: " + filename);
+                } else {
+                    NLM_LOG_WARNING("Failed to initialize brain from: " + filename);
+                }
+            } else {
+                NLM_LOG_WARNING("Failed to load configuration from: " + filename);
+            }
+        }
+        
+        return brains;
+    }, py::arg("configFiles"), "Load multiple brains from configuration files with error handling");
+
+    m.def("getSystemInfo", []() {
+        std::map<std::string, std::string> info;
+        
+        info["nlm_version"] = "Phase 6.0 (Final Integration)";
+        info["cpp_standard"] = "C++20";
+        info["build_type"] = "Release";
+        info["python_bindings"] = "1.0.0";
+        info["last_update"] = "2026-09-24";
+        info["features"] = "Full neural simulation with memory, prediction, cognition, neuromodulation";
+        info["supported_formats"] = "JSON, YAML, Simple Config";
+        
+        return info;
+    }, "Get comprehensive system information");
+
+    m.def("checkBrainHealth", [](const Brain& brain) {
+        std::map<std::string, std::string> healthStatus;
+        
+        healthStatus["brain_initialized"] = brain.getTotalNeuronCount() > 0 ? "yes" : "no";
+        healthStatus["region_count"] = std::to_string(brain.getRegionCount());
+        healthStatus["neuron_count"] = std::to_string(brain.getTotalNeuronCount());
+        healthStatus["synapse_count"] = std::to_string(brain.getTotalSynapseCount());
+        healthStatus["active_neurons"] = std::to_string(brain.getActiveNeuronCount());
+        healthStatus["firing_neurons"] = std::to_string(brain.getFiringNeuronCount());
+        healthStatus["total_spikes"] = std::to_string(brain.getTotalSpikeCount());
+        healthStatus["excitation_inhibition_ratio"] = std::to_string(brain.getExcitationInhibitionRatio());
+        
+        // Check for potential issues
+        if (brain.getTotalNeuronCount() > 100000) {
+            healthStatus["warning"] = "High neuron count may impact performance";
+        }
+        
+        return healthStatus;
+    }, py::arg("brain"), "Check NLM system health status with detailed metrics");
+
+    m.def("createResearchConfiguration", [](const std::string& researchType) {
+        auto config = std::make_shared<Config>();
+        
+        if (researchType == "memory") {
+            config->set("neuron_count", static_cast<int64_t>(8000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+            config->set("connection_probability", 0.08, ConfigSource::Default);
+            config->set("enable_reward_modulation", true, ConfigSource::Default);
+            config->set("enable_curiosity", true, ConfigSource::Default);
+            config->set("enable_development", true, ConfigSource::Default);
+            
+        } else if (researchType == "prediction") {
+            config->set("neuron_count", static_cast<int64_t>(6000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.06, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.015f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.018f, ConfigSource::Default);
+            
+        } else if (researchType == "development") {
+            config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+            config->set("connection_probability", 0.05, ConfigSource::Default);
+            config->set("enable_development", true, ConfigSource::Default);
+            config->set("enable_structural_plasticity", true, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.00002, ConfigSource::Default);
+            
+        } else {
+            // Default research configuration
+            config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.05, ConfigSource::Default);
+            config->set("enable_reward_modulation", true, ConfigSource::Default);
+            config->set("enable_curiosity", true, ConfigSource::Default);
+            config->set("enable_development", true, ConfigSource::Default);
+            config->set("enable_structural_plasticity", true, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("researchType") = "default", "Create research-grade configuration for specific research areas");
+
+    m.def("exportBenchmarkData", [](const Brain& brain, const std::string& filename) {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open benchmark file for writing: " + filename);
+        }
+        
+        // Export brain statistics for benchmarking
+        file << "# NLM Benchmark Data\n";
+        file << "# Generated on " << getCurrentTimestamp() << "\n\n";
+        
+        auto stats = brain.getNeuronStats();
+        file << "brain_statistics:\n";
+        file << "  total_neurons: " << stats["total_neurons"] << "\n";
+        file << "  total_synapses: " << stats["total_synapses"] << "\n";
+        file << "  active_neurons: " << stats["active_neurons"] << "\n";
+        file << "  firing_neurons: " << stats["firing_neurons"] << "\n";
+        file << "  total_spikes: " << stats["total_spikes"] << "\n";
+        file << "  excitation_inhibition_ratio: " << brain.getExcitationInhibitionRatio() << "\n\n";
+        
+        // Export configuration
+        auto config = brain.getConfig();
+        file << "configuration:\n";
+        for (const auto& key : config->getKeys()) {
+            file << "  " << key << ": " << getConfigValueString(config, key) << "\n";
+        }
+        
+        NLM_LOG_INFO("Benchmark data exported to: " + filename);
+        return true;
+    }, py::arg("brain"), py::arg("filename"), "Export benchmark data for performance analysis");
 
 } // namespace nlm

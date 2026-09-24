@@ -55,14 +55,30 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from JSON/YAML file
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Save to JSON/YAML file
+    bool saveToJSONFile(const std::string& filepath) const;
+    bool saveToYAMLFile(const std::string& filepath) const;
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Helper functions for string escaping
+    static std::string escapeJSONString(const std::string& input);
+    static std::string escapeYAMLString(const std::string& input);
+    
+    // Performance and memory management
+    size_t getMemoryUsage() const;
+    bool optimizeMemoryUsage();
+    static std::string getCurrentTimestamp();
+    
+    // Configuration validation and cleanup
+    bool validateConfiguration() const;
+    void cleanupInvalidEntries();
+    
+    // Helper functions for string escaping
+    static std::string escapeJSONString(const std::string& input);
+    static std::string escapeYAMLString(const std::string& input);
     
     // Get values
     template<typename T>
