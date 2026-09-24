@@ -61,6 +61,8 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    virtual ~Brain();  // Virtual destructor for proper memory management
+    
     // Initialize brain with configuration
     bool initialize();
     
