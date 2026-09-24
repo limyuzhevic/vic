@@ -1,0 +1,526 @@
+# GitLab CI/CD Pipeline for NLM
+# This configuration provides comprehensive CI/CD for the NLM project
+
+# Define variables for the pipeline
+variables:
+  # Build configuration
+  CMAKE_BUILD_TYPE: Release
+  CXX_STANDARD: 20
+  PYTHON_VERSION: 3.11
+  NLM_VERSION: 0.1.0
+  
+  # Docker registry settings
+  DOCKER_REGISTRY: $CI_REGISTRY
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE
+  DOCKER_TAG_CI: $CI_COMMIT_SHA
+  DOCKER_TAG_LATEST: latest
+  DOCKER_TAG_VERSION: $NLM_VERSION
+  
+  # Cache settings
+  PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+  CMAKE_BUILD_DIR: ${CI_PROJECT_DIR}/build
+  ARTIFACTS_DIR: ${CI_PROJECT_DIR}/artifacts
+  
+  # Testing settings
+  CTEST_TIMEOUT: 300
+  PYTEST_TIMEOUT: 300
+  BENCHMARK_TIMEOUT: 600
+  
+  # Quality gates
+  COVERAGE_THRESHOLD: 80
+  LINT_ERROR_THRESHOLD: 10
+  
+  # Parallelism
+  MAKE_JOBS: $CI_CPU_LIMIT
+
+systems:
+  # Ubuntu system configuration
+  - name: ubuntu
+    image: ubuntu:22.04
+    cpu_limit: 4
+    memory_limit: 8Gi
+    
+  # Alpine Linux system configuration
+  - name: alpine
+    image: alpine:latest
+    cpu_limit: 2
+    memory_limit: 4Gi
+    
+  # macOS system configuration
+  - name: macos
+    image: ubuntu:latest  # Using ubuntu as a placeholder - would need native macOS runner
+    cpu_limit: 4
+    memory_limit: 8Gi
+    
+  # Windows system configuration
+  - name: windows
+    image: mcr.microsoft.com/windows/servercore:ltsc2022
+    cpu_limit: 4
+    memory_limit: 8Gi
+
+stages:
+  - dependencies
+  - build
+  - test
+  - quality
+  - security
+  - docs
+  - release
+  - deploy
+
+# Cache configuration
+cache:
+  # Cache Python packages
+  - key: ${CI_COMMIT_REF_SLUG}-pip
+    paths:
+      - ${PIP_CACHE_DIR}
+    policy: pull-push
+  
+  # Cache CMake build directory
+  - key: ${CI_COMMIT_REF_SLUG}-cmake-build
+    paths:
+      - ${CMAKE_BUILD_DIR}
+    policy: pull-push
+  
+  # Cache Node.js dependencies if present
+  - key: ${CI_COMMIT_REF_SLUG}-node-modules
+    paths:
+      - node_modules/
+    policy: pull-push
+
+# Default job configuration
+.default:
+  image: ${CI_REGISTRY}/ubuntu:22.04
+  before_script:
+    - echo "Starting job ${CI_JOB_NAME} in ${CI_RUNNER_ID}"
+    - date
+    - export CI_PROJECT_PATH_SLUG
+  after_script:
+    - echo "Job ${CI_JOB_NAME} completed"
+    - date
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - ${ARTIFACTS_DIR}/
+      - test-results/
+    reports:
+      junit: test-results/junit-*.xml
+      coverage: build/coverage.xml
+      dotenv: environment.txt
+    expire_in: 1 week
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == 'push'
+      when: on_success
+
+# Dependency management stage
+dependencies:
+  stage: dependencies
+  script:
+    - echo "Installing system dependencies"
+    - apt-get update && apt-get install -y --no-install-recommends
+      build-essential
+      cmake
+      git
+      python3
+      python3-dev
+      python3-pip
+      python3-venv
+      pkg-config
+      libpython3-dev
+      libopenmpi-dev
+      liblapack-dev
+      libatlas-base-dev
+      valgrind
+      gprof
+      clang-tidy
+      clang-format
+    - echo "Setting up Python virtual environment"
+    - python3 -m venv venv
+    - source venv/bin/activate
+    - pip install --no-cache-dir --upgrade pip setuptools wheel
+    - pip install --no-cache-dir scikit-build-core>=0.5.0 pybind11>=2.11.0 numpy>=1.20 pytest>=7.0 pytest-cov pytest-html
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-pip
+    paths:
+      - venv/
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+  parallel: limited
+
+# Build stage for Ubuntu
+build-ubuntu:
+  stage: build
+  script:
+    - source venv/bin/activate
+    - echo "Configuring CMake build"
+    - mkdir -p ${CMAKE_BUILD_DIR}
+    - cd ${CMAKE_BUILD_DIR}
+    - cmake .. \\
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \\
+      -DCMAKE_CXX_STANDARD=${CXX_STANDARD} \\
+      -DCMAKE_CXX_STANDARD_REQUIRED=ON \\
+      -DENABLE_TESTS=ON \\
+      -DENABLE_VALIDATION=ON \\
+      -DBUILD_EXAMPLES=ON \\
+      -DNLM_PYTHON_BINDINGS=ON \\
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - echo "Building with ${MAKE_JOBS} parallel jobs"
+    - cmake --build . --parallel ${MAKE_JOBS}
+    - echo "Building Python bindings"
+    - cd ..
+    - pip install -e .[dev]
+    - echo "Building distribution packages"
+    - python -m build
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - dist/
+      - *.egg-info/
+    reports:
+      dotenv: build.env
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+
+# Build stage for Alpine Linux
+build-alpine:
+  stage: build
+  script:
+    - source venv/bin/activate
+    - echo "Installing Alpine-specific dependencies"
+    - apk add --no-cache g++ gcc cmake make python3 py3-pip py3-dev git
+    - echo "Configuring CMake build"
+    - mkdir -p ${CMAKE_BUILD_DIR}
+    - cd ${CMAKE_BUILD_DIR}
+    - cmake .. \\
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \\
+      -DCMAKE_CXX_STANDARD=${CXX_STANDARD} \\
+      -DCMAKE_CXX_STANDARD_REQUIRED=ON \\
+      -DENABLE_TESTS=ON \\
+      -DNLM_PYTHON_BINDINGS=ON
+    - echo "Building with ${MAKE_JOBS} parallel jobs"
+    - cmake --build . --parallel ${MAKE_JOBS}
+    - echo "Building Python bindings"
+    - cd ..
+    - pip install -e .[dev]
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - dist/
+      - *.egg-info/
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+
+# Build stage for macOS
+build-macos:
+  stage: build
+  script:
+    - source venv/bin/activate
+    - echo "Installing Homebrew dependencies"
+    - brew install cmake git python3 openmpi lapack
+    - echo "Configuring CMake build"
+    - mkdir -p ${CMAKE_BUILD_DIR}
+    - cd ${CMAKE_BUILD_DIR}
+    - cmake .. \\
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \\
+      -DCMAKE_CXX_STANDARD=${CXX_STANDARD} \\
+      -DCMAKE_CXX_STANDARD_REQUIRED=ON \\
+      -DENABLE_TESTS=ON \\
+      -DNLM_PYTHON_BINDINGS=ON
+    - echo "Building with ${MAKE_JOBS} parallel jobs"
+    - cmake --build . --parallel ${MAKE_JOBS}
+    - echo "Building Python bindings"
+    - cd ..
+    - pip install -e .[dev]
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - dist/
+      - *.egg-info/
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+
+# Build stage for Windows
+build-windows:
+  stage: build
+  script:
+    - call venv\Scripts\activate.bat
+    - echo "Installing Chocolatey packages"
+    - choco install -y cmake git python openmpi lapack
+    - echo "Configuring CMake build"
+    - mkdir build
+    - cd build
+    - cmake .. \\
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \\
+      -DCMAKE_CXX_STANDARD=${CXX_STANDARD} \\
+      -DCMAKE_CXX_STANDARD_REQUIRED=ON \\
+      -DENABLE_TESTS=ON \\
+      -DNLM_PYTHON_BINDINGS=ON
+    - echo "Building with ${MAKE_JOBS} parallel jobs"
+    - cmake --build . --config ${CMAKE_BUILD_TYPE} --parallel ${MAKE_JOBS}
+    - echo "Building Python bindings"
+    - cd ..
+    - pip install -e .[dev]
+  artifacts:
+    paths:
+      - build/
+      - dist/
+      - *.egg-info/
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+
+# Test stage for Ubuntu
+test-ubuntu:
+  stage: test
+  script:
+    - source venv/bin/activate
+    - echo "Running C++ tests"
+    - cd ${CMAKE_BUILD_DIR}
+    - if [ -f "CTestTestfile.cmake" ]; then
+      ctest --output-on-failure --timeout ${CTEST_TIMEOUT} -L unit
+      fi
+    - echo "Running Python tests"
+    - cd ..
+    - pytest tests/ \\
+      --cov=pynlm \\
+      --cov-report=xml \\
+      --cov-report=html \\
+      --cov-report=term-missing \\
+      --cov-config=.coveragerc \\
+      --timeout ${PYTEST_TIMEOUT}
+    - echo "Running benchmarks"
+    - if [ -f "benchmark" ]; then
+      ./benchmark --benchmark_out=benchmark_results.json --benchmark_out_format=json
+      fi
+    - echo "Running performance tests"
+    - if [ -f "performance_tests" ]; then
+      ./performance_tests --output performance_metrics.json
+      fi
+  dependencies:
+    - build-ubuntu
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - test-results/
+      - htmlcov/
+      - benchmark_results.json
+      - performance_metrics.json
+    reports:
+      junit: test-results/ctest-*.xml
+      coverage: build/coverage.xml
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+
+# Test stage for Alpine
+test-alpine:
+  stage: test
+  script:
+    - source venv/bin/activate
+    - echo "Running C++ tests"
+    - cd ${CMAKE_BUILD_DIR}
+    - if [ -f "CTestTestfile.cmake" ]; then
+      ctest --output-on-failure --timeout ${CTEST_TIMEOUT}
+      fi
+    - echo "Running Python tests"
+    - cd ..
+    - pytest tests/ --cov=pynlm --cov-report=html --timeout ${PYTEST_TIMEOUT}
+  dependencies:
+    - build-alpine
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - test-results/
+      - htmlcov/
+    rules:
+    - if: $CI_MERGE_REQUEST_ID
+      when: manual
+
+# Quality stage
+quality:
+  stage: quality
+  script:
+    - source venv/bin/activate
+    - echo "Running code style checks"
+    - if command -v clang-format >/dev/null 2>&1; then
+      find src -name "*.cpp" -o -name "*.h" -o -name "*.hpp" | xargs clang-format --dry-run --Werror
+      fi
+    - if command -v cppcheck >/dev/null 2>&1; then
+      cppcheck --enable=all --insecure --warnings-as-errors src/
+      fi
+    - echo "Running linting checks"
+    - pip install flake8 black isort mypy
+    - flake8 src/ python/ tests/
+    - black --check src/ python/ tests/
+    - isort --check-only src/ python/ tests/
+    - mypy src/ python/
+    - echo "Code coverage analysis"
+    - coverage report --fail-under=${COVERAGE_THRESHOLD}
+    - coverage html
+    - coverage xml
+    - echo "Generating quality reports"
+    - python scripts/generate_quality_report.py
+  dependencies:
+    - build-ubuntu
+    - test-ubuntu
+  artifacts:
+    paths:
+      - quality_report.html
+      - quality_report.json
+    reports:
+      junit: test-results/junit-*.xml
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+
+# Security stage
+security:
+  stage: security
+  script:
+    - source venv/bin/activate
+    - echo "Installing security scanners"
+    - pip install safety bandit semgrep
+    - echo "Running safety audit"
+    - safety check
+    - echo "Running bandit"
+    - bandit -r src/ -f json -o bandit-report.json
+    - echo "Running semgrep"
+    - semgrep --config=auto src/
+    - echo "Checking for license headers"
+    - find src/ python/ -name "*.cpp" -o -name "*.h" -o -name "*.hpp" -o -name "*.py" | xargs grep -L "MIT License" > license_check.txt
+    - if [ -s "license_check.txt" ]; then
+      echo "Files missing license headers:" && cat license_check.txt
+      fi
+    - echo "Checking dependencies"
+    - pip install pipdeptree
+    - pipdeptree -d --warn silence > dependency_tree.txt
+    - echo "Running static analysis"
+    - if [ -f "compile_commands.json" ]; then
+      clang-tidy -p build/ src/*.cpp
+      fi
+  dependencies:
+    - build-ubuntu
+    - test-ubuntu
+    - quality
+  artifacts:
+    paths:
+      - bandit-report.json
+      - dependency_tree.txt
+      - license_check.txt
+    reports:
+      dotenv: security.env
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+
+# Documentation stage
+docs:
+  stage: docs
+  script:
+    - source venv/bin/activate
+    - echo "Installing documentation dependencies"
+    - pip install sphinx sphinx-rtd-theme breathe myst-parser
+    - echo "Generating API documentation"
+    - cd docs
+    - sphinx-build -b html . _build/html
+    - sphinx-build -b latex . _build/latex
+    - sphinx-build -b man . _build/man
+    - cd ..
+    - echo "Generating C++ documentation"
+    - if [ -f "compile_commands.json" ]; then
+      doxygen Doxyfile
+      fi
+  dependencies:
+    - build-ubuntu
+  artifacts:
+    paths:
+      - docs/_build/
+      - build/html/
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: on_success
+
+# Release stage
+release:
+  stage: release
+  script:
+    - source venv/bin/activate
+    - echo "Creating release artifacts"
+    - mkdir -p ${ARTIFACTS_DIR}
+    - cp -r ${CMAKE_BUILD_DIR}/nlm ${ARTIFACTS_DIR}/
+    - cp -r ${CMAKE_BUILD_DIR}/*.demo ${ARTIFACTS_DIR}/ 2>/dev/null || true
+    - cp -r ${CMAKE_BUILD_DIR}/lib*.a ${ARTIFACTS_DIR}/ 2>/dev/null || true
+    - cp -r ${CMAKE_BUILD_DIR}/*.so ${ARTIFACTS_DIR}/ 2>/dev/null || true
+    - cp -r ${CMAKE_BUILD_DIR}/*.dylib ${ARTIFACTS_DIR}/ 2>/dev/null || true
+    - cp -r ${CMAKE_BUILD_DIR}/*.dll ${ARTIFACTS_DIR}/ 2>/dev/null || true
+    - cp dist/* ${ARTIFACTS_DIR}/ 2>/dev/null || true
+    - cp LICENSE README.md ${ARTIFACTS_DIR}/
+    - echo "Creating release archive"
+    - tar -czf nlm-${NLM_VERSION}-${CI_COMMIT_SHORT_SHA}.tar.gz -C ${ARTIFACTS_DIR} .
+    - echo "Pushing to Git tags"
+    - git config --local user.email "action@github.com"
+    - git config --local user.name "GitHub Action"
+    - git tag -a v${NLM_VERSION} -m "Release v${NLM_VERSION}"
+    - git push origin v${NLM_VERSION}
+  dependencies:
+    - build-ubuntu
+    - test-ubuntu
+    - quality
+    - docs
+  artifacts:
+    paths:
+      - ${ARTIFACTS_DIR}/
+      - "nlm-${NLM_VERSION}-${CI_COMMIT_SHORT_SHA}.tar.gz"
+  rules:
+    - if: $CI_COMMIT_TAG != ''
+      when: manual
+
+# Deployment stage (to be customized based on deployment targets)
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying to staging environment"
+    - echo "Deploying to production environment (manual)"
+  only:
+    - tags
+  when: manual
+
+# Job templates for system-specific builds
+.job-template: &
+base:
+  before_script:
+    - echo "Starting job ${CI_JOB_NAME} on $(uname -s)"
+    - date
+    - export CI_PROJECT_PATH_SLUG
+  after_script:
+    - echo "Job ${CI_JOB_NAME} completed"
+    - date
+  artifacts:
+    paths:
+      - ${CMAKE_BUILD_DIR}/
+      - ${ARTIFACTS_DIR}/
+      - test-results/
+    reports:
+      junit: test-results/junit-*.xml
+      coverage: build/coverage.xml
+    expire_in: 1 week
+
+# Manual pipeline trigger
+# This allows users to trigger specific stages manually
+manual_triggers:
+  stage: .post
+  script:
+    - echo "Pipeline triggered manually at ${CI_PIPELINE_URL}"
+  when: manual

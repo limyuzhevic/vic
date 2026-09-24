@@ -7,7 +7,7 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the NLM Python API (including advanced features)
 
 ---
 
@@ -222,19 +222,19 @@ def run_agent_simulation(num_steps=1000):
         # Update world
         world.update(timestep=0.1)
         
-        # Get sensory input from world
+        # Get what the agent sees
         percept = world.getSensoryPercept()
         
-        # Process sensory input in brain
+        # Tell the brain
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Brain thinks
         brain.step(step)
         
-        # Decode motor command from brain activity
+        # Get action from brain
         motor_cmd = agent.decodeMotorCommand()
         
-        # Apply motor command to world
+        # Do action in world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
         # Apply reward modulation
@@ -531,3 +531,15 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+---
+
+## LICENSE
+
+MIT License
+
+---
+
+## AUTHORS
+
+NLM (熙然) Research Project
