@@ -20,6 +20,44 @@
 #include <cmath>
 #include <sstream>
 
+/**
+ * @file Brain.cpp
+ * @brief Implementation of the central Brain coordinator (Phase 6: Final Integration)
+ * @author NLM Research Team
+ * @date Phase 6 - Final Integration
+ * 
+ * This file implements the Brain class, which serves as the central coordinator
+ * of the NLM artificial brain system. The Brain class integrates all major
+ * subsystems into a coherent neural system with the following architecture:
+ * 
+ * Core Architecture:
+ * - Neural computation (spike-based dynamics)
+ * - Synaptic plasticity (STDP, Hebbian, structural)
+ * - Memory systems (working, episodic, associative)
+ * - Prediction and error signals
+ * - Cognitive functions (planning, attention, concept formation)
+ * - Neuromodulation (reward, curiosity, novelty)
+ * - Development and maturation
+ * - Sensory and motor interfaces
+ * - Environmental interaction
+ * 
+ * Key Features:
+ * - Event-driven spike-based neural computation
+ * - Real-time simulation with configurable timestep
+ * - Comprehensive checkpointing and state persistence
+ * - Integration of all plasticity mechanisms
+ * - Memory replay and consolidation
+ * - Developmental stages affecting plasticity
+ * 
+ * @complexity Extremely complex (1117 lines) - represents the culmination
+ * of Phase 6 integration efforts. This file manages integration of
+ * all previously developed components into a unified brain system.
+ * 
+ * @see Brain.hpp
+ * @see Phase6Demo.cpp - Example of integrated brain usage
+ * @see CONFIG.md - Configuration options
+ */
+
 namespace nlm {
 
 struct Brain::Impl {
@@ -174,8 +212,32 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
-bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    /*
+     * Complete brain initialization with all subsystems
+     * 
+     * This method performs comprehensive initialization of all brain components:
+     * 1. Creates neural regions and neurons
+     * 2. Sets up synaptic connections
+     * 3. Initializes all integrated subsystems
+     * 4. Configures plasticity rules
+     * 5. Prepares sensory and motor interfaces
+     * 
+     * The initialization process ensures:
+     * - All neural populations are created with correct types
+     * - Synaptic connectivity is established according to configuration
+     * - Each subsystem is properly configured and ready for operation
+     * - Spike recording and statistics are reset
+     * 
+     * @return true if initialization succeeds, false otherwise
+     * @post Brain is ready for simulation (all systems initialized)
+     * @post Neural network is populated with neurons and connections
+     * @post All plasticity rules are configured
+     * @see addRegion()
+     * @see injectCurrent()
+     */
+    bool Brain::initialize() {
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);

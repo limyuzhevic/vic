@@ -1,6 +1,28 @@
-#include "Hebbian.hpp"
-#include "../../brain/Synapse.hpp"
-#include <algorithm>
+/**
+ * @file Hebbian.cpp
+ * @brief Hebbian learning implementation
+ * @author NLM Research Team
+ * @date Phase 2 - Plasticity Systems
+ * 
+ * This file implements the Hebbian learning rule, which is based on the
+ * correlation between pre-synaptic and post-synaptic spike activity.
+ * 
+ * The classic "neurons that fire together, wire together" principle is
+ * implemented as a covariance-based learning rule that strengthens
+ * connections between simultaneously active neurons.
+ * 
+ * The implementation supports:
+ * - Covariance-based learning with configurable learning rate
+ * - Weight bounds to prevent runaway potentiation
+ * - Comprehensive error handling and logging
+ * - Integration with WeightManagementMixin for consistent behavior
+ * 
+ * @warning This is Phase 2: REAL Hebbian implementation (placeholder removed)
+ * @see Hebbian.hpp
+ * @see PlasticityRule.hpp
+ * @see Synapse.hpp
+ * @see WeightManagementMixin.hpp
+ */
 
 namespace nlm {
 
@@ -22,36 +44,45 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
+    if (!synapse) {
+        NLM_LOG_ERROR("Hebbian::update: null synapse pointer");
+        return;
+    }
+    
+    if (preSpikes.empty()) {
+        NLM_LOG_WARNING("Hebbian::update: empty preSpikes vector");
+        return;
+    }
+    
+    if (postSpikes.empty()) {
+        NLM_LOG_WARNING("Hebbian::update: empty postSpikes vector");
+        return;
+    }
+    
+    NLM_LOG_INFO("Hebbian::update: processing {} pre-spikes and {} post-spikes",
+                 preSpikes.size(), postSpikes.size());
+    
     /*
-     * Real Hebbian learning implementation
+     * Compute correlated spike pairs and apply Hebbian learning
      * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
+     * This implementation uses a simplified covariance rule:
      * Δw = η * (coactivity - baseline)
      * 
      * Where:
-     *   coactivity = number of correlated pre/post spikes
+     *   coactivity = number of correlated pre/post spikes within window
      *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
+     *   η = learningRate (learning parameter)
      * 
      * Biological inspiration:
      *   - Reflects AMPA receptor trafficking
      *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
      *   - Correlation-based learning in visual cortex
-     *   
+     * 
      * Limitations:
      *   - Doesn't account for STDP timing details
      *   - Single learning rate (no separate potentiation/depression rates)
      *   - Assumes stationary statistics
      */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
     
     // Count correlated spike pairs (simplified covariance)
     size_t correlationCount = 0;
@@ -69,19 +100,47 @@ void Hebbian::update(Synapse* synapse,
     // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
+    NLM_LOG_INFO("Hebbian::update: computed delta = {:.6f} (correlation count = {})",
+                 delta, correlationCount);
+    
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
     }
 }
 
-void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
-    
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
-}
+    void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+        /*
+         * Apply weight change with comprehensive error handling and validation
+         * 
+         * This method uses the WeightManagementMixin for consistent weight clamping
+         * and logging. It provides enhanced error checking and validation that
+         * was missing from the original implementation.
+         * 
+         * @param synapse Pointer to the synapse to modify (must not be null)
+         * @param delta Weight change amount to apply
+         * 
+         * @post Weight is clamped to [minWeight, maxWeight] bounds
+         * @post Detailed logging of all weight changes for debugging
+         * @post Input validation ensures safe operation
+         * 
+         * @note Uses WeightManagementMixin::applyClampedWeightChange() for
+         *       consistent behavior with STDP and other plasticity rules.
+         */
+        
+        if (!synapse) {
+            NLM_LOG_ERROR("Hebbian::applyWeightChange: null synapse pointer");
+            return;
+        }
+        
+        NLM_LOG_DEBUG("Hebbian::applyWeightChange: applying delta = {:.6f} to synapse", delta);
+        
+        // Use WeightManagementMixin for consistent weight clamping and logging
+        WeightManagementMixin::applyClampedWeightChange(synapse, delta,
+                                                   pImpl->minWeight,
+                                                   pImpl->maxWeight,
+                                                   "Hebbian");
+    }
 
 const char* Hebbian::getName() const {
     return "Hebbian";
