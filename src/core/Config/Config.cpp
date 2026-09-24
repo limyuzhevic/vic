@@ -2,157 +2,131 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include <filesystem>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    Impl() : entries() {}
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(new Impl()) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+    // TODO: Implement JSON file loading
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
+    // TODO: Implement command line argument parsing
+    return false;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
+    // TODO: Implement file saving
+    return false;
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == key) {
+            if constexpr (std::is_same_v<T, int>) {
+                if (std::holds_alternative<int>(entry.value)) {
+                    return std::get<int>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                if (std::holds_alternative<int64_t>(entry.value)) {
+                    return std::get<int64_t>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, double>) {
+                if (std::holds_alternative<double>(entry.value)) {
+                    return std::get<double>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                if (std::holds_alternative<bool>(entry.value)) {
+                    return std::get<bool>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                if (std::holds_alternative<std::string>(entry.value)) {
+                    return std::get<std::string>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                if (std::holds_alternative<std::vector<int>>(entry.value)) {
+                    return std::get<std::vector<int>>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                if (std::holds_alternative<std::vector<double>>(entry.value)) {
+                    return std::get<std::vector<double>>(entry.value);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+                    return std::get<std::vector<std::string>>(entry.value);
+                }
+            }
+        }
     }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
+    return std::nullopt;
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    auto value = get<T>(key);
+    if (value) {
+        return *value;
+    }
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Remove existing entry if any
+    remove(key);
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
+    // Add new entry
+    pImpl->entries.push_back(ConfigEntry(key, value, source));
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, std::string(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, int(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, double(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, bool(value), source);
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == key) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& entry) { return entry.key == key; });
+    pImpl->entries.erase(it, pImpl->entries.end());
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -177,8 +151,22 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
-            } else {
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[vector of strings]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[vector of doubles]";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[vector of ints]";
+            } else if constexpr (std::is_same_v<T, int>) {
                 oss << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << "[unknown type]";
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
@@ -205,11 +193,17 @@ template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
 
 } // namespace nlm

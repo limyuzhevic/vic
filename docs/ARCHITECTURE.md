@@ -1,289 +1,290 @@
-# NLM Architecture
+# NLM Command Line Interface
 
 ## Overview
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+This document describes the command line interface for the NLM (Neural Learning Machine) project. The NLM project provides several demo executables that demonstrate different phases of development, each with their own command line options for customization and control.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NLM Brain                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │   Sensory   │───▶│    Brain    │───▶│    Motor    │          │
-│  │   Input    │    │   Core      │    │    Output   │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│         │                  │                  │                 │
-│         ▼                  ▼                  ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │  Sensory    │    │  Memory     │    │   Action    │          │
-│  │  Processing │    │  Systems   │    │  Selection  │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │  Prediction │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │Neuromodul. │                              │
-│                    │  Signals    │                              │
-│                    └─────────────┘                              │
-│                            │                                    │
-│                            ▼                                    │
-│                    ┌─────────────┐                              │
-│                    │ Development │                              │
-│                    │   System    │                              │
-│                    └─────────────┘                              │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │              PHASE 4: EMERGING COGNITION                    ││
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       ││
-│  │  │Attention│  │Planning │  │Self-Model│ │ Social  │       ││
-│  │  │         │  │         │  │         │  │Learning │       ││
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘       ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
-```
+## Common Command Line Arguments
 
-## Core Components
+All NLM executables support the following common arguments:
 
-### 1. Core Layer
-- **Types**: Strongly-typed identifiers (NeuronId, SynapseId, etc.)
-- **Config**: Configuration management system
-- **Random**: Deterministic random number generator
-- **Logger**: Structured logging system
-- **SimulationClock**: Time management for simulation
+### `--help` / `-h`
+Display help information and available options
 
-### 2. Brain Layer
-- **Neuron**: Individual neuron representation (LIF dynamics)
-- **Synapse**: Synaptic connection representation
-- **NeuralPopulation**: Group of neurons with shared properties
-- **NeuralRegion**: Brain region with multiple populations
-- **Brain**: Central coordinator
+### `--version`
+Display version information
 
-### 3. Dynamics Layer
-- **NeuralDynamics**: Abstract base for neuron dynamics
-- **SpikeSystem**: Event-driven spike processing
+### `--config <file>`
+Load configuration from the specified file (default: `configs/default.cfg`)
 
-### 4. Plasticity Layer
-- **PlasticityRule**: Abstract base for plasticity rules
-- **Hebbian**: Hebbian learning rule
-- **STDP**: Spike-Timing-Dependent Plasticity
-- **StructuralPlasticity**: Synapse formation/removal
+### `--verbose` / `-v`
+Enable verbose logging output
 
-### 5. Development Layer
-- **DevelopmentSystem**: Orchestrates development
-- **Synaptogenesis**: New synapse formation
-- **Pruning**: Weak synapse removal
-- **Maturation**: Adult property development
+### `--quiet` / `-q`
+Suppress non-essential output
 
-### 6. Neuromodulation Layer
-- **Neuromodulator**: Abstract base for neuromodulators
-- **Dopamine**: Reward and reinforcement
-- **Novelty**: Novelty detection
-- **Curiosity**: Exploration motivation
-- **PredictionError**: Error signals
+### `--steps <N>`
+Number of simulation steps to run (default varies by demo)
 
-### 7. Memory Layer (Phase 4)
-- **NeuralWorkingMemory**: Persistent activity for temporary storage
-- **NeuralEpisodicMemory**: Experience encoding in neural patterns
-- **NeuralAssociativeMemory**: Experience-based associations
-- **ConceptFormation**: Pattern discovery without labels
-- **SpatialRepresentation**: Learned spatial relationships
-- **TemporalRelation**: Before/after/sequence encoding
+### `--neurons <N>`
+Number of neurons in the brain (default varies by demo)
 
-### 8. Prediction Layer (Phase 4)
-- **NeuralPrediction**: Temporal sequence learning
-- **ActionConsequencePredictor**: Action effect prediction
-- **PredictionErrorSignal**: Error computation for learning
+### `--regions <N>`
+Number of brain regions (default varies by demo)
 
-### 9. Cognitive Layer (Phase 4)
-- **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
-- **NeuralPlanner**: Predictive action selection
-- **SelfModel**: Sensorimotor self-awareness
-- **SocialLearning**: Observation and imitation
+### `--seed <N>`
+Random seed for reproducible experiments (default: `42`)
 
-### 10. Sensory Layer
-- **SensoryInput**: Base class for sensory data
-- **Vision**: Visual input processing
-- **Audio**: Audio input processing
-- **InternalSignals**: Internal state signals
+## Phase 3 Demo: Basic Neural Computation
 
-### 11. Motor Layer
-- **Action**: Action representation
-- **MotorSystem**: Neural-to-action conversion
+### Executable
+`./nlm_phase3_demo`
 
-### 12. Environment Layer
-- **Environment**: Abstract environment interface
-- **Observation**: Sensory observation wrapper
-- **Action**: Action wrapper
+### Purpose
+Demonstrates basic neural computation including LIF neuron dynamics, event-driven spike propagation, STDP and Hebbian plasticity, and structural plasticity.
 
-### 13. Experiments Layer
-- **Experiment**: Single experiment recording
-- **ExperimentRunner**: Experiment execution
-- **Metrics**: Data analysis
-- **Phase4Experiment**: Phase 4 cognitive experiments
-
-## Data Flow
-
-### Phase 2: Neural Computation
-```
-Sensory Input (test signals)
-      ↓
-Brain.receiveSensoryInput()
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Plasticity (STDP, Hebbian)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
+### Command Line Options
+```bash
+./nlm_phase3_demo [--steps N] [--neurons N] [--regions N] [--seed N] [--verbose] [--quiet]
 ```
 
-### Phase 3: World Interaction
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT (Vision, Touch, Internal, Proprioception)
-      ↓
-AgentBrain.processSensoryInput()
-      ↓
-Brain.receiveSensoryInput() → Sensory Neurons
-      ↓
-Neural Computation (LIF dynamics)
-      ↓
-Spike Processing (event-driven)
-      ↓
-Motor Decoding → MotorCommand
-      ↓
-AgentBrain.decodeMotorCommand()
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT (reward, success)
-      ↓
-Reward Prediction Error
-      ↓
-Neuromodulation (dopamine-like signal)
-      ↓
-Eligibility Trace Update
-      ↓
-Plasticity (STDP, Hebbian, Reward-Modulated)
-      ↓
-Structural Plasticity (synaptogenesis/pruning)
-      ↓
-Development System (stage progression)
+### Example Usage
+```bash
+# Run basic neural computation test
+./nlm_phase3_demo
+
+# Run with custom parameters
+./nlm_phase3_demo --steps 5000 --neurons 1000 --seed 123
+
+# Enable verbose output
+./nlm_phase3_demo --verbose
 ```
 
-### Phase 4: Emerging Cognition
-```
-WORLD (SimpleWorld)
-      ↓
-SENSORY PERCEPT
-      ↓
-ATTENTION (competitive selection)
-      ↓
-NEURAL PROCESSING
-      ↓
-PREDICTION (temporal sequence learning)
-      ↓
-WORKING MEMORY (persistent activity)
-      ↓
-EPISODIC MEMORY (experience storage)
-      ↓
-CONCEPT FORMATION (pattern discovery)
-      ↓
-PLANNING (multi-step prediction)
-      ↓
-SELF-MODEL (sensorimotor learning)
-      ↓
-MOTOR ACTION
-      ↓
-WORLD.applyMotorCommand()
-      ↓
-ACTION RESULT
-      ↓
-REWARD / ERROR
-      ↓
-NEUROMODULATION
-      ↓
-PLASTICITY
-      ↓
-SOCIAL LEARNING (observation/imitation)
+### Expected Output
+- Neural dynamics simulation
+- Spike propagation visualization
+- Plasticity learning demonstration
+- Final network statistics
+
+## Phase 4 Demo: Working Memory and Prediction
+
+### Executable
+`./nlm_phase4_demo`
+
+### Purpose
+Demonstrates Phase 4 capabilities including working memory, episodic memory, concept formation, neural attention, and predictive planning.
+
+### Command Line Options
+```bash
+./nlm_phase4_demo [--steps N] [--neurons N] [--regions N] [--seed N] [--verbose] [--quiet] [--workload <type>]
 ```
 
-## Agent-Brain Interface
+### Additional Options
+`--workload <type>`
+Memory workload type: `simple`, `complex`, `mixed` (default: `simple`)
 
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+### Example Usage
+```bash
+# Run working memory and prediction demo
+./nlm_phase4_demo
 
-- **SensoryTransduction**: Converts world percepts to neural input
-- **MotorDecoding**: Converts neural activity to motor commands
-- **Neuromodulation**: Applies reward signals to plasticity
-- **Development**: Updates developmental stage
-- **Attention**: Selective processing through competition
-- **Planning**: Uses predictions to select actions
+# Run with complex memory workload
+./nlm_phase4_demo --workload complex --steps 10000
 
-## Key Design Principles
+# Custom configuration
+./nlm_phase4_demo --config my_config.cfg --seed 456
+```
 
-1. **No ML Frameworks**: NLM implements its own neural computation
-2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
-3. **Biological Inspiration**: Designed to be incrementally more biologically accurate
-4. **Modularity**: Clear interfaces between components
-5. **Determinism**: Reproducible experiments via explicit random seeds
-6. **Performance**: Data-oriented design for large-scale simulation
-7. **Extensibility**: Clear patterns for adding new components
-8. **No Predefined Knowledge**: All learning from experience
+### Expected Output
+- Working memory trace demonstrations
+- Concept formation from patterns
+- Predictive planning sequences
+- Memory capacity measurements
 
-## Phase 4 Key Innovations
+## Phase 5 Demo: Performance Optimizations
 
-### Prediction System
-- Learns temporal sequences from experience
-- Predicts action consequences
-- Multi-step prediction capability
-- Error signals modulate learning
+### Executable
+`./nlm_phase5_demo`
 
-### Working Memory
-- Persistent neural activity
-- Recurrent connections for maintenance
-- Competition for selective retention
-- Neural-grounded (not a vector store)
+### Purpose
+Tests advanced performance optimizations including SIMD vectorization, multithreading, memory pools, event-driven processing, and sparse connectivity.
 
-### Episodic Memory
-- Experience encoded as neural patterns
-- Pattern completion retrieval
-- Temporal and spatial indexing
-- Replay during consolidation
+### Command Line Options
+```bash
+./nlm_phase5_demo [--steps N] [--neurons N] [--regions N] [--seed N] [--verbose] [--quiet] [--performance <mode>]
+```
 
-### Concept Formation
-- Discovers patterns without labels
-- Prototype formation through averaging
-- Stability measurement
-- Category hints from properties
+### Additional Options
+`--performance <mode>`
+Performance test mode: `simd`, `threads`, `memory`, `sparse`, `event` (default: `all`)
 
-### Attention
-- Lateral inhibition competition
-- Winner-take-more dynamics
-- Top-down and bottom-up bias
-- NOT Transformer QKV attention
+`--thread-count <N>`
+Number of threads for multithreading tests (default: auto-detect)
 
-### Planning
-- Uses learned predictions
-- Evaluates potential futures
-- Selects actions leading to goals
-- Adapts based on outcomes
+`--output-dir <dir>`
+Output directory for test results (default: `./output/phase5_demo`)
 
-### Self-Model
-- Learns body schema
-- Predicts action consequences
-- Self vs external distinction
-- Capability representation
+### Example Usage
+```bash
+# Run comprehensive performance test
+./nlm_phase5_demo
 
-### Social Learning
-- Observes other agents
-- Learns action effects
-- Imitation capability
-- Simple communication signals
+# Test specific optimization (SIMD)
+./nlm_phase5_demo --performance simd --steps 2000
+
+# Custom thread count
+./nlm_phase5_demo --thread-count 8 --performance threads
+
+# Save detailed results
+./nlm_phase5_demo --output-dir ./results --verbose
+```
+
+### Expected Output
+- Performance benchmark results
+- Optimization effectiveness metrics
+- Memory usage statistics
+- Threading efficiency measurements
+
+## Phase 6 Demo: Full Integration Test
+
+### Executable
+`./nlm_phase6_demo`
+
+### Purpose
+Comprehensive integration test verifying that all brain systems (memory, neuromodulation, prediction, cognition, development) are properly connected and functional.
+
+### Command Line Options
+```bash
+./nlm_phase6_demo [--steps N] [--neurons N] [--regions N] [--seed N] [--verbose] [--quiet] [--integration <test>]
+```
+
+### Additional Options
+`--integration <test>`
+Integration test type: `full`, `memory`, `neuromod`, `prediction`, `cognition`, `development` (default: `full`)
+
+`--enable-checkpointing`
+Enable checkpoint save/load tests
+
+`--enable-replay`
+Enable memory replay system tests
+
+`--enable-development`
+Enable developmental stage tests
+
+### Example Usage
+```bash
+# Run full integration test
+./nlm_phase6_demo
+
+# Test specific integration (memory systems only)
+./nlm_phase6_demo --integration memory
+
+# Enable all optional tests
+./nlm_phase6_demo --enable-checkpointing --enable-replay --enable-development
+
+# Custom test configuration
+./nlm_phase6_demo --steps 5000 --neurons 800 --regions 3
+```
+
+### Expected Output
+- Integration verification results
+- Memory system connectivity tests
+- Neuromodulation system functionality
+- Prediction system integration
+- Cognitive system operation
+- Development stage progression
+- Checkpoint and replay system tests
+
+## Common Configuration Files
+
+### Default Configuration
+`configs/default.cfg`
+
+Basic configuration for all demos with sensible defaults for testing.
+
+### Performance Configuration  
+`configs/performance.cfg`
+
+Optimized settings for Phase 5 performance tests with emphasis on speed and efficiency.
+
+### Integration Configuration
+`configs/integration.cfg`
+
+Configuration for Phase 6 integration tests with all systems enabled.
+
+### Custom Configuration
+Create your own configuration file by copying `configs/default.cfg` and modifying values as needed.
+
+## Output Formats
+
+### Text Output
+- Console output during demo execution
+- Summary statistics and final results
+- Progress updates and logging information
+
+### File Output
+- Detailed logs in `./output/<demo_name>/` directory
+- Configuration snapshots
+- Performance benchmark results
+- Integration test reports
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Build Failure**
+- Ensure CMake 3.16+ and C++20 compiler
+- Check for missing dependencies (pthread, etc.)
+- Verify file paths in CMakeLists.txt
+
+**2. Demo Not Found**
+- Build the project first: `mkdir build && cd build && cmake .. && make`
+- Check executable names: `./nlm_phase3_demo`, `./nlm_phase4_demo`, etc.
+
+**3. Configuration Errors**
+- Ensure configuration files exist in `configs/` directory
+- Check file permissions
+- Use `--config default` to reset to default configuration
+
+**4. Missing Libraries**
+- On Ubuntu/Debian: `sudo apt-get install build-essential cmake`
+- On macOS: `brew install cmake`
+- On Windows: Install Visual Studio with C++ support
+
+### Getting Help
+
+For additional help, refer to:
+- `README.md` - Project overview and building instructions
+- `docs/` - Technical documentation
+- `--help` flag - Command line options for each demo
+- `./<demo> --help` - Specific demo options
+
+## Research and Development
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Fix any compilation issues first
+4. Add new features or demos
+5. Update documentation
+6. Submit pull request
+
+### Testing
+- Unit tests in `tests/` directory (once compilation works)
+- Integration tests in demo executables
+- Performance benchmarks in Phase 5 demo
+- System connectivity tests in Phase 6 demo
+
+### Development Workflow
+1. Start with Phase 3 demos for basic testing
+2. Progress to Phase 4 for memory and cognition features
+3. Use Phase 5 for performance optimization testing
+4. Complete with Phase 6 integration tests
+
+## License
+
+MIT License
+
+---
+
+For more detailed information about specific features, parameters, or experimental results, refer to the project documentation in the `docs/` directory.

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -80,8 +81,8 @@ public:
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() { return static_cast<result_type>(std::mt19937_64::min()); }
+    static constexpr result_type max() { return static_cast<result_type>(std::mt19937_64::max()); }
     
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }
@@ -91,7 +92,10 @@ private:
     Impl* pImpl;
 };
 
-// Template implementations
+} // namespace nlm
+
+// Template implementations - these need to be in the nlm namespace
+namespace nlm {
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
     std::shuffle(container.begin(), container.end(), engine());

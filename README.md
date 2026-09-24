@@ -2,6 +2,10 @@
 
 **An Experimental Artificial Developmental Brain**
 
+## Current Status: Phase 6 (Final Integration - Under Development)
+
+**IMPORTANT**: The NLM project is in Phase 6 Final Integration but currently has compilation issues that prevent successful builds. While significant improvements have been made to address core compilation problems, extensive refactoring is still needed to resolve remaining type compatibility and dependency issues across the codebase.
+
 ## What is NLM?
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
@@ -18,11 +22,23 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
-## Current Phase
+## Project Overview
 
-**PHASE 6: FINAL INTEGRATION**
+NLM implements a comprehensive artificial brain system with the following key components:
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+### Core Architecture
+- **Phase 1-5 Components**: Built incrementally over 5 phases (currently in Phase 6 integration)
+- **Spiking Neural Network**: Leaky Integrate-and-Fire (LIF) neurons with event-driven dynamics
+- **Closed-Loop System**: World → Sensory → Neural Processing → Memory/Prediction → Neuromodulation → Action → World
+
+### Key Features
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Dopamine, curiosity, novelty detection
+- **Prediction**: Forward models and prediction error signals
+- **Cognition**: Neural planning, concept formation, attentional selection
+- **Development**: Age-dependent plasticity, developmental stages
+- **Learning**: STDP, Hebbian plasticity, reward-modulated learning
+- **Integration**: All systems connected in Phase 6 final integration
 
 ### Phase 6 Integration Achievements
 
