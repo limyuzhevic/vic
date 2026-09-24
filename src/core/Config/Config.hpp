@@ -8,20 +8,8 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
 // Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
+using ConfigValue = std::variant<int, int64_t, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>;
 
 // Configuration source
 enum class ConfigSource {
@@ -55,13 +43,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (key=value format for compatibility)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +88,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper for value conversion and formatting
+    static std::string valueToString(const ConfigValue& value);
+    static bool tryParseToType(const std::string& str, ConfigValue& value);
 };
 
 } // namespace nlm
