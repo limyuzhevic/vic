@@ -13,6 +13,10 @@ namespace test_config {
     void runAll();
 }
 
+namespace test_config_enhanced {
+    void runAll();
+}
+
 namespace test_random {
     void runAll();
 }
@@ -37,6 +41,10 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_agent {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -56,9 +64,9 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Config tests..." << std::endl;
+    std::cout << "Running Config enhanced tests..." << std::endl;
     try {
-        test_config::runAll();
+        test_config_enhanced::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
@@ -110,9 +118,9 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Brain tests..." << std::endl;
+    std::cout << "Running Agent tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_agent::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
