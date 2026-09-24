@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +129,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -406,38 +412,74 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+        // Apply neuromodulation effects
+        // Update novelty detection
+        if (pImpl->novelty) {
+            pImpl->novelty->update(pImpl->timestep);
+        }
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        // Update curiosity
+        if (pImpl->curiosity) {
+            pImpl->curiosity->update(pImpl->timestep);
+        }
+        
+        // Update dopamine (reward prediction error)
+        if (pImpl->dopamine) {
+            pImpl->dopamine->update(pImpl->timestep);
+            
+            // Apply dopamine effects on neural excitability
+            // Dopamine modulates neural excitability by adjusting effective current injection
+            // Higher dopamine increases excitability (lower effective threshold)
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Dopamine modulates excitability by injecting additional current
+                        // Positive dopamine adds excitatory bias
+                        float excitabilityMod = dopamineLevel * 0.5f;
+                        if (excitabilityMod > 0.0f) {
+                            neuron->injectCurrent(excitabilityMod);
+                        }
                     }
                 }
             }
         }
-    }
+        
+        // Update acetylcholine (attention)
+        if (pImpl->acetylcholine) {
+            pImpl->acetylcholine->update(pImpl->timestep);
+            // Apply attention effects
+            float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+            if (acetylcholineLevel > 0.0f) {
+                // ACh enhances working memory and attention
+                // TODO: Pass to working memory system
+                NLM_LOG_DEBUG("Acetylcholine level " + std::to_string(acetylcholineLevel) + " enhancing attention and memory");
+            }
+        }
+        
+        // Update norepinephrine (arousal)
+        if (pImpl->norepinephrine) {
+            pImpl->norepinephrine->update(pImpl->timestep);
+            // Apply arousal effects
+            float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+            if (norepinephrineLevel > 0.0f) {
+                // NE enhances sensory processing and alertness
+                // TODO: Pass to sensory systems
+                NLM_LOG_DEBUG("Norepinephrine level " + std::to_string(norepinephrineLevel) + " enhancing arousal and sensory processing");
+            }
+        }
+        
+        // Update serotonin (mood)
+        if (pImpl->serotonin) {
+            pImpl->serotonin->update(pImpl->timestep);
+            // Apply mood effects
+            float serotoninLevel = pImpl->serotonin->getLevel();
+            if (serotoninLevel > 0.0f) {
+                // 5-HT modulates mood and reduces impulsivity
+                // TODO: Pass to action selection
+                NLM_LOG_DEBUG("Serotonin level " + std::to_string(serotoninLevel) + " modulating mood and reducing impulsivity");
+            }
+        }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
@@ -1069,6 +1111,20 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
+// ========== ADDITIONAL NEUROMODULATION SYSTEMS ==========
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
@@ -1101,6 +1157,36 @@ void Brain::logStatus() const {
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
     }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+        if (pImpl->acetylcholine) {
+            NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+        }
+        if (pImpl->norepinephrine) {
+            NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+        }
+        if (pImpl->serotonin) {
+            NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+        }
+        if (pImpl->curiosity) {
+            NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+        }
+        if (pImpl->novelty) {
+            NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+        }
     
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
