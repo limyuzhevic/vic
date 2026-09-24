@@ -205,12 +205,22 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression (Tsodyks-Markram model)
+    // Depression state recovers toward 1.0 after activity
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+        // Calculate time since most recent activity
+        float timeSinceActivity;
+        if (pImpl->lastPostSpikeTime >= 0.0f && pImpl->lastPreSpikeTime >= 0.0f) {
+            timeSinceActivity = std::max(
+                static_cast<float>(currentTime - pImpl->lastPostSpikeTime),
+                static_cast<float>(currentTime - pImpl->lastPreSpikeTime)
+            );
+        } else if (pImpl->lastPostSpikeTime >= 0.0f) {
+            timeSinceActivity = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+        } else {
+            timeSinceActivity = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        }
+        
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }

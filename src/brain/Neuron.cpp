@@ -250,6 +250,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is active but not firing (above threshold but didn't spike due to refractory)
         pImpl->state.firingState = FiringState::Active;
     }
     
