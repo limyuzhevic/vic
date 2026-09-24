@@ -107,6 +107,20 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Python bindings module
+add_library(pynlm MODULE
+    src/pynlm.cpp
+)
+target_include_directories(pynlm PUBLIC src)
+target_link_libraries(pynlm PUBLIC nlm_core)
+
+# Set Python module properties
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
@@ -119,7 +133,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
@@ -148,4 +162,9 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages
 )
