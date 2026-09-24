@@ -1,10 +1,13 @@
+# Legacy test configuration (backward compatibility)
+# Original test infrastructure before Phase 6 GoogleTest integration
+
 cmake_minimum_required(VERSION 3.16)
 
-# Test configuration
+# Test configuration for legacy tests
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-# Create test executable
-add_executable(nlm_test
+# Create legacy test executable
+add_executable(nlm_test_legacy
     test_main.cpp
     test_types.cpp
     test_config.cpp
@@ -16,9 +19,14 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
+target_link_libraries(nlm_test_legacy PRIVATE nlm_core)
+target_compile_features(nlm_test_legacy PRIVATE cxx_std_20)
 
 # Enable testing
 enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_test_legacy COMMAND nlm_test_legacy)
+
+# Note: Phase 6 tests are integrated into the main CMakeLists.txt
+# using GoogleTest framework with separate test executable:
+# nlm_test_phase6 (using GoogleTest)
+# nlm_test_legacy (backward compatibility)

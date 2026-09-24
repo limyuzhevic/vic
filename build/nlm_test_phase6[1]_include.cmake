@@ -1,0 +1,5 @@
+if(EXISTS "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_25bf7a96-3252-4bf0-bc91-18c524c2a454/build/nlm_test_phase6[1]_tests.cmake")
+  include("/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_25bf7a96-3252-4bf0-bc91-18c524c2a454/build/nlm_test_phase6[1]_tests.cmake")
+else()
+  add_test(nlm_test_phase6_NOT_BUILT nlm_test_phase6_NOT_BUILT)
+endif()

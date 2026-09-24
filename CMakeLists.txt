@@ -1,15 +1,13 @@
+# NLM Phase 6 Testing Infrastructure - Simplified CMake Configuration
+# Modern GoogleTest-based testing for Phase 6 systems
+
 cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+project(NLM_Testing VERSION 0.1.0 LANGUAGES CXX)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
 
 # Enable warnings
 if(MSVC)
@@ -18,134 +16,78 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Find GoogleTest
+find_package(GTest REQUIRED)
+find_package(Threads REQUIRED)
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+# Source directories
+set(NLM_CORE_SOURCE_DIR "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_25bf7a96-3252-4bf0-bc91-18c524c2a454/src")
+set(TESTS_SOURCE_DIR "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_25bf7a96-3252-4bf0-bc91-18c524c2a454/tests")
+
+# Legacy test executable (backward compatibility)
+add_executable(nlm_test_legacy
+    ${TESTS_SOURCE_DIR}/test_main.cpp
+    ${TESTS_SOURCE_DIR}/test_types.cpp
+    ${TESTS_SOURCE_DIR}/test_config.cpp
+    ${TESTS_SOURCE_DIR}/test_random.cpp
+    ${TESTS_SOURCE_DIR}/test_clock.cpp
+    ${TESTS_SOURCE_DIR}/test_neuron.cpp
+    ${TESTS_SOURCE_DIR}/test_synapse.cpp
+    ${TESTS_SOURCE_DIR}/test_stdp.cpp
+    ${TESTS_SOURCE_DIR}/test_brain.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
+target_include_directories(nlm_test_legacy PRIVATE
+    ${NLM_CORE_SOURCE_DIR}
 )
+target_link_libraries(nlm_test_legacy PRIVATE ${GTEST_LIBRARIES} Threads::Threads)
+target_compile_features(nlm_test_legacy PRIVATE cxx_std_20)
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
-)
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
-
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
-)
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
-
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Testing
+# Enable testing
 enable_testing()
-add_subdirectory(tests)
+add_test(NAME nlm_test_legacy COMMAND nlm_test_legacy)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# Modern Phase 6 testing with GoogleTest
+add_executable(nlm_test_phase6
+    tests/test_main_phase6.cpp
+    tests/test_phase6/TestPhase6Utils.cpp
+    tests/test_phase6/Phase6TestFramework.hpp
+    tests/test_phase6/TestPhase6Utils.hpp
+    tests/test_phase6/TestPhase6Memory.cpp
+    tests/test_phase6/TestPhase6Neuromodulation.cpp
+    tests/test_phase6/TestPhase6Prediction.cpp
+    tests/test_phase6/TestPhase6Cognition.cpp
+    tests/test_phase6/TestPhase6Development.cpp
+    tests/test_phase6/TestPhase6Checkpointing.cpp
+    tests/test_phase6/TestPhase6Replay.cpp
+    tests/test_phase6/TestPhase6Performance.cpp
+    tests/test_phase6/TestPhase6Integration.cpp
+    tests/test_phase6/TestPhase6Demo.cpp
+    tests/test_phase6/TestPhase6Documentation.hpp
+)
+
+target_include_directories(nlm_test_phase6 PRIVATE
+    ${NLM_CORE_SOURCE_DIR}
+    ${TESTS_SOURCE_DIR}/test_phase6
+)
+target_link_libraries(nlm_test_phase6 PRIVATE ${GTEST_LIBRARIES} Threads::Threads)
+target_compile_features(nlm_test_phase6 PRIVATE cxx_std_20)
+
+# GoogleTest discovery
+include(GoogleTest)
+gtest_discover_tests(nlm_test_legacy
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    TEST_PREFIX "legacy_"
+    TEST_SUFFIX "_legacy"
+)
+
+gtest_discover_tests(nlm_test_phase6
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    TEST_PREFIX "phase6_"
+    TEST_SUFFIX "_phase6"
+)
+
+# Installation
+install(TARGETS nlm_test_legacy nlm_test_phase6
     RUNTIME DESTINATION bin
 )
