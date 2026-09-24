@@ -25,8 +25,8 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
     ${NLM_SOURCE_DIR}/brain/Brain.cpp
-    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
+    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
     ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
@@ -52,12 +52,22 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
     ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
+    ${NLM_SOURCE_DIR}/motor/Action.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+)
+
+set(NLM_AGENT_SOURCES
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+)
+
+set(NLM_WORLD_SOURCES
+    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
 set(NLM_AGENT_SOURCES

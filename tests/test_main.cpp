@@ -54,6 +54,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running Config tests..." << std::endl;
@@ -63,6 +64,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running Random tests..." << std::endl;
@@ -72,6 +74,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running Clock tests..." << std::endl;
@@ -81,6 +84,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running Neuron tests..." << std::endl;
@@ -90,6 +94,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running Synapse tests..." << std::endl;
@@ -99,6 +104,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running STDP tests..." << std::endl;
@@ -108,6 +114,7 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
     std::cout << "Running Brain tests..." << std::endl;
@@ -117,14 +124,16 @@ int main() {
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
+        std::cout << "  Exception type: " << typeid(e).name() << std::endl;
     }
     
-    std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << std::endl;
+        std::cout << "All tests PASSED!" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Some tests FAILED!" << std::endl;
         return 1;
     }
 }

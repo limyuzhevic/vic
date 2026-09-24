@@ -2,10 +2,16 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "BrainMain.hpp"
+#include "spikesystem/BrainSpikeSystem.hpp"
+#include "plasticity/BrainPlasticity.hpp"
+#include "development/BrainDevelopment.hpp"
+#include "neuromodulation/BrainNeuromodulation.hpp"
+#include "memory/BrainMemory.hpp"
+#include "prediction/BrainPrediction.hpp"
+#include "cognition/BrainCognition.hpp"
+#include "checkpoint/BrainCheckpoint.hpp"
+#include "integration/BrainIntegration.hpp"
 #include <memory>
 #include <string>
 
