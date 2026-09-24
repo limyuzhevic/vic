@@ -75,12 +75,33 @@ make -j4
 
 ## Running
 
+### Phase 6 Main (Full Integration)
+```bash
+./nlm
+```
+
+This runs a comprehensive Phase 6 integration demo showing the complete artificial brain with all systems working together.
+
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 4 Demo (Emergent Cognition)
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates Phase 4's emergent cognitive abilities.
+
+### Phase 3 Demo (World Interaction)
+```bash
+./nlm_phase3_demo
+```
+
+This demonstrates Phase 3's world interaction and learning capabilities.
 
 ## Project Structure
 
@@ -104,15 +125,41 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```
+
+## Python Bindings
+
+The NLM framework includes Python bindings through the `pynlm` package, providing an easier interface for working with the brain simulation system.
+
+### Python Usage Example
+
+```python
+import pynlm
+
+# Step 1: Make a brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Step 2: Turn it on
+brain.initialize()
+
+# Step 3: Make it think for 100 steps
+for i in range(100):
+    brain.step(i)  # One step of thinking
+
+print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+```
+
+See `easy_usage.md` for beginner-friendly examples.
+
+See `HOW_TO_USE.md` for detailed documentation.
 
 ## Phase Summary
 
@@ -155,7 +202,7 @@ NLM/
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
+- Neuromodulation affects plasticity and neural dynamics
 - Prediction integrated with learning
 - Development affects plasticity rates
 - Checkpoint save/load working

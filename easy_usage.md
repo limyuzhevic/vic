@@ -71,6 +71,43 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Brain with All Features
+
+```python
+import pynlm
+
+# Setup with Phase 6 features
+config = pynlm.createDefaultConfig()
+# Enable all Phase 6 features for advanced behavior
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run agent with full Phase 6 capabilities
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}, Curiosity: {agent.getCuriosityLevel():.3f}")
+
+print("Advanced Phase 6 simulation complete!")
+```
+
 ---
 
 ## Simple Analogy
@@ -294,4 +331,4 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the full Phase 6 functionality!
