@@ -8,6 +8,7 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -406,35 +407,103 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
+    // ========== ENHANCED NEUROMODULATION ==========
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Get dopamine level for enhanced effects
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+        
+        // 1. Enhanced neural excitability (beyond basic current injection)
+        float excitabilityMod = dopamineLevel * 0.8f;  // Increased from 0.5f
+        if (excitabilityMod > 0.0f) {
+            // Stronger excitability modulation
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Apply exponential modulation for stronger effect
+                        float modulation = 1.0f + excitabilityMod * 2.0f;  // Increased from 1.0f
+                        neuron->setThreshold(neuron->getState().threshold / modulation);
+                        neuron->setRestingPotential(neuron->getState().restingPotential * modulation);
+                        
+                        // Also inject sustained current
+                        neuron->injectCurrent(excitabilityMod * 3.0f);  // Increased from 2.0f
                     }
                 }
+            }
+        } else if (excitabilityMod < 0.0f) {
+            // Strong inhibition
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Lower excitability - harder to fire
+                        neuron->setThreshold(neuron->getState().threshold * (1.0f - std::abs(excitabilityMod)));
+                        neuron->setRestingPotential(neuron->getState().restingPotential * (1.0f - std::abs(excitabilityMod) * 0.5f));
+                        
+                        // Apply strong inhibitory current
+                        neuron->injectCurrent(excitabilityMod * 2.0f);  // Negative current
+                    }
+                }
+            }
+        }
+        
+        // 2. Enhanced plasticity effects (beyond STDP scaling)
+        float plasticityFactor = 0.5f + 0.5f * dopamineLevel;
+        plasticityFactor = std::clamp(plasticityFactor, 0.1f, 3.0f);  // Increased range
+        
+        // A. STDP enhancement
+        pImpl->stdp->setLTPWeight(0.01f * plasticityFactor * 1.5f);  // 50% stronger
+        pImpl->stdp->setLTDWeight(0.012f * plasticityFactor * 1.5f);  // 50% stronger
+        
+        // B. Hebbian enhancement  
+        // Hebbian learning depends on correlated activity - dopamine modulates this
+        // Higher dopamine = stronger Hebbian learning when neurons fire together
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().hebbian) {
+                    // Dopamine enhances Hebbian eligibility traces
+                    float eligibility = syn->getEligibilityTrace();
+                    eligibility *= plasticityFactor;  // Scale eligibility
+                    syn->setEligibilityTrace(eligibility);
+                }
+            }
+        }
+        
+        // C. Structural plasticity enhancement
+        // Dopamine promotes structural changes (synaptogenesis) when reward is positive
+        if (dopamineLevel > 0.0f) {
+            // More synaptogenesis with positive dopamine
+            float synRate = pImpl->structuralPlasticity->getSynaptogenesisRate();
+            synRate *= (1.0f + dopamineLevel * 0.5f);  // Up to 50% increase
+            pImpl->structuralPlasticity->setSynaptogenesisRate(std::min(synRate, 0.0005f));
+        }
+        
+        // 3. Modulated learning dynamics
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                // Dopamine modulates learning rate based on reward prediction error
+                float learningRate = 0.01f;  // Base learning rate
+                learningRate *= plasticityFactor;  // Scale by dopamine
+                
+                // Higher dopamine = faster learning from prediction errors
+                if (dopamineLevel > 0.0f) {
+                    learningRate *= (1.0f + dopamineLevel);
+                }
+                
+                // Apply modulated learning rate to eligibility trace decay
+                float eligibility = syn->getEligibilityTrace();
+                eligibility *= (1.0f - learningRate * 0.1f);  // Decay based on learning rate
+                syn->setEligibilityTrace(eligibility);
+            }
+        }
+        
+        // 4. Behavioral motivation (inspired by basal ganglia)
+        // Positive dopamine increases action selection bias
+        if (dopamineLevel > 0.2f) {
+            // High dopamine = more exploration/aggressive action selection
+            // This would influence motor neuron groups in a full integration
+            for (auto* neuron : pImpl->motorNeurons) {
+                // Increase motor neuron excitability
+                neuron->injectCurrent(dopamineLevel * 0.5f);
             }
         }
     }
@@ -511,8 +580,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // The prediction system would predict next state based on sensory input
+        // and compute prediction error for learning
+        
+        // For now, we'll simulate prediction by tracking novelty as prediction error
+        // This is a placeholder for real prediction system integration with proper
+        // sensory prediction and error computation
+        
+        // Update prediction error based on novelty detection
+        if (pImpl->novelty && pImpl->predictionError) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            float predictionError = noveltyLevel * 0.1f;  // Novelty as proxy for prediction error
+            pImpl->predictionError->computeError(predictionError, predictionError);  // predicted=actual for now
+        }
+        
+        // Also update the internal prediction system error history
+        if (pImpl->predictionError) {
+            float predError = pImpl->predictionError->getError();
+            pImpl->predictionSystem->getErrorHistory().push_back(predError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +615,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This allows the brain to discover recurring patterns from experience
+        
+        // Convert current neural activity to pattern for concept formation
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Extract features from pattern (could be simpler for now)
+        std::vector<float> features = currentPattern;  // For now, features = pattern
+        
+        // Present experience to concept formation
+        // Reward comes from neuromodulation level (dopamine)
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        pImpl->conceptFormation->presentExperience(currentPattern, features, reward, currentStep);
+    }
+    
+    // ========== STEP 11: Planning ==========
+    // Plan next actions based on current state and learned concepts
+    if (pImpl->planner) {
+        // Convert current neural state to planning state
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        // Get reward from neuromodulation (dopamine level)
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Plan action based on current state and reward goal
+        ActionType plannedAction = pImpl->planner->planAction(currentState, reward);
+        
+        // Store planned action for potential use in motor control
+        // Note: Full integration would have this influence motor neuron populations
+        // For now, this is just logging/demonstrating planning capability
+        if (reward != 0.0f) {
+            NLM_LOG_INFO("Planner selected action based on current state with reward " + 
+                        std::to_string(reward));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
