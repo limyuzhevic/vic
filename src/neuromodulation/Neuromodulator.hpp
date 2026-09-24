@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace nlm {
 
@@ -38,6 +39,12 @@ public:
     Dopamine();
     ~Dopamine() override;
     
+    // Disable copying, enable moving
+    Dopamine(const Dopamine&) = delete;
+    Dopamine& operator=(const Dopamine&) = delete;
+    Dopamine(Dopamine&&) noexcept;
+    Dopamine& operator=(Dopamine&&) noexcept;
+    
     const char* getName() const override;
     float getLevel() const override;
     void setLevel(float level) override;
@@ -50,7 +57,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation

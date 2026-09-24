@@ -1,0 +1,82 @@
+# Performance Test Configuration
+// Configuration for NLM Phase 5 Performance Regression Testing
+
+// Test scenario definitions
+test_scenarios {
+    small = {
+        name = "Small Scale"
+        scale = 1
+        neuron_count = 100
+        synaptic_connections = 1000
+        simulation_steps = 1000
+        description = "Small neural population for baseline testing"
+    }
+    
+    medium = {
+        name = "Medium Scale"
+        scale = 10
+        neuron_count = 1000
+        synaptic_connections = 10000
+        simulation_steps = 500
+        description = "Medium neural population for scalability testing"
+    }
+    
+    large = {
+        name = "Large Scale"
+        scale = 100
+        neuron_count = 10000
+        synaptic_connections = 100000
+        simulation_steps = 100
+        description = "Large neural population for performance validation"
+    }
+    
+    extra_large = {
+        name = "Extra Large Scale"
+        scale = 1000
+        neuron_count = 100000
+        synaptic_connections = 1000000
+        simulation_steps = 10
+        description = "Extra large neural population for stress testing"
+    }
+}
+
+// Performance regression thresholds
+performance_thresholds {
+    // Wall time thresholds (seconds)
+    max_wall_time_small = 1.0
+    max_wall_time_medium = 10.0
+    max_wall_time_large = 60.0
+    max_wall_time_extra_large = 600.0
+    
+    // Operations per second thresholds
+    min_ops_per_second_small = 1000.0
+    min_ops_per_second_medium = 10000.0
+    min_ops_per_second_large = 100000.0
+    min_ops_per_second_extra_large = 1000000.0
+    
+    // Memory usage thresholds (bytes)
+    max_memory_small = 10485760      // 10 MB
+    max_memory_medium = 104857600    // 100 MB
+    max_memory_large = 1073741824    // 1 GB
+    max_memory_extra_large = 10737418240  // 10 GB
+    
+    // Scalability thresholds
+    min_scalability_factor = 0.9      // Minimum performance per neuron ratio
+    max_memory_per_operation = 1000.0 // Maximum memory usage per operation (bytes)
+    
+    // Regression detection
+    regression_threshold = 0.05      // 5% regression threshold
+    baseline_retention_days = 90     // Baseline retention period
+}
+
+// Performance test execution settings
+execution_settings {
+    results_directory = "performance_results"
+    baseline_directory = "performance_baseline"
+    ci_integration = true
+    auto_baseline_creation = true
+    regression_detection = true
+    generate_reports = true
+    parallel_execution = true
+    max_concurrent_tests = 4
+}

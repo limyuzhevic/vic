@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
+#include <memory>
 
 namespace nlm {
 
@@ -43,6 +44,12 @@ public:
     HebbianRule();
     ~HebbianRule() override;
     
+    // Disable copying, enable moving
+    HebbianRule(const HebbianRule&) = delete;
+    HebbianRule& operator=(const HebbianRule&) = delete;
+    HebbianRule(HebbianRule&&) noexcept;
+    HebbianRule& operator=(HebbianRule&&) noexcept;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
@@ -56,7 +63,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together

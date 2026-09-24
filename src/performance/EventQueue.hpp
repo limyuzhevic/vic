@@ -26,6 +26,7 @@
 #include <optional>
 #include <limits>
 #include <algorithm>
+#include "../../core/Exceptions/Exceptions.hpp"
 
 namespace nlm {
 
@@ -292,7 +293,9 @@ inline SpikeRingBuffer::SpikeRingBuffer(size_t capacity)
     , tail_(0)
 {
     // Verify capacity is power of 2
-    assert((capacity & (capacity - 1)) == 0 && "SpikeRingBuffer capacity must be power of 2");
+    if ((capacity & (capacity - 1)) != 0) {
+        throw nlm::EventQueueException("SpikeRingBuffer capacity must be power of 2");
+    }
 }
 
 inline SpikeRingBuffer::~SpikeRingBuffer() = default;
@@ -350,7 +353,9 @@ inline DelayedSpikeQueue::DelayedSpikeQueue(size_t numBuckets, size_t maxDelaySt
     , buckets_(numBuckets)
     , pendingCounts_(numBuckets, 0)
 {
-    assert(numBuckets >= maxDelaySteps && "numBuckets must be >= maxDelaySteps");
+    if (numBuckets < maxDelaySteps) {
+        throw nlm::EventQueueException("DelayedSpikeQueue: numBuckets must be >= maxDelaySteps");
+    }
 }
 
 inline DelayedSpikeQueue::~DelayedSpikeQueue() = default;
@@ -360,12 +365,18 @@ inline void DelayedSpikeQueue::schedule(uint64_t sourceNeuron, uint64_t destNeur
                                         bool isExcitatory, uint64_t deliveryStep) {
     if (deliveryStep < currentStep_) return;  // Already due, skip
     
+    if (deliveryStep - currentStep_ > maxDelaySteps_) {
+        throw nlm::EventQueueException("DelayedSpikeQueue: delivery step exceeds maximum delay");
+    }
+    
     size_t bucketIdx = (deliveryStep % numBuckets_);
     QueuedSpikeEvent event(sourceNeuron, destNeuron, synapseId, weight, isExcitatory);
     
-    if (buckets_[bucketIdx].push(event)) {
-        pendingCounts_[bucketIdx].fetch_add(1, std::memory_order_relaxed);
+    if (!buckets_[bucketIdx].push(event)) {
+        throw nlm::EventQueueException("DelayedSpikeQueue: bucket capacity exceeded");
     }
+    
+    pendingCounts_[bucketIdx].fetch_add(1, std::memory_order_relaxed);
 }
 
 inline std::vector<QueuedSpikeEvent> DelayedSpikeQueue::getDueSpikes(uint64_t currentStep) {

@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "../core/Exceptions/Exceptions.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -20,6 +21,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    if (!brain_) {
+        throw nlm::AgentBrainException("AgentBrain requires a valid brain pointer");
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -85,12 +90,19 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        throw nlm::AgentBrainException("Cannot process sensory input: brain not initialized");
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
+            // Validate vision input range
+            if (vision[i] < 0.0f || vision[i] > 1.0f) {
+                throw nlm::AgentBrainException("Invalid vision input value: " + 
+                                               std::to_string(vision[i]) + ". Must be in [0, 1]");
+            }
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
@@ -101,6 +113,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
+            // Validate touch input range
+            if (touch[i] < 0.0f || touch[i] > 1.0f) {
+                throw nlm::AgentBrainException("Invalid touch input value: " + 
+                                               std::to_string(touch[i]) + ". Must be in [0, 1]");
+            }
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
@@ -110,6 +127,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
+            // Validate internal input range
+            if (intern[i] < -1.0f || intern[i] > 1.0f) {
+                throw nlm::AgentBrainException("Invalid internal input value: " + 
+                                               std::to_string(intern[i]) + ". Must be in [-1, 1]");
+            }
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
@@ -119,6 +141,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
+            // Validate proprioception input range
+            if (proprio[i] < -1.0f || proprio[i] > 1.0f) {
+                throw nlm::AgentBrainException("Invalid proprioception input value: " + 
+                                               std::to_string(proprio[i]) + ". Must be in [-1, 1]");
+            }
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
@@ -236,7 +263,21 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        return;
+    }
+    
+    // Validate reward values
+    if (std::isnan(reward) || std::isinf(reward)) {
+        throw nlm::AgentBrainException("Invalid reward value: " + std::to_string(reward) +
+                                       ". Reward must be a finite number");
+    }
+    
+    if (std::isnan(predictedReward) || std::isinf(predictedReward)) {
+        throw nlm::AgentBrainException("Invalid predicted reward value: " + 
+                                       std::to_string(predictedReward) +
+                                       ". Predicted reward must be a finite number");
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -247,7 +288,11 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
+    // Validate and clamp dopamine level
+    if (dopamineLevel_ < -1.0f || dopamineLevel_ > 1.0f) {
+        throw nlm::AgentBrainException("Dopamine level " + std::to_string(dopamineLevel_) +
+                                       " is out of valid range [-1.0, 1.0]");
+    }
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
@@ -280,7 +325,20 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        return;
+    }
+    
+    // Validate timestep
+    if (timestep <= 0.0) {
+        throw nlm::AgentBrainException("Invalid timestep " + std::to_string(timestep) +
+                                       ". Timestep must be positive");
+    }
+    
+    if (std::isnan(timestep) || std::isinf(timestep)) {
+        throw nlm::AgentBrainException("Invalid timestep " + std::to_string(timestep) +
+                                       ". Timestep must be a finite number");
+    }
     
     developmentalAge_ += timestep;
     

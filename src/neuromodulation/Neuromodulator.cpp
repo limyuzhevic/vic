@@ -13,9 +13,18 @@ struct Dopamine::Impl {
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Dopamine::Dopamine() : pImpl(std::make_unique<Impl>()) {}
 
 Dopamine::~Dopamine() = default;
+
+Dopamine::Dopamine(Dopamine&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+Dopamine& Dopamine::operator=(Dopamine&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 const char* Dopamine::getName() const {
     return "DA";

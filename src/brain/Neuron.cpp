@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/Exceptions/Exceptions.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -27,7 +28,10 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
+    if (id == INVALID_NEURON_ID) {
+        throw nlm::NeuronException("Neuron ID cannot be INVALID_NEURON_ID");
+    }
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -37,15 +41,11 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -55,6 +55,11 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate potential is within reasonable biological bounds (-100mV to +50mV)
+    if (potential < -100.0f || potential > 50.0f) {
+        throw nlm::NeuronException("Membrane potential " + std::to_string(potential) + 
+                                   " is out of valid range [-100mV, 50mV]");
+    }
     pImpl->state.membranePotential = potential;
 }
 
@@ -191,6 +196,15 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate timestep
+    if (dt <= 0.0 || dt > 1.0) {  // timestep should be positive and reasonable (<=1ms)
+        throw nlm::NeuronException("Invalid timestep " + std::to_string(dt) + ". Must be (0, 1.0]");
+    }
+    
+    if (currentTime < 0) {
+        throw nlm::NeuronException("Invalid currentTime " + std::to_string(currentTime) + ". Must be >= 0");
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -229,6 +243,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
+    if (V < -100.0f || V > 50.0f) {
+        throw nlm::NeuronException("Membrane potential " + std::to_string(V) + 
+                                   " exceeded valid range [-100mV, 50mV]");
+    }
+    
     V = std::clamp(V, -100.0f, 50.0f);
     
     // Check for spike
@@ -287,6 +306,15 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    
+    // Validate ranges
+    if (pImpl->state.restingPotential < -100.0f || pImpl->state.restingPotential > -40.0f) {
+        throw nlm::NeuronException("Invalid resting potential: " + std::to_string(pImpl->state.restingPotential));
+    }
+    
+    if (pImpl->state.threshold < -80.0f || pImpl->state.threshold > -20.0f) {
+        throw nlm::NeuronException("Invalid threshold: " + std::to_string(pImpl->state.threshold));
+    }
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

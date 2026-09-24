@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <functional>
+#include <memory>
 
 namespace nlm {
 
@@ -13,6 +14,12 @@ class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
+    
+    // Disable copying, enable moving
+    WorkingMemory(const WorkingMemory&) = delete;
+    WorkingMemory& operator=(const WorkingMemory&) = delete;
+    WorkingMemory(WorkingMemory&&) noexcept;
+    WorkingMemory& operator=(WorkingMemory&&) noexcept;
     
     // Store item
     // TODO PHASE 2: Implement real storage
@@ -36,7 +43,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Episodic memory: storage of events and experiences
@@ -55,6 +62,12 @@ class EpisodicMemory {
 public:
     EpisodicMemory();
     ~EpisodicMemory();
+    
+    // Disable copying, enable moving
+    EpisodicMemory(const EpisodicMemory&) = delete;
+    EpisodicMemory& operator=(const EpisodicMemory&) = delete;
+    EpisodicMemory(EpisodicMemory&&) noexcept;
+    EpisodicMemory& operator=(EpisodicMemory&&) noexcept;
     
     // Store episode
     void storeEpisode(const EpisodicMemoryItem& episode);
@@ -76,7 +89,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Semantic memory: gradually acquired knowledge
@@ -86,6 +99,12 @@ class SemanticMemory {
 public:
     SemanticMemory();
     ~SemanticMemory();
+    
+    // Disable copying, enable moving
+    SemanticMemory(const SemanticMemory&) = delete;
+    SemanticMemory& operator=(const SemanticMemory&) = delete;
+    SemanticMemory(SemanticMemory&&) noexcept;
+    SemanticMemory& operator=(SemanticMemory&&) noexcept;
     
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
@@ -104,7 +123,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Procedural memory: learned skills and habits
@@ -123,6 +142,12 @@ public:
     ProceduralMemory();
     ~ProceduralMemory();
     
+    // Disable copying, enable moving
+    ProceduralMemory(const ProceduralMemory&) = delete;
+    ProceduralMemory& operator=(const ProceduralMemory&) = delete;
+    ProceduralMemory(ProceduralMemory&&) noexcept;
+    ProceduralMemory& operator=(ProceduralMemory&&) noexcept;
+    
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
     
@@ -140,7 +165,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Associative memory: relationships between representations
@@ -150,6 +175,12 @@ class AssociativeMemory {
 public:
     AssociativeMemory();
     ~AssociativeMemory();
+    
+    // Disable copying, enable moving
+    AssociativeMemory(const AssociativeMemory&) = delete;
+    AssociativeMemory& operator=(const AssociativeMemory&) = delete;
+    AssociativeMemory(AssociativeMemory&&) noexcept;
+    AssociativeMemory& operator=(AssociativeMemory&&) noexcept;
     
     // Create association
     void associate(NeuronId a, NeuronId b, float strength);
@@ -168,7 +199,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

@@ -1,0 +1,40 @@
+set(NLM_FOUND FALSE)
+
+include(CMakeFindDependencyMacro)
+
+# Import the target definitions
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# Find dependencies
+if(NLM_BUILD_PYTHON)
+    find_dependency(Python COMPONENTS Interpreter Development)
+endif()
+
+# Check if targets are available
+if(TARGET NLM::nlm_core AND TARGET NLM::nlm_agent AND TARGET NLM::nlm_world)
+    set(NLM_FOUND TRUE)
+endif()
+
+# Provide legacy variables for compatibility
+if(NLM_FOUND)
+    set(NLM_LIBRARIES NLM::nlm_core NLM::nlm_agent NLM::nlm_world)
+    set(NLM_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/../include")
+    
+    # Check for experimental features
+    if(NLM_ENABLE_EXPERIMENTS)
+        if(TARGET NLM::nlm_phase3)
+            list(APPEND NLM_LIBRARIES NLM::nlm_phase3)
+        endif()
+        if(TARGET NLM::nlm_phase4)
+            list(APPEND NLM_LIBRARIES NLM::nlm_phase4)
+        endif()
+    endif()
+    
+    # Make targets available in the calling scope
+    foreach(target IN LISTS NLM_LIBRARIES)
+        get_target_property(alias ${target} ALIASED_TARGET)
+        if(NOT alias)
+            set(${target} ${target} PARENT_SCOPE)
+        endif()
+    endforeach()
+endif()

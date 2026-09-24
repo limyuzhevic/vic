@@ -1,4 +1,5 @@
 #include "Synapse.hpp"
+#include "../core/Exceptions/Exceptions.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -47,7 +48,17 @@ struct Synapse::Impl {
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
+    : pImpl(std::make_unique<Impl>()) {
+    if (id == INVALID_SYNAPSE_ID) {
+        throw nlm::SynapseException("Synapse ID cannot be INVALID_SYNAPSE_ID");
+    }
+    if (source == INVALID_NEURON_ID) {
+        throw nlm::SynapseException("Synapse source neuron ID cannot be INVALID_NEURON_ID");
+    }
+    if (destination == INVALID_NEURON_ID) {
+        throw nlm::SynapseException("Synapse destination neuron ID cannot be INVALID_NEURON_ID");
+    }
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -64,15 +75,11 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -94,10 +101,21 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        throw nlm::SynapseException("Synapse weight " + std::to_string(weight) + 
+                                   " is out of valid range [" + std::to_string(Impl::MIN_WEIGHT) + 
+                                   ", " + std::to_string(Impl::MAX_WEIGHT) + "]");
+    }
     pImpl->weight = weight;
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    if (pImpl->weight + delta < Impl::MIN_WEIGHT || pImpl->weight + delta > Impl::MAX_WEIGHT) {
+        throw nlm::SynapseException("Weight change " + std::to_string(delta) + 
+                                   " would cause weight " + std::to_string(pImpl->weight + delta) +
+                                   " to exceed valid range [" + std::to_string(Impl::MIN_WEIGHT) + ", " +
+                                   std::to_string(Impl::MAX_WEIGHT) + "]");
+    }
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -108,6 +126,13 @@ Delay Synapse::getDelay() const {
 }
 
 void Synapse::setDelay(Delay delay) {
+    if (delay == 0) {
+        throw nlm::SynapseException("Synapse delay cannot be 0");
+    }
+    if (delay > MAX_DELAY_STEPS) {
+        throw nlm::SynapseException("Synapse delay " + std::to_string(delay) + 
+                                   " exceeds maximum allowed delay of " + std::to_string(MAX_DELAY_STEPS));
+    }
     pImpl->delay = delay;
 }
 
@@ -192,6 +217,11 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // Validate timestep
+    if (currentTime < 0) {
+        throw nlm::SynapseException("Invalid currentTime " + std::to_string(currentTime) + ". Must be >= 0");
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
@@ -219,6 +249,11 @@ void Synapse::step(Timestamp currentTime) {
     decayEligibilityTrace(0.001f);  // Fast decay
     
     // Clamp weight bounds
+    if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+        throw nlm::SynapseException("Synapse weight " + std::to_string(pImpl->weight) + 
+                                   " is out of valid range [" + std::to_string(Impl::MIN_WEIGHT) + ", " +
+                                   std::to_string(Impl::MAX_WEIGHT) + "]");
+    }
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 

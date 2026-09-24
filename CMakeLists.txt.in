@@ -1,0 +1,22 @@
+# Write the following to the file
+# For the NLM CMake package configuration template
+# This template is processed by configure_package_config_file to create NLMConfig.cmake
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+find_dependency(Python COMPONENTS Interpreter Development)
+
+# Import targets
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# Provide legacy variables for backward compatibility
+if(TARGET NLM::nlm_core AND TARGET NLM::nlm_agent)
+    set(NLM_LIBRARIES NLM::nlm_core NLM::nlm_agent NLM::nlm_world)
+    set(NLM_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/../include")
+endif()
+
+# Create convenience targets
+set(NLM_AVAILABLE TRUE)

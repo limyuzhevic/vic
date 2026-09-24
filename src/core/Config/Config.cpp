@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "../Exceptions/Exceptions.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -24,7 +25,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw nlm::ConfigLoadException("Failed to open config file", filepath);
     }
     
     std::string line;
@@ -81,7 +82,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw nlm::ConfigLoadException("Failed to save config to file", filepath);
     }
     
     for (const auto& entry : pImpl->entries) {
@@ -98,13 +99,13 @@ std::optional<T> Config::get(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
-        return std::nullopt;
+        throw nlm::ConfigParameterException(key, "Key not found in configuration");
     }
     
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        throw nlm::ConfigParameterException(key, "Value type mismatch");
     }
 }
 
@@ -115,6 +116,10 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        throw nlm::ConfigParameterException("", "Key cannot be empty");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -148,11 +153,19 @@ bool Config::has(const std::string& key) const {
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
+    if (key.empty()) {
+        throw nlm::ConfigParameterException("", "Key cannot be empty");
+    }
+    
+    size_t erased = pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    
+    if (erased == 0) {
+        throw nlm::ConfigParameterException(key, "Key not found for removal");
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {

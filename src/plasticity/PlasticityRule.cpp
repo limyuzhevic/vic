@@ -16,9 +16,18 @@ struct HebbianRule::Impl {
     Impl() : learningRate(0.01f) {}
 };
 
-HebbianRule::HebbianRule() : pImpl(new Impl) {}
+HebbianRule::HebbianRule() : pImpl(std::make_unique<Impl>()) {}
 
 HebbianRule::~HebbianRule() = default;
+
+HebbianRule::HebbianRule(HebbianRule&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+HebbianRule& HebbianRule::operator=(HebbianRule&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
