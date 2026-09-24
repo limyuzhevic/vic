@@ -66,11 +66,25 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Build the C++ Core Library
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
+```
+
+### Build Python Bindings
+
+#### Option 1: Development Build (Recommended for Contributors)
+```bash
+cd python
+pip install -e .
+```
+
+#### Option 2: Using PyPI (Binary Installation)
+```bash
+pip install pynlm
 ```
 
 ## Running
@@ -81,6 +95,37 @@ make -j4
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python Bindings Testing
+```bash
+# Run the comprehensive test suite
+python test_bindings.py
+
+# Run specific tests
+python -m pytest test_bindings.py -v
+```
+
+### Basic Python Example
+```python
+import pynlm
+
+# Create a simple brain with default configuration
+config = pynlm.createDefaultBrainConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+
+world.configure(100, 100, 20, 20)
+agent.initialize(world)
+
+# Run a short simulation
+simulation_result = pynlm.run_simulation(brain, world, steps=100, verbose=False)
+spikes, avg_rate = simulation_result
+print(f"Total spikes: {spikes}, Average firing rate: {avg_rate:.2f} Hz")
+```
 
 ## Project Structure
 
