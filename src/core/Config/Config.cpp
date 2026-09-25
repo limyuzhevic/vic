@@ -28,10 +28,20 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    std::string currentDescription;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
+            // Store comment as potential description for next entry
+            if (!line.empty() && line[0] == '#') {
+                // Remove leading # and trim
+                std::string desc = line.substr(1);
+                desc = trim(desc);
+                if (!desc.empty()) {
+                    currentDescription = desc;
+                }
+            }
             continue;
         }
         
@@ -48,7 +58,9 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, value, ConfigSource::File, currentDescription);
+            // Reset description for next entry
+            currentDescription.clear();
         }
     }
     
@@ -65,14 +77,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                set(key, value, ConfigSource::CommandLine, "");
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            set(key, value, ConfigSource::CommandLine, "");
         }
     }
     return true;
@@ -114,32 +126,83 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+bool Config::hasDuplicateKeys(const std::string& key) const {
+    auto count = std::count_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    return count > 1;
+}
+
+std::string Config::findDuplicateKeys() const {
+    std::string duplicates;
+    for (const auto& entry : pImpl->entries) {
+        auto count = std::count_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+        if (count > 1 && std::count(duplicates.begin(), duplicates.end(), entry.key[0]) == 0) {
+            duplicates += entry.key + " ";
+        }
+    }
+    return duplicates;
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        if (it->source == source) {
+            // Same source, overwriting - potential duplicate
+            // Check if there are other duplicates
+            if (hasDuplicateKeys(key)) {
+                // Remove other duplicate entries
+                remove(key);
+                pImpl->entries.emplace_back(key, value, source, description);
+            } else {
+                it->value = value;
+                it->source = source;
+                it->description = description;
+            }
+        } else {
+            // Different source - overwrite with new source
+            it->value = value;
+            it->source = source;
+            it->description = description;
+        }
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, value, source, description);
     }
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+bool Config::validateConfig() const {
+    // Check for duplicate keys with the same source
+    for (const auto& entry : pImpl->entries) {
+        auto count = std::count_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&entry](const ConfigEntry& e) { return e.key == entry.key; });
+        if (count > 1) {
+            // Find if any have the same source
+            int sourceCount = std::count_if(pImpl->entries.begin(), pImpl->entries.end(),
+                [&entry](const ConfigEntry& e) { return e.key == entry.key && e.source == entry.source; });
+            if (sourceCount > 1) {
+                return false; // Duplicate keys with same source
+            }
+        }
+    }
+    return true;
 }
 
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, const std::string& value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, int value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+void Config::set(const std::string& key, double value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source, const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
 bool Config::has(const std::string& key) const {
