@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/EventSystem.hpp"
 #include <memory>
 #include <string>
 
@@ -115,6 +116,10 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+    // Event system access
+    EventSystem* getEventSystem();
+    const EventSystem* getEventSystem() const;
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
@@ -196,6 +201,9 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Event system for integration
+    std::unique_ptr<EventSystem> eventSystem_;
 };
 
 } // namespace nlm
