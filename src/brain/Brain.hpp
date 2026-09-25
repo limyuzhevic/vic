@@ -19,7 +19,7 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;  // Use real neural prediction instead of placeholder PredictionSystem
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -28,6 +28,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;  // For advanced neuromodulation
+class Norepinephrine;  // For advanced neuromodulation
+class Acetylcholine;  // For advanced neuromodulation
+class Vasopressin;  // For advanced neuromodulation
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -151,7 +155,7 @@ public:
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Uses real neural prediction instead of placeholder
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -183,6 +187,12 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Advanced neuromodulation
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
+    Vasopressin* getVasopressin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
