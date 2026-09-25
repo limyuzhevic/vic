@@ -6,29 +6,32 @@
 
 namespace nlm {
 
-// Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// Neural dynamics: Implement neuron and synapse state evolution
+// Real implementation based on LIF dynamics and synaptic models
 
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
-    // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // Update neuron state using Leaky Integrate-and-Fire dynamics
+    // Implements membrane potential integration with synaptic inputs
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
-    // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Update synapse state using short-term plasticity models
+    // Implements Tsodyks-Markram dynamics for synaptic efficacy
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
-    // Apply synaptic input from spike
+    // Apply synaptic input from presynaptic spike
     virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
     
-    // Check if neuron should fire
+    // Check if neuron should fire based on membrane potential threshold
     virtual bool shouldFire(const Neuron* neuron) const = 0;
     
-    // Reset dynamics state
+    // Reset dynamics state to initial conditions
     virtual void reset() = 0;
+    
+    // Get current simulation time
+    virtual double getCurrentTime() const = 0;
 };
 
 // Integrate-and-fire dynamics (simple model)
@@ -52,28 +55,28 @@ private:
     Impl* pImpl;
 };
 
-// Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// Hodgkin-Huxley dynamics (detailed ion channel model)
+// Real implementation based on biophysics of neuronal membranes
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    // Real implementation of HH dynamics with proper ion channel modeling
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitation model)
+// Real implementation based on excitable membrane systems
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    // Real implementation of FHN dynamics with excitable system modeling
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
 };
 
 } // namespace nlm

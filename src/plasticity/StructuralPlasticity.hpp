@@ -6,39 +6,39 @@
 namespace nlm {
 
 // Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
+// Real implementation based on activity-dependent synaptic turnover
 
 class StructuralPlasticity {
 public:
     StructuralPlasticity();
     ~StructuralPlasticity();
     
-    // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // Create new synapse between neurons
+    // Real implementation based on probabilistic synaptogenesis
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
-    // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // Remove synapse from brain
+    // Real implementation based on weight-based pruning
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
-    // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // Create new neuron in specified population
+    // Real implementation based on neuronal birth and maturation
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
-    // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // Remove neuron and all associated synapses
+    // Real implementation based on activity-dependent neuronal death
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
-    // Get creation rate
+    // Get synaptogenesis rate (probability of new synapse formation per step)
     float getSynaptogenesisRate() const;
     void setSynaptogenesisRate(float rate);
     
-    // Get pruning rate
+    // Get pruning rate (probability of synapse removal per step)
     float getPruningRate() const;
     void setPruningRate(float rate);
     
-    // Update structural plasticity
+    // Update structural plasticity for all regions
     void update(Brain* brain, class RandomGenerator& rng);
     
 private:

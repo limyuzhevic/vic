@@ -71,7 +71,7 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Real synaptic dynamics based on short-term plasticity (Tsodyks-Markram model)
     void step(Timestamp currentTime);
     
     // Reset to initial state

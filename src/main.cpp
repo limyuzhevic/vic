@@ -346,11 +346,12 @@ int main(int argc, char** argv) {
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) continue; // Safety check
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+            } else if (i + 1 < argc && argv[i + 1]) {
                 configFile = argv[++i];
             }
         }
@@ -360,6 +361,7 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
+        NLM_LOG_WARNING("Configuration file not found or invalid: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     

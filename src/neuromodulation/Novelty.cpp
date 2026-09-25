@@ -1,12 +1,13 @@
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
+    Brain* brain;
     float level;
     float decayRate;
     std::vector<float> history;
@@ -21,6 +22,10 @@ Novelty::Novelty() : pImpl(new Impl) {}
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize Novelty: brain pointer is null");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }
@@ -30,11 +35,16 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    if (!pImpl->brain) {
+        NLM_LOG_WARNING("Novelty detection called without brain initialization");
+        return;
+    }
+    
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;

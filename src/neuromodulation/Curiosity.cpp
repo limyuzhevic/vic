@@ -1,10 +1,11 @@
 #include "Curiosity.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
 struct Curiosity::Impl {
-    class Brain* brain;
+    Brain* brain;
     float level;
     float noveltyWeight;
     float predictionErrorWeight;
@@ -23,6 +24,10 @@ Curiosity::Curiosity() : pImpl(new Impl) {}
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize Curiosity: brain pointer is null");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }
@@ -32,6 +37,11 @@ float Curiosity::getLevel() const {
 }
 
 void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+    if (!pImpl->brain) {
+        NLM_LOG_WARNING("Curiosity update called without brain initialization");
+        return;
+    }
+
     // Curiosity increases with novelty and prediction error
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
@@ -48,11 +58,11 @@ float Curiosity::getExplorationDrive() const {
 }
 
 void Curiosity::setNoveltyWeight(float weight) {
-    pImpl->noveltyWeight = weight;
+    pImpl->noveltyWeight = std::clamp(weight, 0.0f, 2.0f);
 }
 
 void Curiosity::setPredictionErrorWeight(float weight) {
-    pImpl->predictionErrorWeight = weight;
+    pImpl->predictionErrorWeight = std::clamp(weight, 0.0f, 2.0f);
 }
 
 void Curiosity::reset() {

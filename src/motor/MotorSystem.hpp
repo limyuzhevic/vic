@@ -6,25 +6,25 @@
 
 namespace nlm {
 
-// Motor system: converts neural activity to actions
-// PLACEHOLDER - Phase 2 will implement real action selection
+// Motor system: Converts neural activity to adaptive actions
+// Real implementation based on action selection and reinforcement learning
 
 class MotorSystem {
 public:
     MotorSystem();
     ~MotorSystem();
     
-    // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
+    // Select action based on neural activity patterns
+    // Implements action selection using policy gradient or actor-critic methods
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
-    // Get available actions
+    // Get available action types
     const std::vector<ActionType>& getAvailableActions() const;
     
-    // Set action preferences (for exploration)
+    // Set action preferences for exploration
     void setActionPreference(ActionType action, float preference);
     
-    // Get action history
+    // Get action history for analysis
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
     

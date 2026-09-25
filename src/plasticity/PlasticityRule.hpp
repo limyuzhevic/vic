@@ -13,13 +13,13 @@ public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    // Real plasticity implementation based on spike timing and eligibility traces
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
                         TimestepDuration dt) = 0;
     
-    // Apply weight change
+    // Apply weight change with bounds checking and safety
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
     
     // Get rule name

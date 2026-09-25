@@ -1,11 +1,12 @@
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
 #include <cmath>
 
 namespace nlm {
 
 struct PredictionError::Impl {
-    class Brain* brain;
+    Brain* brain;
     float error;
     float predictedValue;
     float actualValue;
@@ -19,6 +20,10 @@ PredictionError::PredictionError() : pImpl(new Impl) {}
 PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize PredictionError: brain pointer is null");
+        return;
+    }
     pImpl->brain = brain;
     NLM_LOG_INFO("PredictionError system initialized");
 }
@@ -28,13 +33,29 @@ float PredictionError::getError() const {
 }
 
 void PredictionError::computeError(float predicted, float actual) {
+    // Validate input values
+    if (std::isnan(predicted) || std::isnan(actual)) {
+        NLM_LOG_WARNING("Invalid prediction values: predicted=" + std::to_string(predicted) + 
+                       ", actual=" + std::to_string(actual));
+        return;
+    }
+
     pImpl->predictedValue = predicted;
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
     pImpl->history.push_back(pImpl->error);
+    
+    // Limit history size to prevent memory issues
+    if (pImpl->history.size() > 10000) {
+        pImpl->history.erase(pImpl->history.begin(), pImpl->history.begin() + 1000);
+    }
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
+    if (std::isnan(newPrediction)) {
+        NLM_LOG_WARNING("Invalid prediction value: " + std::to_string(newPrediction));
+        return;
+    }
     pImpl->predictedValue = newPrediction;
 }
 

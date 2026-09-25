@@ -1,5 +1,5 @@
 #include "STDP.hpp"
-#include "../../brain/Synapse.hpp"
+#include "Synapse.hpp"
 #include <cmath>
 #include <algorithm>
 
