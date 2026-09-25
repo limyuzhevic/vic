@@ -1,350 +1,356 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+// Advanced cognitive system integration methods for AgentBrain
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
-    , predictionError_(0.0f)
-    , expectedReward_(0.0f)
-    , developmentalAge_(0.0)
-    , plasticityModifier_(1.0f)
-    , rewardModulationEnabled_(true)
-    , structuralPlasticityEnabled_(true)
-    , developmentEnabled_(true)
-    , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-AgentBrain::~AgentBrain() = default;
-
-void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
-}
-
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
-
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+void AgentBrain::updateCognitiveSystems() {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
+    // Update neural planning
+    if (neuralPlannerEnabled_) {
+        updateNeuralPlanner(decodeMotorCommand());
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
+    // Update concept formation
+    if (conceptFormationEnabled_) {
+        updateConceptFormation();
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
+    // Update self-model
+    if (selfModelEnabled_) {
+        updateSelfModel();
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
+    // Update social learning
+    if (socialLearningEnabled_) {
+        updateSocialLearning();
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
-    
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    // Update attention with cognitive context
+    updateAttentionWithCognitiveContext(noveltyLevel_, predictionError_);
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
-    
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+void AgentBrain::updateNeuralPlanner(MotorCommand currentAction) {
+    // Neural planning for action sequences and future evaluation
+    if (!brain_->getPredictionSystem() || !brain_->getPlanner()) {
+        return;
     }
     
-    return decoded;
-}
-
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
-        }
-        return sum / neurons.size();
-    };
+    // Use the brain's prediction system to evaluate future states
+    // In a full implementation, this would:
+    // 1. Generate multiple action sequences
+    // 2. Predict outcomes for each sequence
+    // 3. Select the action with highest predicted value
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
-    }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
-}
-
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
+    // For now, maintain plan confidence based on curiosity and experience
     if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
-    }
-    
-    return defaultCmd;
-}
-
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
-    
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
-            
-            if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
-            }
-        }
-    }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
-    }
-}
-
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
-    
-    developmentalAge_ += timestep;
-    
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
+        // Higher curiosity = more exploration = lower plan confidence
+        planConfidence_ = std::max(0.1f, planConfidence_ - 0.05f);
     } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+        // Normal operation = increase plan confidence
+        planConfidence_ = std::min(1.0f, planConfidence_ + 0.02f);
     }
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
+    // Store current action for future planning
+    if (brain_->getPlanner()) {
+        brain_->getPlanner()->recordActionSequence(currentAction);
+    }
+}
+
+void AgentBrain::updateConceptFormation() {
+    // Concept formation from accumulated experiences
+    if (experienceBuffer_.size() < 10) {
+        return;  // Need more experiences to form concepts
+    }
+    
+    // Analyze stored experiences to find patterns
+    // This would use the brain's concept formation system
+    if (brain_->getConceptFormation()) {
+        // Extract percept patterns from experiences
+        std::vector<std::vector<float>> perceptPatterns;
+        std::vector<MotorCommand> actions;
+        std::vector<float> rewards;
+        
+        for (const auto& exp : experienceBuffer_) {
+            perceptPatterns.push_back(exp.percept);
+            actions.push_back(exp.action);
+            rewards.push_back(exp.reward);
+        }
+        
+        // Form concepts from patterns
+        brain_->getConceptFormation()->formConcepts(perceptPatterns, rewards);
+        
+        // Update concept stability based on consistency
+        float conceptStability = calculateConceptStability() / perceptPatterns.size();
+        conceptStability_ = conceptStability;
+    }
+}
+
+void AgentBrain::updateSelfModel() {
+    // Self-model for body schema and action consequences
+    if (!brain_ || !brain_->getConceptFormation()) {
+        return;
+    }
+    
+    // Update body schema based on proprioception and sensory feedback
+    // This helps the agent understand its own body structure and capabilities
+    for (const auto& proprio : previousVision_) {
+        // Simple integration of proprioceptive information
+        float bodyComponent = proprio * 0.1f;
+        bodySchema_.push_back(bodyComponent);
+    }
+    
+    // Update action consequences based on rewards
+    // This helps predict the outcomes of different actions
+    if (brain_->getPlanner()) {
+        float actionConsequence = (expectedReward_ > 0.0f) ? 1.0f : -1.0f;
+        actionConsequences_.push_back(actionConsequence);
+        
+        // Update the planner's self-model
+        brain_->getPlanner()->updateSelfModel(bodySchema_, actionConsequences_);
+    }
+}
+
+void AgentBrain::updateSocialLearning() {
+    // Social learning from observations of other agents
+    if (socialObservations_.empty()) {
+        return;
+    }
+    
+    // Analyze observed behaviors to learn social rules
+    if (brain_->getConceptFormation()) {
+        // Extract patterns from observations
+        std::vector<std::vector<float>> socialContexts;
+        std::vector<MotorCommand> observedActions;
+        
+        for (const auto& obs : socialObservations_) {
+            socialContexts.push_back(obs.socialContext);
+            observedActions.push_back(obs.observedAction);
+        }
+        
+        // Learn social rules from observed patterns
+        brain_->getConceptFormation()->learnSocialRules(socialContexts, observedActions);
+        
+        // Update social learning influence based on observation quality
+        float observationQuality = calculateSocialLearningQuality();
+        socialLearningInfluence_ = std::min(1.0f, socialLearningInfluence_ + observationQuality * 0.01f);
+    }
+}
+
+void AgentBrain::updateAttentionWithCognitiveContext(float novelty, float predictionError) {
+    // Update attention based on cognitive context and prediction error
+    // This affects which sensory inputs and neural activities receive priority
+    
+    // Novelty increases attention to new stimuli
+    float noveltyAttention = novelty * 0.4f;
+    
+    // Prediction error signals learning opportunities
+    float predictionAttention = std::abs(predictionError) * 0.3f;
+    
+    // Cognitive load and planning needs
+    float cognitiveLoad = (1.0f - planConfidence_) * 0.2f;
+    
+    // Combine attention factors
+    attentionFocus_ = noveltyAttention + predictionAttention + cognitiveLoad;
+    attentionFocus_ = std::clamp(attentionFocus_, 0.1f, 1.0f);
+    
+    // Update prediction accuracy based on prediction error
+    if (std::abs(predictionError) < 0.1f) {
+        predictionAccuracy_ = std::min(1.0f, predictionAccuracy_ + 0.05f);
+    } else {
+        predictionAccuracy_ = std::max(0.0f, predictionAccuracy_ - 0.05f);
+    }
+}
+
+void AgentBrain::processPredictionErrorForLearning(float predictionError) {
+    // Process prediction error for cognitive system learning
+    // This integrates with the brain's prediction system
+    
+    if (!brain_ || !brain_->getPredictionSystem()) {
+        return;
+    }
+    
+    // Update prediction system with new prediction error
+    brain_->getPredictionSystem()->updatePredictionError(predictionError);
+    
+    // Affect concept formation stability
+    if (conceptFormationEnabled_) {
+        float learningRate = std::abs(predictionError) * 0.01f;
+        for (float& stability : conceptStability_) {
+            stability = std::max(0.0f, stability - learningRate);
         }
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
-}
-
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
-
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
-
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
-
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
-
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::storeExperienceForConceptFormation(const SensoryPercept& percept, MotorCommand action, float reward) {
+    // Store experience for later concept formation and learning
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    Experience exp;
+    exp.percept = percept.getAllSignals();
+    exp.action = action;
+    exp.reward = reward;
+    exp.timestamp = developmentalAge_;
+    
+    experienceBuffer_.push_back(exp);
+    
+    // Maintain experience buffer size
+    if (experienceBuffer_.size() > 1000) {
+        experienceBuffer_.erase(experienceBuffer_.begin());
+    }
+}
+
+void AgentBrain::updateSelfModelWithSensoryInput(const SensoryPercept& percept) {
+    // Update self-model representation with new sensory input
+    // This helps maintain body awareness and action consequence prediction
+    
+    const auto& vision = percept.getVision();
+    for (size_t i = 0; i < vision.size() && i < bodySchema_.size(); ++i) {
+        // Update body schema with new sensory information
+        bodySchema_[i] = bodySchema_[i] * 0.9f + vision[i] * 0.1f;
+    }
+}
+
+void AgentBrain::observeOtherAgent(const AgentBrain& otherAgent) {
+    // Observe another agent's behavior for social learning
+    // This helps learn social rules and norms
+    
+    SocialObservation obs;
+    obs.observerPercept = previousVision_;
+    obs.observedAction = otherAgent.decodeMotorCommand();
+    obs.socialContext = std::vector<float>(6, 0.0f);  // Placeholder for social context
+    obs.observationTime = developmentalAge_;
+    
+    socialObservations_.push_back(obs);
+    
+    // Limit social observations
+    if (socialObservations_.size() > 500) {
+        socialObservations_.erase(socialObservations_.begin());
+    }
+}
+
+float AgentBrain::calculateNovelty(const std::vector<float>& vision) const {
+    // Calculate novelty based on difference from previous vision
+    if (previousVision_.empty() || vision.empty()) {
+        return 0.5f;
+    }
+    
+    float totalDifference = 0.0f;
+    size_t minSize = std::min(previousVision_.size(), vision.size());
+    
+    for (size_t i = 0; i < minSize; ++i) {
+        totalDifference += std::abs(vision[i] - previousVision_[i]);
+    }
+    
+    float avgDifference = totalDifference / static_cast<float>(minSize);
+    return std::min(1.0f, avgDifference * 2.0f);
+}
+
+float AgentBrain::calculateConceptStability() const {
+    // Calculate concept stability based on experience consistency
+    float stability = 0.0f;
+    float totalWeight = 0.0f;
+    
+    for (size_t i = 0; i < experienceBuffer_.size(); ++i) {
+        // Weight recent experiences more heavily
+        float weight = 1.0f + (static_cast<float>(i) / static_cast<float>(experienceBuffer_.size()));
+        float consistency = 0.0f;
+        
+        // Check consistency of this experience with others
+        for (size_t j = i + 1; j < experienceBuffer_.size() && j - i < 10; ++j) {
+            float similarity = calculatePerceptSimilarity(experienceBuffer_[i].percept, 
+                                                         experienceBuffer_[j].percept);
+            consistency += similarity;
+        }
+        
+        stability += consistency * weight;
+        totalWeight += weight;
+    }
+    
+    return totalWeight > 0.0f ? stability / totalWeight : 0.0f;
+}
+
+float AgentBrain::calculateSocialLearningQuality() const {
+    // Calculate quality of social learning based on observation consistency
+    if (socialObservations_.empty()) {
+        return 0.0f;
+    }
+    
+    float totalConsistency = 0.0f;
+    for (size_t i = 0; i < socialObservations_.size(); ++i) {
+        for (size_t j = i + 1; j < socialObservations_.size() && j - i < 5; ++j) {
+            // Calculate similarity of observed behaviors
+            float actionSimilarity = calculateActionSimilarity(socialObservations_[i].observedAction,
+                                                             socialObservations_[j].observedAction);
+            float contextSimilarity = calculateContextSimilarity(socialObservations_[i].socialContext,
+                                                               socialObservations_[j].socialContext);
+            totalConsistency += (actionSimilarity + contextSimilarity) * 0.5f;
+        }
+    }
+    
+    return totalConsistency / (socialObservations_.size() * 2.0f);
+}
+
+float AgentBrain::calculatePerceptSimilarity(const std::vector<float>& percept1, const std::vector<float>& percept2) const {
+    // Calculate similarity between two percept vectors
+    if (percept1.empty() || percept2.empty()) {
+        return 0.0f;
+    }
+    
+    float totalDifference = 0.0f;
+    size_t minSize = std::min(percept1.size(), percept2.size());
+    
+    for (size_t i = 0; i < minSize; ++i) {
+        totalDifference += std::abs(percept1[i] - percept2[i]);
+    }
+    
+    float avgDifference = totalDifference / static_cast<float>(minSize);
+    return std::max(0.0f, 1.0f - avgDifference);
+}
+
+float AgentBrain::calculateActionSimilarity(MotorCommand action1, MotorCommand action2) const {
+    // Calculate similarity between two motor commands
+    // Simple mapping: same actions are identical, different actions are dissimilar
+    return (action1 == action2) ? 1.0f : 0.0f;
+}
+
+float AgentBrain::calculateContextSimilarity(const std::vector<float>& context1, const std::vector<float>& context2) const {
+    // Calculate similarity between two context vectors
+    if (context1.empty() || context2.empty()) {
+        return 0.0f;
+    }
+    
+    float totalDifference = 0.0f;
+    size_t minSize = std::min(context1.size(), context2.size());
+    
+    for (size_t i = 0; i < minSize; ++i) {
+        totalDifference += std::abs(context1[i] - context2[i]);
+    }
+    
+    float avgDifference = totalDifference / static_cast<float>(minSize);
+    return std::max(0.0f, 1.0f - avgDifference);
+}
+
+// Implementation of advanced cognitive system getter methods
+float AgentBrain::getPlanConfidence() const {
+    return planConfidence_;
+}
+
+float AgentBrain::getSelfModelAwareness() const {
+    return selfModelAwareness_;
+}
+
+float AgentBrain::getSocialLearningInfluence() const {
+    return socialLearningInfluence_;
+}
+
+AgentBrain::CognitiveMetrics AgentBrain::getCognitiveMetrics() const {
+    CognitiveMetrics metrics;
+    metrics.planConfidence = planConfidence_;
+    metrics.conceptStability = conceptFormationEnabled_ ? calculateConceptStability() : 0.0f;
+    metrics.selfModelAwareness = selfModelAwareness_;
+    metrics.socialLearningInfluence = socialLearningInfluence_;
+    metrics.attentionFocus = attentionFocus_;
+    metrics.predictionAccuracy = predictionAccuracy_;
+    return metrics;
 }
 
 } // namespace nlm

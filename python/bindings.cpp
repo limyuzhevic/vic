@@ -353,73 +353,145 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // ========== MEMORY SYSTEMS ACCESS ==========
+    
+    // Working memory - transient active information
+    py::class_<NeuralWorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system for transient information)pbdoc")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces, "Get number of active memory traces")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons, "Get memory neuron IDs")
+        .def("getTotalMemory", &NeuralWorkingMemory::getTotalMemory, "Get total memory capacity")
+        .def("clear", &NeuralWorkingMemory::clear, "Clear working memory");
+    
+    // Episodic memory - experience storage
+    py::class_<NeuralEpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system for storing experiences)pbdoc")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount, "Get number of stored episodes")
+        .def("getTotalMemoryUsage", &NeuralEpisodicMemory::getTotalMemoryUsage, "Get total memory usage in bytes")
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes, py::arg("maxEpisodes") = 10, "Get recent episodes")
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("maxEpisodes") = 5, "Get episodes for replay")
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("consolidationRate") = 0.5f, "Consolidate memories");
+    
+    // Associative memory - pattern associations
+    py::class_<NeuralAssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory system for pattern associations)pbdoc")
+        .def("getAssociationCount", &NeuralAssociativeMemory::getAssociationCount, "Get number of associations")
+        .def("getAssociationStrength", &NeuralAssociativeMemory::getAssociationStrength, py::arg("pattern1"), py::arg("pattern2"), "Get association strength between patterns")
+        .def("clear", &NeuralAssociativeMemory::clear, "Clear associative memory");
+    
+    // ========== CHECKPOINT/RECOVERY API ==========
+    
+    // Checkpoint info structure
+    py::class_<CheckpointManager::CheckpointInfo>(m, "CheckpointInfo", R"pbdoc(Information about a checkpoint)pbdoc")
+        .def_readonly("name", &CheckpointManager::CheckpointInfo::name)
+        .def_readonly("step", &CheckpointManager::CheckpointInfo::step)
+        .def_readonly("simulationTime", &CheckpointManager::CheckpointInfo::simulationTime)
+        .def_readonly("neuronCount", &CheckpointManager::CheckpointInfo::neuronCount)
+        .def_readonly("synapseCount", &CheckpointManager::CheckpointInfo::synapseCount)
+        .def_readonly("fileSize", &CheckpointManager::CheckpointInfo::fileSize)
+        .def_readonly("timestamp", &CheckpointManager::CheckpointInfo::timestamp);
+    
+    // Checkpoint manager
+    py::class_<CheckpointManager>(m, "CheckpointManager", R"pbdoc(Checkpoint manager for saving/loading brain state)pbdoc")
+        .def(py::init<>())
+        .def("configure", &CheckpointManager::configure, 
+             py::arg("checkpointDir"), 
+             py::arg("saveIntervalSteps") = 10000,
+             py::arg("maxCheckpoints") = 10,
+             py::arg("compress") = true,
+             "Configure checkpoint system")
+        .def("update", &CheckpointManager::update,
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Update checkpoint state (call each simulation step)")
+        .def("saveImmediately", &CheckpointManager::saveImmediately,
+             py::arg("name") = "", "Save checkpoint immediately")
+        .def("load", &CheckpointManager::load,
+             py::arg("name"), "Load checkpoint")
+        .def("listCheckpoints", &CheckpointManager::listCheckpoints,
+             "List available checkpoints")
+        .def("pruneOldCheckpoints", &CheckpointManager::pruneOldCheckpoints,
+             py::arg("keepCount"), "Delete old checkpoints (keep most recent N)")
+        .def("getCheckpointDir", &CheckpointManager::getCheckpointDir,
+             "Get checkpoint directory")
+        .def("getLastCheckpointPath", &CheckpointManager::getLastCheckpointPath,
+             "Get last checkpoint path")
+        .def("shouldSave", &CheckpointManager::shouldSave,
+             py::arg("currentStep"), "Check if checkpoint should be saved")
+    
+    // ========== ADVANCED COGNITIVE METRICS ==========
+    
+    // Advanced cognitive metrics for AgentBrain
+    py::class_<AgentBrain::CognitiveMetrics>(m, "CognitiveMetrics", R"pbdoc(Cognitive metrics for advanced analysis)pbdoc")
+        .def_readonly("planConfidence", &AgentBrain::CognitiveMetrics::planConfidence, "Plan confidence level")
+        .def_readonly("conceptStability", &AgentBrain::CognitiveMetrics::conceptStability, "Concept stability")
+        .def_readonly("selfModelAwareness", &AgentBrain::CognitiveMetrics::selfModelAwareness, "Self-model awareness level")
+        .def_readonly("socialLearningInfluence", &AgentBrain::CognitiveMetrics::socialLearningInfluence, "Social learning influence")
+        .def_readonly("attentionFocus", &AgentBrain::CognitiveMetrics::attentionFocus, "Attention focus level")
+        .def_readonly("predictionAccuracy", &AgentBrain::CognitiveMetrics::predictionAccuracy, "Prediction accuracy")
+        .def("to_dict", [](const AgentBrain::CognitiveMetrics& metrics) {
+            py::dict result;
+            result["planConfidence"] = metrics.planConfidence;
+            result["conceptStability"] = metrics.conceptStability;
+            result["selfModelAwareness"] = metrics.selfModelAwareness;
+            result["socialLearningInfluence"] = metrics.socialLearningInfluence;
+            result["attentionFocus"] = metrics.attentionFocus;
+            result["predictionAccuracy"] = metrics.predictionAccuracy;
+            return result;
+        }, "Convert metrics to dictionary");
+    
+    // ========== ADVANCED AGENTBRAIN METHODS ==========
+    
+    // Enhanced AgentBrain with cognitive integration
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Advanced agent brain interface with cognitive systems integration)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"), "Create agent brain")
+        .def("initialize", &AgentBrain::initialize, py::arg("world"), "Initialize agent with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize, "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize, "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput, py::arg("percept"), "Process sensory input")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand, "Decode motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation, py::arg("reward"), py::arg("predictedReward"), "Apply reward modulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment, py::arg("timestep"), "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage, "Get developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel, "Get neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel, "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel, "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError, "Get prediction error")
+        .def("reset", &AgentBrain::reset, "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain, "Get underlying brain")
+        
+        // Configuration
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation, py::arg("enable"), "Enable/disable reward modulation")
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity, py::arg("enable"), "Enable/disable structural plasticity")
+        .def("enableDevelopment", &AgentBrain::enableDevelopment, py::arg("enable"), "Enable/disable development")
+        .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"), "Enable/disable curiosity")
+        
+        // Advanced cognitive system configuration
+        .def("enableNeuralPlanner", &AgentBrain::enableNeuralPlanner, py::arg("enable"), "Enable/disable neural planner")
+        .def("isNeuralPlannerEnabled", &AgentBrain::isNeuralPlannerEnabled, "Check if neural planner is enabled")
+        .def("enableConceptFormation", &AgentBrain::enableConceptFormation, py::arg("enable"), "Enable/disable concept formation")
+        .def("isConceptFormationEnabled", &AgentBrain::isConceptFormationEnabled, "Check if concept formation is enabled")
+        .def("enableSelfModel", &AgentBrain::enableSelfModel, py::arg("enable"), "Enable/disable self-model")
+        .def("isSelfModelEnabled", &AgentBrain::isSelfModelEnabled, "Check if self-model is enabled")
+        .def("enableSocialLearning", &AgentBrain::enableSocialLearning, py::arg("enable"), "Enable/disable social learning")
+        .def("isSocialLearningEnabled", &AgentBrain::isSocialLearningEnabled, "Check if social learning is enabled")
+        
+        // Cognitive metrics and analysis
+        .def("getPlanConfidence", &AgentBrain::getPlanConfidence, "Get plan confidence level")
+        .def("getSelfModelAwareness", &AgentBrain::getSelfModelAwareness, "Get self-model awareness")
+        .def("getSocialLearningInfluence", &AgentBrain::getSocialLearningInfluence, "Get social learning influence")
+        .def("getCognitiveMetrics", &AgentBrain::getCognitiveMetrics, "Get cognitive metrics")
+        .def("getAttentionFocus", &AgentBrain::getAttentionFocus, "Get attention focus level")
+        .def("getPredictionAccuracy", &AgentBrain::getPredictionAccuracy, "Get prediction accuracy")
+        
+        // Experience and social learning management
+        .def("storeExperienceForConceptFormation", &AgentBrain::storeExperienceForConceptFormation, 
+             py::arg("percept"), py::arg("action"), py::arg("reward"), 
+             "Store experience for concept formation")
+        .def("updateSelfModelWithSensoryInput", &AgentBrain::updateSelfModelWithSensoryInput, 
+             py::arg("percept"), "Update self-model with sensory input")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent, py::arg("otherAgent"), 
+             "Observe another agent for social learning")
+        .def("processPredictionErrorForLearning", &AgentBrain::processPredictionErrorForLearning, 
+             py::arg("predictionError"), "Process prediction error for learning")
+        .def("updateAttentionWithCognitiveContext", &AgentBrain::updateAttentionWithCognitiveContext,
+             py::arg("novelty"), py::arg("predictionError"), 
+             "Update attention with cognitive context");
 
 } // namespace nlm
