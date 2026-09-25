@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -189,6 +192,15 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Get current sensory observation (for prediction system)
+    std::unique_ptr<class SensoryInput> getCurrentSensoryObservation() const;
+    
+    // Get neuromodulators
+    Dopamine* getDopamine();
+    Acetylcholine* getACh();
+    Norepinephrine* getNE();
+    Serotonin* get5HT();
     
     // Logging
     void logStatus() const;
