@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <map>
+#include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -43,6 +47,58 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation error
+class ConfigValidationError : public std::runtime_error {
+public:
+    ConfigValidationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Configuration validation rule
+struct ValidationRule {
+    std::string key;
+    std::function<bool(const ConfigValue&)> validator;
+    std::string errorMessage;
+};
+
+// Configuration template (inheritance)
+struct ConfigTemplate {
+    std::string name;
+    std::vector<ConfigEntry> baseEntries;
+    std::vector<ValidationRule> validationRules;
+    bool inheritFromDefault;
+};
+
+// Preset profile configuration
+struct PresetProfile {
+    enum class ProfileType {
+        Basic,
+        Advanced,
+        Research
+    };
+    
+    std::string name;
+    ProfileType type;
+    std::vector<ConfigEntry> entries;
+    std::string description;
+    std::string useCase;
+};
+
+// File format
+enum class ConfigFileFormat {
+    PlainText,
+    JSON,
+    YAML
+};
+
+// Configuration options
+struct ConfigOptions {
+    bool validateOnSet = true;
+    bool allowInheritance = true;
+    ConfigFileFormat preferredFormat = ConfigFileFormat::JSON;
+    bool mergeOnLoad = false;
+    std::string defaultFileExtension = ".json";
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,14 +111,33 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Configuration loading/saving
+    bool loadFromFile(const std::string& filepath, ConfigFileFormat format = ConfigFileFormat::PlainText);
+    bool loadFromJSON(const std::string& jsonString);
+    bool loadFromYAML(const std::string& yamlString);
+    bool saveToFile(const std::string& filepath, ConfigFileFormat format = ConfigFileFormat::PlainText) const;
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Preset profiles
+    static std::vector<std::string> getAvailablePresets();
+    static PresetProfile loadPreset(const std::string& presetName);
+    bool applyPreset(const std::string& presetName);
+    
+    // Configuration inheritance
+    bool loadFromTemplate(const ConfigTemplate& template);
+    bool mergeWith(const Config& other, bool overwriteConflicting = false);
+    
+    // Validation
+    void addValidationRule(const ValidationRule& rule);
+    void clearValidationRules();
+    void validate() const;
+    bool isValid() const;
+    
+    // Set values with validation
+    template<typename T>
+    void setValidated(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
     
     // Get values
     template<typename T>
@@ -93,6 +168,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration statistics
+    size_t getEntryCount() const;
+    ConfigSource getEntrySource(const std::string& key) const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration options
+    void setOptions(const ConfigOptions& options);
+    ConfigOptions getOptions() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +186,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool parseJSON(const std::string& json, std::vector<ConfigEntry>& entries);
+    static bool parseYAML(const std::string& yaml, std::vector<ConfigEntry>& entries);
+    static std::string configValueToString(const ConfigValue& value);
+    static ConfigValue stringToConfigValue(const std::string& str);
 };
 
 } // namespace nlm

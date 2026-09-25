@@ -100,3 +100,18 @@ install(TARGETS pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
 )
+
+# Visualization Python bindings
+pybind11_add_module(pynlm_viz bindings_viz.cpp)
+target_link_libraries(pynlm_viz PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_viz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+if(MSVC)
+    target_compile_options(pynlm_viz PRIVATE /permissive-)
+endif()
+
+install(TARGETS pynlm_viz
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)

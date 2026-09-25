@@ -1,0 +1,29 @@
+# NLM Configuration - Research Preset
+# Research-grade configuration for scientific studies with comprehensive parameter control and reproducibility
+
+random_seed: 2024
+simulation_timestep: 0.0001
+neuron_count: 5000
+region_count: 10
+connection_probability: 0.15
+plasticity_learning_rate: 0.015
+stdp_ltp_weight: 0.015
+stdp_ltd_weight: 0.018
+stdp_time_constant: 15.0
+development_synaptogenesis_rate: 0.001
+development_pruning_rate: 0.00005
+dopamine_baseline: 0.05
+reward_discount_factor: 0.995
+environment_name: "ComplexEnvironment"
+log_level: "TRACE"
+log_to_file: true
+log_filename: "nlm_research_$(date + %Y%m%d_%H%M%S).log"
+max_simulation_steps: 100000
+simulation_time_limit: 3600.0
+visualization_enabled: true
+visualization_update_rate: 60.0
+checkpoint_interval: 5000
+replay_interval: 1000
+enable_development: true
+enable_curiosity: true
+enable_novelty: true

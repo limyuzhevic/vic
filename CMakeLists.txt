@@ -18,6 +18,24 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Try to find nlohmann/json library
+option(NLM_USE_SYSTEM_JSON "Use system nlohmann/json" ON)
+if(NLM_USE_SYSTEM_JSON)
+    find_package(nlohmann_json 3.2.0 REQUIRED)
+else()
+    # Use bundled nlohmann/json (not implemented yet)
+    message(FATAL_ERROR "Bundled nlohmann/json not yet implemented")
+endif()
+
+# Try to find yaml-cpp library
+option(NLM_USE_SYSTEM_YAML "Use system yaml-cpp" ON)
+if(NLM_USE_SYSTEM_YAML)
+    find_package(yaml-cpp REQUIRED)
+else()
+    # Use bundled yaml-cpp (not implemented yet)
+    message(FATAL_ERROR "Bundled yaml-cpp not yet implemented")
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -121,6 +139,14 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase6DemoPerformance.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -139,12 +165,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
