@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigValidator.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -54,17 +55,14 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+# Memory
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/AttentionalSelection.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
@@ -124,6 +122,25 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    # CLI files
+    src/cli/CLIManager.cpp
+    src/cli/Command.cpp
+    src/cli/command/run/RunCommand.cpp
+    src/cli/command/status/StatusCommand.cpp
+    src/cli/command/config/ConfigCommand.cpp
+    src/cli/command/memory/MemoryCommand.cpp
+    src/cli/command/neuromod/NeuromodCommand.cpp
+    src/cli/command/cognition/CognitionCommand.cpp
+    src/cli/command/prediction/PredictionCommand.cpp
+    src/cli/command/develop/DevelopCommand.cpp
+    src/cli/command/checkpoint/CheckpointCommand.cpp
+    src/cli/command/experiment/ExperimentCommand.cpp
+    src/cli/command/help/HelpCommand.cpp
+    src/cli/options/ConfigOptions.cpp
+    src/cli/options/ControlOptions.cpp
+    src/cli/options/LoggingOptions.cpp
+    src/cli/options/InteractiveOptions.cpp
+    src/cli/util/FileUtils.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 

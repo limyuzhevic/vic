@@ -237,6 +237,148 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
     }
 }
 
+// Neural mechanisms for planning
+
+void NeuralPlanner::integrateWithWorkingMemory() {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    // Get current working memory patterns
+    auto workingMemory = brain_->getWorkingMemory();
+    auto memoryNeurons = workingMemory->getMemoryNeurons();
+    
+    if (memoryNeurons.empty()) return;
+    
+    // Evaluate action sequences based on working memory content
+    std::vector<float> currentMemoryPattern;
+    float totalActivation = 0.0f;
+    
+    for (NeuronId neuronId : memoryNeurons) {
+        float activation = workingMemory->getNeuronActivation(neuronId);
+        totalActivation += activation;
+        currentMemoryPattern.push_back(activation);
+    }
+    
+    if (totalActivation > 0.0f) {
+        // Normalize pattern
+        for (float& val : currentMemoryPattern) {
+            val /= totalActivation;
+        }
+        
+        // Set current state based on working memory for planning
+        currentGoal_ = currentMemoryPattern;
+        
+        // Update planning depth based on memory complexity
+        float memoryComplexity = computeMemoryComplexity(currentMemoryPattern);
+        size_t newDepth = static_cast<size_t>(5.0f + memoryComplexity * 3.0f);
+        setPlanningDepth(std::min(newDepth, 10u));  // Cap at 10
+    }
+}
+
+void NeuralPlanner::integrateWithEpisodicMemory() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    auto episodicMemory = brain_->getEpisodicMemory();
+    auto episodes = episodicMemory->getEpisodes();
+    
+    // Analyze recent episodes to extract planning knowledge
+    if (episodes.size() > 10) {
+        // Take last 10 episodes for pattern analysis
+        size_t startIdx = std::max(0, static_cast<int>(episodes.size()) - 10);
+        std::vector<const EpisodicMemoryItem*> recentEpisodes;
+        
+        for (size_t i = startIdx; i < episodes.size(); ++i) {
+            recentEpisodes.push_back(episodes[i]);
+        }
+        
+        // Extract successful action sequences
+        analyzeSuccessfulSequences(recentEpisodes);
+    }
+}
+
+void NeuralPlanner::integrateWithNeuromodulation() {
+    if (!brain_) return;
+    
+    float dopamineLevel = 0.5f;  // Default if no dopamine system
+    if (brain_->getDopamine()) {
+        dopamineLevel = brain_->getDopamine()->getLevel();
+    }
+    
+    // Adjust planning confidence based on neuromodulation
+    planningConfidence_ = 0.3f + dopamineLevel * 0.7f;
+    
+    // Adjust exploration based on curiosity
+    float curiosityLevel = 0.5f;
+    if (brain_->getCuriosity()) {
+        curiosityLevel = brain_->getCuriosity()->getLevel();
+    }
+    
+    // Higher curiosity = more exploratory planning
+    if (curiosityLevel > 0.7f) {
+        // Increase planning depth for exploration
+        size_t currentDepth = getPlanningDepth();
+        if (currentDepth < 10) {
+            setPlanningDepth(currentDepth + 1);
+        }
+    } else if (curiosityLevel < 0.3f) {
+        // Decrease planning depth for exploitation
+        size_t currentDepth = getPlanningDepth();
+        if (currentDepth > 2) {
+            setPlanningDepth(currentDepth - 1);
+        }
+    }
+}
+
+void NeuralPlanner::applyPredictionError(float error) {
+    if (!brain_ || !brain_->getPredictionErrorSignal()) return;
+    
+    // Use prediction error to update planning
+    auto predictionError = brain_->getPredictionErrorSignal();
+    
+    // Adjust action quality based on prediction error
+    for (size_t i = 0; i < actionQuality_.size(); ++i) {
+        // Larger prediction error = more adjustment needed
+        float adjustment = error * 0.1f * (i % 3 + 1);  // Varying adjustment by action index
+        
+        // Negative error (worse than predicted) = decrease quality
+        // Positive error (better than predicted) = increase quality
+        float delta = -error * 0.05f * adjustment;
+        actionQuality_[i] = std::clamp(actionQuality_[i] + delta, -1.0f, 1.0f);
+    }
+}
+
+float NeuralPlanner::computeMemoryComplexity(const std::vector<float>& pattern) const {
+    // Compute complexity as entropy of the pattern
+    float entropy = 0.0f;
+    
+    for (float val : pattern) {
+        if (val > 0.0f && val < 1.0f) {
+            entropy -= val * std::log(val);
+        }
+    }
+    
+    return std::min(1.0f, entropy);
+}
+
+void NeuralPlanner::analyzeSuccessfulSequences(const std::vector<const EpisodicMemoryItem*>& episodes) {
+    // Extract successful action sequences from episodic memory
+    for (const auto* episode : episodes) {
+        if (episode && episode->reward > 0.5f) {
+            // Record this as a successful sequence
+            // In a full implementation, this would update internal knowledge
+            size_t actionCount = episode->actionSequence.size();
+            if (actionCount > 0) {
+                // Mark action types as high quality
+                for (ActionType action : episode->actionSequence) {
+                    size_t actionIdx = static_cast<size_t>(action);
+                    if (actionIdx < actionQuality_.size()) {
+                        actionQuality_[actionIdx] = std::max(actionQuality_[actionIdx], 0.7f);
+                    }
+                }
+            }
+        }
+    }
+}
+
 void NeuralPlanner::clearCache() {
     // Clear any planning cache
 }

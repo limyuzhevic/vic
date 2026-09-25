@@ -189,7 +189,7 @@ Phase4Results EpisodicRecallExperiment::run(Brain* brain, size_t numTrials) {
     
     for (size_t trial = 0; trial < numTrials; ++trial) {
         // Store an episode
-        EpisodicMemoryItem episode;
+        nlm::EpisodicMemoryItem episode;
         episode.timestamp = trial;
         episode.sensoryState = std::vector<float>(50, static_cast<float>(trial % 10) / 10.0f);
         episode.reward = (trial % 3 == 0) ? 1.0f : 0.0f;
@@ -599,7 +599,7 @@ Phase4Results Phase4IntegratedExperiment::run(Brain* brain, size_t numEpisodes, 
             }
             
             // Store episode
-            EpisodicMemoryItem episodeItem;
+            nlm::EpisodicMemoryItem episodeItem;
             episodeItem.timestamp = episode * 1000 + step;
             episodeItem.sensoryState = currentState;
             episodeItem.resultingSensoryState = nextState;

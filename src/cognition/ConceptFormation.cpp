@@ -1,5 +1,6 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -291,258 +292,219 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
-void ConceptFormation::clear() {
-    concepts_.clear();
-    nextConceptId_ = 1;
-}
-
-// SpatialRepresentation Implementation
-struct SpatialRepresentation::Impl {
-    Brain* brain;
+void ConceptFormation::processNeuralPatterns() {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
     
-    Impl() : brain(nullptr) {}
-};
-
-SpatialRepresentation::SpatialRepresentation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , currentX_(0)
-    , currentY_(0)
-    , gridSpacing_(1.0f)
-{
-}
-
-SpatialRepresentation::~SpatialRepresentation() = default;
-
-void SpatialRepresentation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SpatialRepresentation initialized");
-}
-
-void SpatialRepresentation::recordPosition(float x, float y, const std::vector<float>& sensoryCues) {
-    currentX_ = x;
-    currentY_ = y;
-    lastSensoryCue_ = sensoryCues;
+    // Get current neural activity patterns from working memory
+    auto workingMemory = brain_->getWorkingMemory();
+    auto memoryNeurons = workingMemory->getMemoryNeurons();
     
-    // Check if we have a place cell near this position
-    bool hasNearbyCell = false;
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < pc.fieldRadius) {
-            hasNearbyCell = true;
-            break;
-        }
-    }
+    if (memoryNeurons.empty()) return;
     
-    // Create new place cell if needed
-    if (!hasNearbyCell && brain_) {
-        PlaceCell newCell;
-        newCell.neuron = NeuronId(placeCells_.size() + 40000);
-        newCell.x = x;
-        newCell.y = y;
-        newCell.fieldRadius = 0.5f;  // Place field size
-        newCell.activation = 1.0f;
-        
-        placeCells_.push_back(newCell);
-        
-        // Inject current to activate this neuron
-        brain_->injectCurrent(newCell.neuron, 5.0f);
-    }
-}
-
-std::pair<float, float> SpatialRepresentation::getPredictedPosition() const {
-    return {currentX_, currentY_};
-}
-
-void SpatialRepresentation::integrateMovement(float dx, float dy) {
-    currentX_ += dx;
-    currentY_ += dy;
-}
-
-float SpatialRepresentation::getPositionActivation(float x, float y) const {
+    // Extract pattern from neural activity
+    std::vector<float> currentPattern;
     float totalActivation = 0.0f;
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
-        
-        // Gaussian place field
-        if (dist < pc.fieldRadius * 2.0f) {
-            float activation = std::exp(-dist * dist / (2.0f * pc.fieldRadius * pc.fieldRadius));
-            totalActivation += activation * pc.activation;
-        }
+    for (NeuronId neuronId : memoryNeurons) {
+        float activation = workingMemory->getNeuronActivation(neuronId);
+        currentPattern.push_back(activation);
+        totalActivation += activation;
     }
     
-    return totalActivation;
+    if (totalActivation > 0.1f) {
+        // Normalize pattern
+        for (float& val : currentPattern) {
+            val /= totalActivation;
+        }
+        
+        // Get current reward from neuromodulation
+        float currentReward = 0.0f;
+        if (brain_->getDopamine()) {
+            currentReward = brain_->getDopamine()->getLevel();
+        }
+        
+        // Present experience to concept formation system
+        presentExperience(currentPattern, currentPattern, currentReward, 
+                         static_cast<SimulationStep>(brain_->getCurrentStep()));
+    }
 }
 
-std::vector<NeuronId> SpatialRepresentation::getPlaceNeuronsNear(float x, float y, float radius) const {
-    std::vector<NeuronId> result;
+void ConceptFormation::integrateWithEpisodicMemory() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < radius) {
-            result.push_back(pc.neuron);
+    auto episodicMemory = brain_->getEpisodicMemory();
+    auto episodes = episodicMemory->getEpisodes();
+    
+    // Extract patterns from episodic memory to discover concepts
+    for (const auto* episode : episodes) {
+        if (!episode) continue;
+        
+        // Create neural pattern from episode
+        std::vector<float> episodePattern;
+        episodePattern.reserve(episode->sensoryState.size() + episode->activeNeurons.size());
+        
+        // Add sensory state features
+        for (float val : episode->sensoryState) {
+            episodePattern.push_back(val);
+        }
+        
+        // Add neural activation features
+        for (float val : episode->neuronActivations) {
+            episodePattern.push_back(val / 20.0f); // Normalize
+        }
+        
+        // Get reward from episode
+        float episodeReward = episode->resultingReward > 0.0f ? 
+                             episode->resultingReward : episode->reward;
+        
+        if (!episodePattern.empty()) {
+            // Present to concept formation
+            presentExperience(episodePattern, episodePattern, episodeReward,
+                             episode->timestamp);
         }
     }
+}
+
+void ConceptFormation::integrateWithPredictionSystem() {
+    if (!brain_ || !brain_->getPredictionSystem()) return;
     
-    return result;
-}
-
-void SpatialRepresentation::clear() {
-    placeCells_.clear();
-    currentX_ = 0;
-    currentY_ = 0;
-}
-
-// TemporalRelation Implementation
-struct TemporalRelation::Impl {
-    Brain* brain;
+    auto predictionSystem = brain_->getPredictionSystem();
     
-    Impl() : brain(nullptr) {}
-};
-
-TemporalRelation::TemporalRelation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-{
+    // Get prediction confidence and error
+    float confidence = predictionSystem->getConfidence();
+    float predictionError = predictionSystem->getPredictionError();
+    
+    // Adjust concept formation threshold based on prediction
+    // High confidence = more stable concepts (higher threshold)
+    // High error = more novel concepts (lower threshold)
+    float thresholdAdjustment = confidence * 0.3f - predictionError * 0.2f;
+    
+    float newThreshold = formationThreshold_ + thresholdAdjustment;
+    newThreshold = std::max(0.3f, std::min(0.9f, newThreshold));
+    
+    setFormationThreshold(newThreshold);
 }
 
-TemporalRelation::~TemporalRelation() = default;
-
-void TemporalRelation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-}
-
-void TemporalRelation::recordSequence(const std::vector<float>& eventA,
-                                      const std::vector<float>& eventB,
-                                      float reward) {
-    // Find existing link or create new
-    for (auto& link : sequences_) {
-        float simA = 0.0f, simB = 0.0f;
+void ConceptFormation::integrateWithAttention() {
+    if (!brain_) return;
+    
+    auto attention = brain_->getAttention();
+    if (!attention) return;
+    
+    // Get attended neurons
+    const auto& winners = attention->getWinners();
+    
+    if (winners.empty()) return;
+    
+    // Get activation levels of attended neurons
+    std::vector<float> attendedActivations;
+    
+    for (NeuronId neuronId : winners) {
+        float activation = 0.0f;
+        if (brain_->getWorkingMemory()) {
+            activation = brain_->getWorkingMemory()->getNeuronActivation(neuronId);
+        }
+        attendedActivations.push_back(activation);
+    }
+    
+    // Normalize activations
+    float maxActivation = *std::max_element(attendedActivations.begin(), 
+                                            attendedActivations.end());
+    if (maxActivation > 0.0f) {
+        for (float& val : attendedActivations) {
+            val /= maxActivation;
+        }
         
-        // Compute similarity
-        if (link.fromEvent.size() == eventA.size() && link.toEvent.size() == eventB.size()) {
-            float dotA = 0.0f, normA = 0.0f, normB = 0.0f;
-            for (size_t i = 0; i < eventA.size(); ++i) {
-                dotA += link.fromEvent[i] * eventA[i];
-                normA += link.fromEvent[i] * link.fromEvent[i];
-                normB += eventA[i] * eventA[i];
-            }
-            if (normA > 0.0001f && normB > 0.0001f) {
-                simA = dotA / (std::sqrt(normA) * std::sqrt(normB));
+        // Present attended patterns to concept formation
+        presentExperience(attendedActivations, attendedActivations, 
+                         maxActivation, 
+                         static_cast<SimulationStep>(brain_->getCurrentStep()));
+    }
+}
+
+void ConceptFormation::applyNeuromodulationEffects() {
+    if (!brain_) return;
+    
+    float noveltyLevel = 0.5f;
+    if (brain_->getNovelty()) {
+        noveltyLevel = brain_->getNovelty()->getLevel();
+    }
+    
+    float curiosityLevel = 0.5f;
+    if (brain_->getCuriosity()) {
+        curiosityLevel = brain_->getCuriosity()->getLevel();
+    }
+    
+    // Novelty and curiosity affect concept formation
+    // High novelty = form new concepts more readily
+    // High curiosity = explore more variations before committing to concepts
+    
+    // Adjust formation threshold based on neuromodulation
+    float noveltyEffect = noveltyLevel * 0.4f;
+    float curiosityEffect = curiosityLevel * 0.3f;
+    
+    float thresholdAdjustment = curiosityEffect - noveltyEffect;
+    float newThreshold = formationThreshold_ + thresholdAdjustment;
+    
+    // Higher curiosity means we're more exploratory, so lower threshold
+    // Higher novelty means we're more surprised, so higher threshold (need more evidence)
+    setFormationThreshold(std::max(0.3f, std::min(0.8f, newThreshold)));
+}
+
+void ConceptFormation::updateConceptStability() {
+    // Periodically update concept stability based on recent experience
+    if (concepts_.empty()) return;
+    
+    // Check if we need to stabilize concepts
+    for (auto& concept : concepts_) {
+        if (concept.totalObservations > 10) {  // Need enough observations
+            float currentStability = getConceptStability(concept.id);
+            
+            // Stability increases with consistency, decreases with variance
+            float newStability = 0.8f;  // Base stability
+            
+            if (!concept.instances.empty()) {
+                // Calculate variance from prototype
+                float totalVariance = 0.0f;
+                for (const auto& instance : concept.instances) {
+                    float sim = computeSimilarity(instance.pattern, concept.prototype);
+                    totalVariance += (1.0f - sim);
+                }
+                
+                float avgVariance = totalVariance / concept.instances.size();
+                newStability = std::max(0.0f, 1.0f - avgVariance * 2.0f);
             }
             
-            float dotB = 0.0f;
-            for (size_t i = 0; i < eventB.size(); ++i) {
-                dotB += link.toEvent[i] * eventB[i];
-            }
-            if (normB > 0.0001f) {
-                simB = dotB / normB;
-            }
-        }
-        
-        if (simA > 0.8f && simB > 0.8f) {
-            // Update existing link
-            link.strength = std::min(1.0f, link.strength + 0.1f);
-            link.observationCount++;
-            return;
-        }
-    }
-    
-    // Create new link
-    SequenceLink newLink;
-    newLink.fromEvent = eventA;
-    newLink.toEvent = eventB;
-    newLink.strength = 0.5f;
-    newLink.observationCount = 1;
-    
-    sequences_.push_back(newLink);
-}
-
-std::vector<float> TemporalRelation::predictNext(const std::vector<float>& eventA) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != eventA.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventA.size(); ++i) {
-            dot += link.fromEvent[i] * eventA[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += eventA[i] * eventA[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.toEvent;
+            // Smooth update
+            concept.avgStability = concept.avgStability * 0.8f + newStability * 0.2f;
+            
+            // Update instance stability
+            for (auto& instance : concept.instances) {
+                instance.stability = newStability;
             }
         }
     }
-    
-    return bestPrediction;
 }
 
-std::vector<float> TemporalRelation::predictPrevious(const std::vector<float>& eventB) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
+void ConceptFormation::pruneUnstableConcepts() {
+    // Remove concepts that are too unstable
+    auto stableConcepts = concepts_;
+    concepts_.clear();
     
-    for (const auto& link : sequences_) {
-        if (link.toEvent.size() != eventB.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventB.size(); ++i) {
-            dot += link.toEvent[i] * eventB[i];
-            normA += link.toEvent[i] * link.toEvent[i];
-            normB += eventB[i] * eventB[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.fromEvent;
-            }
+    for (const auto& concept : stableConcepts) {
+        if (isConceptStable(concept.id)) {
+            concepts_.push_back(concept);
         }
     }
     
-    return bestPrediction;
-}
-
-float TemporalRelation::getPredictionConfidence(const std::vector<float>& event) const {
-    size_t matchingCount = 0;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != event.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < event.size(); ++i) {
-            dot += link.fromEvent[i] * event[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += event[i] * event[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > 0.7f) {
-                matchingCount++;
-            }
-        }
+    // Reassign concept IDs
+    for (size_t i = 0; i < concepts_.size(); ++i) {
+        concepts_[i].id = i + 1;
     }
     
-    return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
+    if (concepts_.size() < stableConcepts.size()) {
+        NLM_LOG_INFO("ConceptFormation pruned unstable concepts from " +
+                     std::to_string(stableConcepts.size()) + " to " +
+                     std::to_string(concepts_.size()));
+    }
 }
-
-void TemporalRelation::clear() {
-    sequences_.clear();
-}
-
-} // namespace nlm

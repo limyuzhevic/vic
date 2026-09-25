@@ -19,6 +19,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -64,11 +66,20 @@ public:
     // Initialize brain with configuration
     bool initialize();
     
-    // Main simulation step
+    // Simulation time step
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    // Simulation time step with timestamp
     void step(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Get current simulation step
+    SimulationStep getCurrentStep() const;
+    
+    // Get current simulation time
+    Timestamp getCurrentTime() const;
+    
+    // Get timestep duration
+    TimestepDuration getTimestep() const;
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
@@ -137,6 +148,9 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
+    // Internal cognition integration helper
+    void generateCurrentPlan();
+    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
@@ -147,6 +161,15 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - learned facts and knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
+    
+    // Total memory capacity
+    size_t getTotalMemoryCapacity() const;
     
     // ========== PREDICTION SYSTEM ==========
     
