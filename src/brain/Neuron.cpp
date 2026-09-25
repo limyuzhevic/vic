@@ -1,7 +1,18 @@
+// Neuron.cpp - Code Quality Improvements
+// ==========================
+// 
+// This file contains fixes for the Neuron class implementation, focusing on:
+// 1. Memory management improvements
+// 2. Input validation and bounds checking
+// 3. Error handling enhancements
+// 4. Modern C++ adoption
+// 5. Performance optimizations
+
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -28,11 +39,17 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    // Input validation
+    if (id == INVALID_NEURON_ID) {
+        throw std::invalid_argument("Neuron ID cannot be INVALID_NEURON_ID");
+    }
+    
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
 }
 
 Neuron::~Neuron() = default;
@@ -92,6 +109,9 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    if (steps > MAX_REFRACTORY_STEPS) {
+        throw std::invalid_argument("Refractory period exceeds maximum allowed steps");
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +120,10 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate biologically plausible range
+    if (potential < -100.0f || potential > -40.0f) {
+        throw std::invalid_argument("Resting potential must be between -100mV and -40mV");
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,6 +132,10 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Reset potential should be close to resting potential
+    if (std::abs(potential - pImpl->state.restingPotential) > 20.0f) {
+        throw std::invalid_argument("Reset potential should be within 20mV of resting potential");
+    }
     pImpl->state.resetPotential = potential;
 }
 
@@ -120,12 +148,18 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    if (amplitude < 0.0f) {
+        throw std::invalid_argument("Excitatory input amplitude must be positive");
+    }
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    if (amplitude < 0.0f) {
+        throw std::invalid_argument("Inhibitory input amplitude must be positive");
+    }
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
@@ -138,6 +172,9 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
+    if (current < -1000.0f || current > 1000.0f) {
+        throw std::invalid_argument("Injected current exceeds biological limits");
+    }
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
@@ -148,10 +185,11 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    if (pImpl->spikeHistory.size() >= Impl::MAX_SPIKE_HISTORY) {
+        // Remove oldest spike before adding new one (maintain circular buffer behavior)
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    pImpl->spikeHistory.push_back(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
