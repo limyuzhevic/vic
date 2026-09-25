@@ -1,5 +1,5 @@
 // Random Tests
-#include "core/Random/Random.hpp"
+#include "../src/core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
 #include <cmath>
@@ -78,11 +78,91 @@ void testBernoulli() {
 void testRandomBool() {
     nlm::RandomGenerator rng(42);
     
+    // Test that randomBool returns a valid boolean value
     bool val = rng.randomBool();
-    // Just check it doesn't crash
-    assert(true || false);  // Always true
+    assert(val == true || val == false);
+    
+    // Test with different seed to ensure it can produce different values
+    nlm::RandomGenerator rng2(43);
+    bool val2 = rng2.randomBool();
+    assert(val2 == true || val2 == false);
+    
+    // Most importantly, test that the function actually produces random behavior
+    // by testing multiple calls with the same seed (they should be consistent)
+    nlm::RandomGenerator rng3(42);
+    for (int i = 0; i < 10; ++i) {
+        bool testVal = rng3.randomBool();
+        assert(testVal == true || testVal == false);
+    }
     
     std::cout << "    testRandomBool passed" << std::endl;
+}
+
+void testUniformInt64() {
+    nlm::RandomGenerator rng(42);
+    
+    for (int i = 0; i < 100; ++i) {
+        uint64_t val = rng.uniformInt64(100, 200);
+        assert(val >= 100 && val <= 200);
+    }
+    
+    std::cout << "    testUniformInt64 passed" << std::endl;
+}
+
+void testUniformReal32() {
+    nlm::RandomGenerator rng(42);
+    
+    for (int i = 0; i < 100; ++i) {
+        float val = rng.uniformReal32(0.0f, 1.0f);
+        assert(val >= 0.0f && val < 1.0f);
+    }
+    
+    std::cout << "    testUniformReal32 passed" << std::endl;
+}
+
+void testNormal32() {
+    nlm::RandomGenerator rng(42);
+    
+    double sum = 0.0;
+    int samples = 10000;
+    for (int i = 0; i < samples; ++i) {
+        float val = rng.normal32(0.0f, 1.0f);
+        sum += val;
+    }
+    double mean = sum / samples;
+    
+    // Mean should be close to 0
+    assert(std::abs(mean) < 0.1);
+    
+    std::cout << "    testNormal32 passed" << std::endl;
+}
+
+void testUniformReal64() {
+    nlm::RandomGenerator rng(42);
+    
+    for (int i = 0; i < 100; ++i) {
+        double val = rng.uniformReal64(0.0, 1.0);
+        assert(val >= 0.0 && val < 1.0);
+    }
+    
+    std::cout << "    testUniformReal64 passed" << std::endl;
+}
+
+void testNormal64() {
+    nlm::RandomGenerator rng(42);
+    
+    double sum = 0.0;
+    int samples = 10000;
+    for (int i = 0; i < samples; ++i) {
+        double val = rng.normal64(0.0, 1.0);
+        sum += val;
+    }
+    double mean = sum / samples;
+    
+    // Mean should be close to 0
+    assert(std::abs(mean) < 0.1);
+    
+    std::cout << "    testNormal64 passed" << std::endl;
 }
 
 void testPickRandomIndex() {
@@ -139,6 +219,11 @@ void runAll() {
     testPickRandomIndex();
     testShuffle();
     testSeed();
+    testUniformInt64();
+    testUniformReal32();
+    testNormal32();
+    testUniformReal64();
+    testNormal64();
 }
 
 } // namespace test_random

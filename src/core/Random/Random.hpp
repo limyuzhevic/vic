@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -35,16 +36,24 @@ public:
     
     // Random number generation
     // Uniform integer in [min, max]
-    uint32_t uniformInt(uint32_t min, uint32_t max);
-    uint64_t uniformInt(uint64_t min, uint64_t max);
+    template<typename IntegerType>
+    IntegerType uniformInt(IntegerType min, IntegerType max);
     
     // Uniform real in [min, max)
-    double uniformReal(double min, double max);
-    float uniformReal(float min, float max);
+    template<typename RealType>
+    RealType uniformReal(RealType min, RealType max);
     
     // Normal distribution
-    double normal(double mean, double stddev);
-    float normal(float mean, float stddev);
+    template<typename RealType>
+    RealType normal(RealType mean, RealType stddev);
+    
+    // Convenience overloads for backward compatibility
+    uint32_t uniformInt32(uint32_t min, uint32_t max);
+    uint64_t uniformInt64(uint64_t min, uint64_t max);
+    double uniformReal64(double min, double max);
+    float uniformReal32(float min, float max);
+    double normal64(double mean, double stddev);
+    float normal32(float mean, float stddev);
     
     // Bernoulli distribution
     bool bernoulli(double p = 0.5);
@@ -80,8 +89,8 @@ public:
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() { return static_cast<result_type>(std::mt19937_64::min()); }
+    static constexpr result_type max() { return static_cast<result_type>(std::mt19937_64::max()); }
     
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }

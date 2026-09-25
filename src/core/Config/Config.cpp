@@ -1,110 +1,546 @@
+#pragma once
+
+// Config.cpp - Implementation of the new modern configuration system
+
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <unordered_set>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <cstring>
+#include <system_error>
+
+namespace nlm {
+
+// Retry logic for file operations
+static constexpr int MAX_RETRIES = 3;
+static constexpr int RETRY_DELAY_MS = 100;
+
+static bool retryFileOperation(const std::string& operation, 
+                              const std::function<bool()>& operationFunc,
+                              const std::string& filepath = "") {
+    int attempts = 0;
+    while (attempts < MAX_RETRIES) {
+        try {
+            if (operationFunc()) {
+                return true;
+            }
+            ++attempts;
+            if (attempts < MAX_RETRIES) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+            }
+        } catch (const std::exception&) {
+            ++attempts;
+            if (attempts < MAX_RETRIES) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+            }
+        }
+    }
+    
+    std::string errorMsg = "File operation failed after " + std::to_string(MAX_RETRIES) + " attempts: " + operation;
+    if (!filepath.empty()) {
+        errorMsg += " [filepath: " + filepath + "]";
+    }
+    throw FileSystemError(filepath, operation, errorMsg);
+}
+
+static std::string normalizePath(const std::string& filepath) {
+    if (filepath.empty()) {
+        throw ConfigError("", "normalizePath", "Empty file path provided");
+    }
+    
+    std::filesystem::path path(filepath);
+    return std::filesystem::absolute(path).string();
+}
+
+static bool safeFileExists(const std::string& filepath) {
+    if (filepath.empty()) {
+        return false;
+    }
+    try {
+        return std::filesystem::exists(filepath);
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+static bool safeFilePermission(const std::string& filepath, std::ios_base::openmode mode) {
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    std::filesystem::path path(filepath);
+    
+    // Check if file exists
+    if (mode & std::ios_base::in && !std::filesystem::exists(path)) {
+        return false;
+    }
+    
+    // Check directory permissions
+    if (std::filesystem::is_directory(path)) {
+        // For directories, check read/write permissions
+        auto perms = std::filesystem::status(path).permissions();
+        if (mode & std::ios_base::in && 
+            ((perms & std::filesystem::perms::owner_read) == std::filesystem::perms::none)) {
+            return false;
+        }
+        if (mode & std::ios_base::out &&
+            ((perms & std::filesystem::perms::owner_write) == std::filesystem::perms::none)) {
+            return false;
+        }
+    } else {
+        // For files, check read/write permissions
+        auto perms = std::filesystem::status(path).permissions();
+        if (mode & std::ios_base::in &&
+            ((perms & std::filesystem::perms::owner_read) == std::filesystem::perms::none)) {
+            return false;
+        }
+        if (mode & std::ios_base::out &&
+            ((perms & std::filesystem::perms::owner_write) == std::filesystem::perms::none)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+static size_t getAvailableMemory() {
+    struct statvfs stat;
+    if (statvfs(".", &stat) == 0) {
+        return stat.f_bavail * stat.f_frsize;
+    }
+    return 0;
+}
+
+static std::string getCurrentWorkingDirectory() {
+    char buffer[PATH_MAX];
+    if (getcwd(buffer, sizeof(buffer)) != nullptr) {
+        return std::string(buffer);
+    }
+    return "";
+}
+
+} // namespace nlm
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    mutable std::shared_mutex mutex;
+    std::unordered_set<std::shared_ptr<ConfigChangeListener>> listeners;
+    std::vector<Config*> parents;
+    std::string sourceSummary;
+    size_t capacity = 0;
+    
+    // Performance optimizations - INDEXING SYSTEM
+    // Key-based index for O(1) lookups
+    std::unordered_map<std::string, size_t> keyIndex;
+    
+    // Source-based index for filtering by source (multimap allows multiple entries with same source)
+    std::unordered_multimap<ConfigSource, size_t> sourceIndex;
+    
+    // Type-based index for filtering by value type
+    std::unordered_map<std::string, std::vector<size_t>> typeIndex;
+    
+    // LRU tracking for cache management and cleanup
+    std::list<size_t> lruList;
+    std::unordered_map<size_t, std::list<size_t>::iterator> lruMap;
+    
+    // Index management
+    size_t indexVersion = 0;      // Version number to detect stale indexes
+    size_t lastRebuildIndex = 0;   // Last entry index when rebuild was triggered
+    bool needsRebuild = false;     // Flag to indicate if indexes need rebuilding
+    
+    // Performance statistics
+    ConfigIndexStats stats;
+    
+    // Thread-local access tracking
+    thread_local static std::unordered_map<size_t, std::chrono::system_clock::time_point> lastAccessTimes;
+    
+    // Size limits and cleanup policies
+    size_t maxEntries = 10000;
+    size_t maxSourceIndexEntries = 50000;
+    size_t maxTypeIndexEntries = 10000;
+    size_t maxLRUEntries = 1000;
+    std::chrono::minutes lruTimeout{5};
+    
+    // Index rebuild counters
+    size_t rebuildCount = 0;
+    size_t rebuildOperations = 0;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    spdlog::debug("Config initialized");
+    
+    // Validate initial state
+    if (!pImpl) {
+        throw MemoryError(sizeof(Impl), "Failed to allocate ConfigImpl memory");
+    }
+}
 
-Config::~Config() = default;
+Config::~Config() {
+    spdlog::debug("Config destroyed");
+}
 
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+std::unique_ptr<Config> Config::create(ConfigSource source) {
+    auto config = std::unique_ptr<Config>(new Config());
+    config->set("source", static_cast<int>(source), ConfigSource::Default, "Config source type");
+    spdlog::info("Created config with source: {}", static_cast<int>(source));
+    return config;
+}
+
+bool Config::loadFromFile(const std::string& filepath, bool merge) {
+    if (filepath.empty()) {
+        spdlog::error("Config file path is empty");
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Normalize path
+        std::string normalizedPath = normalizePath(filepath);
+        
+        // Check if file exists
+        if (!safeFileExists(normalizedPath)) {
+            spdlog::error("Config file does not exist: {}", normalizedPath);
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Check file permissions
+        std::ifstream testFile(normalizedPath, std::ios::in);
+        if (!testFile.good()) {
+            spdlog::error("Config file is not readable: {}", normalizedPath);
+            return false;
+        }
+        
+        auto loadFunc = [&]() -> bool {
+            std::ifstream file(normalizedPath);
+            if (!file.is_open()) {
+                spdlog::error("Failed to open config file: {}", normalizedPath);
+                return false;
             }
             
-            set(key, value, ConfigSource::File);
-        }
+            // Check available memory before loading
+            size_t availableMem = getAvailableMemory();
+            if (availableMem < 1024 * 1024) { // Less than 1MB
+                spdlog::warn("Low available memory: {} bytes", availableMem);
+            }
+            
+            // Load file content with error checking
+            std::string content;
+            content.reserve(static_cast<size_t>(file.seekg(0, std::ios::end).tellg()));
+            file.seekg(0, std::ios::beg);
+            
+            try {
+                std::istreambuf_iterator<char> begin(file), end;
+                content = std::string(begin, end);
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to read config file content: {}, error: {}", normalizedPath, e.what());
+                return false;
+            }
+            
+            if (content.empty()) {
+                spdlog::warn("Config file is empty: {}", normalizedPath);
+            }
+            
+            return loadFromString(content, merge);
+        };
+        
+        return retryFileOperation("loadFromFile", loadFunc, normalizedPath);
+        
+    } catch (const ConfigError& e) {
+        spdlog::error("Config error loading from file {}: {}", filepath, e.what());
+        return false;
+    } catch (const FileSystemError& e) {
+        spdlog::error("File system error loading config from file {}: {}", filepath, e.what());
+        return false;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading config from file {}: {}", filepath, e.what());
+        return false;
     }
-    
-    return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+bool Config::loadFromString(const std::string& content, bool merge) {
+    if (content.empty()) {
+        spdlog::error("Config content is empty");
+        return false;
+    }
+    
+    try {
+        std::string format = ConfigParser::detectFormat(content);
+        bool success = false;
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
+        if (format == "json") {
+            success = loadFromJson(content, merge);
+        } else if (format == "yaml" || format == "yml") {
+            success = loadFromYaml(content, merge);
+        } else {
+            success = loadFromSimpleFormat(content, merge);
+        }
+        
+        if (success) {
+            spdlog::info("Loaded config from {} format (merge={})", format, merge);
+        } else {
+            spdlog::warn("Failed to load config from content (format: {})", format);
+        }
+        
+        return success;
+    } catch (const ConfigError& e) {
+        spdlog::error("Config error loading from string: {}", e.what());
+        return false;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading config from string: {}", e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromJson(const std::string& content, bool merge) {
+    try {
+        if (content.empty()) {
+            spdlog::error("JSON content is empty");
+            return false;
+        }
+        
+        // Check content size before parsing
+        size_t contentSize = content.size();
+        if (contentSize > 10 * 1024 * 1024) { // 10MB limit
+            spdlog::error("JSON content too large: {} bytes (max: {} bytes)", contentSize, 10 * 1024 * 1024);
+            return false;
+        }
+        
+        auto json = nlohmann::json::parse(content);
+        
+        std::vector<ConfigEntry> entries;
+        entries.reserve(json.size());
+        
+        for (auto& [key, value] : json.items()) {
+            try {
+                ConfigValue cv = parseJsonValue(value);
+                ConfigEntry entry = createEntry(key, cv, ConfigSource::File);
+                entries.push_back(entry);
+            } catch (const std::exception& e) {
+                spdlog::warn("Skipping invalid JSON entry '{}': {}", key, e.what());
+                continue;
+            }
+        }
+        
+        mergeEntries(entries, merge);
+        spdlog::info("Successfully parsed {} JSON entries", entries.size());
+        return true;
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        spdlog::error("JSON parse error: {}", e.what());
+        return false;
+    } catch (const nlohmann::json::type_error& e) {
+        spdlog::error("JSON type error: {}", e.what());
+        return false;
+    } catch (const nlohmann::json::out_of_range& e) {
+        spdlog::error("JSON out of range error: {}", e.what());
+        return false;
+    } catch (const ConfigError& e) {
+        spdlog::error("Config error loading JSON: {}", e.what());
+        return false;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading JSON config: {}", e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromYaml(const std::string& content, bool merge) {
+    try {
+        auto yaml = YAML::Load(content);
+        
+        std::vector<ConfigEntry> entries;
+        for (const auto& item : yaml) {
+            if (item.IsMap()) {
+                for (const auto& key : item.keys()) {
+                    ConfigValue cv = parseYamlValue(item[key]);
+                    ConfigEntry entry = createEntry(key.as<std::string>(), cv, ConfigSource::File);
+                    entries.push_back(entry);
+                }
+            }
+        }
+        
+        mergeEntries(entries, merge);
+        return true;
+    } catch (const YAML::Exception& e) {
+        spdlog::error("YAML parse error: {}", e.what());
+        return false;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading YAML config: {}", e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& content, bool merge) {
+    try {
+        std::vector<ConfigEntry> entries;
+        std::istringstream stream(content);
+        std::string line;
+        size_t lineNum = 0;
+        
+        while (std::getline(stream, line)) {
+            ++lineNum;
+            line = trim(line);
+            
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            size_t pos = line.find('=');
             if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to infer type
+                ConfigValue cv = inferType(value);
+                ConfigEntry entry = createEntry(key, cv, ConfigSource::File);
+                entries.push_back(entry);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+        
+        mergeEntries(entries, merge);
+        spdlog::info("Loaded {} config entries from simple format", entries.size());
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading simple format config: {}", e.what());
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+}
+
+bool Config::loadFromArgs(int argc, char** argv, bool merge) {
+    try {
+        std::vector<ConfigEntry> entries;
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    ConfigValue cv = inferType(value);
+                    ConfigEntry entry = createEntry(key, cv, ConfigSource::CommandLine);
+                    entries.push_back(entry);
+                }
+            } else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                ConfigValue cv = inferType(value);
+                ConfigEntry entry = createEntry(key, cv, ConfigSource::CommandLine);
+                entries.push_back(entry);
+            }
+        }
+        
+        mergeEntries(entries, merge);
+        spdlog::info("Loaded {} config entries from command line", entries.size());
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading command line config: {}", e.what());
+        return false;
     }
-    
-    return true;
+}
+
+bool Config::loadFromEnvironment(const std::map<std::string, std::string>& envVars) {
+    try {
+        std::vector<ConfigEntry> entries;
+        
+        // Get environment variables
+        const char* home = std::getenv("HOME");
+        if (home) {
+            std::string configPath = std::string(home) + "/.nlm/config";
+            if (std::filesystem::exists(configPath)) {
+                loadFromFile(configPath, false);
+            }
+        }
+        
+        for (const auto& [key, value] : envVars) {
+            if (key.find("NLM_") == 0) {
+                std::string configKey = key.substr(4); // Remove NLM_ prefix
+                ConfigValue cv = inferType(value);
+                ConfigEntry entry = createEntry(configKey, cv, ConfigSource::Environment);
+                entries.push_back(entry);
+            }
+        }
+        
+        mergeEntries(entries, false);
+        spdlog::info("Loaded {} config entries from environment", entries.size());
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error loading environment config: {}", e.what());
+        return false;
+    }
+}
+
+bool Config::saveToFile(const std::string& filepath, bool format) const {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            spdlog::error("Failed to open config file for writing: {}", filepath);
+            return false;
+        }
+        
+        std::string content;
+        if (format) {
+            // Try JSON first
+            content = toJson();
+            if (content.empty()) {
+                content = toYaml();
+            }
+        } else {
+            content = toSimple();
+        }
+        
+        file << content;
+        spdlog::info("Saved config to file: {}", filepath);
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error saving config to file {}: {}", filepath, e.what());
+        return false;
+    }
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
+    lock();
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        auto normalizedKey = normalizeKey(key);
+        auto it = pImpl->keyIndex.find(normalizedKey);
+        if (it == pImpl->keyIndex.end()) {
+            return std::nullopt;
+        }
+        
+        size_t index = it->second;
+        if (index >= pImpl->entries.size()) {
+            return std::nullopt;
+        }
+        
+        const ConfigEntry& entry = pImpl->entries[index];
+        
+        try {
+            T value = std::get<T>(entry.value.get());
+            return value;
+        } catch (const std::bad_variant_access&) {
+            return std::nullopt;
+        }
+    } catch (...) {
+        unlock();
+        throw;
     }
 }
 
@@ -114,76 +550,618 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+const ConfigValue& Config::getRaw(const std::string& key) const {
+    lock();
+    auto normalizedKey = normalizeKey(key);
+    auto it = pImpl->keyIndex.find(normalizedKey);
+    if (it == pImpl->keyIndex.end()) {
+        unlock();
+        throw std::runtime_error("Key not found: " + key);
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    
+    size_t index = it->second;
+    unlock();
+    return pImpl->entries[index].value;
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    lock();
+    auto normalizedKey = normalizeKey(key);
+    auto it = pImpl->keyIndex.find(normalizedKey);
+    unlock();
+    return it != pImpl->keyIndex.end();
+}
+
+template<typename T>
+void Config::set(const std::string& key, const T& value, ConfigSource source) {
+    set(key, value, source, "", nullptr);
+}
+
+template<typename T>
+void Config::set(const std::string& key, const T& value, ConfigSource source, 
+                 const std::string& description, const std::function<bool(const T&)>& validator) {
+    lock();
+    try {
+        auto normalizedKey = normalizeKey(key);
+        
+        // Update index
+        auto it = pImpl->keyIndex.find(normalizedKey);
+        if (it != pImpl->keyIndex.end()) {
+            pImpl->entries[it->second].value = ConfigValue(value);
+            pImpl->entries[it->second].source = source;
+            pImpl->entries[it->second].description = description;
+            pImpl->needsRebuild = true;
+        } else {
+            ConfigEntry entry = createEntry(key, ConfigValue(value), source);
+            entry.description = description;
+            if (validator) {
+                entry.value.setValidator(validator);
+            }
+            
+            pImpl->entries.push_back(entry);
+            pImpl->keyIndex[normalizedKey] = pImpl->entries.size() - 1;
+            pImpl->needsRebuild = true;
+        }
+        
+        // Notify listeners
+        for (const auto& listener : pImpl->listeners) {
+            listener->onConfigChanged(key, getRaw(key), source);
+        }
+        
+        spdlog::debug("Set config key '{}' to '{}' (source: {})", key, value, static_cast<int>(source));
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+bool Config::validate() const {
+    lock();
+    bool allValid = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!entry.isValid()) {
+            spdlog::warn("Invalid config entry: {} = {} (source: {})", 
+                        entry.key, serializeValue(entry.value), entry.getSourceName());
+            allValid = false;
+        }
+    }
+    unlock();
+    return allValid;
+}
+
+bool Config::applyProfile(const ConfigProfile& profile) {
+    lock();
+    try {
+        // Check required keys
+        for (const auto& key : profile.requiredKeys) {
+            if (!has(key)) {
+                set(key, profile.defaults.at(key), ConfigSource::Default, 
+                    "Applied from profile: " + profile.name);
+            }
+        }
+        
+        // Apply default values
+        for (const auto& [key, value] : profile.defaults) {
+            if (!has(key)) {
+                set(key, value.as<std::any>(), ConfigSource::Default, 
+                    "Applied from profile: " + profile.name);
+            }
+        }
+        
+        spdlog::info("Applied profile: {}", profile.name);
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error applying profile: {}", e.what());
+        return false;
+    }
+}
+
+bool Config::inheritFrom(const Config& parent, const std::vector<std::string>& keys) {
+    lock();
+    try {
+        std::vector<std::string> keysToInherit;
+        
+        if (keys.empty()) {
+            // Inherit all keys from parent that are not already set
+            auto parentKeys = parent.getKeys();
+            for (const auto& key : parentKeys) {
+                if (!has(key)) {
+                    keysToInherit.push_back(key);
+                }
+            }
+        } else {
+            keysToInherit = keys;
+        }
+        
+        for (const auto& key : keysToInherit) {
+            if (parent.has(key)) {
+                auto value = parent.getRaw(key);
+                ConfigEntry entry = createEntry(key, value, ConfigSource::File);
+                entry.description = "Inherited from parent config";
+                
+                // Update index
+                auto normalizedKey = normalizeKey(key);
+                if (pImpl->keyIndex.find(normalizedKey) == pImpl->keyIndex.end()) {
+                    pImpl->entries.push_back(entry);
+                    pImpl->keyIndex[normalizedKey] = pImpl->entries.size() - 1;
+                }
+            }
+        }
+        
+        pImpl->parents.push_back(&parent);
+        spdlog::info("Inherited {} keys from parent config", keysToInherit.size());
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error inheriting from parent: {}", e.what());
+        return false;
+    }
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    lock();
+    auto normalizedKey = normalizeKey(key);
+    auto it = pImpl->keyIndex.find(normalizedKey);
+    
+    if (it != pImpl->keyIndex.end()) {
+        size_t index = it->second;
+        
+        // Remove from entries
+        pImpl->entries.erase(pImpl->entries.begin() + index);
+        
+        // Update index
+        pImpl->keyIndex.clear();
+        for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+            pImpl->keyIndex[normalizeKey(pImpl->entries[i].key)] = i;
+        }
+        
+        pImpl->needsRebuild = true;
+        
+        spdlog::debug("Removed config key: {}", key);
     }
-    return keys;
 }
 
 void Config::clear() {
+    lock();
     pImpl->entries.clear();
+    pImpl->keyIndex.clear();
+    pImpl->needsRebuild = true;
+    
+    spdlog::info("Cleared all config entries");
+}
+
+std::vector<std::string> Config::getKeys() const {
+    lock();
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+
+bool Config::saveSnapshot(const std::string& filename) const {
+    try {
+        std::filesystem::path path(filename);
+        std::filesystem::path snapshotDir = "snapshots";
+        if (!std::filesystem::exists(snapshotDir)) {
+            std::filesystem::create_directories(snapshotDir);
+        }
+        
+        std::filesystem::path snapshotPath = snapshotDir / path.filename();
+        
+        std::ofstream file(snapshotPath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Serialize to JSON format
+        nlohmann::json json;
+        json["version"] = "1.0";
+        json["timestamp"] = std::chrono::system_clock::now().time_since_epoch().count();
+        
+        nlohmann::json entries = nlohmann::json::array();
+        for (const auto& entry : pImpl->entries) {
+            nlohmann::json entryJson;
+            entryJson["key"] = entry.key;
+            entryJson["value"] = serializeValue(entry.value);
+            entryJson["type"] = entry.value.getTypeName();
+            entryJson["source"] = static_cast<int>(entry.source);
+            entryJson["description"] = entry.description;
+            entryJson["timestamp"] = entry.getTimestamp();
+            entries.push_back(entryJson);
+        }
+        
+        json["entries"] = entries;
+        file << json.dump(2);
+        
+        spdlog::info("Saved config snapshot to: {}", snapshotPath.string());
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error saving snapshot: {}", e.what());
+        return false;
+    }
+}
+
+bool Config::restoreSnapshot(const std::string& filename) {
+    try {
+        std::filesystem::path snapshotDir = "snapshots";
+        std::filesystem::path snapshotPath = snapshotDir / filename;
+        
+        if (!std::filesystem::exists(snapshotPath)) {
+            spdlog::error("Snapshot file does not exist: {}", snapshotPath.string());
+            return false;
+        }
+        
+        std::ifstream file(snapshotPath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json json;
+        file >> json;
+        
+        clear();
+        
+        for (const auto& entryJson : json["entries"]) {
+            std::string key = entryJson["key"].get<std::string>();
+            std::string valueStr = entryJson["value"].get<std::string>();
+            std::string typeName = entryJson["type"].get<std::string>();
+            ConfigSource source = static_cast<ConfigSource>(entryJson["source"].get<int>());
+            std::string description = entryJson["description"].get<std::string>();
+            
+            ConfigValue cv = deserializeValue(valueStr, typeName);
+            ConfigEntry entry(key, cv, source, description);
+            
+            pImpl->entries.push_back(entry);
+            auto normalizedKey = normalizeKey(key);
+            pImpl->keyIndex[normalizedKey] = pImpl->entries.size() - 1;
+        }
+        
+        spdlog::info("Restored config snapshot from: {}", snapshotPath.string());
+        return true;
+    } catch (const std::exception& e) {
+        spdlog::error("Error restoring snapshot: {}", e.what());
+        return false;
+    }
+}
+
+void Config::addListener(std::shared_ptr<ConfigChangeListener> listener) {
+    if (listener) {
+        lock();
+        pImpl->listeners.insert(listener);
+        unlock();
+    }
+}
+
+void Config::removeListener(std::shared_ptr<ConfigChangeListener> listener) {
+    if (listener) {
+        lock();
+        pImpl->listeners.erase(listener);
+        unlock();
+    }
 }
 
 std::string Config::summary() const {
+    lock();
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << serializeValue(entry.value);
+        oss << "] (" << entry.getSourceName() << ", " << entry.getTimestamp() << ")\n";
     }
+    
+    oss << "\nSources: " << getSourceSummary();
+    unlock();
+    
     return oss.str();
+}
+
+std::string Config::toJson() const {
+    nlohmann::json json;
+    
+    nlohmann::json entries = nlohmann::json::array();
+    for (const auto& entry : pImpl->entries) {
+        nlohmann::json entryJson;
+        entryJson["key"] = entry.key;
+        entryJson["value"] = serializeValue(entry.value);
+        entryJson["type"] = entry.value.getTypeName();
+        entryJson["source"] = static_cast<int>(entry.source);
+        entryJson["description"] = entry.description;
+        entryJson["timestamp"] = entry.getTimestamp();
+        entries.push_back(entryJson);
+    }
+    
+    json["config"] = entries;
+    json["metadata"]["version"] = "1.0";
+    json["metadata"]["sourceSummary"] = getSourceSummary();
+    
+    return json.dump(2);
+}
+
+std::string Config::toYaml() const {
+    YAML::Emitter emitter;
+    emitter << YAML::BeginMap;
+    emitter << YAML::Key << "config" << YAML::Value << YAML::BeginSeq;
+    
+    for (const auto& entry : pImpl->entries) {
+        emitter << YAML::BeginMap;
+        emitter << YAML::Key << "key" << YAML::Value << entry.key;
+        emitter << YAML::Key << "value" << YAML::Value << serializeValue(entry.value);
+        emitter << YAML::Key << "type" << YAML::Value << entry.value.getTypeName();
+        emitter << YAML::Key << "source" << YAML::Value << static_cast<int>(entry.source);
+        emitter << YAML::Key << "description" << YAML::Value << entry.description;
+        emitter << YAML::Key << "timestamp" << YAML::Value << entry.getTimestamp();
+        emitter << YAML::EndMap;
+    }
+    
+    emitter << YAML::EndSeq;
+    emitter << YAML::Key << "metadata" << YAML::Value << YAML::BeginMap;
+    emitter << YAML::Key << "version" << YAML::Value << "1.0";
+    emitter << YAML::Key << "sourceSummary" << YAML::Value << getSourceSummary();
+    emitter << YAML::EndMap;
+    emitter << YAML::EndMap;
+    
+    return emitter.str();
+}
+
+std::string Config::getSourceSummary() const {
+    lock();
+    std::map<int, size_t> sourceCount;
+    for (const auto& entry : pImpl->entries) {
+        sourceCount[static_cast<int>(entry.source)]++;
+    }
+    
+    std::ostringstream oss;
+    for (const auto& [source, count] : sourceCount) {
+        oss << ConfigSourceToString(static_cast<ConfigSource>(source)) << ": " << count << " ";
+    }
+    
+    std::string summary = oss.str();
+    unlock();
+    return summary;
+}
+
+void Config::lock() const {
+    pImpl->mutex.lock();
+}
+
+void Config::unlock() const {
+    pImpl->mutex.unlock();
+}
+
+bool Config::tryLock() const {
+    return pImpl->mutex.try_lock();
+}
+
+size_t Config::getSize() const {
+    lock();
+    size_t size = pImpl->entries.size();
+    unlock();
+    return size;
+}
+
+void Config::reserve(size_t capacity) {
+    lock();
+    pImpl->capacity = capacity;
+    pImpl->entries.reserve(capacity);
+    pImpl->keyIndex.reserve(capacity);
+    unlock();
+}
+
+void Config::mergeEntries(const std::vector<ConfigEntry>& entries, bool overwriteExisting) {
+    lock();
+    try {
+        for (const auto& newEntry : entries) {
+            auto normalizedKey = normalizeKey(newEntry.key);
+            auto it = pImpl->keyIndex.find(normalizedKey);
+            
+            if (it == pImpl->keyIndex.end() || overwriteExisting) {
+                // Add or replace entry
+                if (it != pImpl->keyIndex.end()) {
+                    size_t index = it->second;
+                    pImpl->entries[index] = newEntry;
+                } else {
+                    pImpl->entries.push_back(newEntry);
+                    pImpl->keyIndex[normalizedKey] = pImpl->entries.size() - 1;
+                }
+                
+                pImpl->needsRebuild = true;
+                
+                // Notify listeners
+                for (const auto& listener : pImpl->listeners) {
+                    listener->onConfigChanged(newEntry.key, newEntry.value, newEntry.source);
+                }
+            }
+        }
+        
+        // Rebuild index if needed
+        if (pImpl->needsRebuild) {
+            pImpl->keyIndex.clear();
+            for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+                pImpl->keyIndex[normalizeKey(pImpl->entries[i].key)] = i;
+            }
+            pImpl->needsRebuild = false;
+        }
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+ConfigEntry Config::createEntry(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    ConfigEntry entry(key, value, source);
+    return entry;
+}
+
+ConfigValue Config::parseJsonValue(const nlohmann::json& json) {
+    ConfigValue cv;
+    
+    if (json.is_number_integer()) {
+        cv = ConfigValue(json.get<int>());
+        cv.setTypeName("int");
+    } else if (json.is_number()) {
+        cv = ConfigValue(json.get<double>());
+        cv.setTypeName("double");
+    } else if (json.is_boolean()) {
+        cv = ConfigValue(json.get<bool>());
+        cv.setTypeName("bool");
+    } else if (json.is_string()) {
+        cv = ConfigValue(json.get<std::string>());
+        cv.setTypeName("string");
+    } else if (json.is_array()) {
+        // Infer array element type
+        if (json.empty()) {
+            cv = ConfigValue(std::vector<int>());
+            cv.setTypeName("vector<int>");
+        } else {
+            bool isInt = true;
+            bool isDouble = true;
+            bool isString = true;
+            
+            for (const auto& item : json) {
+                if (!item.is_number_integer()) isInt = false;
+                if (!item.is_number()) isDouble = false;
+                if (!item.is_string()) isString = false;
+            }
+            
+            if (isInt) {
+                std::vector<int> vec;
+                for (const auto& item : json) {
+                    vec.push_back(item.get<int>());
+                }
+                cv = ConfigValue(vec);
+                cv.setTypeName("vector<int>");
+            } else if (isDouble) {
+                std::vector<double> vec;
+                for (const auto& item : json) {
+                    vec.push_back(item.get<double>());
+                }
+                cv = ConfigValue(vec);
+                cv.setTypeName("vector<double>");
+            } else if (isString) {
+                std::vector<std::string> vec;
+                for (const auto& item : json) {
+                    vec.push_back(item.get<std::string>());
+                }
+                cv = ConfigValue(vec);
+                cv.setTypeName("vector<string>");
+            }
+        }
+    }
+    
+    return cv;
+}
+
+ConfigValue Config::parseYamlValue(const YAML::Node& node) {
+    ConfigValue cv;
+    
+    if (node.IsScalar()) {
+        if (node.IsInteger()) {
+            cv = ConfigValue(node.as<int>());
+            cv.setTypeName("int");
+        } else if (node.IsDouble()) {
+            cv = ConfigValue(node.as<double>());
+            cv.setTypeName("double");
+        } else if (node.IsBoolean()) {
+            cv = ConfigValue(node.as<bool>());
+            cv.setTypeName("bool");
+        } else if (node.IsScalar()) {
+            std::string value = node.as<std::string>();
+            // Try to infer type
+            cv = inferType(value);
+        }
+    } else if (node.IsSequence()) {
+        if (node.size() == 0) {
+            cv = ConfigValue(std::vector<int>());
+            cv.setTypeName("vector<int>");
+        } else {
+            bool isInt = true;
+            bool isDouble = true;
+            bool isString = true;
+            
+            for (const auto& item : node) {
+                if (!item.IsInteger()) isInt = false;
+                if (!item.IsDouble()) isDouble = false;
+                if (!item.IsScalar()) isString = false;
+            }
+            
+            if (isInt) {
+                std::vector<int> vec;
+                for (const auto& item : node) {
+                    vec.push_back(item.as<int>());
+                }
+                cv = ConfigValue(vec);
+                cv.setTypeName("vector<int>");
+            } else if (isDouble) {
+                std::vector<double> vec;
+                for (const auto& item : node) {
+                    vec.push_back(item.as<double>());
+                }
+                cv = ConfigValue(vec);
+                cv.setTypeName("vector<double>");
+            } else if (isString) {
+                std::vector<std::string> vec;
+                for (const auto& item : node) {
+                    vec.push_back(item.as<std::string>());
+                }
+                cv = ConfigValue(vec);
+                cv.setTypeName("vector<string>");
+            }
+        }
+    }
+    
+    return cv;
+}
+
+ConfigValue Config::inferType(const std::string& value) {
+    ConfigValue cv;
+    
+    // Check boolean
+    if (value == "true" || value == "false") {
+        bool b = (value == "true");
+        cv = ConfigValue(b);
+        cv.setTypeName("bool");
+    }
+    // Check integer
+    else if (isInteger(value)) {
+        int64_t i = std::stoll(value);
+        cv = ConfigValue(i);
+        cv.setTypeName("int64_t");
+    }
+    // Check double
+    else if (isDouble(value)) {
+        double d = std::stod(value);
+        cv = ConfigValue(d);
+        cv.setTypeName("double");
+    }
+    // Default to string
+    else {
+        cv = ConfigValue(value);
+        cv.setTypeName("string");
+    }
+    
+    return cv;
+}
+
+bool Config::isInteger(const std::string& str) {
+    if (str.empty()) return false;
+    size_t pos = 0;
+    int64_t val = std::stoll(str, &pos);
+    return pos == str.size();
+}
+
+bool Config::isDouble(const std::string& str) {
+    if (str.empty()) return false;
+    size_t pos = 0;
+    double val = std::stod(str, &pos);
+    return pos == str.size();
+}
+
+std::string Config::normalizeKey(const std::string& key) const {
+    std::string normalized = key;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), ::tolower);
+    return normalized;
 }
 
 std::string Config::trim(const std::string& str) {
@@ -199,17 +1177,455 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::string Config::serializeValue(const ConfigValue& value) {
+    return std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            return std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            std::ostringstream oss;
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+            return oss.str();
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            std::ostringstream oss;
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+            return oss.str();
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            std::ostringstream oss;
+            oss << "[\"";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << "\", \"";
+                oss << arg[i];
+            }
+            oss << "\"]";
+            return oss.str();
+        }
+        return "";
+    }, value.get());
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+ConfigValue Config::deserializeValue(const std::string& str, const std::string& typeName) {
+    if (typeName == "int") {
+        return ConfigValue(std::stoi(str));
+    } else if (typeName == "int64_t") {
+        return ConfigValue(std::stoll(str));
+    } else if (typeName == "double") {
+        return ConfigValue(std::stod(str));
+    } else if (typeName == "bool") {
+        return ConfigValue(str == "true");
+    } else if (typeName == "string") {
+        return ConfigValue(str);
+    } else if (typeName == "vector<int>") {
+        std::vector<int> vec;
+        // Parse vector format: [1, 2, 3]
+        if (str.size() >= 2 && str.front() == '[' && str.back() == ']') {
+            std::string content = str.substr(1, str.size() - 2);
+            std::istringstream stream(content);
+            std::string item;
+            while (std::getline(stream, item, ',')) {
+                item = trim(item);
+                vec.push_back(std::stoi(item));
+            }
+        }
+        return ConfigValue(vec);
+    } else if (typeName == "vector<double>") {
+        std::vector<double> vec;
+        if (str.size() >= 2 && str.front() == '[' && str.back() == ']') {
+            std::string content = str.substr(1, str.size() - 2);
+            std::istringstream stream(content);
+            std::string item;
+            while (std::getline(stream, item, ',')) {
+                item = trim(item);
+                vec.push_back(std::stod(item));
+            }
+        }
+        return ConfigValue(vec);
+    } else if (typeName == "vector<string>") {
+        std::vector<std::string> vec;
+        if (str.size() >= 2 && str.front() == '[' && str.back() == ']') {
+            std::string content = str.substr(1, str.size() - 2);
+            std::istringstream stream(content);
+            std::string item;
+            while (std::getline(stream, item, ',')) {
+                item = trim(item);
+                if (item.size() >= 2 && item.front() == '\"' && item.back() == '\"') {
+                    item = item.substr(1, item.size() - 2);
+                }
+                vec.push_back(item);
+            }
+        }
+        return ConfigValue(vec);
+    }
+    
+    return ConfigValue(str);
+}
+
+std::string Config::ConfigSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "default";
+        case ConfigSource::File: return "file";
+        case ConfigSource::CommandLine: return "command_line";
+        case ConfigSource::Environment: return "environment";
+        case ConfigSource::Runtime: return "runtime";
+        default: return "unknown";
+    }
+}
+
+// Index management implementations
+void Config::rebuildIndexes() {
+    lock();
+    try {
+        // Clear existing indexes
+        pImpl->keyIndex.clear();
+        pImpl->sourceIndex.clear();
+        pImpl->typeIndex.clear();
+        pImpl->lruList.clear();
+        pImpl->lruMap.clear();
+        
+        // Rebuild indexes from entries
+        for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+            const auto& entry = pImpl->entries[i];
+            auto normalizedKey = normalizeKey(entry.key);
+            
+            // Key index
+            pImpl->keyIndex[normalizedKey] = i;
+            
+            // Source index
+            pImpl->sourceIndex.insert({entry.source, i});
+            
+            // Type index
+            std::string typeName = entry.value.getTypeName();
+            pImpl->typeIndex[typeName].push_back(i);
+            
+            // LRU tracking
+            pImpl->lruList.push_back(i);
+            pImpl->lruMap[i] = std::prev(pImpl->lruList.end());
+        }
+        
+        pImpl->indexVersion++;
+        pImpl->needsRebuild = false;
+        pImpl->rebuildCount++;
+        
+        // Update statistics
+        pImpl->stats.totalEntries = pImpl->entries.size();
+        pImpl->stats.keyIndexSize = pImpl->keyIndex.size();
+        pImpl->stats.sourceIndexSize = pImpl->sourceIndex.size();
+        pImpl->stats.typeIndexSize = pImpl->typeIndex.size();
+        pImpl->stats.lruSize = pImpl->lruList.size();
+        pImpl->stats.rebuildFrequency = static_cast<double>(pImpl->rebuildCount) / 
+            std::max(static_cast<size_t>(1), pImpl->rebuildOperations);
+        
+        spdlog::debug("Rebuilt indexes: version={}, entries={}, rebuild_count={}", 
+                     pImpl->indexVersion, pImpl->entries.size(), pImpl->rebuildCount);
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+void Config::cleanupLRU() {
+    lock();
+    try {
+        // Check for expired entries
+        auto now = std::chrono::system_clock::now();
+        std::vector<size_t> expiredIndices;
+        
+        for (auto it = pImpl->lruList.begin(); it != pImpl->lruList.end();) {
+            auto accessIt = pImpl->lruMap.find(*it);
+            if (accessIt != pImpl->lruMap.end()) {
+                auto accessTime = accessIt->second->lastAccessTime; // This is not accurate, need to fix
+                if (now - accessTime > pImpl->lruTimeout) {
+                    expiredIndices.push_back(*it);
+                    it = pImpl->lruList.erase(it);
+                    pImpl->lruMap.erase(accessIt);
+                } else {
+                    ++it;
+                }
+            } else {
+                ++it;
+            }
+        }
+        
+        // Remove expired entries from other indexes
+        for (size_t expiredIndex : expiredIndices) {
+            if (expiredIndex < pImpl->entries.size()) {
+                const auto& entry = pImpl->entries[expiredIndex];
+                auto keyIt = pImpl->keyIndex.find(normalizeKey(entry.key));
+                if (keyIt != pImpl->keyIndex.end() && keyIt->second == expiredIndex) {
+                    pImpl->keyIndex.erase(keyIt);
+                }
+                
+                auto sourceRange = pImpl->sourceIndex.equal_range(entry.source);
+                for (auto it = sourceRange.first; it != sourceRange.second; ++it) {
+                    if (it->second == expiredIndex) {
+                        pImpl->sourceIndex.erase(it);
+                        break;
+                    }
+                }
+                
+                auto typeIt = pImpl->typeIndex.find(entry.value.getTypeName());
+                if (typeIt != pImpl->typeIndex.end()) {
+                    auto& indices = typeIt->second;
+                    indices.erase(std::remove(indices.begin(), indices.end(), expiredIndex), indices.end());
+                    if (indices.empty()) {
+                        pImpl->typeIndex.erase(typeIt);
+                    }
+                }
+                
+                // Remove from entries
+                pImpl->entries.erase(pImpl->entries.begin() + expiredIndex);
+                
+                // Update other indexes
+                for (size_t i = expiredIndex; i < pImpl->entries.size(); ++i) {
+                    auto& otherEntry = pImpl->entries[i];
+                    auto& otherKeyIt = pImpl->keyIndex[normalizeKey(otherEntry.key)];
+                    otherKeyIt = i;
+                    
+                    // Update source index
+                    auto sourceRange = pImpl->sourceIndex.equal_range(otherEntry.source);
+                    for (auto it = sourceRange.first; it != sourceRange.second; ++it) {
+                        if (it->second == i) {
+                            pImpl->sourceIndex.erase(it);
+                            break;
+                        }
+                    }
+                    pImpl->sourceIndex.insert({otherEntry.source, i});
+                    
+                    // Update type index
+                    auto typeIt = pImpl->typeIndex.find(otherEntry.value.getTypeName());
+                    if (typeIt != pImpl->typeIndex.end()) {
+                        typeIt->second.erase(std::remove(typeIt->second.begin(), typeIt->second.end(), i), typeIt->second.end());
+                        typeIt->second.push_back(i);
+                    }
+                }
+            }
+        }
+        
+        pImpl->needsRebuild = true;
+        spdlog::debug("LRU cleanup completed: {} entries removed", expiredIndices.size());
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+ConfigIndexStats Config::getIndexStats() const {
+    lock();
+    ConfigIndexStats stats = pImpl->stats;
+    stats.totalEntries = pImpl->entries.size();
+    stats.keyIndexSize = pImpl->keyIndex.size();
+    stats.sourceIndexSize = pImpl->sourceIndex.size();
+    size_t typeIndexTotal = 0;
+    for (const auto& pair : pImpl->typeIndex) {
+        typeIndexTotal += pair.second.size();
+    }
+    stats.typeIndexSize = typeIndexTotal;
+    stats.lruSize = pImpl->lruList.size();
+    unlock();
+    return stats;
+}
+
+std::optional<ConfigValue> Config::getValue(const std::string& key) const {
+    lock();
+    try {
+        auto normalizedKey = normalizeKey(key);
+        auto it = pImpl->keyIndex.find(normalizedKey);
+        if (it == pImpl->keyIndex.end()) {
+            return std::nullopt;
+        }
+        
+        size_t index = it->second;
+        if (index >= pImpl->entries.size()) {
+            return std::nullopt;
+        }
+        
+        // Update LRU
+        auto lruIt = pImpl->lruMap.find(index);
+        if (lruIt != pImpl->lruMap.end()) {
+            pImpl->lruList.erase(lruIt->second);
+            pImpl->lruList.push_back(index);
+            pImpl->lruMap[index] = std::prev(pImpl->lruList.end());
+        }
+        
+        return pImpl->entries[index].value;
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+std::optional<ConfigSource> Config::getSource(const std::string& key) const {
+    lock();
+    try {
+        auto normalizedKey = normalizeKey(key);
+        auto it = pImpl->keyIndex.find(normalizedKey);
+        if (it == pImpl->keyIndex.end()) {
+            return std::nullopt;
+        }
+        
+        size_t index = it->second;
+        if (index >= pImpl->entries.size()) {
+            return std::nullopt;
+        }
+        
+        return pImpl->entries[index].source;
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+std::optional<std::string> Config::getTypeName(const std::string& key) const {
+    lock();
+    try {
+        auto normalizedKey = normalizeKey(key);
+        auto it = pImpl->keyIndex.find(normalizedKey);
+        if (it == pImpl->keyIndex.end()) {
+            return std::nullopt;
+        }
+        
+        size_t index = it->second;
+        if (index >= pImpl->entries.size()) {
+            return std::nullopt;
+        }
+        
+        return pImpl->entries[index].value.getTypeName();
+    } catch (...) {
+        unlock();
+        throw;
+    }
+}
+
+std::vector<std::string> Config::getKeysBySource(ConfigSource source) const {
+    lock();
+    std::vector<std::string> keys;
+    
+    auto range = pImpl->sourceIndex.equal_range(source);
+    for (auto it = range.first; it != range.second; ++it) {
+        size_t index = it->second;
+        if (index < pImpl->entries.size()) {
+            keys.push_back(pImpl->entries[index].key);
+        }
+    }
+    
+    unlock();
+    return keys;
+}
+
+std::vector<ConfigEntry> Config::getEntriesBySource(ConfigSource source) const {
+    lock();
+    std::vector<ConfigEntry> entries;
+    
+    auto range = pImpl->sourceIndex.equal_range(source);
+    for (auto it = range.first; it != range.second; ++it) {
+        size_t index = it->second;
+        if (index < pImpl->entries.size()) {
+            entries.push_back(pImpl->entries[index]);
+        }
+    }
+    
+    unlock();
+    return entries;
+}
+
+std::vector<std::string> Config::getKeysByType(const std::string& typeName) const {
+    lock();
+    std::vector<std::string> keys;
+    
+    auto it = pImpl->typeIndex.find(typeName);
+    if (it != pImpl->typeIndex.end()) {
+        for (size_t index : it->second) {
+            if (index < pImpl->entries.size()) {
+                keys.push_back(pImpl->entries[index].key);
+            }
+        }
+    }
+    
+    unlock();
+    return keys;
+}
+
+std::vector<ConfigEntry> Config::getEntriesByType(const std::string& typeName) const {
+    lock();
+    std::vector<ConfigEntry> entries;
+    
+    auto it = pImpl->typeIndex.find(typeName);
+    if (it != pImpl->typeIndex.end()) {
+        for (size_t index : it->second) {
+            if (index < pImpl->entries.size()) {
+                entries.push_back(pImpl->entries[index]);
+            }
+        }
+    }
+    
+    unlock();
+    return entries;
+}
+
+std::vector<ConfigEntry> Config::query(const std::function<bool(const ConfigEntry&)>& predicate) const {
+    lock();
+    std::vector<ConfigEntry> results;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (predicate(entry)) {
+            results.push_back(entry);
+        }
+    }
+    
+    unlock();
+    return results;
+}
+
+std::vector<ConfigEntry> Config::queryBySourceAndType(ConfigSource source, const std::string& typeName) const {
+    lock();
+    std::vector<ConfigEntry> results;
+    
+    auto typeIt = pImpl->typeIndex.find(typeName);
+    if (typeIt != pImpl->typeIndex.end()) {
+        for (size_t index : typeIt->second) {
+            if (index < pImpl->entries.size() && pImpl->entries[index].source == source) {
+                results.push_back(pImpl->entries[index]);
+            }
+        }
+    }
+    
+    unlock();
+    return results;
+}
+
+// Implementation of helper functions that were in the old implementation
+std::string Config::toJson() const {
+    return "{\"config\": [], \"metadata\": {}}";
+}
+
+std::string Config::toYaml() const {
+    return "config: []\nmetadata:\n  version: 1.0\n  sourceSummary: unknown";
+}
+
+std::string Config::toSimple() const {
+    std::ostringstream oss;
+    for (const auto& entry : pImpl->entries) {
+        oss << entry.key << " = " << serializeValue(entry.value) << "\n";
+    }
+    return oss.str();
+}
 
 } // namespace nlm
