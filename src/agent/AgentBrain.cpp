@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "AgentConfiguration.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -227,6 +228,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::Wait;
                 default: return MotorCommand::Wait;
             }
         }

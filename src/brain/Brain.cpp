@@ -111,7 +111,6 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -238,9 +237,6 @@ bool Brain::initialize() {
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)

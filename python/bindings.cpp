@@ -416,10 +416,183 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+        // Configuration helpers
+    m.def("loadConfigFromFile", &Config::loadFromFile, py::arg("filepath"),
+          "Load configuration from a JSON file");
+    
+    m.def("saveConfigToFile", &Config::saveToFile, py::arg("filepath"),
+          "Save configuration to a JSON file");
+    
+    // Simplified configuration creation with common presets
+    m.def("createConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        return config;
+    }, "Create a default configuration with common settings");
+    
+    m.def("createConfigForSmallSimulation", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        return config;
+    }, "Create a small simulation configuration");
+    
+    m.def("createConfigForLargeSimulation", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 5000, ConfigSource::Default);
+        config->set("region_count", 2, ConfigSource::Default);
+        config->set("connection_probability", 0.05f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(456), ConfigSource::Default);
+        return config;
+    }, "Create a large simulation configuration");
+    
+    // Experiment helpers
+    m.def("run_integration_test", [](std::shared_ptr<Brain> brain,
+                                   const Phase6Config& experimentConfig) {
+        Phase6IntegratedExperiment experiment;
+        Phase6Config config;
+        config.neuronCount = experimentConfig.neuronCount;
+        config.maxSteps = experimentConfig.maxSteps;
+        config.enableCheckpointing = experimentConfig.enableCheckpointing;
+        config.enableReplay = experimentConfig.enableReplay;
+        config.enableDevelopment = experimentConfig.enableDevelopment;
+        
+        return experiment.run(config);
+    }, py::arg("brain"), py::arg("experimentConfig"),
+        "Run Phase 6 integration test on a brain");
+    
+    m.def("create_complete_agent_system", 
+        []() -> std::tuple<std::shared_ptr<Config>, std::shared_ptr<Brain>, 
+                          std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", 1000);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.1f);
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(16, 16, 8, 8);
+            world->reset();
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            
+            // Enable key features
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+            
+            return std::make_tuple(config, brain, world, agent);
+        }, "Create a complete agent system (config, brain, world, agent)");
+    
+    // Convenience simulation functions
+    m.def("run_simple_simulation", [](size_t steps) -> std::vector<float> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        std::vector<float> firingRates;
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+            firingRates.push_back(brain->getAverageFiringRate());
+        }
+        
+        return firingRates;
+    }, py::arg("steps"), "Run a simple simulation and return firing rates");
+    
+    m.def("get_system_stats", [](std::shared_ptr<Brain> brain) {
+        std::unordered_map<std::string, py::object> stats;
+        stats["neuron_count"] = py::cast(brain->getTotalNeuronCount());
+        stats["synapse_count"] = py::cast(brain->getTotalSynapseCount());
+        stats["firing_rate"] = py::cast(brain->getAverageFiringRate());
+        stats["excitatory_inhibition_ratio"] = py::cast(
+            brain->getExcitationInhibitionRatio());
+        
+        if (auto wm = brain->getWorkingMemory()) {
+            stats["working_memory_traces"] = py::cast(wm->getActiveTraces());
+        }
+        
+        if (auto em = brain->getEpisodicMemory()) {
+            stats["episodes_stored"] = py::cast(em->getEpisodeCount());
+        }
+        
+        if (auto dopamine = brain->getDopamine()) {
+            stats["dopamine_level"] = py::cast(dopamine->getLevel());
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive system statistics");
+    
+    // Advanced utilities
+    m.def("benchmark_brain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            end - start);
+        
+        std::unordered_map<std::string, double> results;
+        results["total_steps"] = steps;
+        results["wall_clock_time_ms"] = duration.count();
+        results["steps_per_second"] = (steps * 1000.0) / duration.count();
+        results["avg_firing_rate"] = brain->getAverageFiringRate();
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"),
+        "Benchmark brain performance");
+    
+    m.def("compare_brain_configurations", [](const std::vector<std::shared_ptr<Config>>& configs,
+                                            size_t steps) {
+        std::vector<std::unordered_map<std::string, double>> results;
+        
+        for (const auto& config : configs) {
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            auto start = std::chrono::high_resolution_clock::now();
+            
+            for (size_t i = 0; i < steps; ++i) {
+                brain->step(i, i * 0.001);
+            }
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                end - start);
+            
+            std::unordered_map<std::string, double> result;
+            result["neuron_count"] = config->getOr<int64_t>("neuron_count", 0);
+            result["region_count"] = config->getOr<int64_t>("region_count", 0);
+            result["connection_probability"] = 
+                config->getOr<float>("connection_probability", 0.0f);
+            result["wall_clock_time_ms"] = duration.count();
+            result["steps_per_second"] = (steps * 1000.0) / duration.count();
+            result["avg_firing_rate"] = brain->getAverageFiringRate();
+            result["total_synapses"] = brain->getTotalSynapseCount();
+            
+            results.push_back(result);
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("steps"),
+        "Compare performance across different brain configurations");
 }
 
 } // namespace nlm
