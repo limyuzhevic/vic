@@ -422,4 +422,689 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
+// =============================================================================
+// ADVANCED FUNCTIONALITY FOR EXPERT USERS
+// =============================================================================
+
+// Memory system access methods
+m.def("getWorkingMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralWorkingMemory> {
+    return brain->getWorkingMemory();
+}, py::arg("brain"), "Access working memory system");
+
+m.def("getEpisodicMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralEpisodicMemory> {
+    return brain->getEpisodicMemory();
+}, py::arg("brain"), "Access episodic memory system");
+
+m.def("getAssociativeMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralAssociativeMemory> {
+    return brain->getAssociativeMemory();
+}, py::arg("brain"), "Access associative memory system");
+
+// Prediction system access methods
+m.def("getPredictionSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionSystem> {
+    return brain->getPredictionSystem();
+}, py::arg("brain"), "Access prediction system");
+
+m.def("getPlanner", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralPlanner> {
+    return brain->getPlanner();
+}, py::arg("brain"), "Access neural planner");
+
+m.def("getConceptFormation", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<ConceptFormation> {
+    return brain->getConceptFormation();
+}, py::arg("brain"), "Access concept formation system");
+
+m.def("getAttention", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AttentionalSelection> {
+    return brain->getAttention();
+}, py::arg("brain"), "Access attentional selection system");
+
+// Neuromodulation system access
+m.def("getDopamine", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Dopamine> {
+    return brain->getDopamine();
+}, py::arg("brain"), "Access dopamine neuromodulator");
+
+m.def("getCuriosity", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Curiosity> {
+    return brain->getCuriosity();
+}, py::arg("brain"), "Access curiosity neuromodulator");
+
+m.def("getNovelty", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Novelty> {
+    return brain->getNovelty();
+}, py::arg("brain"), "Access novelty neuromodulator");
+
+m.def("getPredictionErrorSignal", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionError> {
+    return brain->getPredictionErrorSignal();
+}, py::arg("brain"), "Access prediction error signal");
+
+// Plasticity system access
+m.def("getSTDP", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<STDP> {
+    return brain->getSTDP();
+}, py::arg("brain"), "Access STDP plasticity system");
+
+m.def("getHebbian", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Hebbian> {
+    return brain->getHebbian();
+}, py::arg("brain"), "Access Hebbian plasticity system");
+
+m.def("getStructuralPlasticity", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<StructuralPlasticity> {
+    return brain->getStructuralPlasticity();
+}, py::arg("brain"), "Access structural plasticity system");
+
+// Development system access
+m.def("getDevelopmentSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<DevelopmentSystem> {
+    return brain->getDevelopmentSystem();
+}, py::arg("brain"), "Access development system");
+
+// Spike system access
+m.def("getSpikeSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<SpikeSystem> {
+    return brain->getSpikeSystem();
+}, py::arg("brain"), "Access spike system for advanced spike manipulation");
+
+// Direct system control
+m.def("applyNeuromodulation", [](std::shared_ptr<Brain> brain, const Neuromodulator& signal) {
+    brain->applyNeuromodulation(signal);
+}, py::arg("brain"), py::arg("signal"), "Apply neuromodulatory signal directly to brain");
+
+m.def("updatePlasticity", [](std::shared_ptr<Brain> brain) {
+    brain->updatePlasticity();
+}, py::arg("brain"), "Update plasticity rules directly");
+
+m.def("develop", [](std::shared_ptr<Brain> brain) {
+    brain->develop();
+}, py::arg("brain"), "Apply developmental changes directly");
+
+// Connection management
+m.def("addInterRegionConnection", [](std::shared_ptr<Brain> brain, RegionId source, RegionId target, 
+                                      float weight = 0.0f, Delay delay = 1) {
+    brain->addInterRegionConnection(source, target, weight, delay);
+}, py::arg("brain"), py::arg("source"), py::arg("target"), 
+      py::arg("weight") = 0.0f, py::arg("delay") = 1,
+      "Create connection between brain regions");
+
+m.def("removeInterRegionConnection", [](std::shared_ptr<Brain> brain, RegionId source, RegionId target) {
+    brain->removeInterRegionConnection(source, target);
+}, py::arg("brain"), py::arg("source"), py::arg("target"), "Remove connection between brain regions");
+
+// Enhanced AgentBrain accessors for neuromodulation state
+m.def("getDopamineLevel", [](std::shared_ptr<AgentBrain> agent) -> float {
+    return agent->getDopamineLevel();
+}, py::arg("agent"), "Get current dopamine level from agent");
+
+m.def("getCuriosityLevel", [](std::shared_ptr<AgentBrain> agent) -> float {
+    return agent->getCuriosityLevel();
+}, py::arg("agent"), "Get current curiosity level from agent");
+
+m.def("getNoveltyLevel", [](std::shared_ptr<AgentBrain> agent) -> float {
+    return agent->getNoveltyLevel();
+}, py::arg("agent"), "Get current novelty level from agent");
+
+m.def("getPredictionError", [](std::shared_ptr<AgentBrain> agent) -> float {
+    return agent->getPredictionError();
+}, py::arg("agent"), "Get current prediction error from agent");
+
+m.def("getNeuromodulationLevel", [](std::shared_ptr<AgentBrain> agent) -> float {
+    return agent->getNeuromodulationLevel();
+}, py::arg("agent"), "Get overall neuromodulation level from agent");
+
+// Configuration helper functions
+m.def("createConfigWithDefaults", []() -> std::shared_ptr<Config> {
+    auto config = std::make_shared<Config>();
+    // Set reasonable defaults for simulation
+    config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("brain.synapse_density", 0.05f, ConfigSource::Default);
+    config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+    config->set("brain.initial_weight_mean", 0.5f, ConfigSource::Default);
+    config->set("brain.initial_weight_std", 0.1f, ConfigSource::Default);
+    config->set("brain.v_thresh", -50.0f, ConfigSource::Default);
+    config->set("brain.v_rest", -70.0f, ConfigSource::Default);
+    config->set("brain.v_reset", -75.0f, ConfigSource::Default);
+    config->set("brain.tau_mem", 20.0f, ConfigSource::Default);
+    config->set("brain.tau_ref", 2.0f, ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    
+    // Enable core plasticity rules
+    config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+    config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+    config->set("plasticity.stdp.tau_plus", 20.0f, ConfigSource::Default);
+    config->set("plasticity.stdp.tau_minus", 20.0f, ConfigSource::Default);
+    config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+    config->set("plasticity.hebbian.learning_rate", 0.0005f, ConfigSource::Default);
+    config->set("plasticity.structural.enable", true, ConfigSource::Default);
+    config->set("plasticity.structural.synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("plasticity.structural.pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Enable neuromodulation
+    config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+    config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+    config->set("neuromod.curiosity.exploration_rate", 0.1f, ConfigSource::Default);
+    config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+    config->set("neuromod.novelty.sensitivity", 0.5f, ConfigSource::Default);
+    
+    return config;
+}, "Create configuration with sensible defaults for simulation");
+
+m.def("createWorldWithDefaults", []() -> std::shared_ptr<SimpleWorld> {
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(width=20, height=20, visionWidth=8, visionHeight=8);
+    world->setMaxEnergy(100.0f);
+    world->setEnergyDecayRate(0.01f);
+    return world;
+}, "Create world with default configuration");
+
+// Error handling and validation
+m.def("validateBrainState", [](std::shared_ptr<Brain> brain) -> bool {
+    // Basic validation checks
+    bool valid = true;
+    
+    // Check neuron count
+    if (brain->getTotalNeuronCount() == 0) {
+        std::cerr << "WARNING: Brain has no neurons!" << std::endl;
+        valid = false;
+    }
+    
+    // Check for regions
+    if (brain->getRegionCount() == 0) {
+        std::cerr << "WARNING: Brain has no regions!" << std::endl;
+        valid = false;
+    }
+    
+    // Check spike system
+    auto spikeSystem = brain->getSpikeSystem();
+    if (spikeSystem->getPendingSpikeEventCount() > 1000) {
+        std::cerr << "WARNING: High number of pending spike events (" 
+                  << spikeSystem->getPendingSpikeEventCount() << ")" << std::endl;
+        valid = false;
+    }
+    
+    return valid;
+}, py::arg("brain"), "Validate brain state and return true if configuration is valid");
+
+// Simulation helper functions
+m.def("runTrainingEpisode", 
+      [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+         size_t numSteps, float timestep = 0.1f) {
+          if (!brain->initialize() || !agent->initialize(*world)) {
+              throw std::runtime_error("Failed to initialize brain or agent");
+          }
+          
+          world->reset();
+          world->setAgentStart(10.0f, 10.0f);
+          
+          for (size_t step = 0; step < numSteps; ++step) {
+              // Update world
+              world->update(timestep);
+              
+              // Get sensory input
+              auto percept = world->getSensoryPercept();
+              
+              // Process sensory input
+              agent->processSensoryInput(percept);
+              
+              // Run brain step
+              brain->step(step, world->getSimulationTime());
+              
+              // Get action
+              auto action = agent->decodeMotorCommand();
+              
+              // Apply action to world
+              world->applyMotorCommand(action, world->getSimulationTime());
+              
+              // Apply reward modulation based on agent state
+              float curiosity = agent->getCuriosityLevel();
+              float novelty = agent->getNoveltyLevel();
+              float reward = curiosity * 0.1f + novelty * 0.05f;
+              agent->applyRewardModulation(reward, 0.0f);
+              
+              // Update development
+              agent->updateDevelopment(timestep);
+          }
+      },
+      py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("numSteps"), py::arg("timestep") = 0.1f,
+      "Run a complete training episode with brain, agent, and world");
+
+m.def("saveBrainWithTimestamp", [](std::shared_ptr<Brain> brain, const std::string& basePath) {
+    // Create filename with timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream filename;
+    filename << basePath << "_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") 
+             << "_neurons" << brain->getTotalNeuronCount() 
+             << "_spikes" << brain->getTotalSpikeCount() << ".bin";
+    
+    if (!brain->save(filename.str())) {
+        throw std::runtime_error("Failed to save brain state");
+    }
+    
+    return filename.str();
+}, py::arg("brain"), py::arg("basePath"), "Save brain state with timestamp in filename");
+
+// Convenience functions for common operations
+m.def("resetSystem", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world) {
+    brain->reset();
+    agent->reset();
+    world->reset();
+    world->setAgentStart(10.0f, 10.0f);
+}, py::arg("brain"), py::arg("agent"), py::arg("world"), "Reset all system components");
+
+m.def("getSystemStatistics", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+    py::dict stats;
+    stats["neurons"] = brain->getTotalNeuronCount();
+    stats["synapses"] = brain->getTotalSynapseCount();
+    stats["active_neurons"] = brain->getActiveNeuronCount();
+    stats["firing_neurons"] = brain->getFiringNeuronCount();
+    stats["spike_count"] = brain->getTotalSpikeCount();
+    stats["pending_spikes"] = brain->getPendingSpikeEventCount();
+    stats["average_firing_rate"] = brain->getAverageFiringRate();
+    stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+    stats["curiosity"] = agent->getCuriosityLevel();
+    stats["novelty"] = agent->getNoveltyLevel();
+    stats["prediction_error"] = agent->getPredictionError();
+    stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+    stats["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+    return stats;
+}, py::arg("brain"), py::arg("agent"), "Get comprehensive system statistics as dictionary");
+
+m.def("printSystemStatus", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+    brain->logStatus();
+    std::cout << "[Agent Status]" << std::endl;
+    std::cout << "  Curiosity Level: " << agent->getCuriosityLevel() << std::endl;
+    std::cout << "  Novelty Level: " << agent->getNoveltyLevel() << std::endl;
+    std::cout << "  Prediction Error: " << agent->getPredictionError() << std::endl;
+    std::cout << "  Neuromodulation Level: " << agent->getNeuromodulationLevel() << std::endl;
+    std::cout << "  Developmental Stage: " << static_cast<int>(agent->getDevelopmentalStage()) << std::endl;
+    std::cout << "  Reward Mod. Enabled: " << (agent->isRewardModulationEnabled() ? "Yes" : "No") << std::endl;
+    std::cout << "  Structural Plasticity Enabled: " << (agent->isStructuralPlasticityEnabled() ? "Yes" : "No") << std::endl;
+    std::cout << "  Development Enabled: " << (agent->isDevelopmentEnabled() ? "Yes" : "No") << std::endl;
+    std::cout << "  Curiosity Enabled: " << (agent->isCuriosityEnabled() ? "Yes" : "No") << std::endl;
+}, py::arg("brain"), py::arg("agent"), "Print comprehensive system status");
+
+// =============================================================================
+// COMMAND-LINE INTERFACE SUPPORT
+// =============================================================================
+
+m.def("create_python_script_from_template", []() {
+    return R"PYTHON_SCRIPT(
+#!/usr/bin/env python3
+"""Automatically generated NLM Python script from template."""
+
+import pynlm
+import sys
+import os
+
+def run_brain_simulation(config_path=None, num_steps=1000, output_file=None):
+    """Run a brain simulation with the given configuration."""
+    
+    try:
+        # Create configuration
+        if config_path and os.path.exists(config_path):
+            config = pynlm.createDefaultConfig()
+            config.loadFromFile(config_path)
+        else:
+            config = pynlm.createConfigWithDefaults()
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        print(f"Starting simulation with {brain.getTotalNeuronCount()} neurons")
+        print(f"Target steps: {num_steps}")
+        
+        # Run simulation
+        for step in range(num_steps):
+            brain.step(step)
+            
+            if step % 100 == 0:
+                print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons, "
+                      f"{brain.getTotalSpikeCount()} total spikes")
+                
+                # Print additional stats
+                if step % 500 == 0:
+                    stats = pynlm.getSystemStatistics(brain, None)
+                    print(f"  Average firing rate: {stats['average_firing_rate']:.3f}")
+                    print(f"  E/I ratio: {stats['e_i_ratio']:.3f}")
+        
+        # Save brain state if requested
+        if output_file:
+            brain.save(output_file)
+            print(f"Brain state saved to {output_file}")
+        
+        print("Simulation completed successfully!")
+        
+    except Exception as e:
+        print(f"Error during simulation: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="NLM Brain Simulation")
+    parser.add_argument("--config", help="Configuration file path")
+    parser.add_argument("--steps", type=int, default=1000, help="Number of simulation steps")
+    parser.add_argument("--output", help="Output file for brain state")
+    
+    args = parser.parse_args()
+    run_brain_simulation(args.config, args.steps, args.output)
+)PYTHON_SCRIPT";
+}, "Generate a complete Python script template for running simulations");
+
+m.def("create_jupyter_notebook_template", []() {
+    return R"JUPYTER_NOTEBOOK(
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# NLM Brain Simulation in Jupyter Notebook",
+    "",
+    "This notebook demonstrates how to use the NLM Python bindings to create and run neural simulations."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pynlm",
+    "import matplotlib.pyplot as plt",
+    "import numpy as np",
+    "",
+    "# Create a brain with default configuration",
+    "config = pynlm.createDefaultConfig()",
+    "brain = pynlm.createBrain(config)",
+    "brain.initialize()",
+    "",
+    "print(f\"Created brain with {brain.getTotalNeuronCount()} neurons\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Run a short simulation",
+    "num_steps = 500",
+    "firing_rates = []",
+    "spike_counts = []",
+    "",
+    "for step in range(num_steps):",
+    "    brain.step(step)",
+    "    ",
+    "    if step % 50 == 0:",
+    "        firing_rate = brain.getFiringNeuronCount() / brain.getTotalNeuronCount()",
+    "        firing_rates.append(firing_rate)
+    "        spike_counts.append(brain.getTotalSpikeCount())",
+    "",
+    "# Plot results",
+    "fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))",
+    "",
+    "ax1.plot(firing_rates)",
+    "ax1.set_xlabel('Step / 50')",
+    "ax1.set_ylabel('Firing Rate')",
+    "ax1.set_title('Neuron Firing Rate Over Time')",
+    "ax1.grid(True)",
+    "",
+    "ax2.plot(spike_counts)",
+    "ax2.set_xlabel('Step / 50')",
+    "ax2.set_ylabel('Total Spike Count')",
+    "ax2.set_title('Cumulative Spike Count Over Time')",
+    "ax2.grid(True)",
+    "",
+    "plt.tight_layout()",
+    "plt.show()"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.8+"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
+)JUPYTER_NOTEBOOK";
+}, "Generate a Jupyter notebook template for interactive exploration");
+
+m.def("create_advanced_agent_example", []() {
+    return R"PYTHON_ADVANCED(
+#!/usr/bin/env python3
+"""Advanced NLM agent example with complete world interaction."""
+
+import pynlm
+import math
+import random
+
+class NLMAgent:
+    """Advanced NLM agent with learning and exploration capabilities."""
+    
+    def __init__(self, config_file=None):
+        # Create configuration
+        if config_file:
+            self.config = pynlm.createDefaultConfig()
+            self.config.loadFromFile(config_file)
+        else:
+            self.config = pynlm.createConfigWithDefaults()
+        
+        # Create brain
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        
+        # Create agent brain interface
+        self.agent = pynlm.createAgentBrain(self.brain)
+        
+        # Create world
+        self.world = pynlm.createWorldWithDefaults()
+        
+        # Initialize agent
+        self.agent.initialize(self.world)
+        
+        # Enable learning systems
+        self.agent.enableRewardModulation(True)
+        self.agent.enableStructuralPlasticity(True)
+        self.agent.enableDevelopment(True)
+        self.agent.enableCuriosity(True)
+        
+        # Agent state
+        self.episode_reward = 0.0
+        self.step_count = 0
+        self.observation_history = []
+        
+        print(f"Initialized advanced agent with {self.brain.getTotalNeuronCount()} neurons")
+    
+    def get_observation(self):
+        """Get current sensory observation from world."""
+        return self.world.getSensoryPercept()
+    
+    def take_action(self, action):
+        """Take an action in the world and return result."""
+        # Apply action to world
+        self.world.applyMotorCommand(action, self.world.getSimulationTime())
+        
+        # Get reward from agent's internal state
+        curiosity = self.agent.getCuriosityLevel()
+        novelty = self.agent.getNoveltyLevel()
+        reward = curiosity * 0.1f + novelty * 0.05f
+        
+        # Get next observation
+        next_observation = self.get_observation()
+        
+        # Store experience
+        self.observation_history.append({
+            'action': action,
+            'reward': reward,
+            'next_observation': next_observation,
+            'step': self.step_count
+        })
+        
+        self.episode_reward += reward
+        self.step_count += 1
+        
+        return reward, next_observation
+    
+    def run_episode(self, max_steps=1000, timestep=0.1f):
+        """Run a complete episode of agent-world interaction."""
+        print(f"Running episode (max {max_steps} steps)...")
+        
+        # Reset world
+        self.world.reset()
+        self.world.setAgentStart(10.0f, 10.0f)
+        
+        # Reset agent
+        self.agent.reset()
+        self.episode_reward = 0.0
+        self.step_count = 0
+        self.observation_history = []
+        
+        for step in range(max_steps):
+            # Update world
+            self.world.update(timestep)
+            
+            # Get current observation
+            observation = self.get_observation()
+            
+            # Process observation through agent
+            self.agent.processSensoryInput(observation)
+            
+            # Brain computation
+            self.brain.step(step, self.world.getSimulationTime())
+            
+            # Get action from agent
+            action = self.agent.decodeMotorCommand()
+            
+            # Take action and get reward
+            reward, next_observation = self.take_action(action)
+            
+            # Apply reward modulation
+            self.agent.applyRewardModulation(reward, 0.0f)
+            
+            # Update development
+            self.agent.updateDevelopment(timestep)
+            
+            # Print progress
+            if step % 100 == 0:
+                print(f"  Step {step}: Reward={reward:.3f}, "
+                      f"Curiosity={self.agent.getCuriosityLevel():.3f}, "
+                      f"Novelty={self.agent.getNoveltyLevel():.3f}, "
+                      f"Total Episode Reward={self.episode_reward:.3f}")
+        
+        print(f"Episode completed after {self.step_count} steps")
+        print(f"Total episode reward: {self.episode_reward:.3f}")
+        
+        return self.episode_reward, self.observation_history
+    
+    def get_brain_stats(self):
+        """Get comprehensive brain statistics."""
+        stats = {
+            'neurons': self.brain.getTotalNeuronCount(),
+            'synapses': self.brain.getTotalSynapseCount(),
+            'active_neurons': self.brain.getActiveNeuronCount(),
+            'firing_neurons': self.brain.getFiringNeuronCount(),
+            'spike_count': self.brain.getTotalSpikeCount(),
+            'pending_spikes': self.brain.getPendingSpikeEventCount(),
+            'average_firing_rate': self.brain.getAverageFiringRate(),
+            'e_i_ratio': self.brain.getExcitationInhibitionRatio(),
+            'curiosity': self.agent.getCuriosityLevel(),
+            'novelty': self.agent.getNoveltyLevel(),
+            'prediction_error': self.agent.getPredictionError(),
+            'neuromodulation_level': self.agent.getNeuromodulationLevel(),
+            'developmental_stage': int(self.agent.getDevelopmentalStage()),
+            'reward_mod_enabled': self.agent.isRewardModulationEnabled(),
+            'structural_plasticity_enabled': self.agent.isStructuralPlasticityEnabled(),
+            'development_enabled': self.agent.isDevelopmentEnabled(),
+            'curiosity_enabled': self.agent.isCuriosityEnabled(),
+        }
+        return stats
+    
+    def save_brain_state(self, filepath):
+        """Save brain state to file."""
+        self.brain.save(filepath)
+        print(f"Brain state saved to {filepath}")
+    
+    def load_brain_state(self, filepath):
+        """Load brain state from file."""
+        if self.brain.load(filepath):
+            print(f"Brain state loaded from {filepath}")
+        else:
+            print(f"Warning: Failed to load brain state from {filepath}")
+    
+    def print_status(self):
+        """Print comprehensive agent status."""
+        print("=" * 60)
+        print("NLM AGENT STATUS REPORT")
+        print("=" * 60)
+        
+        print(f"\n[BRAIN STATISTICS]")
+        print(f"  Neurons: {self.brain.getTotalNeuronCount()}")
+        print(f"  Synapses: {self.brain.getTotalSynapseCount()}")
+        print(f"  Active Neurons: {self.brain.getActiveNeuronCount()}")
+        print(f"  Firing Neurons: {self.brain.getFiringNeuronCount()}")
+        print(f"  Spike Count: {self.brain.getTotalSpikeCount()}")
+        print(f"  Average Firing Rate: {self.brain.getAverageFiringRate():.3f}")
+        print(f"  E/I Ratio: {self.brain.getExcitationInhibitionRatio():.3f}")
+        
+        print(f"\n[AGENT STATISTICS]")
+        print(f"  Curiosity Level: {self.agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty Level: {self.agent.getNoveltyLevel():.3f}")
+        print(f"  Prediction Error: {self.agent.getPredictionError():.3f}")
+        print(f"  Neuromodulation Level: {self.agent.getNeuromodulationLevel():.3f}")
+        print(f"  Developmental Stage: {int(self.agent.getDevelopmentalStage())}")
+        
+        print(f"\n[SYSTEM ENABLED]")
+        print(f"  Reward Modulation: {'Yes' if self.agent.isRewardModulationEnabled() else 'No'}")
+        print(f"  Structural Plasticity: {'Yes' if self.agent.isStructuralPlasticityEnabled() else 'No'}")
+        print(f"  Development: {'Yes' if self.agent.isDevelopmentEnabled() else 'No'}")
+        print(f"  Curiosity: {'Yes' if self.agent.isCuriosityEnabled() else 'No'}")
+        
+        print(f"\n[EPISODE INFO]")
+        print(f"  Steps: {self.step_count}")
+        print(f"  Total Reward: {self.episode_reward:.3f}")
+        print(f"  Observations: {len(self.observation_history)}")
+        
+        print("=" * 60)
+
+# Example usage function
+def example_advanced_usage():
+    """Example of advanced NLM agent usage."""
+    print("Example: Advanced NLM Agent with Complete World Interaction")
+    print("=" * 60)
+    
+    # Create agent
+    agent = NLMAgent()
+    
+    # Print initial status
+    agent.print_status()
+    
+    # Run multiple episodes
+    for episode in range(3):
+        print(f"\n--- Episode {episode + 1} ---")
+        reward, history = agent.run_episode(max_steps=500)
+        
+        # Save brain state after each episode
+        agent.save_brain_state(f"agent_episode_{episode + 1}.bin")
+        
+        # Print final stats
+        stats = agent.get_brain_stats()
+        print(f"\nEpisode {episode + 1} Statistics:")
+        print(f"  Final Reward: {reward:.3f}")
+        print(f"  Total Synapses: {stats['synapses']}")
+        print(f"  Spike Count: {stats['spike_count']}")
+        print(f"  Average Firing Rate: {stats['average_firing_rate']:.3f}")
+    
+    print("\nAdvanced agent example completed successfully!")
+
+if __name__ == "__main__":
+    example_advanced_usage()
+)PYTHON_ADVANCED";
+}, "Generate advanced agent example with complete functionality");
+
+m.attr("ADVANCED_PYTHON_TEMPLATE") = "agent_example.py";
+m.attr("JUPYTER_NOTEBOOK_TEMPLATE") = "nlm_analysis.ipynb";
+m.attr("SCRIPT_TEMPLATE") = "nlm_simulation.py";
+}
+
 } // namespace nlm
