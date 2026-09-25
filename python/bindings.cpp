@@ -39,7 +39,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("to_int", [](const NeuronId& id) { return static_cast<int>(id.value); });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -170,7 +171,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("__repr__", [](const SensoryInput& input) {
+            return "<SensoryInput type=" + std::to_string(static_cast<int>(input.getType())) +
+                   " timestamp=" + std::to_string(input.getTimestamp()) + ">";
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +186,13 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("clear", &Vision::clear)
+        .def("__repr__", [](const Vision& v) {
+            return "<Vision width=" + std::to_string(v.getWidth()) +
+                   " height=" + std::to_string(v.getHeight()) +
+                   " channels=" + std::to_string(v.getChannels()) + ">";
+        });
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,7 +202,12 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("clear", &Audio::clear)
+        .def("__repr__", [](const Audio& a) {
+            return "<Audio sampleRate=" + std::to_string(a.getSampleRate()) +
+                   " numSamples=" + std::to_string(a.getNumSamples()) + ">";
+        });
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -400,21 +416,116 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Helper functions for creating common configurations
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        return config;
+    }, "Create a default configuration with reasonable values for beginners");
+    
+    m.def("createConfigWithNeuronCount", [](size_t neuronCount) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        return config;
+    }, py::arg("neuronCount"), "Create a configuration with specific neuron count");
+    
+    m.def("createConfigWithPlasticity", [](bool stdp, bool hebbian, bool structural) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("plasticity.stdp.enable", stdp);
+        config->set("plasticity.hebbian.enable", hebbian);
+        config->set("plasticity.structural.enable", structural);
+        return config;
+    }, py::arg("stdp"), py::arg("hebbian"), py::arg("structural"), "Create configuration with specific plasticity settings");
+    
+    // Advanced helper functions
+    m.def("createLearningConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // High learning capacity configuration
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.15f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.002f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.5f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enable", true);
+        return config;
+    }, "Create configuration optimized for learning and adaptation");
+    
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // High exploration configuration
+        config->set("brain.neuron_count", 1500);
+        config->set("brain.synapse_density", 0.12f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", false);
+        config->set("neuromod.dopamine.scale", 0.8f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enable", true);
+        return config;
+    }, "Create configuration optimized for exploration and novelty detection");
+    
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t numSteps, bool verbose = false) {
+        for (size_t i = 0; i < numSteps; ++i) {
+            brain->step(i);
+            if (verbose && (i % 100 == 0)) {
+                NML_LOG_INFO("Step " + std::to_string(i) + ": " + 
+                           std::to_string(brain->getFiringNeuronCount()) + " firing neurons");
+            }
+        }
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("verbose") = false, "Run a simulation for the specified number of steps");
+    
+    // Convenience methods for brain configuration
+    m.def("configureBrainForLearning", [](std::shared_ptr<Brain> brain) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, true);
+            }
+        }
+        brain->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+    }, "Configure a brain for optimal learning with all plasticity mechanisms enabled");
+    
+    m.def("configureBrainForStability", [](std::shared_ptr<Brain> brain) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(false, false, false);  // Disable plasticity
+            }
+        }
+        brain->setDevelopmentalStage(DevelopmentalStage::Adult);
+    }, "Configure a brain for stable operation with all plasticity disabled");
+    
+    // Utility functions for inspection
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::stringstream stats;
+        stats << "=== Brain Statistics ===\n";
+        stats << "Neurons: " << brain->getTotalNeuronCount() << "\n";
+        stats << "Synapses: " << brain->getTotalSynapseCount() << "\n";
+        stats << "Active neurons: " << brain->getActiveNeuronCount() << "\n";
+        stats << "Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        stats << "Average firing rate: " << brain->getAverageFiringRate() << " Hz\n";
+        stats << "Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        stats << "E/I ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        stats << "Development stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        return stats.str();
+    }, "Get comprehensive brain statistics as a formatted string");
+    
+    // Version and metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM - Neural Learning Machine Python Bindings";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__copyright__") = "Copyright (c) 2024 NLM Project";
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
