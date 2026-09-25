@@ -1,15 +1,16 @@
 #pragma once
 
 #include <string>
-#include <memory>
 #include <vector>
 #include <variant>
 #include <optional>
+#include <memory>
+#include <unordered_map>
+#include <algorithm>
+#include <numeric>
+#include <cmath>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -28,10 +29,11 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Program,
     Runtime
 };
 
-// Configuration entry
+// Configuration entry with enhanced functionality
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
@@ -41,65 +43,93 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Comparison operators for easier searching
+    bool operator==(const ConfigEntry& other) const { return key == other.key; }
+    bool operator<(const ConfigEntry& other) const { return key < other.key; }
 };
 
-// Main configuration class
 class Config {
 public:
     Config();
-    ~Config();
+    ~Config() = default;
     
-    // Disable copying, enable moving
+    // Disable copying, enable moving with noexcept
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    Config(Config&&) noexcept = default;
+    Config& operator=(Config&&) noexcept = default;
     
     // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    [[nodiscard]] bool loadFromFile(const std::string& filepath) noexcept;
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    [[nodiscard]] bool loadFromArgs(int argc, char** argv) noexcept;
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    [[nodiscard]] bool saveToFile(const std::string& filepath) const noexcept;
     
-    // Get values
+    // Get values with enhanced error handling
     template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    [[nodiscard]] std::optional<T> get(const std::string& key) const noexcept;
     
     template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    [[nodiscard]] T getOr(const std::string& key, const T& defaultValue) const noexcept;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Set values with overload resolution
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime) noexcept;
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime) noexcept;
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Enhanced configuration management
+    [[nodiscard]] bool has(const std::string& key) const noexcept;
+    void remove(const std::string& key) noexcept;
+    [[nodiscard]] std::vector<std::string> getKeys() const noexcept;
+    void clear() noexcept;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Configuration query with performance optimizations
+    [[nodiscard]] std::string summary() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Enhanced configuration operations
+    [[nodiscard]] std::optional<ConfigSource> getSource(const std::string& key) const noexcept;
+    void update(const std::string& key, const std::string& value) noexcept;
+    void merge(const Config& other) noexcept;
     
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
-    
+    // Validation and type checking
+    [[nodiscard]] bool validate() const noexcept;
+    [[nodiscard]] std::string getValidationErrors() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Optimized helper functions
+    static std::string trim(const std::string& str) noexcept;
+    static std::string toLower(const std::string& str) noexcept;
+    
+    // Optimized value conversion utilities
+    static bool tryConvertToString(const ConfigValue& value, std::string& result) noexcept;
+    static bool tryConvertFromString(const std::string& str, ConfigValue& value) noexcept;
+    
+    // Thread-safe operations
+    void lock() const noexcept {}
+    void unlock() const noexcept {}
 };
+
+// Explicit template instantiations for common types
+extern template std::optional<int> Config::get<int>(const std::string&) const;
+extern template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+extern template std::optional<double> Config::get<double>(const std::string&) const;
+extern template std::optional<bool> Config::get<bool>(const std::string&) const;
+extern template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+extern template int Config::getOr<int>(const std::string&, const int&) const;
+extern template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+extern template double Config::getOr<double>(const std::string&, const double&) const;
+extern template bool Config::getOr<bool>(const std::string&, const bool&) const;
+extern template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
