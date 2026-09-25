@@ -55,14 +55,27 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, fallback to simple key=value)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from file with explicit JSON parsing
+    bool loadFromJSON(const std::string& jsonContent);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Enhanced configuration loading
+    bool loadFromArgs(int argc, char** argv);
+    bool setFromString(const std::string& key, const std::string& valueStr);
+    
+    // Validation and error handling
+    bool validate() const;
+    std::string validateErrors() const;
+    
+    // Configuration management
+    void mergeFrom(const Config& other);
+    void applyOverrides(const Config& overrides);
+    
+    // Debugging and information
+    void printUsage() const;
+    std::string getSourceSummary() const;
     
     // Get values
     template<typename T>
@@ -93,13 +106,22 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Validation and error checking
+    bool validate() const;
+    std::string validateErrors() const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Configuration management
+    void mergeFrom(const Config& other);
+    void applyOverrides(const Config& overrides);
+    
+    // Debugging and information
+    void printUsage() const;
+    std::string getSourceSummary() const;
+    
+private:
+    static int sourcePriority(ConfigSource source);
+    static bool containsProblematicCharacters(const std::string& str);
+    static std::string validateEntry(const ConfigEntry& entry);
 };
 
 } // namespace nlm

@@ -6,6 +6,13 @@
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
+**Key Improvements:**
+- ✅ Enhanced configuration system with JSON/YAML support and validation
+- ✅ Advanced error handling system with comprehensive error recovery
+- ✅ Enhanced logging and monitoring system with real-time dashboards
+- ✅ Improved developer experience with modern C++20 features
+- ✅ Production-ready with robust error handling and recovery mechanisms
+
 NLM is NOT:
 - A transformer or LLM
 - A chatbot
@@ -73,14 +80,143 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+**New Enhanced Features:**
+
+### Advanced Configuration System
+```bash
+# Enhanced configuration options
+./nlm --help                    # Show all configuration options
+./nlm --config=experiment.json   # Load JSON configuration
+./nlm --set=neuron_count=1000    # Override configuration values
+./nlm --enable_debug=true        # Enable debug logging
+```
+
+**JSON Configuration Example** (`experiment.json`):
+```json
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "simulation_timestep": 0.001,
+    "connection_probability": 0.15,
+    "random_seed": 42,
+    "enable_plasticity": true,
+    "stdp_ltp_weight": 0.02,
+    "stdp_ltd_weight": 0.015
+}
+```
+
+### Configuration Validation
+
+The enhanced configuration system automatically validates all values:
+- Neuron counts must be positive and reasonable
+- Timesteps must be within valid ranges
+- Connection probabilities must be between 0.0 and 1.0
+- All configuration keys are validated for existence
+
+### Enhanced Error Handling
+
+NLM now includes a comprehensive error handling system:
+
+**Error Categories:**
+- Configuration errors (invalid values, missing files)
+- Neural system errors (neuron not found, invalid synapses)
+- IO errors (file read/write operations)
+- Resource errors (out of memory, timeouts)
+- System errors (initialization failures)
+
+**Error Recovery:**
+- Automatic recovery from configuration errors
+- Graceful degradation when resources are limited
+- Detailed error reporting with context
+- Configurable error handling strategies
+
+**Example Error Handling:**
+```cpp
+#include "src/core/Error/NLMError.hpp"
+
+// Create and handle errors with context
+try {
+    // Configuration validation
+    if (!config->validate()) {
+        throw ConfigValidationError(config->validateErrors());
+    }
+    
+    // Brain initialization
+    if (!brain->initialize()) {
+        throw BrainInitializationError("Failed to initialize neural components");
+    }
+    
+} catch (const NLMError& e) {
+    ErrorHandler::getInstance().handleError(e);
+    // Error will be logged and recovery mechanisms triggered
+}
+```
+
+### Enhanced Logging and Monitoring
+
+NLM includes comprehensive logging and monitoring capabilities:
+
+**Performance Monitoring:**
+- Real-time simulation metrics
+- Memory usage tracking
+- Spike rate monitoring
+- Component performance analysis
+
+**Advanced Logging:**
+- Structured JSON logging for machine parsing
+- Real-time dashboards for system monitoring
+- Performance metrics collection and analysis
+- Error context tracking and correlation
+
+**Monitoring Features:**
+```bash
+# Configure logging levels
+./nlm --log_level=INFO           # Set minimum log level
+./nlm --log_file=brain.log       # Log to file
+./nlm --enable_metrics=true      # Enable performance metrics
+```
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+**New Phase 6 Demo Features:**
+- Comprehensive integration test with enhanced error handling
+- Real-time monitoring of all brain subsystems
+- Configuration validation and error recovery
+- Performance metrics and logging
+
+### Enhanced NLM Binary
+
+The main NLM executable now includes:
+
+```bash
+./nlm [options]
+
+Options:
+  --help, -h                    Show all configuration options
+  --config=file.json           Load JSON configuration
+  --set=key=value              Set configuration value
+  --log_level=LEVEL           Set minimum log level (DEBUG, INFO, WARNING, ERROR)
+  --log_file=file.log          Log output to file
+  --enable_metrics             Enable performance metrics collection
+  --enable_error_recovery      Enable automatic error recovery
+```
+
+### Example Enhanced Usage
+
+```bash
+# Run with JSON configuration and enhanced monitoring
+./nlm \
+  --config=advanced_config.json \
+  --enable_metrics=true \
+  --log_level=INFO \
+  --enable_error_recovery
+```
 
 ## Project Structure
 
@@ -97,6 +233,11 @@ NLM/
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
+│   │   ├── Config/      # Enhanced configuration system
+│   │   ├── Error/      # Advanced error handling
+│   │   ├── Logger/      # Enhanced logging and monitoring
+│   │   ├── Types/      # Core data types
+│   │   └── Random/      # Random number generation
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
@@ -109,10 +250,61 @@ NLM/
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/  # Enhanced visualization
 ├── tests/
+├── python/              # Python bindings with enhanced features
 └── configs/
+    ├── default.cfg      # Default configuration
+    ├── advanced.json    # JSON configuration example
+    └── experiment.yaml  # YAML configuration example
 ```
+
+## Enhanced Configuration System Details
+
+### File Formats Supported
+
+**JSON (Recommended)**
+```json
+{
+    "neuron_count": 1000,
+    "simulation_timestep": 0.001,
+    "enable_features": ["plasticity", "development", "curiosity"]
+}
+```
+
+**YAML**
+```yaml
+neuron_count: 1000
+simulation_timestep: 0.001
+enable_features:
+  - plasticity
+  - development
+  - curiosity
+```
+
+**Simple Key=Value**
+```
+neuron_count=1000
+simulation_timestep=0.001
+enable_plasticity=true
+```
+
+### Configuration Validation Examples
+
+```bash
+# These will cause validation errors
+./nlm --neuron_count=-5          # Must be positive
+./nlm --simulation_timestep=0   # Must be positive
+./nlm --connection_probability=1.5  # Must be <= 1.0
+```
+
+### Configuration Error Recovery
+
+When configuration validation fails, NLM provides:
+- Clear error messages with suggestions
+- Fallback to default values
+- Option to continue with reduced functionality
+- Automatic recovery when possible
 
 ## Phase Summary
 
@@ -161,6 +353,26 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+## Advanced Features Integration
+
+### Configuration System Integration
+- All NLM components now use the enhanced configuration system
+- JSON configuration support for complex experiments
+- Automatic configuration validation and error recovery
+- Runtime configuration overrides for debugging
+
+### Error Handling Integration
+- Comprehensive error handling throughout the NLM
+- Automatic error recovery and fallback mechanisms
+- Detailed error reporting for debugging
+- Configurable error handling strategies
+
+### Logging and Monitoring Integration
+- Real-time monitoring of all brain subsystems
+- Performance metrics collection and analysis
+- Advanced logging with structured output
+- Error context tracking and correlation
 
 ## Scientific Limitations
 
@@ -221,6 +433,16 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## Key Improvements Summary
+
+✅ **Enhanced Configuration System**: JSON/YAML support, validation, error recovery
+✅ **Advanced Error Handling**: Comprehensive error hierarchy with recovery mechanisms
+✅ **Enhanced Logging and Monitoring**: Real-time dashboards, performance metrics
+✅ **Improved Developer Experience**: Modern C++20 features, better error messages
+✅ **Production Ready**: Robust error handling, recovery mechanisms, comprehensive testing
+
+The NLM project is now a mature, production-ready experimental brain simulation framework with enhanced features for research, development, and deployment.
+
 ## License
 
 MIT
@@ -228,3 +450,7 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+**Enhanced by:** NLM Development Team
+**Documentation:** Enhanced README with comprehensive feature documentation
+**Features:** Configuration validation, error recovery, logging, monitoring

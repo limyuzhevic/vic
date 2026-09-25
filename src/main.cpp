@@ -340,7 +340,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with enhanced system
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
@@ -363,8 +363,14 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args using enhanced parser
+    config->loadFromArgsEnhanced(argc, argv);
+    
+    // Validate configuration
+    if (!config->validate()) {
+        NLM_LOG_ERROR("Configuration validation failed: " + config->validateErrors());
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -381,6 +387,11 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Log configuration source summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration source summary:");
+    NLM_LOG_INFO(config->getSourceSummary());
     
     // Log configuration summary
     NLM_LOG_INFO("");
