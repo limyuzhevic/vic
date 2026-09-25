@@ -140,7 +140,21 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
+    
+    // Add input validation and error handling
+    if (std::isnan(current) || std::isinf(current)) {
+        NLM_LOG_WARNING("Neuron " + std::to_string(pImpl->id) + ": Invalid current value " + 
+                       std::to_string(current) + ". Setting to 0.0f.");
+        current = 0.0f;
+    }
+    
     pImpl->synapticInput += current;
+    
+    // Log if current exceeds reasonable bounds
+    if (std::abs(current) > 1000.0f) {
+        NLM_LOG_WARNING("Neuron " + std::to_string(pImpl->id) + ": Large current injection " + 
+                       std::to_string(current) + "mV");
+    }
 }
 
 void Neuron::clearTotalCurrent() {

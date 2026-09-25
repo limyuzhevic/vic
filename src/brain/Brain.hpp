@@ -11,18 +11,26 @@
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for all integrated brain systems
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
+// Memory System Components
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+
+// Cognitive System Components
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+
+// Neuromodulation Components
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -30,12 +38,13 @@ class Novelty;
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
+// Enables communication between different brain regions
 struct InterRegionConnection {
     RegionId sourceRegion;
     RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
+    float weight;  // Synaptic strength of the connection
+    Delay delay;   // Transmission delay in simulation steps
+    PlasticityFlags plasticityFlags;  // Plasticity rules for this connection
     
     InterRegionConnection()
         : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
@@ -45,8 +54,34 @@ struct InterRegionConnection {
 };
 
 // Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// Implements the complete artificial brain architecture with the following characteristics:
+// - Real spiking neural computation with LIF neuron dynamics
+// - Event-driven dynamics with synaptic delays and spike propagation
+// - Integrated memory systems (working, episodic, associative)
+// - Neuromodulation system (dopamine, curiosity, novelty, prediction error)
+// - Prediction and cognitive systems (planning, concept formation, attention)
+// - Development system for structural plasticity and maturation
+// - Plasticity rules (STDP, Hebbian, structural)
+// - Modular architecture with independent subsystems
+// - Closed-loop interaction with environment
+// - Checkpoint save/load capabilities
+// - Performance optimizations (memory pools, event queues, SIMD)
+//
+// The brain operates as a hierarchical system where:
+// 1. Neural dynamics drive internal state and activity
+// 2. Memory systems store and retrieve experiences
+// 3. Neuromodulators regulate plasticity and motivation
+// 4. Cognitive systems plan actions and form concepts
+// 5. Development shapes plasticity rates and connectivity
+// 6. Prediction error signals guide learning
+//
+// Architecture Philosophy:
+// WORLD → SENSORY INPUT → NEURAL PROCESSING → INTERNAL STATE
+//                  ↓                  ↓                  ↓
+//                MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION
+//                  ↓                  ↓
+//            PLASTICITY → MEMORY/DEVELOPMENT → CHANGED BEHAVIOR
 
 class Brain {
 public:
@@ -62,12 +97,15 @@ public:
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration
+    // Performs memory allocation, system initialization, and connectivity setup
     bool initialize();
     
     // Main simulation step
+    // Advances the brain by one simulation timestep
     void step(SimulationStep currentStep);
     
     // Simulation time step
+    // Advances the brain with explicit timestamp
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment

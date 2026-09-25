@@ -128,6 +128,13 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    // Add input validation and error handling
+    if (std::isnan(timestamp) || std::isinf(timestamp)) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Invalid spike timestamp " + 
+                       std::to_string(timestamp));
+        return;
+    }
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +142,13 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    // Add input validation and error handling
+    if (std::isnan(timestamp) || std::isinf(timestamp)) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Invalid spike timestamp " + 
+                       std::to_string(timestamp));
+        return;
+    }
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -192,6 +206,13 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // Add input validation
+    if (std::isnan(currentTime) || std::isinf(currentTime)) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Invalid timestamp " + 
+                       std::to_string(currentTime));
+        return;
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
@@ -202,7 +223,15 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        
+        // Validate timeSincePre
+        if (std::isnan(timeSincePre) || std::isinf(timeSincePre) || timeSincePre < 0.0f) {
+            NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Invalid time since pre spike " + 
+                           std::to_string(timeSincePre) + ". Resetting facilitation.");
+            pImpl->shortTermFacilitation = 0.0f;
+        } else {
+            pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        }
     }
     
     // Decay short-term depression
@@ -211,15 +240,33 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        
+        // Validate timeSinceActivity
+        if (std::isnan(timeSinceActivity) || std::isinf(timeSinceActivity) || timeSinceActivity < 0.0f) {
+            NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Invalid time since activity " + 
+                           std::to_string(timeSinceActivity) + ". Skipping depression recovery.");
+        } else {
+            // Recovery from depression toward 1.0
+            pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        }
     }
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
+    // Clamp weight bounds with validation
+    float currentWeight = pImpl->weight;
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Check for weight instability
+    if (std::isnan(pImpl->weight) || std::isinf(pImpl->weight)) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Invalid weight " + 
+                       std::to_string(pImpl->weight) + ". Resetting to 0.0f.");
+        pImpl->weight = 0.0f;
+    } else if (std::abs(pImpl->weight - currentWeight) > 0.1f) {
+        NLM_LOG_WARNING("Synapse " + std::to_string(pImpl->id) + ": Large weight change from " + 
+                       std::to_string(currentWeight) + " to " + std::to_string(pImpl->weight));
+    }
 }
 
 void Synapse::reset() {
