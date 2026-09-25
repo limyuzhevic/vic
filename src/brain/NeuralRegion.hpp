@@ -66,6 +66,18 @@ public:
     // Step all populations and synapses
     void step(Timestamp currentTime);
     
+    // Batch step all neurons in this region for improved performance
+    void batchUpdateNeurons(Timestamp currentTime, TimestepDuration dt);
+    
+    // Batch step all synapses in this region for improved performance
+    void batchUpdateSynapses(Timestamp currentTime);
+    
+    // Check if this region has any active neurons (for lazy evaluation)
+    bool hasActiveNeurons() const;
+    
+    // Get total number of synapses in this region
+    size_t getSynapseCount() const;
+    
     // Reset all neurons and synapses
     void reset();
     

@@ -129,6 +129,14 @@ void NeuralPopulation::step(Timestamp currentTime) {
     }
 }
 
+void NeuralPopulation::batchStepNeurons(Timestamp currentTime, TimestepDuration dt) {
+    // Vectorized neuron step for improved performance
+    // Neurons are stored contiguously for cache-friendly access
+    for (auto* neuron : pImpl->neurons) {
+        neuron->stepLIF(currentTime, dt);
+    }
+}
+
 void NeuralPopulation::reset() {
     for (auto* neuron : pImpl->neurons) {
         neuron->reset();

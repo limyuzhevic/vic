@@ -56,6 +56,9 @@ public:
     // Step all neurons
     void step(Timestamp currentTime);
     
+    // Batch step all neurons for improved performance
+    void batchStepNeurons(Timestamp currentTime, TimestepDuration dt);
+    
     // Reset all neurons
     void reset();
     

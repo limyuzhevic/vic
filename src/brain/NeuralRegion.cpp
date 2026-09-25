@@ -223,6 +223,45 @@ void NeuralRegion::step(Timestamp currentTime) {
     }
 }
 
+void NeuralRegion::batchUpdateNeurons(Timestamp currentTime, TimestepDuration dt) {
+    // Vectorized neuron updates for improved performance
+    // Collect all neurons first for cache-friendly access
+    std::vector<Neuron*> allNeurons;
+    allNeurons.reserve(getTotalNeuronCount());
+    for (auto& pop : pImpl->populations) {
+        auto& neurons = pop->getNeurons();
+        allNeurons.insert(allNeurons.end(), neurons.begin(), neurons.end());
+    }
+    
+    // Batch update all neurons
+    for (auto* neuron : allNeurons) {
+        neuron->stepLIF(currentTime, dt);
+    }
+}
+
+void NeuralRegion::batchUpdateSynapses(Timestamp currentTime) {
+    // Batch synapse updates for improved performance
+    for (auto& syn : pImpl->synapses) {
+        syn->step(currentTime);
+    }
+}
+
+bool NeuralRegion::hasActiveNeurons() const {
+    // Check if any neuron is firing or has significant activity
+    for (const auto& pop : pImpl->populations) {
+        for (const auto* neuron : pop->getNeurons()) {
+            if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+size_t NeuralRegion::getSynapseCount() const {
+    return pImpl->synapses.size();
+}
+
 void NeuralRegion::reset() {
     for (auto& pop : pImpl->populations) {
         pop->reset();

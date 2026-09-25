@@ -68,14 +68,28 @@ public:
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+
+    // ========== CONVENIENCE METHODS ==========
     
+    // Enable all learning features (reward, curiosity, development, plasticity)
+    void enableAllLearning();
+    
+    // Disable all learning features
+    void disableAllLearning();
+    
+    // Set learning rates for different systems
+    void setLearningRates(float rewardRate, float curiosityRate, float developmentRate);
+    
+    // Reset all learning-related state and memories
+    void resetLearningState();
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

@@ -348,3 +348,78 @@ void AgentBrain::reset() {
 }
 
 } // namespace nlm
+
+    std::shared_ptr<Brain> AgentBrain::getBrain() const {
+        return brain_;
+    }
+
+    // ========== CONVENIENCE METHODS ==========
+
+    // Enable all learning features (reward, curiosity, development, plasticity)
+    void AgentBrain::enableAllLearning() {
+        rewardModulationEnabled_ = true;
+        structuralPlasticityEnabled_ = true;
+        developmentEnabled_ = true;
+        curiosityEnabled_ = true;
+        
+        // Reset learning levels
+        curiosityLevel_ = 0.5f;
+        plasticityModifier_ = 1.0f;
+        
+        NLM_LOG_INFO("Enabled all learning features (reward, curiosity, development, plasticity)");
+    }
+
+    // Disable all learning features
+    void AgentBrain::disableAllLearning() {
+        rewardModulationEnabled_ = false;
+        structuralPlasticityEnabled_ = false;
+        developmentEnabled_ = false;
+        curiosityEnabled_ = false;
+        
+        // Reset learning levels
+        curiosityLevel_ = 0.0f;
+        plasticityModifier_ = 0.1f;  // Low baseline plasticity
+        
+        NLM_LOG_INFO("Disabled all learning features (reward, curiosity, development, plasticity)");
+    }
+
+    // Set learning rates for different systems
+    void AgentBrain::setLearningRates(float rewardRate, float curiosityRate, float developmentRate) {
+        // Validate input ranges
+        rewardRate = std::clamp(rewardRate, 0.0f, 1.0f);
+        curiosityRate = std::clamp(curiosityRate, 0.0f, 1.0f);
+        developmentRate = std::clamp(developmentRate, 0.0f, 1.0f);
+        
+        // Scale these to affect internal systems
+        curiosityLevel_ = curiosityRate;
+        
+        // Influence plasticity based on development rate
+        plasticityModifier_ = 0.1f + developmentRate * 0.9f;
+        
+        NLM_LOG_INFO("Set learning rates - reward: " + std::to_string(rewardRate) + 
+                    ", curiosity: " + std::to_string(curiosityRate) + 
+                    ", development: " + std::to_string(developmentRate));
+    }
+
+    // Reset all learning-related state and memories
+    void AgentBrain::resetLearningState() {
+        // Reset neuromodulation
+        dopamineLevel_ = 0.0f;
+        predictionError_ = 0.0f;
+        expectedReward_ = 0.0f;
+        
+        // Reset curiosity
+        curiosityLevel_ = 0.0f;
+        noveltyLevel_ = 0.0f;
+        
+        // Reset development
+        developmentalAge_ = 0.0;
+        plasticityModifier_ = 0.2f;  // Lower baseline after reset
+        
+        // Reset previous sensory state
+        std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+        
+        NLM_LOG_INFO("Reset all learning-related state and memories");
+    }
+
+} // namespace nlm

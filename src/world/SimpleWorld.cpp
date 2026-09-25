@@ -401,3 +401,123 @@ void SimpleWorld::checkCollisions() {
 }
 
 } // namespace nlm
+
+// ========== CONVENIENCE METHODS ==========
+
+// Create random environment with given seed
+void SimpleWorld::createRandomEnvironment(uint64_t seed) {
+    NLM_LOG_INFO("Creating random environment with seed " + std::to_string(seed));
+    
+    setRandomSeed(seed);
+    reset();
+    
+    NLM_LOG_INFO("Random environment created with " + std::to_string(objects_.size()) + 
+                " objects (resources and hazards)");
+}
+
+// Add obstacles at specified positions
+void SimpleWorld::addObstacles(const std::vector<std::pair<float, float>>& positions) {
+    NLM_LOG_INFO("Adding obstacles at " + std::to_string(positions.size()) + " specified positions");
+    
+    for (const auto& pos : positions) {
+        if (isValidPosition(pos.first, pos.second)) {
+            objects_.emplace_back(pos.first, pos.second, WorldObjectType::Wall, 0.0f, 0.8f);
+            NLM_LOG_INFO("Added wall obstacle at (" + std::to_string(pos.first) + ", " + 
+                        std::to_string(pos.second) + ")");
+        } else {
+            NLM_LOG_WARNING("Skipping invalid position for obstacle: (" + 
+                           std::to_string(pos.first) + ", " + std::to_string(pos.second) + ")");
+        }
+    }
+}
+
+// Remove all obstacles from world
+void SimpleWorld::clearObstacles() {
+    NLM_LOG_INFO("Clearing all obstacles from world");
+    
+    // Preserve resources and hazards, only remove walls
+    std::vector<WorldObject> remaining;
+    for (const auto& obj : objects_) {
+        if (obj.type != WorldObjectType::Wall) {
+            remaining.push_back(obj);
+        }
+    }
+    
+    objects_ = std::move(remaining);
+    NLM_LOG_INFO("Cleared " + std::to_string(objects_.size()) + " walls");
+}
+
+// Run complete episode simulation
+ActionResult SimpleWorld::simulateEpisode(std::shared_ptr<Brain> brain, 
+                                       std::shared_ptr<AgentBrain> agent, 
+                                       SimulationStep steps) {
+    if (!brain || !agent) {
+        NLM_LOG_ERROR("Invalid brain or agent provided for episode simulation");
+        return ActionResult(-100.0f, false, "Invalid brain or agent");
+    }
+    
+    NLM_LOG_INFO("Starting episode simulation with " + std::to_string(steps) + " steps");
+    
+    // Initialize the simulation
+    double totalReward = 0.0;
+    int successCount = 0;
+    
+    // Reset for new episode
+    reset();
+    
+    // Run the episode
+    for (SimulationStep step = 0; step < steps; ++step) {
+        double currentTime = static_cast<double>(step) * 0.1;  // 100ms per step
+        
+        // Get sensory percept from world
+        const SensoryPercept& percept = getSensoryPercept();
+        
+        // Process sensory input through agent
+        agent->processSensoryInput(percept);
+        
+        // Get brain to produce action
+        std::unique_ptr<Action> action = brain->produceAction();
+        
+        if (action) {
+            // Apply motor command to world
+            MotorCommand cmd = agent->decodeMotorCommand();
+            ActionResult result = applyMotorCommand(cmd, currentTime);
+            
+            // Apply reward modulation based on result
+            agent->applyRewardModulation(result.reward, 0.0f);
+            
+            totalReward += result.reward;
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Check if episode ended (agent died or time ran out)
+            if (agent->getBrain()->getAgentBody() && agent->getBrain()->getAgentBody()->health <= 0.0f) {
+                NLM_LOG_INFO("Episode ended early due to agent death after " + std::to_string(step + 1) + " steps");
+                break;
+            }
+        } else {
+            NLM_LOG_WARNING("Brain returned null action at step " + std::to_string(step));
+        }
+        
+        // Get statistics at the end
+        if (step == steps - 1) {
+            auto stats = brain->getStatistics();
+            NLM_LOG_INFO("Episode statistics - Total reward: " + std::to_string(totalReward) + 
+                        ", Steps completed: " + std::to_string(step + 1));
+        }
+    }
+    
+    // Create final result
+    ActionResult finalResult;
+    finalResult.reward = totalReward;
+    finalResult.success = (successCount > 0);
+    finalResult.message = "Episode completed with " + std::to_string(steps) + " steps, total reward " + 
+                         std::to_string(totalReward);
+    
+    NLM_LOG_INFO("Episode simulation completed: " + finalResult.message);
+    
+    return finalResult;
+}
+
+} // namespace nlm
