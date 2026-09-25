@@ -502,8 +502,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (consistent reward)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Set action based on motor neuron activity
+            if (!pImpl->motorNeurons.empty()) {
+                // Determine which action was selected based on highest motor activity
+                float maxActivation = 0.0f;
+                ActionType selectedAction = ActionType::Wait;
+                
+                for (Neuron* motorNeuron : pImpl->motorNeurons) {
+                    if (motorNeuron) {
+                        float activation = motorNeuron->getActivation();
+                        if (activation > maxActivation) {
+                            maxActivation = activation;
+                            
+                            // Simple action mapping based on neuron type/population
+                            // In a real implementation, this would be more sophisticated
+                            if (activation > 0.3f) {
+                                selectedAction = ActionType::MoveForward;  // Default action
+                            }
+                        }
+                    }
+                }
+                
+                // If there's meaningful motor activity, consider that as the action
+                if (maxActivation > 0.3f) {
+                    episode.action = selectedAction;
+                } else {
+                    episode.action = ActionType::Wait;
+                }
+            } else {
+                episode.action = ActionType::Wait;
+            }
+            
+            // Store position/orientation if we have spatial information
+            // For now, set default values
+            episode.positionX = 0.0f;
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Store sensory novelty based on recent changes
+            float novelty = 0.0f;
+            if (pImpl->novelty) {
+                novelty = pImpl->novelty->getLevel();
+            }
+            episode.novelty = novelty;
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -511,8 +555,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity patterns
+        // This could use working memory content or current brain state
+        
+        // Simple integration: use prediction error signal to update predictions
+        // In a full implementation, this would:
+        // 1. Generate predictions based on sensory input patterns
+        // 2. Compare predictions with actual neural activity
+        // 3. Update prediction weights based on prediction error
+        
+        // For now, track prediction error history if available
+        if (pImpl->predictionSystem) {
+            float currentPredictionError = 0.0f;
+            if (pImpl->predictionError) {
+                currentPredictionError = pImpl->predictionError->getLevel();
+            }
+            
+            // Simple integration: prediction system could use this error signal
+            // predictionSystem->updateWithError(currentPredictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +589,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation detects recurring patterns in experience
+        
+        // Gather current neural activity pattern from key populations
+        std::vector<float> currentPattern;
+        
+        // Sample neural activity from a subset of populations for concept formation
+        // This is computationally efficient and captures essential activity patterns
+        size_t samplesPerPop = std::min<size_t>(3, 5);  // Sample 3-5 neurons per population
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                size_t neuronCount = pop->getNeuronCount();
+                if (neuronCount > 0) {
+                    // Sample neurons to get pattern representation
+                    for (size_t i = 0; i < samplesPerPop && i < neuronCount; ++i) {
+                        // Use the neuron's average activation over recent time
+                        float activation = pop->getAverageActivation();
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Only process if we have meaningful activity
+        float patternStrength = 0.0f;
+        for (float val : currentPattern) {
+            patternStrength += std::abs(val);
+        }
+        
+        if (patternStrength > 0.1f && !currentPattern.empty()) {
+            // Present pattern to concept formation system
+            // In full implementation, would also provide features and reward
+            // For now, just provide basic pattern
+            // conceptFormation->presentExperience(currentPattern, std::vector<float>(), 0.0f, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -574,6 +669,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+    }
+    
+    // ========== STEP 14: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner uses predictions to guide action selection
+        // This would be called by AgentBrain when making decisions
+        
+        // In full integration, planner would:
+        // 1. Use prediction system output for expected outcomes
+        // 2. Consider current state and goals
+        // 3. Evaluate multiple action sequences
+        // 4. Select best action for current context
+        
+        // For now, placeholder for planner update
+        // pImpl->planner->updatePlanning();
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========

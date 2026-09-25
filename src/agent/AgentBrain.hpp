@@ -31,6 +31,9 @@ public:
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
     
+    // Convert planned action from planner to motor command
+    MotorCommand convertToMotorCommand(ActionType action) const;
+    
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
     

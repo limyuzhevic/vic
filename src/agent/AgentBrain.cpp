@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "../motor/Action.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -124,6 +125,86 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // ========== INTEGRATE WITH BRAIN SYSTEMS ==========
+    
+    // 1. Connect to working memory for experience storage
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (workingMemory) {
+        // Convert sensory input to neural pattern for working memory
+        std::vector<float> sensoryPattern;
+        
+        // Build pattern from current sensory neuron activations
+        if (!sensoryVision_.empty()) {
+            // Sample some vision neurons to create pattern
+            size_t sampleCount = std::min<size_t>(16, sensoryVision_.size());
+            for (size_t i = 0; i < sampleCount; ++i) {
+                if (sensoryVision_[i]) {
+                    float activation = sensoryVision_[i]->getActivation();
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Add touch and internal signals to pattern
+        if (!sensoryTouch_.empty()) {
+            for (size_t i = 0; i < std::min<size_t>(4, sensoryTouch_.size()); ++i) {
+                if (sensoryTouch_[i]) {
+                    float activation = sensoryTouch_[i]->getActivation();
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        if (!sensoryInternal_.empty()) {
+            for (size_t i = 0; i < std::min<size_t>(2, sensoryInternal_.size()); ++i) {
+                if (sensoryInternal_[i]) {
+                    float activation = sensoryInternal_[i]->getActivation();
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Store in working memory if we have meaningful pattern
+        if (!sensoryPattern.empty()) {
+            float patternStrength = 0.0f;
+            for (float val : sensoryPattern) {
+                patternStrength += std::abs(val);
+            }
+            
+            if (patternStrength > 0.5f) {
+                workingMemory->store(sensoryPattern, patternStrength);
+            }
+        }
+    }
+    
+    // 2. Connect to prediction system for prediction error
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (predictionSystem) {
+        // For now, use novelty as proxy for prediction error
+        // predictionSystem->updatePrediction(...)
+    }
+    
+    // 3. Compute prediction error for reward modulation
+    // This would normally use the prediction system
+    // For now, use novelty and curiosity to estimate prediction error
+    float noveltyPredictionError = noveltyLevel_ - (curiosityLevel_ * 0.5f);
+    predictionError_ = noveltyPredictionError * 0.1f;  // Scale appropriately
+    
+    // 4. Update concept formation if available
+    auto* conceptFormation = brain_->getConceptFormation();
+    if (conceptFormation && !sensoryPattern.empty()) {
+        // Concept formation would extract features from sensoryPattern
+        // conceptFormation->presentExperience(sensoryPattern, features, reward, currentStep);
+    }
+    
+    // 5. Update attention if available
+    auto* attention = brain_->getAttention();
+    if (attention) {
+        // Attention would be updated based on sensory importance
+        // For now, just update attention with current novelty level
+        // attention->updateAttention(noveltyLevel_);
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -152,6 +233,51 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try neural planner first if available (highest priority)
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        // Convert current sensory state to format planner expects
+        std::vector<float> currentState;
+        
+        // Build state representation from sensory neurons
+        if (!sensoryVision_.empty()) {
+            size_t sampleCount = std::min<size_t>(8, sensoryVision_.size());
+            for (size_t i = 0; i < sampleCount; ++i) {
+                if (sensoryVision_[i]) {
+                    currentState.push_back(sensoryVision_[i]->getActivation());
+                }
+            }
+        }
+        
+        // Add other sensory modalities to state
+        if (!sensoryTouch_.empty()) {
+            for (size_t i = 0; i < std::min<size_t>(2, sensoryTouch_.size()); ++i) {
+                if (sensoryTouch_[i]) {
+                    currentState.push_back(sensoryTouch_[i]->getActivation());
+                }
+            }
+        }
+        
+        // Get planned action from neural planner
+        ActionType plannedAction = planner->planAction(currentState, 0.5f);  // Default target reward
+        
+        // Convert planned action to MotorCommand
+        MotorCommand plannedMotorCommand = convertToMotorCommand(plannedAction);
+        
+        // Only use planned action if it's meaningful (not the default)
+        if (plannedMotorCommand != MotorCommand::Wait) {
+            NLM_LOG_INFO("Neural planner selected action: " + std::to_string(static_cast<int>(plannedMotorCommand)));
+            
+            // Apply curiosity-based exploration to planned action
+            if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+                return selectWithCuriosity(plannedMotorCommand);
+            }
+            
+            return plannedMotorCommand;
+        }
+    }
+    
+    // Fall back to traditional motor neuron decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -233,6 +359,28 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     }
     
     return defaultCmd;
+}
+
+// Convert ActionType to MotorCommand
+MotorCommand AgentBrain::convertToMotorCommand(ActionType action) const {
+    switch (action) {
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::MoveLeft: return MotorCommand::TurnLeft;  // Map MoveLeft to TurnLeft
+        case ActionType::MoveRight: return MotorCommand::TurnRight;  // Map MoveRight to TurnRight
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Look: return MotorCommand::Wait;  // Look doesn't have direct motor command, use Wait
+        case ActionType::LookUp: return MotorCommand::Wait;  // Up/Down don't have direct motor commands
+        case ActionType::LookDown: return MotorCommand::Wait;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::Interact;  // Map Eat to Interact
+        case ActionType::Drink: return MotorCommand::Interact;  // Map Drink to Interact
+        case ActionType::Rest: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;  // Default for custom actions
+        default: return MotorCommand::Wait;
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
