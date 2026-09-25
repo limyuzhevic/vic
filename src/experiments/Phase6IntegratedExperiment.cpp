@@ -221,6 +221,22 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    // Test 4b: Self-model (sensorimotor self-awareness)
+    if (brain->getSelfModel() != nullptr) {
+        NLM_LOG_INFO("[PASS] SelfModel is integrated (self-awareness)");
+    } else {
+        NLM_LOG_ERROR("[FAIL] SelfModel is NOT integrated");
+        success = false;
+    }
+    
+    // Test 4c: Social learning (observation and imitation)
+    if (brain->getSocialLearning() != nullptr) {
+        NLM_LOG_INFO("[PASS] SocialLearning is integrated (social learning)");
+    } else {
+        NLM_LOG_ERROR("[FAIL] SocialLearning is NOT integrated");
+        success = false;
+    }
+    
     if (brain->getConceptFormation() != nullptr) {
         NLM_LOG_INFO("[PASS] Concept formation is integrated");
     } else {

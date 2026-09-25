@@ -22,6 +22,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -38,6 +44,33 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
+    
+    // If no memory neurons yet, create some from the brain
+    if (memoryNeurons_.empty()) {
+        // Get all neurons in the brain and use first few as memory neurons
+        for (const auto& region : brain_->getRegions()) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (memoryNeurons_.size() < capacity_) {
+                    memoryNeurons_.push_back(neuron->getId());
+                    memoryActivations_.push_back(0.0f);
+                    memoryTimestamps_.push_back(0);
+                }
+            }
+            if (memoryNeurons_.size() >= capacity_) break;
+        }
+        
+        // If still no neurons, create dummy neurons
+        if (memoryNeurons_.empty()) {
+            for (size_t i = 0; i < std::min(capacity_, pattern.size()); ++i) {
+                memoryNeurons_.push_back(NeuronId(10000 + i));
+                memoryActivations_.push_back(0.0f);
+                memoryTimestamps_.push_back(0);
+            }
+        }
+    }
+    
+    neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
@@ -259,6 +292,11 @@ AttentionalSelection::AttentionalSelection()
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)
     , competitionThreshold_(0.3f)
+    , attendedRegions_()
+    , winners_()
+    , neuronSalience_()
+    , topDownBias_()
+    , bottomUpSalience_()
 {
 }
 

@@ -1,9 +1,14 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace nlm {
+
+// AgentBrain: Connects NLM brain to the world
+// Handles sensory transduction and motor decoding
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -19,7 +24,21 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , neuralPlanner_(new NeuralPlanner())
+    , selfModel_(new SelfModel())
+    , socialLearning_(new SocialLearning())
 {
+    // Initialize cognitive systems
+    neuralPlanner_ = std::make_unique<NeuralPlanner>();
+    selfModel_ = std::make_unique<SelfModel>();
+    socialLearning_ = std::make_unique<SocialLearning>();
+    predictionSystem_ = nullptr;  // Will be set via connectPredictionSystem
+    
+    // Initialize temporary state
+    currentGoal_.clear();
+    lastPlannedAction_ = ActionType::Wait;
+    currentVisionAfterAction_.clear();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -123,6 +142,32 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
+    
+    // === COGNITION SYSTEMS INTEGRATION ===
+    
+    // Get current neural activity as state vector for cognition systems
+    std::vector<float> currentState = vision;
+    if (!touch.empty()) {
+        currentState.insert(currentState.end(), touch.begin(), touch.end());
+    }
+    if (!intern.empty()) {
+        currentState.insert(currentState.end(), intern.begin(), intern.end());
+    }
+    if (!proprio.empty()) {
+        currentState.insert(currentState.end(), proprio.begin(), proprio.end());
+    }
+    
+    // Update neural planner based on current state and goal
+    updateNeuralPlanner(currentState);
+    
+    // Record sensory input for self-model learning
+    // Store before state for self-model tracking
+    std::vector<float> beforeState = currentState;
+    
+    // Update self-model with new sensory experience
+    // (Self-model learning happens after actions are executed)
+    
+    // === END COGNITION SYSTEMS INTEGRATION ===
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
@@ -330,10 +375,6 @@ float AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
-
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -345,6 +386,248 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset cognitive systems
+    if (neuralPlanner_) {
+        neuralPlanner_->clearCache();
+        neuralPlanner_->setCurrentGoal(std::vector<float>());
+    }
+    if (selfModel_) {
+        selfModel_->clear();
+    }
+    if (socialLearning_) {
+        socialLearning_->clear();
+    }
+}
+
+void AgentBrain::updateNeuralPlanner(const std::vector<float>& currentState) {
+    if (!neuralPlanner_ || !brain_) return;
+    
+    // Update neural planner with current state
+    // The neural planner uses prediction system to evaluate action sequences
+    
+    // If we have a prediction system, use it for planning
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (predictionSystem) {
+        // Create a simple sensory input from current state
+        // This is a simplified approach - real implementation would use
+        // the brain's sensory input system
+        
+        // Set prediction system's current state (simplified)
+        // Update planning based on prediction accuracy
+        float predictionError = predictionSystem->getPredictionError();
+        
+        // Adjust planning depth based on prediction error
+        if (predictionError > 0.5f) {
+            // High prediction error = explore more
+            neuralPlanner_->setPlanningDepth(std::min(neuralPlanner_->getPlanningDepth() + 1, 10));
+            neuralPlanner_->setPlanningConfidence(0.3f);
+        } else {
+            // Good prediction = plan more deeply
+            neuralPlanner_->setPlanningDepth(std::max(1u, neuralPlanner_->getPlanningDepth() - 1));
+            neuralPlanner_->setPlanningConfidence(0.8f);
+        }
+        
+        // Update neural planner's current goal based on prediction system
+        std::vector<float> goalState = currentState;
+        if (!goalState.empty()) {
+            // Set a simple goal state (target approach)
+            neuralPlanner_->setCurrentGoal(goalState);
+        }
+    }
+    
+    // Plan next action based on current state
+    ActionType plannedAction = neuralPlanner_->planAction(currentState);
+    
+    // If planning succeeded, update action quality
+    if (plannedAction != ActionType::Wait) {
+        neuralPlanner_->setActionQuality(plannedAction, 0.8f);
+    }
+}
+
+void AgentBrain::updateSelfModel(const std::vector<float>& beforeState, 
+                                const std::vector<float>& afterState,
+                                ActionType action) {
+    if (!selfModel_) return;
+    
+    // Update self-model with action consequences
+    selfModel_->recordSelfAction(action, beforeState, afterState);
+    
+    // Predict next state using self-model
+    std::vector<float> predictedState = selfModel_->predictActionConsequence(action, beforeState);
+    
+    // Update self-model with prediction error
+    selfModel_->updateSelfModel(predictedState, afterState, action);
+    
+    // Update capability level based on prediction accuracy
+    float confidence = selfModel_->getSelfModelConfidence(action);
+    // Self-model capability is a running average of confidence
+    static float capabilityAccumulator = 0.0f;
+    static size_t capabilityCount = 0;
+    capabilityAccumulator += confidence;
+    capabilityCount++;
+    if (capabilityCount > 0) {
+        float newCapability = capabilityAccumulator / capabilityCount;
+        // Update neural planner capability level
+        if (neuralPlanner_) {
+            // This affects planning confidence
+            float planningConf = neuralPlanner_->getPlanningConfidence();
+            neuralPlanner_->setPlanningConfidence(planningConf * 0.5f + newCapability * 0.5f);
+        }
+    }
+}
+
+void AgentBrain::recordObservation(ActionType observedAction,
+                                   const std::vector<float>& observerState,
+                                   const std::vector<float>& resultingState) {
+    if (!socialLearning_) return;
+    
+    // Record observation of other agent's action and effect
+    socialLearning_->observeAgentAction(observedAction, observerState, resultingState);
+    
+    // Update social knowledge based on observation
+    bool canImitate = socialLearning_->canImitate(observedAction);
+    
+    }
+    
+    return defaultCmd;
+}
+
+// Connection methods for cognition systems
+
+void AgentBrain::connectPredictionSystem(PredictionSystem* predictionSystem) {
+    predictionSystem_ = predictionSystem;
+    if (predictionSystem_) {
+        NLM_LOG_INFO("AgentBrain connected to PredictionSystem");
+    }
+}
+
+void AgentBrain::connectNeuralPlanner(NeuralPlanner* planner) {
+    // Note: neuralPlanner_ is owned by AgentBrain, not set via this method
+    // This method is kept for API compatibility
+    if (planner) {
+        NLM_LOG_INFO("AgentBrain connected to NeuralPlanner");
+    }
+}
+
+void AgentBrain::connectSelfModel(SelfModel* selfModel) {
+    // Note: selfModel_ is owned by AgentBrain, not set via this method
+    // This method is kept for API compatibility
+    if (selfModel) {
+        NLM_LOG_INFO("AgentBrain connected to SelfModel");
+    }
+}
+
+void AgentBrain::connectSocialLearning(SocialLearning* socialLearning) {
+    // Note: socialLearning_ is owned by AgentBrain, not set via this method
+    // This method is kept for API compatibility
+    if (socialLearning) {
+        NLM_LOG_INFO("AgentBrain connected to SocialLearning");
+    }
+}
+
+void AgentBrain::updateCognitionSystems() {
+    if (!brain_) return;
+    
+    // Update neural planner with current state
+    if (neuralPlanner_ && curiosityEnabled_) {
+        // Get current goal state (simplified - in real implementation would extract from brain)
+        std::vector<float> currentState(256, 0.0f);
+        for (size_t i = 0; i < std::min(currentState.size(), previousVision_.size()); ++i) {
+            currentState[i] = previousVision_[i];
+        }
+        
+        // Set current goal based on accumulated experience
+        float maxValue = 0.0f;
+        for (float v : currentState) {
+            maxValue = std::max(maxValue, v);
+        }
+        std::vector<float> goal = currentState;
+        for (float& g : goal) {
+            g = maxValue * 0.8f; // Approach higher activity levels
+        }
+        
+        neuralPlanner_->setCurrentGoal(goal);
+        
+        // Plan action based on current state and goal
+        ActionType plannedAction = neuralPlanner_->planAction(currentState, 0.5f);
+        
+        // Store planned action for experience
+        lastPlannedAction_ = plannedAction;
+    }
+    
+    // Update self-model with action-consequence experience
+    if (selfModel_ && lastAction_.type != ActionType::Wait && lastAction_.type != ActionType::Custom) {
+        // Record action and its effect
+        selfModel_->recordSelfAction(lastAction_.type, previousVision_, 
+                                    currentVisionAfterAction_);
+    }
+    
+    // Update social learning from agent's own behavior
+    if (socialLearning_ && predictionError_ > 0.5f) {
+        // Record own actions as social learning examples
+        socialLearning_->observeAgentAction(lastAction_.type, previousVision_, 
+                                           currentVisionAfterAction_);
+    }
+    
+    // Update prediction system
+    if (predictionSystem_) {
+        // Create prediction based on current sensory state
+        auto predictedState = predictionSystem_->predictNextState(
+            createSensoryInputFromVision(previousVision_));
+        
+        // This would be updated when world updates and we see the result
+        // For now, just record prediction error based on agent's own predictions
+        float predError = predictionSystem_->getPredictionError();
+        predictionError_ = predError; // Update existing prediction error
+    }
+    
+    // Update planning quality based on actual outcomes
+    if (neuralPlanner_ && lastPlannedAction_ != ActionType::Wait && lastAction_.type != ActionType::Wait) {
+        // If plan was followed and succeeded, update planner quality
+        if (lastPlannedAction_ == lastAction_.type) {
+            neuralPlanner_->updatePlanQuality({lastPlannedAction_}, {lastAction_.type}, expectedReward_);
+        }
+    }
+}
+
+void AgentBrain::setGoal(const std::vector<float>& goal) {
+    currentGoal_ = goal;
+}
+
+std::vector<float> AgentBrain::getCurrentGoal() const {
+    return currentGoal_;
+}
+
+NeuralPlanner* AgentBrain::getNeuralPlanner() {
+    return neuralPlanner_.get();
+}
+
+SelfModel* AgentBrain::getSelfModel() {
+    return selfModel_.get();
+}
+
+SocialLearning* AgentBrain::getSocialLearning() {
+    return socialLearning_.get();
+}
+
+PredictionSystem* AgentBrain::getPredictionSystem() {
+    return predictionSystem_;
+}
+
+void AgentBrain::resetCognitionSystems() {
+    if (neuralPlanner_) neuralPlanner_->clearCache();
+    if (selfModel_) selfModel_->clear();
+    if (socialLearning_) socialLearning_->clear();
+    if (predictionSystem_) predictionSystem_->clearHistory();
+}
+
+// Helper method for creating sensory input from vision data
+SensoryInput AgentBrain::createSensoryInputFromVision(const std::vector<float>& visionData) {
+    SensoryInput input;
+    input.setData(visionData);
+    input.setTimestamp(0.0);
+    return input;
 }
 
 } // namespace nlm

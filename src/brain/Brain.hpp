@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -79,6 +81,32 @@ public:
     
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    
+private:
+    // Modular step methods
+    void createNewBrainStep();
+    void updateNeurons(Timestamp currentTime);
+    void processSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateMemorySystems(SimulationStep currentStep, Timestamp currentTime);
+    void applyNeuromodulation();
+    void applyPlasticityRules(Timestamp currentTime);
+    void updateCognitionSystems(Timestamp currentTime);
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep, Timestamp currentTime);
+    void updateStatistics(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Helper methods for refactored step logic
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateAllNeurons(Timestamp currentTime);
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory(Timestamp currentTime);
+    void updateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    void updatePredictionSystem(Timestamp currentTime);
+    void updateAttentionSystem(Timestamp currentTime);
+    void updateConceptFormation(Timestamp currentTime);
+    void applyPeriodicStructuralPlasticity(SimulationStep currentStep);
+    void applyPeriodicMemoryConsolidation(SimulationStep currentStep);
     
     // Spike system access
     SpikeSystem* getSpikeSystem();
@@ -157,6 +185,12 @@ public:
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
+    
+    // Self-model for internal self-awareness
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation and imitation
+    SocialLearning* getSocialLearning();
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();

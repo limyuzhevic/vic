@@ -40,7 +40,7 @@ public:
     // Plan next action given current state and goal
     // Returns the best action to take now
     ActionType planAction(const std::vector<float>& currentState,
-                         float targetReward = 0.5f);
+                         float targetReward);
 
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence

@@ -4,6 +4,8 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <memory>
 #include <vector>
 
@@ -69,6 +71,37 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+// Cognitive systems integration
+    void updateNeuralPlanner(const std::vector<float>& currentState);
+    void updateSelfModel(const std::vector<float>& beforeState, 
+                        const std::vector<float>& afterState,
+                        ActionType action);
+    void recordObservation(ActionType observedAction,
+                          const std::vector<float>& observerState,
+                          const std::vector<float>& resultingState);
+    
+    // Connection methods for cognition systems
+    void connectPredictionSystem(PredictionSystem* predictionSystem);
+    void connectNeuralPlanner(NeuralPlanner* planner);
+    void connectSelfModel(SelfModel* selfModel);
+    void connectSocialLearning(SocialLearning* socialLearning);
+    
+    // Update all cognition systems
+    void updateCognitionSystems();
+    
+    // Get current goal state for planning
+    std::vector<float> getCurrentGoal() const;
+    void setGoal(const std::vector<float>& goal);
+    
+    // Get cognition system pointers
+    NeuralPlanner* getNeuralPlanner();
+    SelfModel* getSelfModel();
+    SocialLearning* getSocialLearning();
+    PredictionSystem* getPredictionSystem();
+    
+    // Reset cognition systems
+    void resetCognitionSystems();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +110,19 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive systems
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<SelfModel> selfModel_;
+    std::unique_ptr<SocialLearning> socialLearning_;
+    PredictionSystem* predictionSystem_;  // Raw pointer, not owned by AgentBrain
+    
+    // Current goal state for planning
+    std::vector<float> currentGoal_;
+    
+    // Temporary variables for cognition updates
+    ActionType lastPlannedAction_;
+    std::vector<float> currentVisionAfterAction_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

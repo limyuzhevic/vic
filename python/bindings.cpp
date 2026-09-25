@@ -12,9 +12,27 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/sensory/Proprioception.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/NeuralAssociativeMemory.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -399,22 +417,47 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Connection methods for cognition systems
+    .def("connectPredictionSystem", &AgentBrain::connectPredictionSystem,
+         py::arg("prediction_system"),
+         "Connect prediction system to agent brain")
+    .def("connectNeuralPlanner", &AgentBrain::connectNeuralPlanner,
+         py::arg("planner"),
+         "Connect neural planner to agent brain")
+    .def("connectSelfModel", &AgentBrain::connectSelfModel,
+         py::arg("self_model"),
+         "Connect self model to agent brain")
+    .def("connectSocialLearning", &AgentBrain::connectSocialLearning,
+         py::arg("social_learning"),
+         "Connect social learning to agent brain")
+    
+    // Cognition system update and control
+    .def("updateCognitionSystems", &AgentBrain::updateCognitionSystems,
+         "Update all cognition systems")
+    .def("setGoal", &AgentBrain::setGoal,
+         py::arg("goal"),
+         "Set current goal state for planning")
+    .def("getCurrentGoal", &AgentBrain::getCurrentGoal,
+         "Get current goal state")
+    
+    // Get cognition system pointers
+    .def("getNeuralPlanner", &AgentBrain::getNeuralPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner pointer")
+    .def("getSelfModel", &AgentBrain::getSelfModel,
+         py::return_value_policy::reference_internal,
+         "Get self model pointer")
+    .def("getSocialLearning", &AgentBrain::getSocialLearning,
+         py::return_value_policy::reference_internal,
+         "Get social learning pointer")
+    .def("getPredictionSystem", &AgentBrain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system pointer")
+    
+    // Reset cognition systems
+    .def("resetCognitionSystems", &AgentBrain::resetCognitionSystems,
+         "Reset all cognition systems");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
