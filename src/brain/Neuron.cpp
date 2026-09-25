@@ -150,7 +150,10 @@ void Neuron::clearTotalCurrent() {
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        // Remove oldest spike (first element) when history exceeds limit
+        if (!pImpl->spikeHistory.empty()) {
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        }
     }
 }
 

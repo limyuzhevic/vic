@@ -8,6 +8,20 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string configStats;
+    bool validationEnabled;
+    std::vector<std::string> validationErrors;
+    std::vector<std::string> validationWarnings;
+    std::string statistics;
+    
+    // Configuration history
+    std::chrono::system_clock::time_point creationTime;
+    std::chrono::system_clock::time_point lastModifiedTime;
+    std::string modificationHistory;
+    
+    Impl() : configStats(), validationEnabled(false), 
+             creationTime(std::chrono::system_clock::now()),
+             lastModifiedTime(std::chrono::system_clock::now()) {}
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -60,7 +74,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.find("--") == 0) {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
@@ -186,30 +200,116 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+bool Config::validate(const std::vector<std::string>& requiredKeys) const {
+    return validateConfig(requiredKeys);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::validateConfig(const std::vector<std::string>& requiredKeys) const {
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+    
+    // Check required keys
+    for (const auto& key : requiredKeys) {
+        if (!hasKey(key)) {
+            errors.push_back("Missing required configuration key: " + key);
+        }
+    }
+    
+    // Validate parameter ranges based on common NLM parameters
+    auto validateParameter = [&errors, &warnings](const std::string& key, 
+                                                   double value, double min, double max, 
+                                                   const std::string& paramName) {
+        if (value < min) {
+            warnings.push_back("Parameter " + paramName + " (" + key + ") is below recommended minimum: " + 
+                             std::to_string(value) + " < " + std::to_string(min));
+        }
+        if (value > max) {
+            errors.push_back("Parameter " + paramName + " (" + key + ") exceeds maximum allowed value: " + 
+                           std::to_string(value) + " > " + std::to_string(max));
+        }
+    };
+    
+    // Validate common NLM configuration parameters
+    if (hasKey("simulation_timestep")) {
+        double timestep = getOr<double>("simulation_timestep", 0.001);
+        validateParameter("simulation_timestep", timestep, 0.000001, 0.1, 
+                         "simulation timestep");
+    }
+    
+    if (hasKey("neuron_count")) {
+        double neuronCount = getOr<double>("neuron_count", 1000);
+        validateParameter("neuron_count", neuronCount, 10, 100000, 
+                         "neuron count");
+    }
+    
+    if (hasKey("connection_probability")) {
+        double connProb = getOr<double>("connection_probability", 0.1);
+        validateParameter("connection_probability", connProb, 0.0, 1.0, 
+                         "connection probability");
+    }
+    
+    if (hasKey("random_seed")) {
+        double seed = getOr<double>("random_seed", 42);
+        if (seed < 0) {
+            errors.push_back("Random seed must be non-negative: " + std::to_string(seed));
+        }
+    }
+    
+    // Validate plasticity parameters
+    if (hasKey("plasticity_learning_rate")) {
+        double learningRate = getOr<double>("plasticity_learning_rate", 0.01);
+        validateParameter("plasticity_learning_rate", learningRate, 0.0, 1.0, 
+                         "plasticity learning rate");
+    }
+    
+    if (hasKey("stdp_ltp_weight")) {
+        double ltpWeight = getOr<double>("stdp_ltp_weight", 0.01);
+        validateParameter("stdp_ltp_weight", ltpWeight, -1.0, 1.0, 
+                         "STDP LTP weight");
+    }
+    
+    if (hasKey("stdp_ltd_weight")) {
+        double ltdWeight = getOr<double>("stdp_ltd_weight", 0.012);
+        validateParameter("stdp_ltd_weight", ltdWeight, -1.0, 1.0, 
+                         "STDP LTD weight");
+    }
+    
+    // Generate statistics
+    std::ostringstream stats;
+    stats << "Configuration Analysis:" << std::endl;
+    stats << "  Total parameters: " << getKeys().size() << std::endl;
+    stats << "  Source distribution: ";
+    // Count by source type (simplified)
+    size_t defaultCount = 0, fileCount = 0, cliCount = 0, runtimeCount = 0;
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default: defaultCount++; break;
+            case ConfigSource::File: fileCount++; break;
+            case ConfigSource::CommandLine: cliCount++; break;
+            case ConfigSource::Runtime: runtimeCount++; break;
+        }
+    }
+    stats << "Default: " << defaultCount << ", File: " << fileCount 
+          << ", CLI: " << cliCount << ", Runtime: " << runtimeCount << std::endl;
+    
+    // Store statistics
+    setStatistics(stats.str());
+    
+    // Clear existing validation results
+    clearValidationErrors();
+    clearValidationWarnings();
+    
+    // Set new validation results
+    for (const auto& error : errors) {
+        setValidationEnabled(true);
+        validationErrors_.push_back(error);
+    }
+    
+    for (const auto& warning : warnings) {
+        setValidationEnabled(true);
+        validationWarnings_.push_back(warning);
+    }
+    
+    // Return true if no errors
+    return errors.empty();
 }
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

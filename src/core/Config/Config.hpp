@@ -1,10 +1,5 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -49,57 +44,111 @@ public:
     Config();
     ~Config();
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+public:
+    // Validate configuration against schema
+    bool validate(const std::vector<std::string>& requiredKeys = {}) const {
+        return validateConfig(requiredKeys);
+    }
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Validate configuration
+    bool validateConfig(const std::vector<std::string>& requiredKeys = {}) const;
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Get validation result
+    ValidationResult getValidationResult() const {
+        ValidationResult result;
+        result.isValid = isValid();
+        result.errors = getValidationErrors();
+        result.warnings = getValidationWarnings();
+        result.statistics = getStatistics();
+        return result;
+    }
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Get validation status
+    bool isValid() const {
+        return validationEnabled_ && validationErrors_.empty();
+    }
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Get all validation issues
+    std::vector<std::string> getAllValidationIssues() const {
+        std::vector<std::string> allIssues;
+        allIssues.insert(allIssues.end(), validationErrors_.begin(), validationErrors_.end());
+        allIssues.insert(allIssues.end(), validationWarnings_.begin(), validationWarnings_.end());
+        return allIssues;
+    }
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Get validation statistics
+    std::string getStatistics() const {
+        return configStats_;
+    }
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Save configuration to file with compression option
+    bool saveToFile(const std::string& filepath, bool compressed = false) const;
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Load configuration from JSON file (new format)
+    bool loadFromJSON(const std::string& filepath);
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get configuration by category
+    std::map<std::string, std::map<std::string, std::string>> getConfigurationByCategory() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Apply configuration presets
+    bool applyPreset(const std::string& presetName);
     
-    // Clear all
-    void clear();
+    // Reset to factory defaults
+    void resetToDefaults();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Export configuration for sharing
+    bool exportConfiguration(const std::string& filepath) const;
+    
+    // Import configuration from shared file
+    bool importConfiguration(const std::string& filepath);
+    
+    // Configuration comparison
+    bool operator==(const Config& other) const;
+    bool operator!=(const Config& other) const {
+        return !(*this == other);
+    }
+    
+    // Get configuration age (for tracking modifications)
+    std::chrono::system_clock::time_point getCreationTime() const {
+        return creationTime_;
+    }
+    
+    // Check if configuration has been modified
+    bool hasBeenModified() const {
+        return creationTime_ != lastModifiedTime_;
+    }
+    
+    // Get configuration history (last changes)
+    std::string getConfigurationHistory() const {
+        return modificationHistory_;
+    }
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Validation state
+    bool validationEnabled_ = false;
+    std::vector<std::string> validationErrors_;
+    std::vector<std::string> validationWarnings_;
+    std::string validationStatistics_;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    void setValidationEnabled(bool enabled);
+    void clearValidationErrors();
+    void clearValidationWarnings();
+    void setValidationStatistics(const std::string& stats);
+    
+    // Helper to access private Impl
+    struct ImplAccess {
+        static std::vector<ConfigEntry>& getEntries(Config& config) {
+            return static_cast<Impl*>(config.pImpl.get())->entries;
+        }
+    };
 };
 
 } // namespace nlm

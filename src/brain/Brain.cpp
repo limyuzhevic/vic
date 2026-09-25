@@ -80,7 +80,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng()  // Default-construct unique_ptr
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -97,6 +97,10 @@ struct Brain::Impl {
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
+        }
+        if (!seed) {
+            // Fallback to time-based seed if config value is invalid
+            seed = std::chrono::system_clock::now().time_since_epoch().count();
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
@@ -139,18 +143,56 @@ struct Brain::Impl {
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        
+        // Validate plasticity parameters
+        if (synaptogenesisRate < 0.0f) {
+            NLM_LOG_ERROR("Invalid synaptogenesis_rate: " + std::to_string(synaptogenesisRate) + ". Must be >= 0.0");
+            return false;
+        }
+        if (pruningRate < 0.0f) {
+            NLM_LOG_ERROR("Invalid pruning_rate: " + std::to_string(pruningRate) + ". Must be >= 0.0");
+            return false;
+        }
+        
+        // Set rates on plasticity system
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Validate plasticity parameters
+        if (synaptogenesisRate < 0.0f) {
+            NLM_LOG_ERROR("Invalid synaptogenesis_rate: " + std::to_string(synaptogenesisRate) + ". Must be >= 0.0");
+            return false;
+        }
+        if (pruningRate < 0.0f) {
+            NLM_LOG_ERROR("Invalid pruning_rate: " + std::to_string(pruningRate) + ". Must be >= 0.0");
+            return false;
+        }
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Validate configuration parameters
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Using default 0.001");
+            timestep = 0.001;
+        }
+        if (replayInterval == 0) {
+            NLM_LOG_ERROR("Invalid replay_interval: " + std::to_string(replayInterval) + ". Using default 100");
+            replayInterval = 100;
+        }
+        if (consolidationInterval == 0) {
+            NLM_LOG_ERROR("Invalid consolidation_interval: " + std::to_string(consolidationInterval) + ". Using default 1000");
+            consolidationInterval = 1000;
+        }
+        if (ltpWeight < -1.0f || ltpWeight > 1.0f) {
+            NLM_LOG_WARNING("Invalid stdp_ltp_weight: " + std::to_string(ltpWeight) + ". Clamping to [-1.0, 1.0]");
+            ltpWeight = std::clamp(ltpWeight, -1.0f, 1.0f);
+        }
+        if (ltdWeight < -1.0f || ltdWeight > 1.0f) {
+            NLM_LOG_WARNING("Invalid stdp_ltd_weight: " + std::to_string(ltdWeight) + ". Clamping to [-1.0, 1.0]");
+            ltdWeight = std::clamp(ltdWeight, -1.0f, 1.0f);
+        }
+        if (tau <= 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_tau: " + std::to_string(tau) + ". Using default 20.0");
+            tau = 20.0f;
+        }
     }
     
     DevelopmentalStage developmentalStage;
@@ -181,6 +223,26 @@ bool Brain::initialize() {
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration parameters
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be > 0");
+        return false;
+    }
+    if (neuronCount > 100000) {
+        NLM_LOG_WARNING("Large neuron_count: " + std::to_string(neuronCount) + ". May impact performance");
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be > 0");
+        return false;
+    }
+    if (regionCount > 100) {
+        NLM_LOG_WARNING("Large region_count: " + std::to_string(regionCount) + ". May impact performance");
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProbability) + ". Must be in [0,1]");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
