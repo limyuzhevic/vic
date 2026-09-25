@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "../Exception.hpp"
 
 namespace nlm {
 
@@ -100,6 +101,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    void validateValue(const std::string& key, const ConfigValue& value);
 };
 
 } // namespace nlm

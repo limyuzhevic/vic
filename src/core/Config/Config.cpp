@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "../Exception.hpp"
 
 namespace nlm {
 
@@ -19,16 +20,23 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Validate file path
+    if (filepath.empty()) {
+        throw ConfigError("File path cannot be empty");
     }
     
+    // Check if file exists and is readable
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw FileError("Cannot open configuration file for reading", filepath);
+    }
+    
+    // Read and parse configuration
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,19 +45,32 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            throw ConfigError("Invalid configuration format: missing '='", "line " + std::to_string(lineNum));
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            throw ConfigError("Configuration key cannot be empty", "line " + std::to_string(lineNum));
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Validate key contains only valid characters
+        if (!std::all_of(key.begin(), key.end(), [](char c) {
+            return std::isalnum(c) || c == '_' || c == '-';
+        })) {
+            throw ConfigError("Invalid configuration key: contains invalid characters", key);
+        }
+        
+        set(key, value, ConfigSource::File);
     }
     
     return true;
@@ -115,6 +136,20 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw ConfigError("Configuration key cannot be empty");
+    }
+    
+    if (!std::all_of(key.begin(), key.end(), [](char c) {
+        return std::isalnum(c) || c == '_' || c == '-';
+    })) {
+        throw ConfigError("Invalid configuration key: contains invalid characters", key);
+    }
+    
+    // Validate value based on key
+    validateValue(key, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -123,6 +158,61 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->source = source;
     } else {
         pImpl->entries.emplace_back(key, value, source);
+    }
+}
+
+void Config::validateValue(const std::string& key, const ConfigValue& value) {
+    // Basic validation rules for specific keys
+    std::string lowerKey = toLower(key);
+    
+    if (lowerKey == "random_seed") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t seed = std::get<int64_t>(value);
+            if (seed < 0) {
+                throw ValidationError("Random seed must be non-negative", key);
+            }
+        } else if (std::holds_alternative<int>(value)) {
+            int seed = std::get<int>(value);
+            if (seed < 0) {
+                throw ValidationError("Random seed must be non-negative", key);
+            }
+        }
+    }
+    
+    else if (lowerKey == "simulation_timestep") {
+        if (std::holds_alternative<double>(value)) {
+            double timestep = std::get<double>(value);
+            if (timestep <= 0.0) {
+                throw ValidationError("Simulation timestep must be positive", key);
+            }
+        }
+    }
+    
+    else if (lowerKey == "neuron_count") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t count = std::get<int64_t>(value);
+            if (count <= 0) {
+                throw ValidationError("Neuron count must be positive", key);
+            }
+        }
+    }
+    
+    else if (lowerKey == "region_count") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t count = std::get<int64_t>(value);
+            if (count <= 0) {
+                throw ValidationError("Region count must be positive", key);
+            }
+        }
+    }
+    
+    else if (lowerKey == "connection_probability") {
+        if (std::holds_alternative<double>(value)) {
+            double prob = std::get<double>(value);
+            if (prob < 0.0 || prob > 1.0) {
+                throw ValidationError("Connection probability must be between 0.0 and 1.0", key);
+            }
+        }
     }
 }
 
