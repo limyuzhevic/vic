@@ -18,9 +18,8 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
-{
-    // Initialize motor and sensory neuron groups
+    , sensoryNoveltyDecay_(0.99f) {
+    // Initialize motor and sensory neuron groups only if brain is available
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -345,6 +344,39 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Configuration methods
+void AgentBrain::enableRewardModulation(bool enable) {
+    rewardModulationEnabled_ = enable;
+}
+
+void AgentBrain::enableStructuralPlasticity(bool enable) {
+    structuralPlasticityEnabled_ = enable;
+}
+
+void AgentBrain::enableDevelopment(bool enable) {
+    developmentEnabled_ = enable;
+}
+
+void AgentBrain::enableCuriosity(bool enable) {
+    curiosityEnabled_ = enable;
+}
+
+bool AgentBrain::isRewardModulationEnabled() const {
+    return rewardModulationEnabled_;
+}
+
+bool AgentBrain::isStructuralPlasticityEnabled() const {
+    return structuralPlasticityEnabled_;
+}
+
+bool AgentBrain::isDevelopmentEnabled() const {
+    return developmentEnabled_;
+}
+
+bool AgentBrain::isCuriosityEnabled() const {
+    return curiosityEnabled_;
 }
 
 } // namespace nlm

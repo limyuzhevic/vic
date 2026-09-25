@@ -59,10 +59,10 @@ public:
     Brain* getBrain() { return brain_.get(); }
     
     // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }

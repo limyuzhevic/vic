@@ -54,6 +54,46 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
+    // Additional parameters for advanced Hebbian rules
+    void setBCMThreshold(float theta);
+    float getBCMThreshold() const;
+    void setBCMThresholdRate(float rate);
+    float getBCMThresholdRate() const;
+    
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    // Rule configuration flags
+    void enableBCM(bool enable);
+    void enableOja(bool enable);
+    void enableSpikeBased(bool enable);
+    void enableAntiHebbian(bool enable);
+    void enableScaling(bool enable);
+    
+    // Activity normalization
+    void setPostActivityNorm(float norm);
+    float getPostActivityNorm() const;
+    void setPreActivityNorm(float norm);
+    float getPreActivityNorm() const;
+    
+    // Learning rate modulation
+    void setLearningRateMod(float mod);
+    float getLearningRateMod() const;
+    void setGlobalLearningMod(float mod);
+    float getGlobalLearningMod() const;
+    void setScalingThreshold(float threshold);
+    float getScalingThreshold() const;
+    void setTimeDependentModulation(float mod);
+    float getTimeDependentModulation() const;
+    
+    // STDP parameters
+    void setSTDPTimeWindow(float window);
+    float getSTDPTimeWindow() const;
+    void setSTDPMaxWeightChange(float change);
+    float getSTDPMaxWeightChange() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
