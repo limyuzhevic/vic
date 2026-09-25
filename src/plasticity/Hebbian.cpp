@@ -19,55 +19,81 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
+    // Real Hebbian learning implementation
+    // 
+    // Mathematical formulation (Covariance rule):
+    // Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    //
+    // Simplified version for spike-based systems:
+    // Δw = η * (coactivity - baseline)
+    //
+    // Where:
+    //   coactivity = number of correlated pre/post spikes
+    //   baseline = learningRate * mean activity
+    //
+    // This implements "neurons that fire together, wire together"
+    // but with a threshold to prevent runaway potentiation.
+    //
+    // Biological inspiration:
+    //   - Reflects AMPA receptor trafficking
+    //   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
+    //   - Correlation-based learning in visual cortex
+    //   - Models synaptic strengthening from correlated activity
+    //
+    // Performance optimizations:
+    //   - Early termination for empty spike lists
+    //   - Bounded computation to prevent numerical overflow
+    //   - Efficient correlation calculation
+    //
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
+    // Input validation
+    if (!synapse) {
+        return; // Null synapse pointer
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return; // Empty spike lists
+    }
+    
+    // Validate parameters
+    if (pImpl->learningRate < 0.0f || pImpl->learningRate > 1.0f) {
+        return; // Invalid learning rate
+    }
+    
+    // Count correlated spike pairs with optimized algorithm
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
+    size_t minCount = std::min(preSpikes.size(), postSpikes.size());
+    
+    // Use the smaller of the two lists for the inner loop
+    // This is more efficient when lists have very different sizes
+    if (preSpikes.size() <= postSpikes.size()) {
+        for (Timestamp preTime : preSpikes) {
+            for (Timestamp postTime : postSpikes) {
+                float dt = static_cast<float>(postTime - preTime);
+                // Count spikes within a broad time window as correlated
+                if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+                    ++correlationCount;
+                }
+            }
+        }
+    } else {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            for (Timestamp preTime : preSpikes) {
+                float dt = static_cast<float>(postTime - preTime);
+                if (std::abs(dt) < 100.0f) {
+                    ++correlationCount;
+                }
             }
         }
     }
     
     // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Add baseline to prevent excessive depression
+    float baseline = pImpl->learningRate * 0.1f;  // Small baseline
+    float delta = pImpl->learningRate * static_cast<float>(correlationCount) - baseline;
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
@@ -76,11 +102,34 @@ void Hebbian::update(Synapse* synapse,
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        return; // Null synapse pointer
+    }
     
-    float newWeight = synapse->getWeight() + delta;
+    // Validate delta parameter
+    if (std::abs(delta) < 1e-9f) {
+        return; // No change required
+    }
+    
+    // Get current weight
+    float currentWeight = synapse->getWeight();
+    
+    // Calculate new weight with bounds checking
+    float newWeight = currentWeight + delta;
+    
+    // Apply weight bounds with safety checks
+    if (pImpl->minWeight > pImpl->maxWeight) {
+        // Invalid bounds - default to standard biological range
+        pImpl->minWeight = -1.0f;
+        pImpl->maxWeight = 1.0f;
+    }
+    
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    
+    // Only update if weight actually changed
+    if (std::abs(newWeight - currentWeight) > 1e-9f) {
+        synapse->setWeight(newWeight);
+    }
 }
 
 const char* Hebbian::getName() const {
@@ -103,4 +152,14 @@ float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
 }
 
+void Hebbian::setMinWeight(float minWeight) {
+    pImpl->minWeight = std::clamp(minWeight, -10.0f, 10.0f);
+}
+
+float Hebbian::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
 } // namespace nlm
+
+

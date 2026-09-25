@@ -17,11 +17,13 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
+    // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
-    
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
     
 private:
     struct Impl;

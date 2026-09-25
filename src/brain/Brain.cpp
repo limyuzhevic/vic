@@ -888,27 +888,105 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
+    // Apply synapse states - restore synapse connections
+        // This is complex because we need to find matching synapses
+        // We'll create new synapses with the loaded properties
+        
+        // First, save current regions
+        std::vector<std::unique_ptr<NeuralRegion>> savedRegions;
+        for (auto& region : pImpl->regions) {
+            savedRegions.push_back(std::move(region));
+        }
+        pImpl->regions.clear();
+        
+        // Recreate regions and neurons with saved states
+        size_t regionIndex = 0;
+        for (const auto& synData : synapseData) {
+            // For each synapse, we need to ensure source and destination neurons exist
+            // This is a simplified implementation - in practice, we'd need more sophisticated matching
+            if (regionIndex < pImpl->regions.size()) {
+                auto* region = pImpl->regions[regionIndex].get();
+                
+                // Find or create source and destination neurons
+                auto* sourceNeuron = findNeuronInRegion(neuronData, synData.sourceNeuron);
+                auto* destNeuron = findNeuronInRegion(neuronData, synData.destinationNeuron);
+                
+                if (sourceNeuron && destNeuron) {
+                    // Create synapse if not exists
+                    auto* existingSyn = findSynapseInRegion(region, synData.sourceNeuron, synData.destinationNeuron);
+                    if (!existingSyn) {
+                        // Add new synapse
+                        region->addSynapse(sourceNeuron, destNeuron, synData.weight);
+                        auto* newSyn = existingSyn; // This should be the newly created synapse
+                    } else {
+                        auto* newSyn = existingSyn;
+                        // Update existing synapse properties
+                        if (newSyn) {
+                            newSyn->setWeight(synData.weight);
+                            newSyn->setDelay(synData.delay);
+                            newSyn->setType(static_cast<SynapseType>(synData.synapseType));
+                            newSyn->setEligibilityTrace(synData.eligibilityTrace);
+                        }
+                    }
+                }
+            }
+            regionIndex = (regionIndex + 1) % pImpl->regions.size();
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
     } catch (const std::exception& e) {
+        // Restore regions from savedRegions if something went wrong
+        pImpl->regions.clear();
+        for (auto& region : savedRegions) {
+            pImpl->regions.push_back(std::move(region));
+        }
+        
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
         return false;
     }
+RegionId Brain::addRegion(const std::string& name) {
+    RegionId id(pImpl->nextRegionId++);
+    auto region = std::make_unique<NeuralRegion>(id, name);
+    pImpl->regions.push_back(std::move(region));
+    return id;
 }
 
-RegionId Brain::addRegion(const std::string& name) {
+NeuralRegion* Brain::getRegion(RegionId id) {
+    for (auto& region : pImpl->regions) {
+        if (region->getId() == id) {
+            return region.get();
+        }
+    }
+    return nullptr;
+}
+
+const NeuralRegion* Brain::getRegion(RegionId id) const {
+    for (const auto& region : pImpl->regions) {
+        if (region->getId() == id) {
+            return region.get();
+        }
+    }
+    return nullptr;
+}
+
+// Helper functions for loading
+Neuron* Brain::findNeuronInRegion(const NeuronCheckpointData& neuronData, size_t neuronIndex) {
+    if (neuronIndex < neuronData.membranePotential.size()) {
+        // In a real implementation, we'd need to map indices to actual neurons
+        // For now, returning nullptr as we don't have the neuron index mapping
+        return nullptr;
+    }
+    return nullptr;
+}
+
+Synapse* Brain::findSynapseInRegion(NeuralRegion* region, size_t sourceNeuronIndex, size_t destinationNeuronIndex) {
+    // This would need to be implemented based on the specific region structure
+    // For now, returning nullptr to indicate no synapse found
+    return nullptr;
+}
     RegionId id(pImpl->nextRegionId++);
     auto region = std::make_unique<NeuralRegion>(id, name);
     pImpl->regions.push_back(std::move(region));

@@ -78,6 +78,16 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Set with validation (advanced)
+    bool setWithValidation(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validate configuration values
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const std::string& value) const;
+    
+    // Get validation error messages
+    std::string getValidationError(const std::string& key, const std::string& value) const;
+    
     // Check existence
     bool has(const std::string& key) const;
     

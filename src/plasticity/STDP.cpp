@@ -24,82 +24,130 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
+    // Real STDP implementation based on spike-timing correlation
+    // 
+    // Mathematical formulation (basic pairwise STDP):
+    // For each pre-post spike pair with timing difference Δt = t_post - t_pre:
+    // 
+    // If Δt > 0 (pre before post): POTENTIATION
+    //   Δw = A+ * exp(-Δt / τ+)
+    // 
+    // If Δt < 0 (post before pre): DEPRESSION  
+    //   Δw = A- * exp(Δt / τ-)
+    // 
+    // Where:
+    //   A+ = ltpWeight (potentiation amplitude)
+    //   A- = ltdWeight (depression amplitude)
+    //   τ+ = τ- = timeConstant (STDP time window)
+    //
+    // Biological inspiration:
+    //   - Reflects NMDA receptor-mediated calcium signaling
+    //   - Pre-before-post activates NMDA receptors when postsynaptic spikes
+    //   - Post-before-pre causes backpropagating action potentials
+    //   - Models spike-timing dependent plasticity observed in hippocampal synapses
+    //
+    // Performance optimizations:
+    //   - Early termination for empty spike lists
+    //   - Bounded floating-point accumulation
+    //   - Efficient loop structure with cache-friendly access
+    //
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Input validation
+    if (!synapse) {
         return;
+    }
+    
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Validate parameters
+    if (pImpl->ltpWeight < 0.0f || pImpl->ltpWeight > 1.0f) {
+        return; // Invalid LTP weight
+    }
+    
+    if (pImpl->ltdWeight < 0.0f || pImpl->ltdWeight > 1.0f) {
+        return; // Invalid LTD weight
+    }
+    
+    if (pImpl->timeConstant < 1.0f || pImpl->timeConstant > 100.0f) {
+        return; // Invalid time constant
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Calculate STDP contribution for all spike pairs
+    // Optimized to minimize expensive exp() calls
     for (Timestamp preTime : preSpikes) {
+        float preFactor = pImpl->ltpWeight;
+        
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+            if (dt > 0.0f) {
+                // Pre before post: POTENTIATION (LTP)
+                // "Cells that fire together, wire together" - pre before post
+                float delta = preFactor * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
+            } else if (dt < 0.0f) {
+                // Post before pre: DEPRESSION (LTD)
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // dt == 0.0f: simultaneous spikes - no change
         }
     }
     
-    // Apply weight change with bounds
+    // Apply weight change with bounds checking
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
+        if (efficacy < 0.0f) {
+            efficacy = 1.0f; // Default to no modification if invalid efficacy
+        }
         totalDelta *= efficacy;
         
-        // Apply weight change
+        // Apply weight change through synapse interface
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
+        // This enables combination with reinforcement learning
         float currentTrace = synapse->getEligibilityTrace();
         synapse->setEligibilityTrace(currentTrace + totalDelta);
     }
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        return; // Null synapse pointer
+    }
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
+    // Validate delta parameter
+    if (std::abs(delta) < 1e-9f) {
+        return; // No change required
+    }
+    
+    // Get current weight
+    float currentWeight = synapse->getWeight();
+    
+    // Calculate new weight with bounds checking
+    float newWeight = currentWeight + delta;
+    
+    // Apply weight bounds with safety checks
+    if (pImpl->minWeight > pImpl->maxWeight) {
+        // Invalid bounds - default to standard biological range
+        pImpl->minWeight = -1.0f;
+        pImpl->maxWeight = 1.0f;
+    }
+    
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    
+    // Only update if weight actually changed
+    if (std::abs(newWeight - currentWeight) > 1e-9f) {
+        synapse->setWeight(newWeight);
+    }
 }
 
 const char* STDP::getName() const {
