@@ -16,11 +16,15 @@ using ConfigValue = std::variant<
     int,
     int64_t,
     double,
+    float,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<float>,
+    std::vector<std::string>,
+    size_t
 >;
 
 // Configuration source
@@ -64,34 +68,67 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with type conversion
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Get commonly used types
+    std::optional<bool> getBool(const std::string& key) const;
+    std::optional<int> getInt(const std::string& key) const;
+    std::optional<double> getDouble(const std::string& key) const;
+    std::optional<float> getFloat(const std::string& key) const;
+    std::optional<std::string> getString(const std::string& key) const;
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Set commonly used types
+    void setBool(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setInt(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setDouble(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setFloat(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
+    void setString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     
-    // Remove key
-    void remove(const std::string& key);
+    // Configuration validation
+    bool validateConfig() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Default configuration initialization
+    static Config getDefaultConfig();
     
-    // Clear all
-    void clear();
+    // Configuration version
+    static constexpr const char* getConfigVersion() { return "1.0.0"; }
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration keys namespace (grouping related parameters)
+    namespace ConfigKeys {
+        // Neuron parameters
+        const std::string NEURON_MEMBRANE_CAPACITANCE = "neuron.membrane_capacitance";
+        const std::string NEURON_TIME_CONSTANT = "neuron.time_constant";
+        const std::string NEURON_MAX_SPIKE_HISTORY = "neuron.max_spike_history";
+        const std::string NEURON_RESTING_POTENTIAL = "neuron.resting_potential";
+        const std::string NEURON_THRESHOLD = "neuron.threshold";
+        const std::string NEURON_RESET_POTENTIAL = "neuron.reset_potential";
+        const std::string NEURON_REFACTORY_PERIOD = "neuron.refractory_period";
+        const std::string NEURON_ADAPTATION_STRENGTH = "neuron.adaptation_strength";
+        const std::string NEURON_SPIKE_HISTORY_SIZE = "neuron.spike_history_size";
+        
+        // Plasticity parameters
+        const std::string PLASTICITY_STDP_LTP_WEIGHT = "plasticity.stdp.ltp_weight";
+        const std::string PLASTICITY_STDP_LTD_WEIGHT = "plasticity.stdp.ltd_weight";
+        const std::string PLASTICITY_STDP_TIME_CONSTANT = "plasticity.stdp.time_constant";
+        
+        // Development parameters
+        const std::string DEVELOPMENT_BASE_PLASTICITY_RATE = "development.base_plasticity_rate";
+        const std::string DEVELOPMENT_CRITICAL_PERIOD_DURATION = "development.critical_period_duration";
+        const std::string DEVELOPMENT_MATURATION_RATE = "development.maturation_rate";
+        
+        // Memory parameters
+        const std::string MEMORY_Episodic_CAPACITY = "memory.episodic_capacity";
+        const std::string MEMORY_WORKING_DURATION = "memory.working_memory_duration";
+        
+        // Neuromodulation parameters
+        const std::string NEUROMODULATION_DOPAMINE_SCALE = "neuromodulation.dopamine_scale";
+        const std::string NEUROMODULATION_NOVELTY_THRESHOLD = "neuromodulation.novelty_threshold";
+    }
     
 private:
     struct Impl;

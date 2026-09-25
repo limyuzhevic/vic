@@ -44,8 +44,9 @@ struct NeuronState {
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
 public:
-    // Create neuron with ID
+    // Create neuron with ID and optional configuration
     explicit Neuron(NeuronId id);
+    Neuron(NeuronId id, std::shared_ptr<Config> config);
     
     ~Neuron();
     
@@ -74,6 +75,7 @@ public:
     // Threshold
     MembranePotential getThreshold() const;
     void setThreshold(MembranePotential threshold);
+    void setThresholdFromConfig(std::shared_ptr<Config> config);
     
     // Firing state
     bool isFiring() const;
@@ -88,11 +90,15 @@ public:
     
     // LIF neuron parameters
     void setLeakConductance(MembranePotential conductance);
+    void setLeakConductanceFromConfig(std::shared_ptr<Config> config);
     MembranePotential getLeakConductance() const;
     uint32_t getRefractoryPeriod() const;
     void setRestingPotential(MembranePotential potential);
+    void setRestingPotentialFromConfig(std::shared_ptr<Config> config);
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
+    void setResetPotentialFromConfig(std::shared_ptr<Config> config);
+    MembranePotential getResetPotential() const;
     
     // Spike detection
     bool checkThreshold() const;
@@ -142,6 +148,9 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Initialize from configuration
+    void initializeFromConfig(std::shared_ptr<Config> config);
     
 private:
     struct Impl;

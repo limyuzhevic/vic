@@ -142,6 +142,14 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+void Config::set(const std::string& key, float value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, size_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
 bool Config::has(const std::string& key) const {
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -197,6 +205,137 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Get commonly used types
+std::optional<bool> Config::getBool(const std::string& key) const {
+    auto val = get<bool>(key);
+    return val;
+}
+
+std::optional<int> Config::getInt(const std::string& key) const {
+    auto val = get<int>(key);
+    return val;
+}
+
+std::optional<double> Config::getDouble(const std::string& key) const {
+    auto val = get<double>(key);
+    return val;
+}
+
+std::optional<float> Config::getFloat(const std::string& key) const {
+    auto val = get<float>(key);
+    return val;
+}
+
+std::optional<std::string> Config::getString(const std::string& key) const {
+    auto val = get<std::string>(key);
+    return val;
+}
+
+void Config::setBool(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setInt(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setDouble(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setFloat(const std::string& key, float value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::setString(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+bool Config::validateConfig() const {
+    // Basic validation: check that required keys exist and have valid values
+    // This is a placeholder - actual validation would depend on application needs
+    
+    // Check that neuron_count is a positive integer
+    auto neuronCount = getInt("brain.neuron_count");
+    if (neuronCount && *neuronCount <= 0) {
+        return false;
+    }
+    
+    // Check that simulation_timestep is positive
+    auto timestep = getDouble("simulation_timestep");
+    if (timestep && *timestep <= 0.0) {
+        return false;
+    }
+    
+    // Add more validation rules as needed
+    return true;
+}
+
+Config Config::getDefaultConfig() {
+    Config config;
+    
+    // Neuron parameters
+    config.setFloat(ConfigKeys::NEURON_MEMBRANE_CAPACITANCE, 1.0);
+    config.setDouble(ConfigKeys::NEURON_TIME_CONSTANT, 20.0);
+    config.setSize_t(ConfigKeys::NEURON_MAX_SPIKE_HISTORY, 100);
+    config.setDouble(ConfigKeys::NEURON_RESTING_POTENTIAL, -70.0);
+    config.setDouble(ConfigKeys::NEURON_THRESHOLD, -55.0);
+    config.setDouble(ConfigKeys::NEURON_RESET_POTENTIAL, -70.0);
+    config.setInt(ConfigKeys::NEURON_REFACTORY_PERIOD, 5);
+    config.setDouble(ConfigKeys::NEURON_ADAPTATION_STRENGTH, 1.0);
+    config.setSize_t(ConfigKeys::NEURON_SPIKE_HISTORY_SIZE, 100);
+    
+    // Plasticity parameters
+    config.setDouble(ConfigKeys::PLASTICITY_STDP_LTP_WEIGHT, 0.02);
+    config.setDouble(ConfigKeys::PLASTICITY_STDP_LTD_WEIGHT, 0.015);
+    config.setDouble(ConfigKeys::PLASTICITY_STDP_TIME_CONSTANT, 20.0);
+    
+    // Development parameters
+    config.setDouble(ConfigKeys::DEVELOPMENT_BASE_PLASTICITY_RATE, 0.0001);
+    config.setDouble(ConfigKeys::DEVELOPMENT_CRITICAL_PERIOD_DURATION, 100.0);
+    config.setDouble(ConfigKeys::DEVELOPMENT_MATURATION_RATE, 0.01);
+    
+    // Memory parameters
+    config.setSize_t(ConfigKeys::MEMORY_Episodic_CAPACITY, 1000);
+    config.setDouble(ConfigKeys::MEMORY_WORKING_DURATION, 5000.0);
+    
+    // Neuromodulation parameters
+    config.setDouble(ConfigKeys::NEUROMODULATION_DOPAMINE_SCALE, 1.0);
+    config.setDouble(ConfigKeys::NEUROMODULATION_NOVELTY_THRESHOLD, 0.5);
+    
+    // Brain parameters
+    config.setInt("brain.neuron_count", 1000);
+    config.setInt("brain.region_count", 1);
+    config.setDouble("brain.connection_probability", 0.1);
+    config.setDouble("brain.initial_weight_mean", 0.5);
+    config.setDouble("brain.initial_weight_std", 0.1);
+    config.setDouble("brain.v_thresh", -50.0);
+    config.setDouble("brain.v_rest", -70.0);
+    config.setDouble("brain.v_reset", -75.0);
+    config.setDouble("brain.tau_mem", 20.0);
+    config.setDouble("brain.tau_ref", 2.0);
+    
+    // Plasticity configuration
+    config.setBool("plasticity.stdp.enable", true);
+    config.setDouble("plasticity.stdp.learning_rate", 0.001);
+    config.setDouble("plasticity.stdp.tau_plus", 20.0);
+    config.setDouble("plasticity.stdp.tau_minus", 20.0);
+    config.setBool("plasticity.hebbian.enable", true);
+    config.setBool("plasticity.structural.enable", true);
+    
+    // Neuromodulation configuration
+    config.setDouble("neuromod.dopamine.scale", 1.0);
+    config.setBool("neuromod.curiosity.enable", true);
+    config.setBool("neuromod.novelty.enable", true);
+    
+    // Development configuration
+    config.setBool("development.enable", true);
+    config.setDouble("development.maturation_rate", 0.01);
+    config.setDouble("development.critical_period_end", 100.0);
+    
+    return config;
 }
 
 // Explicit template instantiations

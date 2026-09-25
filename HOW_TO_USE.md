@@ -8,6 +8,8 @@ This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
 3. Using the NLM Python API
+4. Configuration options
+5. Testing and troubleshooting
 
 ---
 
@@ -52,7 +54,8 @@ After successful compilation, you will have:
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
+| `nlm_phase6_demo` | Executable | Phase 6 integration test |
+| `nlm_test` | Executable | Unit test suite (includes new DevelopmentSystem, Neuromodulator, and PredictionError tests) |
 
 ### Build Options
 
@@ -220,7 +223,7 @@ def run_agent_simulation(num_steps=1000):
     # 7. Run simulation loop
     for step in range(num_steps):
         # Update world
-        world.update(timestep=0.1)
+        world.update(0.1)
         
         # Get sensory input from world
         percept = world.getSensoryPercept()
@@ -256,6 +259,47 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
+### Advanced Configuration
+
+NLM now supports extensive configuration options for fine-tuning brain parameters:
+
+```python
+import pynlm
+
+# Create configuration with custom parameters
+config = pynlm.createDefaultConfig()
+
+# Neuron parameters
+config.set("neuron.membrane_capacitance", 2.0f)  # nF
+config.set("neuron.time_constant", 25.0)         # ms
+config.set("neuron.resting_potential", -65.0)    # mV
+config.set("neuron.threshold", -50.0)            # mV
+config.set("neuron.refractory_period", 10)       # steps
+
+# Brain parameters
+config.set("brain.neuron_count", 500)
+config.set("brain.synapse_density", 0.2)
+config.set("brain.connection_probability", 0.05)
+
+# Plasticity parameters
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.005)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+
+# Development parameters
+config.set("development.enable", True)
+config.set("development.maturation_rate", 0.02)
+
+# Neuromodulation parameters
+config.set("neuromod.dopamine.scale", 1.5)
+config.set("neuromod.curiosity.enable", True)
+
+# Create brain with custom configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
 ### Key Classes and Methods
 
 #### Brain Class
@@ -286,10 +330,6 @@ brain.getExcitationInhibitionRatio()  # E/I balance
 # State
 brain.save("checkpoint.bin")       # Save state
 brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
 ```
 
 #### Config Class
@@ -387,9 +427,9 @@ world.setMaxEnergy(100.0)
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
 # Developmental stages
@@ -401,7 +441,12 @@ pynlm.DevelopmentalStage.Aging
 
 # Action types
 pynlm.ActionType.MoveForward
+pynlm.ActionType.MoveBackward
+pynlm.ActionType.MoveLeft
+pynlm.ActionType.MoveRight
 pynlm.ActionType.TurnLeft
+pynlm.ActionType.TurnRight
+pynlm.ActionType.Look
 pynlm.ActionType.Interact
 pynlm.ActionType.Eat
 # ... and more
@@ -412,6 +457,48 @@ pynlm.WorldObjectType.Resource
 pynlm.WorldObjectType.Hazard
 pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
+```
+
+### Example Scripts
+
+#### Minimal Example
+
+```python
+import pynlm
+
+# Create and initialize
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Simulate
+for i in range(100):
+    brain.step(i)
+
+print("Simulation complete!")
+```
+
+#### Environment Interaction
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run episode
+for _ in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(0)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
 ---
@@ -451,6 +538,14 @@ pynlm.WorldObjectType.Marker
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+
+### Development Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `development.enable` | bool | true | Enable development |
+| `development.maturation_rate` | float | 0.01 | Development maturation rate |
+| `development.critical_period_end` | float | 100.0 | Critical period end time |
 
 ---
 
@@ -524,6 +619,20 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+### Configuration Issues
+
+**Configuration validation fails:**
+- Check that numeric values are within valid ranges
+- Ensure required keys are present
+- Use `config.summary()` to see current configuration
+
+### Testing Issues
+
+**New unit tests fail to compile:**
+- Ensure all test headers are properly included
+- Check that the test framework CMakeLists.txt includes the new test files
+- Run `make -j4` in the build directory to recompile tests
+
 ---
 
 ## Further Reading
@@ -531,3 +640,5 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+The NLM project has been significantly enhanced with improved code quality, comprehensive testing, and extensive configuration options while maintaining backward compatibility.

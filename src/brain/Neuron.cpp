@@ -18,13 +18,14 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // LIF parameters (can be overridden by config)
+    float membraneCapacitance;  // nF - default: 1.0
+    float timeConstant;  // ms - default: 20.0
+    size_t maxSpikeHistory;  // default: 100
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             membraneCapacitance(1.0f), timeConstant(20.0f), maxSpikeHistory(100) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -33,6 +34,19 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+}
+
+Neuron::Neuron(NeuronId id, std::shared_ptr<Config> config) : pImpl(new Impl) {
+    pImpl->id = id;
+    pImpl->type = NeuronType::Internal;
+    pImpl->regionId = INVALID_REGION_ID;
+    pImpl->populationId = INVALID_POPULATION_ID;
+    pImpl->totalCurrent = 0.0f;
+    
+    // Initialize from configuration if provided
+    if (config) {
+        initializeFromConfig(config);
+    }
 }
 
 Neuron::~Neuron() = default;
@@ -210,8 +224,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = pImpl->timeConstant;  // ms (configurable)
+    float C = pImpl->membraneCapacitance;  // nF (configurable)
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -295,6 +309,97 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.lastSpikeTime = -1.0f;
     
     // Clear any residual state
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
+}
+
+void Neuron::initializeFromConfig(std::shared_ptr<Config> config) {
+    if (!config) {
+        return;
+    }
+    
+    // Initialize membrane capacitance from config if available
+    auto membraneCapacitance = config->getFloat(ConfigKeys::NEURON_MEMBRANE_CAPACITANCE);
+    if (membraneCapacitance) {
+        pImpl->membraneCapacitance = *membraneCapacitance;
+    }
+    
+    // Initialize time constant from config if available
+    auto timeConstant = config->getDouble(ConfigKeys::NEURON_TIME_CONSTANT);
+    if (timeConstant) {
+        pImpl->timeConstant = static_cast<float>(*timeConstant);
+    }
+    
+    // Initialize max spike history from config if available
+    auto maxSpikeHistory = config->getSize_t(ConfigKeys::NEURON_MAX_SPIKE_HISTORY);
+    if (maxSpikeHistory) {
+        pImpl->maxSpikeHistory = *maxSpikeHistory;
+    }
+    
+    // Initialize other neuron parameters from config
+    auto restingPotential = config->getDouble(ConfigKeys::NEURON_RESTING_POTENTIAL);
+    if (restingPotential) {
+        pImpl->state.restingPotential = static_cast<MembranePotential>(*restingPotential);
+    }
+    
+    auto threshold = config->getDouble(ConfigKeys::NEURON_THRESHOLD);
+    if (threshold) {
+        pImpl->state.threshold = static_cast<MembranePotential>(*threshold);
+    }
+    
+    auto resetPotential = config->getDouble(ConfigKeys::NEURON_RESET_POTENTIAL);
+    if (resetPotential) {
+        pImpl->state.resetPotential = static_cast<MembranePotential>(*resetPotential);
+    }
+    
+    auto refractoryPeriod = config->getInt(ConfigKeys::NEURON_REFACTORY_PERIOD);
+    if (refractoryPeriod) {
+        pImpl->state.refractoryPeriod = static_cast<uint32_t>(*refractoryPeriod);
+    }
+}
+
+// Set threshold from config (convenience method)
+void Neuron::setThresholdFromConfig(std::shared_ptr<Config> config) {
+    if (config) {
+        auto threshold = config->getDouble(ConfigKeys::NEURON_THRESHOLD);
+        if (threshold) {
+            setThreshold(static_cast<MembranePotential>(*threshold));
+        }
+    }
+}
+
+// Set leak conductance from config (convenience method)
+void Neuron::setLeakConductanceFromConfig(std::shared_ptr<Config> config) {
+    if (config) {
+        auto conductance = config->getDouble(ConfigKeys::NEURON_LEAK_CONDUCTANCE);
+        if (conductance) {
+            setLeakConductance(static_cast<MembranePotential>(*conductance));
+        }
+    }
+}
+
+// Set resting potential from config (convenience method)
+void Neuron::setRestingPotentialFromConfig(std::shared_ptr<Config> config) {
+    if (config) {
+        auto restingPotential = config->getDouble(ConfigKeys::NEURON_RESTING_POTENTIAL);
+        if (restingPotential) {
+            setRestingPotential(static_cast<MembranePotential>(*restingPotential));
+        }
+    }
+}
+
+// Set reset potential from config (convenience method)
+void Neuron::setResetPotentialFromConfig(std::shared_ptr<Config> config) {
+    if (config) {
+        auto resetPotential = config->getDouble(ConfigKeys::NEURON_RESET_POTENTIAL);
+        if (resetPotential) {
+            setResetPotential(static_cast<MembranePotential>(*resetPotential));
+        }
+    }
+}
+
+void Neuron::reset() {
+    pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }

@@ -62,14 +62,7 @@ struct LearningExperiment {
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
-        
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
-            }
-        }
+        recordWeightsVector(initialWeights);
         
         NLM_LOG_INFO("Initial state recorded:");
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
@@ -81,14 +74,7 @@ struct LearningExperiment {
     }
     
     void recordFinalState() {
-        finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
-            }
-        }
+        recordWeightsVector(finalWeights);
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
@@ -98,6 +84,25 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        }
+    }
+    
+    void recordWeightsVector(std::vector<float>& weights) {
+        weights.clear();
+        
+        // Record weights from first region with proper error handling
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            const auto& synapses = region->getSynapses();
+            if (synapses.empty()) {
+                NLM_LOG_WARNING("No synapses found in region for weight recording");
+                return;
+            }
+            
+            for (const auto& syn : synapses) {
+                weights.push_back(syn->getWeight());
+            }
+        } else {
+            NLM_LOG_ERROR("Failed to get region 1 for weight recording");
         }
     }
     
@@ -159,17 +164,23 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+};
+
+// Test functions with improved naming conventions
+void testBasicConnectivity(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: Failed to get region for basic connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("ERROR: No neurons found in region for connectivity test");
         return;
     }
     
@@ -202,20 +213,46 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+}
+
+// Test functions with improved naming conventions
+void testPlasticityLearningExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Brain pointer is null in plasticity experiment");
+        return;
+    }
     
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
+    // Enable plasticity on synapses with error checking
+    bool plasticityEnabled = false;
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        auto& synapses = region->getSynapses();
+        if (synapses.empty()) {
+            NLM_LOG_WARNING("No synapses found in region for plasticity - experiment may not work as expected");
+        } else {
+            for (auto& syn : synapses) {
+                // Check if plasticity is supported before enabling
+                if (syn) {
+                    syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+                    plasticityEnabled = true;
+                } else {
+                    NLM_LOG_WARNING("Null synapse encountered during plasticity setup");
+                }
+            }
         }
+    } else {
+        NLM_LOG_ERROR("ERROR: Failed to get region 1 for plasticity experiment");
+    }
+    
+    if (!plasticityEnabled) {
+        NLM_LOG_WARNING("Plasticity was not enabled on any synapses - learning may not occur");
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -245,18 +282,55 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+}
+
+// Test functions with improved naming conventions
+void testStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Brain pointer is null in STDP verification");
+        return;
+    }
     
-    // Get first few synapses
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: Failed to get region 1 for STDP verification");
+        return;
+    }
+    
+    // Get first few synapses with validation
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
         NLM_LOG_INFO("  Not enough synapses for STDP test");
         return;
+    }
+    
+    // Validate synapse plasticity capabilities
+    size_t plasticityEnabled = 0;
+    for (size_t i = 0; i < 5; ++i) {
+        if (!synapses[i]) {
+            NLM_LOG_WARNING("Null synapse at index " + std::to_string(i) + " in STDP test");
+            continue;
+        }
+        
+        // Check current plasticity flags before setting
+        auto plasticityFlags = synapses[i]->getPlasticityFlags();
+        if (!plasticityFlags.hebbianEnabled && !plasticityFlags.stdpEnabled && !plasticityFlags.rewardModulated) {
+            NLM_LOG_INFO("    Enabling STDP for synapse " + std::to_string(i));
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+            plasticityEnabled++;
+        } else {
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + " already has plasticity enabled: " +
+                        "Hebbian=" + std::to_string(plasticityFlags.hebbianEnabled) +
+                        " STDP=" + std::to_string(plasticityFlags.stdpEnabled) +
+                        " RewardModulated=" + std::to_string(plasticityFlags.rewardModulated));
+        }
+    }
+    
+    if (plasticityEnabled == 0) {
+        NLM_LOG_WARNING("WARNING: No synapses had plasticity enabled for STDP test");
     }
     
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
@@ -264,26 +338,26 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     // Record initial weights
     std::vector<float> beforeWeights;
     for (size_t i = 0; i < 5; ++i) {
+        if (!synapses[i]) continue;  // Skip null synapses
         beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
+    // Get neurons for correlation testing
+    auto neurons = region->getAllNeurons();
+    if (neurons.size() < 2) {
+        NLM_LOG_ERROR("ERROR: Need at least 2 neurons for STDP correlation test");
+        return;
+    }
+    
     for (int trial = 0; trial < 50; ++trial) {
-        // Fire pre-synaptic neuron
-        Neuron* preNeuron = nullptr;
-        Neuron* postNeuron = nullptr;
-        
-        auto neurons = region->getAllNeurons();
-        if (neurons.size() >= 2) {
-            preNeuron = neurons[0];
-            postNeuron = neurons[1];
-        }
+        Neuron* preNeuron = neurons[0];
+        Neuron* postNeuron = neurons[1];
         
         if (preNeuron && postNeuron) {
             // Pre fires first
@@ -296,28 +370,40 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         }
     }
     
-    // Record after weights
+    // Record after weights with error checking
     NLM_LOG_INFO("  After correlated activity:");
     for (size_t i = 0; i < 5; ++i) {
+        if (i >= beforeWeights.size() || !synapses[i]) {
+            continue; // Skip invalid synapses
+        }
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
-    // Check if weights increased (LTP)
+    // Check if weights increased (LTP) with validation
     float totalDelta = 0.0f;
+    size_t validSynapses = 0;
     for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+        if (i < beforeWeights.size() && synapses[i]) {
+            totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+            validSynapses++;
+        }
     }
     
     NLM_LOG_INFO("");
+    if (validSynapses == 0) {
+        NLM_LOG_INFO("  ERROR: No valid synapses to analyze for STDP");
+        return;
+    }
+    
     if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation (Δ=" + std::to_string(totalDelta) + ")");
     } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+        NLM_LOG_INFO("  ! STDP reversed: Check parameters (Δ=" + std::to_string(totalDelta) + ")");
     } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_INFO("  ! No change: STDP may not be triggering (total synapses analyzed: " + std::to_string(validSynapses) + ")");
     }
 }
 
@@ -410,19 +496,17 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    testBasicConnectivity(brain);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    testPlasticityLearningExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run Test 3: STDP verification
+    testStdpVerification(brain);
     
     // Final brain status
     NLM_LOG_INFO("");
