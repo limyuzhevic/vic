@@ -134,9 +134,14 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
-    // Set parameters
+    // Get parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Get current parameters
+    float getFormationThreshold() const { return formationThreshold_; }
+    float getStabilityThreshold() const { return stabilityThreshold_; }
+    size_t getStabilityWindow() const { return stabilityWindow_; }
 
 private:
     // Create new concept from pattern

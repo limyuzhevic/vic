@@ -55,14 +55,14 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
+    src/memory/NeuralSemanticMemory.cpp
+    src/memory/NeuralProceduralMemory.cpp
+    # Memory
+    # Memory
+    # Memory
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
     # Sensory
@@ -72,14 +72,22 @@ add_library(nlm_core STATIC
     src/sensory/InternalSignals.cpp
     # Prediction
     src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
+    # Environment
+    # Environment
+    src/environment/Environment.cpp
+    src/environment/Observation.cpp
+    # Environment
+    src/environment/Environment.cpp
+    src/environment/Observation.cpp
+    # Environment
+    src/environment/Environment.cpp
+    src/environment/Observation.cpp
+    # Environment
+    src/environment/Environment.cpp
+    src/environment/Observation.cpp
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp

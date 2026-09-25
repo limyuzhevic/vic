@@ -12,7 +12,7 @@ void testRandomGeneratorCreation() {
     
     // Same seed should produce same sequence
     for (int i = 0; i < 10; ++i) {
-        assert(rng1.uniformInt(0, 100) == rng2.uniformInt(0, 100));
+        assert(rng1.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(100)) == rng2.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(100)));
     }
     
     std::cout << "    testRandomGeneratorCreation passed" << std::endl;
@@ -22,7 +22,7 @@ void testUniformInt() {
     nlm::RandomGenerator rng(42);
     
     for (int i = 0; i < 100; ++i) {
-        uint32_t val = rng.uniformInt(5, 10);
+        uint32_t val = rng.uniformInt(static_cast<uint32_t>(5), static_cast<uint32_t>(10));
         assert(val >= 5 && val <= 10);
     }
     
@@ -119,10 +119,10 @@ void testSeed() {
     nlm::RandomGenerator rng;
     
     rng.seed(12345);
-    uint32_t val1 = rng.uniformInt(0, 1000);
+    uint32_t val1 = rng.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(1000));
     
     rng.seed(12345);
-    uint32_t val2 = rng.uniformInt(0, 1000);
+    uint32_t val2 = rng.uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(1000));
     
     assert(val1 == val2);
     

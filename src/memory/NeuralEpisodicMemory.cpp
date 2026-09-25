@@ -235,21 +235,46 @@ void NeuralEpisodicMemory::clear() {
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
     size_t count) const {
     
-    // Select episodes for replay based on:
+    // Enhanced replay selection based on multiple criteria:
     // 1. Recency (more recent episodes)
     // 2. Reward (higher reward episodes)
     // 3. Unpredictability (higher prediction error episodes)
+    // 4. Novelty (higher novelty episodes)
+    // 5. Coherence (higher coherence with current state)
+    // 6. Importance (higher importance scores)
     
-    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    std::vector<std::tuple<float, float, size_t, float>> scored;  // (score, reward, index, importance)
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
+        // Recency score - more recent episodes are more important for replay
         float recencyScore = 1.0f / (episodes_[i].age + 1);
+        
+        // Reward score - reward learning benefits from replay
         float rewardScore = episodes_[i].reward;
-        float score = recencyScore * 0.5f + rewardScore * 0.5f;
-        scored.emplace_back(score, rewardScore, i);
+        
+        // Novelty score - novel episodes need consolidation
+        float noveltyScore = episodes_[i].novelty;
+        
+        // Coherence score - episodes that cohere with current state
+        float coherenceScore = 0.5f;  // Placeholder - would compute coherence with current neural state
+        
+        // Importance score - intrinsic importance of the episode
+        float importanceScore = coherenceScore * 0.5f + 
+                              recencyScore * 0.2f + 
+                              noveltyScore * 0.2f + 
+                              rewardScore * 0.1f;
+        
+        // Combined replay score using multiple criteria
+        float replayScore = recencyScore * 0.25f + 
+                           rewardScore * 0.25f + 
+                           noveltyScore * 0.20f + 
+                           coherenceScore * 0.15f + 
+                           importanceScore * 0.15f;
+        
+        scored.emplace_back(replayScore, rewardScore, i, importanceScore);
     }
     
-    // Sort by score
+    // Sort by replay score (highest first)
     std::sort(scored.begin(), scored.end(),
         [](const auto& a, const auto& b) {
             return std::get<0>(a) > std::get<0>(b);
@@ -292,30 +317,208 @@ float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
     return dot / (std::sqrt(normQ) * std::sqrt(normE));
 }
 
-bool NeuralEpisodicMemory::matchesCriteria(
-    const EpisodicMemoryItem& episode,
-    const std::vector<float>* sensoryQuery,
-    SimulationStep* startTime,
-    SimulationStep* endTime,
-    ActionType* actionQuery) const {
+void NeuralEpisodicMemory::integrateIntoSchema(const EpisodicMemoryItem* episode) {
+    if (!episode || !brain_) return;
     
-    if (sensoryQuery) {
-        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
-            return false;
+    // Schema integration involves:
+    // 1. Identifying patterns in the episode
+    // 2. Integrating with existing schemas in semantic memory
+    // 3. Abstracting general knowledge from specific experience
+    
+    // For now, this is a placeholder - in full implementation this would
+    // integrate with semantic memory and create generalized knowledge
+    
+    NLM_LOG_INFO("Integrating episode into schema: timestamp " + 
+                std::to_string(episode->timestamp));
+}
+
+void NeuralEpisodicMemory::recordReplayRepetition(const EpisodicMemoryItem* episode) {
+    if (!episode) return;
+    
+    // Track replay repetitions for consolidation
+    // In a full implementation, this would maintain replay counters
+    // and adjust consolidation based on repetition count
+    
+    // For now, just track that replay occurred
+    NLM_LOG_INFO("Recording replay repetition for episode: " + 
+                std::to_string(episode->timestamp));
+}
+
+void NeuralEpisodicMemory::enhancedReplayEpisode(const EpisodicMemoryItem* episode, 
+                                               float replayStrength,
+                                               bool enablePatternCompletion,
+                                               bool enableSchemaIntegration) {
+    if (!episode || !brain_) return;
+    
+    // Enhanced replay with multiple mechanisms:
+    // 1. Synaptic strengthening through spike timing-dependent plasticity
+    // 2. Pattern completion through attractor network dynamics
+    // 3. Schema integration for abstract knowledge formation
+    // 4. Cross-modal integration
+    
+    // Reactivate neurons that were active during this episode with enhanced strength
+    for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+        NeuronId neuron = episode->activeNeurons[i];
+        float activation = i < episode->neuronActivations.size() ? 
+                          episode->neuronActivations[i] : 0.5f;
+        
+        // Enhanced current injection based on replay strength
+        float enhancedCurrent = activation * 3.0f * replayStrength;
+        brain_->injectCurrent(neuron, enhancedCurrent);
+        
+        // Apply spike timing-dependent plasticity if enabled
+        // This would involve timing spikes with existing activity
+    }
+    
+    // Pattern completion - if enabled, use partial activation to complete full pattern
+    if (enablePatternCompletion) {
+        // Use working memory or current activation patterns to complete episode pattern
+        if (brain_->getWorkingMemory()) {
+            std::vector<float> currentPattern = brain_->getWorkingMemory()->retrieve();
+            
+            // Pattern completion dynamics
+            for (size_t i = 0; i < std::min(currentPattern.size(), 
+                                           episode->sensoryState.size()); ++i) {
+                float target = episode->sensoryState[i];
+                float current = currentPattern[i];
+                float completion = (target - current) * 0.5f * replayStrength;
+                // Would apply completion to relevant neural populations
+            }
         }
     }
     
-    if (startTime && endTime) {
-        if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
-            return false;
+    // Schema integration - integrate episode into abstract knowledge
+    if (enableSchemaIntegration) {
+        integrateIntoSchema(episode);
+    }
+    
+    // Record replay for consolidation tracking
+    recordReplayRepetition(episode);
+}
+
+// Implement the new methods from the header
+std::vector<std::vector<const EpisodicMemoryItem*>> NeuralEpisodicMemory::getGroupedEpisodesForReplay(
+    size_t maxTotalEpisodes, size_t maxGroupSize) const {
+    
+    std::vector<std::vector<const EpisodicMemoryItem*>> groups;
+    
+    // Score all episodes for importance
+    std::vector<std::pair<float, size_t>> scoredEpisodes;
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        float recencyScore = 1.0f / (episodes_[i].age + 1);
+        float rewardScore = episodes_[i].reward;
+        float noveltyScore = episodes_[i].novelty;
+        
+        float totalScore = recencyScore * 0.4f + rewardScore * 0.3f + 
+                          noveltyScore * 0.3f;
+        
+        scoredEpisodes.emplace_back(totalScore, i);
+    }
+    
+    // Sort by score
+    std::sort(scoredEpisodes.begin(), scoredEpisodes.end(),
+        [](const auto& a, const auto& b) { return a.first > b.first; });
+    
+    // Group by temporal proximity (episodes with similar timestamps)
+    size_t currentGroupIndex = 0;
+    std::vector<const EpisodicMemoryItem*> currentGroup;
+    
+    for (const auto& scored : scoredEpisodes) {
+        size_t episodeIndex = scored.second;
+        const auto& episode = episodes_[episodeIndex];
+        
+        if (currentGroup.size() < maxGroupSize) {
+            // Check if this episode is temporally close to others in the group
+            bool canAddToGroup = true;
+            if (!currentGroup.empty()) {
+                // For simplicity, just check if it's one of the top recent episodes
+                // In full implementation, would check temporal distance
+                canAddToGroup = true;
+            }
+            
+            if (canAddToGroup) {
+                currentGroup.push_back(&episode);
+            }
+        }
+        
+        if (currentGroup.size() >= maxGroupSize) {
+            groups.push_back(currentGroup);
+            currentGroup.clear();
+        }
+        
+        if (groups.size() * maxGroupSize >= maxTotalEpisodes) {
+            break;
         }
     }
     
-    if (actionQuery && episode.action != *actionQuery) {
-        return false;
+    if (!currentGroup.empty()) {
+        groups.push_back(currentGroup);
     }
     
-    return true;
+    return groups;
+}
+
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getImportantEpisodesForRehearsal(
+    float importanceThreshold) const {
+    
+    std::vector<const EpisodicMemoryItem*> importantEpisodes;
+    
+    for (const auto& episode : episodes_) {
+        // Calculate importance based on multiple factors
+        float recencyScore = 1.0f / (episode.age + 1);
+        float rewardScore = episode.reward;
+        float noveltyScore = episode.novelty;
+        
+        float importance = recencyScore * 0.4f + rewardScore * 0.3f + 
+                          noveltyScore * 0.3f;
+        
+        if (importance >= importanceThreshold) {
+            importantEpisodes.push_back(&episode);
+        }
+    }
+    
+    // Sort by importance (highest first)
+    std::sort(importantEpisodes.begin(), importantEpisodes.end(),
+        [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+            float scoreA = 1.0f / (a->age + 1) * 0.4f + a->reward * 0.3f + a->novelty * 0.3f;
+            float scoreB = 1.0f / (b->age + 1) * 0.4f + b->reward * 0.3f + b->novelty * 0.3f;
+            return scoreA > scoreB;
+        });
+    
+    return importantEpisodes;
+}
+
+void NeuralEpisodicMemory::scheduleReplays(float timeUntilSleep) {
+    if (!brain_ || timeUntilSleep <= 0.0f) return;
+    
+    // Schedule replays based on time until sleep
+    // More replays if more time available
+    size_t numReplays = std::min(static_cast<size_t>(timeUntilSleep / 100.0f), 
+                                static_cast<size_t>(episodes_.size() / 10));
+    
+    if (numReplays == 0) return;
+    
+    // Get episodes for replay with temporal grouping
+    auto groups = getGroupedEpisodesForReplay(numReplays * 3, 3);  // 3 episodes per group
+    
+    // Schedule replays - in full implementation, would schedule actual replay events
+    for (const auto& group : groups) {
+        if (group.empty()) continue;
+        
+        // For now, just log the scheduling
+        // In full implementation, would schedule replay through brain or event system
+    }
+}
+
+NeuralEpisodicMemory::ReplayStats NeuralEpisodicMemory::getReplayStats() const {
+    ReplayStats stats;
+    stats.totalReplays = 0;
+    stats.totalRehearsals = 0;
+    
+    // Calculate basic statistics
+    // In full implementation, would track actual replay events
+    
+    return stats;
 }
 
 // NeuralAssociativeMemory Implementation

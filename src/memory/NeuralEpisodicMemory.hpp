@@ -6,11 +6,9 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <map>
 
 namespace nlm {
-
-// EpisodicMemoryItem: Represents a stored experience
-// NOT a textual record - stores neural activity patterns and associations
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
     
@@ -123,6 +121,41 @@ public:
 
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
+
+    // Enhanced replay mechanisms for memory consolidation
+    
+    // Get episodes for replay with enhanced selection (temporal grouping)
+    std::vector<std::vector<const EpisodicMemoryItem*>> getGroupedEpisodesForReplay(
+        size_t maxTotalEpisodes, size_t maxGroupSize) const;
+    
+    // Get important episodes that need multiple replays
+    std::vector<const EpisodicMemoryItem*> getImportantEpisodesForRehearsal(
+        float importanceThreshold = 0.7f) const;
+    
+    // Replay episode with enhanced mechanisms (schema integration, pattern completion)
+    void enhancedReplayEpisode(const EpisodicMemoryItem* episode, 
+                              float replayStrength = 1.0f,
+                              bool enablePatternCompletion = true,
+                              bool enableSchemaIntegration = true);
+    
+    // Schedule replay for important memories with optimal timing
+    void scheduleReplays(float timeUntilSleep);
+    
+    // Memory schema formation during replay
+    void integrateIntoSchema(const EpisodicMemoryItem* episode);
+    
+    // Track replay repetitions for consolidation
+    void recordReplayRepetition(const EpisodicMemoryItem* episode);
+    
+    // Get replay statistics for monitoring
+    struct ReplayStats {
+        size_t totalReplays;
+        size_t totalRehearsals;
+        std::map<SleepPhase, size_t> replaysByPhase;
+        std::vector<float> replayStrengths;
+    };
+    
+    ReplayStats getReplayStats() const;
 
 private:
     // Compute similarity between query and stored episode

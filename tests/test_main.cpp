@@ -4,6 +4,12 @@
 #include <iostream>
 #include <cassert>
 
+// Include test files for enhanced Phase 2 functionality
+#include "test_memory_systems.cpp"
+#include "test_attention_concept.cpp"
+#include "test_agent_brain_integration.cpp"
+#include "test_sleep_consolidation.cpp"
+
 // Forward declarations of test functions
 namespace test_types {
     void runAll();
@@ -34,6 +40,22 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+namespace test_memory_systems {
+    void runAll();
+}
+
+namespace test_attention_and_concept {
+    void runAll();
+}
+
+namespace test_agent_brain_integration {
+    void runAll();
+}
+
+namespace test_sleep_consolidation {
     void runAll();
 }
 
@@ -113,6 +135,42 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Memory System tests..." << std::endl;
+    try {
+        test_memory_systems::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Attention and Concept Formation tests..." << std::endl;
+    try {
+        test_attention_and_concept::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running AgentBrain Integration tests..." << std::endl;
+    try {
+        test_agent_brain_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Sleep/Rest Cycle tests..." << std::endl;
+    try {
+        test_sleep_consolidation::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

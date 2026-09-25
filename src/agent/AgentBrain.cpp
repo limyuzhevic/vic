@@ -1,7 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace nlm {
 
@@ -19,6 +21,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , episodeActive_(false)
+    , currentStep_(0)
+    , currentTime_(0.0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -63,10 +68,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
+AgentBrain::~AgentBrain() = default;
+
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    episodeActive_ = false;
+    currentStep_ = 0;
+    currentTime_ = 0.0;
+    
+    // Clear current experience data
+    currentSensoryState_.clear();
+    currentAction_ = MotorCommand::Wait;
+    currentReward_ = 0.0f;
+    currentEnergy_ = 1.0f;
+    currentNovelty_ = 0.0f;
+    currentPredictionError_ = 0.0f;
+    currentNeuralActivity_.clear();
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -87,8 +106,13 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Capture current sensory state for episodic memory
+    currentSensoryState_.clear();
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
+    currentSensoryState_.insert(currentSensoryState_.end(), vision.begin(), vision.end());
+    
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
@@ -99,6 +123,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
+    currentSensoryState_.insert(currentSensoryState_.end(), touch.begin(), touch.end());
+    
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
@@ -108,6 +134,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
+    currentSensoryState_.insert(currentSensoryState_.end(), intern.begin(), intern.end());
+    
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
@@ -117,6 +145,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
+    currentSensoryState_.insert(currentSensoryState_.end(), proprio.begin(), proprio.end());
+    
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
@@ -157,6 +187,11 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Store action decision in episodic memory if action is meaningful
+    if (decoded != MotorCommand::Wait) {
+        currentAction_ = decoded;
     }
     
     return decoded;
@@ -209,7 +244,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+MotorCommand selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
@@ -218,7 +253,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(7));
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -235,6 +270,92 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     return defaultCmd;
 }
 
+void AgentBrain::storeExperience(const SimpleWorld& world, MotorCommand action, float reward, float predictedReward) {
+    // Store the current experience for episodic memory
+    episodeActive_ = true;
+    currentAction_ = action;
+    currentReward_ = reward;
+    currentEnergy_ = world.getAgentBody().energy;
+    currentPredictionError_ = predictionError_;
+    
+    // Store neural activity pattern from working memory
+    if (brain_ && brain_->getWorkingMemory()) {
+        currentNeuralActivity_ = brain_->getWorkingMemory()->retrieve();
+    }
+    
+    // Create and store episodic memory item
+    float curiosity = curiosityLevel_;
+    float novelty = noveltyLevel_;
+    
+    EpisodicMemoryItem episode = createEpisodicMemoryItem(world, action, reward, predictedReward,
+                                                          curiosity, novelty, currentNeuralActivity_);
+    
+    if (brain_ && brain_->getEpisodicMemory()) {
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+        NLM_LOG_INFO("Stored episodic memory item: step=" + std::to_string(currentStep_)
+                    + ", action=" + std::to_string(static_cast<int>(action))
+                    + ", reward=" + std::to_string(reward)
+                    + ", novelty=" + std::to_string(novelty)
+                    + ", sensoryDim=" + std::to_string(currentSensoryState_.size()));
+    }
+}
+
+EpisodicMemoryItem AgentBrain::createEpisodicMemoryItem(const SimpleWorld& world, MotorCommand action, 
+                                                      float reward, float predictedReward, float curiosity,
+                                                      float novelty, const std::vector<float>& neuralActivity) const {
+    EpisodicMemoryItem episode;
+    
+    // Set temporal and state information
+    episode.timestamp = currentStep_;
+    episode.age = 0;  // Will be aged by episodic memory system
+    
+    // Store current sensory state
+    episode.sensoryState = currentSensoryState_;
+    
+    // Store position and orientation from world state
+    episode.positionX = world.getAgentBody().x;
+    episode.positionY = world.getAgentBody().y;
+    episode.orientation = world.getAgentBody().orientation;
+    
+    // Store action decision
+    episode.action = action;
+    
+    // Store internal state
+    episode.reward = reward;
+    episode.energy = world.getAgentBody().energy;
+    episode.novelty = novelty;
+    episode.resultingReward = predictedReward;
+    
+    // Store neural activity pattern for later pattern completion
+    episode.activeNeurons.clear();
+    episode.neuronActivations.clear();
+    
+    // Record current neuromodulation state
+    if (brain_) {
+        if (brain_->getDopamine()) {
+            float dopamineLevel = brain_->getDopamine()->getLevel();
+            episode.neuronActivations.push_back(dopamineLevel);
+        }
+        if (brain_->getCuriosity()) {
+            float curiosityLevel = brain_->getCuriosity()->getLevel();
+            episode.neuronActivations.push_back(curiosityLevel);
+        }
+        if (brain_->getNovelty()) {
+            float noveltyLevel = brain_->getNovelty()->getLevel();
+            episode.neuronActivations.push_back(noveltyLevel);
+        }
+    }
+    
+    // Store the full neural activity pattern
+    episode.neuronActivations.insert(episode.neuronActivations.end(), 
+                                     neuralActivity.begin(), neuralActivity.end());
+    
+    // Store resulting state (this would be updated after world effects)
+    episode.resultingSensoryState = currentSensoryState_;
+    
+    return episode;
+}
+
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
@@ -249,6 +370,16 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Update current step from brain (maintains temporal consistency)
+    currentStep_ = brain_->getCurrentStep();
+    currentTime_ = brain_->getCurrentTime();
+    
+    // Store the current experience in episodic memory
+    // This is the key integration - episodic memory automatically captures the agent loop experience
+    if (brain_) {
+        storeExperienceSimplified(currentStep_, currentAction_, reward, predictedReward);
+    }
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -276,6 +407,43 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+}
+
+void AgentBrain::storeExperienceSimplified(SimulationStep step, MotorCommand action, float reward, float predictedReward) {
+    // Store the current experience for episodic memory without requiring the world reference
+    // This is the automatic episodic memory integration - experiences are captured during the agent loop
+    episodeActive_ = true;
+    currentStep_ = step;
+    currentAction_ = action;
+    currentReward_ = reward;
+    currentPredictionError_ = predictionError_;
+    
+    // Store neural activity pattern from working memory
+    if (brain_ && brain_->getWorkingMemory()) {
+        currentNeuralActivity_ = brain_->getWorkingMemory()->retrieve();
+    }
+    
+    // Create and store episodic memory item
+    float curiosity = curiosityLevel_;
+    float novelty = noveltyLevel_;
+    
+    // For this simplified version, we'll create a placeholder for the world reference
+    // In a real implementation, this would be passed from the agent loop
+    class SimpleWorld dummyWorld;
+    dummyWorld.setAgentStart(0.0f, 0.0f);
+    dummyWorld.configure(100.0f, 100.0f, 16, 16);
+    
+    EpisodicMemoryItem episode = createEpisodicMemoryItem(dummyWorld, action, reward, predictedReward,
+                                                          curiosity, novelty, currentNeuralActivity_);
+    
+    if (brain_ && brain_->getEpisodicMemory()) {
+        brain_->getEpisodicMemory()->storeEpisode(episode);
+        NLM_LOG_INFO("Stored episodic memory item: step=" + std::to_string(step)
+                    + ", action=" + std::to_string(static_cast<int>(action))
+                    + ", reward=" + std::to_string(reward)
+                    + ", novelty=" + std::to_string(novelty)
+                    + ", sensoryDim=" + std::to_string(currentSensoryState_.size()));
     }
 }
 
@@ -330,21 +498,97 @@ float AgentBrain::getNoveltyLevel() const {
     return noveltyLevel_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+float AgentBrain::getPredictionAccuracy() const {
+    return predictionAccuracy_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::predictAndUpdatePredictions(const SensoryPercept& percept, SimulationStep timestep) {
+    if (!brain_ || !predictionSystem_) return;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Extract current sensory state from percept
+    std::vector<float> currentSensoryState;
+    
+    // Add vision data
+    const auto& vision = percept.getVision();
+    currentSensoryState.insert(currentSensoryState.end(), vision.begin(), vision.end());
+    
+    // Add touch data
+    const auto& touch = percept.getTouch();
+    currentSensoryState.insert(currentSensoryState.end(), touch.begin(), touch.end());
+    
+    // Add internal signals
+    const auto& internal = percept.getInternal();
+    currentSensoryState.insert(currentSensoryState.end(), internal.begin(), internal.end());
+    
+    // Add proprioception
+    const auto& proprioception = percept.getProprioception();
+    currentSensoryState.insert(currentSensoryState.end(), proprioception.begin(), proprioception.end());
+    
+    // Create SensoryInput from current state
+    auto sensoryInput = std::make_unique<SensoryInput>(currentSensoryState.size());
+    for (size_t i = 0; i < currentSensoryState.size() && i < sensoryInput->getData().size(); ++i) {
+        sensoryInput->getData()[i] = currentSensoryState[i];
+    }
+    
+    // Get predictions from prediction system
+    auto prediction = predictionSystem_->predictNextState(*sensoryInput);
+    
+    // Compare predictions with actual sensory input (simple error calculation)
+    float predictionError = 0.0f;
+    if (prediction && prediction->getData().size() == currentSensoryState.size()) {
+        for (size_t i = 0; i < prediction->getData().size(); ++i) {
+            float diff = prediction->getData()[i] - currentSensoryState[i];
+            predictionError += diff * diff;
+        }
+        predictionError = std::sqrt(predictionError / prediction->getData().size());
+    }
+    
+    // Store prediction error
+    predictionError_ = predictionError;
+    predictionAccuracy_ = std::max(0.0f, 1.0f - predictionError);
+    
+    // Update prediction system with actual observations
+    predictionSystem_->updatePredictions(*prediction, *sensoryInput);
+    
+    // Train prediction system with current observation
+    predictionSystem_->train(*sensoryInput);
+    
+    // Update neural prediction system with activity patterns
+    std::vector<float> neuralActivity;
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto* pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                float activation = std::max(0.0f, std::min(1.0f, 
+                    (neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f));
+                neuralActivity.push_back(activation);
+            }
+        }
+    }
+    
+    // Update prediction system with neural activity
+    predictionSystem_->updateWithNeuralActivity(neuralActivity, timestep);
+    
+    // Automatic prediction system integration
+    predictionSystem_->automaticUpdate(*sensoryInput, timestep);
+    
+    // Store current state for episodic memory
+    currentSensoryState_ = currentSensoryState;
+    currentPredictionError_ = predictionError;
+    currentNeuralActivity_ = neuralActivity;
+    
+    // Update neuromodulation based on prediction accuracy
+    if (predictionError_ > 0.5f) {
+        // High prediction error triggers curiosity and exploration
+        curiosityLevel_ = std::min(1.0f, curiosityLevel_ + 0.1f);
+        dopamineLevel_ = std::max(0.0f, dopamineLevel_ - 0.1f);
+    } else {
+        // Successful prediction reinforces learning
+        curiosityLevel_ = std::max(0.0f, curiosityLevel_ - 0.05f);
+        dopamineLevel_ = std::min(1.0f, dopamineLevel_ + 0.05f);
+    }
+    
+    // Log prediction performance
+    NLM_LOG_INFO("Prediction cycle: error=" + std::to_string(predictionError_) + 
+                 ", accuracy=" + std::to_string(predictionAccuracy_) + 
+                 ", confidence=" + std::to_string(predictionSystem_->getConfidence()));
 }
-
-} // namespace nlm

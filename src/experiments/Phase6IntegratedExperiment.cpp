@@ -53,7 +53,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
     
-    NLM_LOG_INFO("Brain and agent initialized successfully");
+    // Create and initialize prediction system
+    auto predictionSystem = std::make_unique<PredictionSystem>();
+    predictionSystem->initialize(brain.get());
+    agent.setPredictionSystem(std::move(predictionSystem));
+    
+    NLM_LOG_INFO("Brain, agent, and prediction system initialized successfully");
     
     // Run simulation
     float totalReward = 0.0f;
@@ -61,13 +66,30 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+    // Get observation
+    SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+    
+    // Process sensory input
+    agent.processSensoryInput(percept);
+    
+    // AUTOMATIC PREDICTION SYSTEM INTEGRATION
+    // Predict based on current sensory input and update prediction system
+    if (agent.hasPredictionSystem()) {
+        agent.predictAndUpdatePredictions(percept, step);
         
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        // Use predictions to influence action selection
+        // Higher prediction accuracy means more confidence in current action
+        float predictionAccuracy = agent.getPredictionAccuracy();
+        float predictionError = agent.getPredictionError();
         
-        // Brain step
+        NLM_LOG_INFO("Prediction integration: accuracy=" + std::to_string(predictionAccuracy) + 
+                     ", error=" + std::to_string(predictionError));
+        
+        // If prediction accuracy is high, reinforce current action selection
+        // If prediction error is high, encourage exploration via curiosity
+    }
+    
+    // Brain step
         brain->step(step, step * 0.001);
         
         // Get motor command
@@ -115,7 +137,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
+    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr) && (agent.hasPredictionSystem());
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");

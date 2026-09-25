@@ -6,8 +6,16 @@
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Forward declarations for neural memory systems
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
+
+// Basic memory systems with neural integration
+// 
+// These provide simplified interfaces to neural memory systems
+// or contain neural-inspired implementations
 
 class WorkingMemory {
 public:
@@ -15,7 +23,6 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -40,7 +47,7 @@ private:
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// NOTE: NeuralEpisodicMemory provides neural implementation
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -80,7 +87,7 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// NOTE: NeuralSemanticMemory provides neural implementation
 
 class SemanticMemory {
 public:
@@ -108,7 +115,7 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// NOTE: NeuralProceduralMemory provides neural implementation
 
 struct Skill {
     std::string name;
@@ -144,7 +151,7 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// NOTE: NeuralAssociativeMemory provides neural implementation
 
 class AssociativeMemory {
 public:
@@ -170,5 +177,25 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Neural memory integration
+// These functions provide integration between neural and basic memory systems
+
+namespace NeuralIntegration {
+    // Create neural working memory implementation
+    WorkingMemory createWorkingMemoryIntegration(NeuralWorkingMemory* neuralWM);
+    
+    // Create neural episodic memory implementation
+    EpisodicMemory createEpisodicMemoryIntegration(NeuralEpisodicMemory* neuralEM);
+    
+    // Create neural semantic memory implementation
+    SemanticMemory createSemanticMemoryIntegration(NeuralSemanticMemory* neuralSM);
+    
+    // Create neural procedural memory implementation
+    ProceduralMemory createProceduralMemoryIntegration(NeuralProceduralMemory* neuralPM);
+    
+    // Create neural associative memory implementation
+    AssociativeMemory createAssociativeMemoryIntegration(NeuralAssociativeMemory* neuralAM);
+}
 
 } // namespace nlm

@@ -1,13 +1,20 @@
-#pragma once
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+// Phase 2: Real neural computation components
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Neural memory systems
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
+class NeuralAssociativeMemory;
 
 namespace nlm {
 
@@ -16,18 +23,11 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
-class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
 class Novelty;
-class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -44,9 +44,71 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// ========== SLEEP/REST CYCLE ==========
+
+// Sleep cycle state enumeration
+enum class SleepPhase {
+    Awake,
+    LightSleep,    // Shallow sleep
+    DeepSleep,     // Slow-wave sleep
+    REM           // Rapid eye movement sleep
+};
+
+// Sleep cycle state structure
+struct SleepCycleState {
+    SleepPhase phase;
+    float phaseDuration;  // Duration of current phase in steps
+    float nextPhaseTransition;  // Step when phase should change
+    float sleepProgress;  // Progress through current sleep cycle (0-1)
+    float synapticDownscaling;  // Current level of synaptic normalization
+    float memoryReorganization;  // Current level of memory integration
+    float consolidationStrength;  // Strength of memory consolidation processes
+    float age;  // Simulated age of the brain
+    
+    SleepCycleState() 
+        : phase(SleepPhase::Awake)
+        , phaseDuration(0.0f)
+        , nextPhaseTransition(0.0f)
+        , sleepProgress(0.0f)
+        , synapticDownscaling(1.0f)
+        , memoryReorganization(0.0f)
+        , consolidationStrength(0.5f)
+        , age(0.0f) {}
+};
+
+// Memory prioritization weights structure
+struct MemoryPriorityWeights {
+    float recencyWeight;      // How much recency matters (0-1)
+    float rewardWeight;       // How much reward matters (0-1)
+    float noveltyWeight;      // How much novelty matters (0-1)
+    float coherenceWeight;    // How much coherence matters (0-1)
+    float importanceWeight;   // How much intrinsic importance matters (0-1)
+    
+    MemoryPriorityWeights()
+        : recencyWeight(0.3f)
+        , rewardWeight(0.25f)
+        , noveltyWeight(0.2f)
+        , coherenceWeight(0.1f)
+        , importanceWeight(0.15f) {}
+};
+
+// Synaptic homeostasis structure
+struct SynapticHomeostasis {
+    float synapticStrengthTotal;      // Total synaptic strength across all synapses
+    float synapticStrengthTarget;     // Target total synaptic strength (homeostatic bound)
+    float normalizationFactor;        // Current normalization factor
+    float saturationThreshold;        // Threshold for synaptic saturation
+    float adaptationRate;             // Rate at which synaptic weights adapt
+    
+    SynapticHomeostasis()
+        : synapticStrengthTotal(0.0f)
+        , synapticStrengthTarget(100.0f)  // Baseline target
+        , normalizationFactor(1.0f)
+        , saturationThreshold(2.0f)
+        , adaptationRate(0.01f) {}
+};
+
+// ========== BRAIN CLASS ==========
 
 class Brain {
 public:
@@ -148,6 +210,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - knowledge and facts
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
@@ -192,6 +260,14 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Memory system integration
+    void initializeMemorySystems();
+    void updateMemorySystems();
+    void resetMemorySystems();
+    void consolidateMemorySystems();
+    void replayImportantMemories();
+    void integrateMemorySystems();
     
 private:
     struct Impl;

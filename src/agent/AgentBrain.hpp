@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include <memory>
 #include <vector>
 
@@ -52,6 +53,10 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Automatic prediction system update
+    // Integrates with prediction system during agent loop
+    void predictAndUpdatePredictions(const SensoryPercept& percept, SimulationStep timestep);
+    
     // Reset agent for new episode
     void reset();
     
@@ -69,6 +74,15 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Prediction system integration
+    void setPredictionSystem(std::unique_ptr<PredictionSystem> predictionSystem) {
+        predictionSystem_ = std::move(predictionSystem);
+    }
+    bool hasPredictionSystem() const { return predictionSystem_ != nullptr; }
+    
+    // Get prediction accuracy
+    float getPredictionAccuracy() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,7 +90,21 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
-    std::shared_ptr<Brain> brain_;
+    // Store episodic memory with current experience
+    void storeExperience(const SimpleWorld& world, MotorCommand action, float reward, float predictedReward);
+    
+    // Simplified version for when world is not directly available
+    void storeExperienceSimplified(SimulationStep step, MotorCommand action, float reward, float predictedReward);
+    
+    // Create episodic memory item from current state
+    EpisodicMemoryItem createEpisodicMemoryItem(const SimpleWorld& world, MotorCommand action, 
+                                                float reward, float predictedReward, float curiosity,
+                                                float novelty, const std::vector<float>& neuralActivity) const;
+    
+std::shared_ptr<Brain> brain_;
+    
+    // Prediction system integration
+    std::unique_ptr<PredictionSystem> predictionSystem_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -98,6 +126,7 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    float predictionAccuracy_;
     
     // Development state
     double developmentalAge_;
@@ -112,6 +141,20 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Episodic memory integration state
+    bool episodeActive_;
+    SimulationStep currentStep_;
+    Timestamp currentTime_;
+    
+    // Current experience data for episodic storage
+    std::vector<float> currentSensoryState_;
+    MotorCommand currentAction_;
+    float currentReward_;
+    float currentEnergy_;
+    float currentNovelty_;
+    float currentPredictionError_;
+    std::vector<float> currentNeuralActivity_;
 };
 
 } // namespace nlm
