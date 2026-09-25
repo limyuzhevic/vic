@@ -18,65 +18,127 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+// Load from file (supports both simple key=value and JSON formats)
+    bool Config::loadFromFile(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_WARNING("Could not open config file: " + filepath);
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Try to detect file format by extension and content
+        std::string extension = filepath.substr(filepath.find_last_of('.') + 1);
+        
+        if (extension == "json" || extension == "yaml" || extension == "yml") {
+            return loadFromJsonFile(filepath);
+        } else if (extension == "cfg" || extension == "ini" || filepath.find("config") != std::string::npos) {
+            // For backward compatibility - simple key=value format
+            return loadFromSimpleFile(filepath);
+        } else {
+            // Auto-detect based on first line
+            std::string firstLine;
+            std::getline(file, firstLine);
+            file.clear();
+            file.seekg(0);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (firstLine.find('{') != std::string::npos || firstLine.find('[') != std::string::npos) {
+                return loadFromJsonFile(filepath);
+            } else {
+                return loadFromSimpleFile(filepath);
+            }
+        }
+    }
+    
+    // Load from simple key=value format (backward compatibility)
+    bool Config::loadFromSimpleFile(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        int lineNum = 0;
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/' || line.substr(0, 2) == "//") {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        NLM_LOG_INFO("Loaded configuration from simple file: " + filepath);
+        return true;
     }
     
-    return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+    // Load from JSON format (Phase 2 implementation)
+    bool Config::loadFromJsonFile(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+        try {
+            nlohmann::json jsonConfig;
+            file >> jsonConfig;
+            
+            parseJsonConfig(jsonConfig);
+            NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to parse JSON config file " + filepath + ": " + std::string(e.what()));
+            return false;
+        }
+    }
+
+// Load from command line arguments (new map-based interface)
+    bool Config::loadFromArgs(const std::map<std::string, std::string>& cliArgs) {
+        for (const auto& pair : cliArgs) {
+            const std::string& key = pair.first;
+            const std::string& value = pair.second;
+            set(key, value, ConfigSource::CommandLine);
+        }
+        return true;
+    }
+    
+    // Load from command line arguments (original interface)
+    bool Config::loadFromArgs(int argc, char** argv) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
     }
-    return true;
-}
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
@@ -193,10 +255,21 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::getValueTypeName(const ConfigValue& value) {
+    std::string type;
+    std::visit([&type](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) type = "int";
+        else if constexpr (std::is_same_v<T, int64_t>) type = "int64_t";
+        else if constexpr (std::is_same_v<T, double>) type = "double";
+        else if constexpr (std::is_same_v<T, bool>) type = "bool";
+        else if constexpr (std::is_same_v<T, std::string>) type = "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) type = "std::vector<int>";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) type = "std::vector<double>";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) type = "std::vector<string>";
+        else type = "unknown";
+    }, value);
+    return type;
 }
 
 // Explicit template instantiations
@@ -212,4 +285,52 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Parse JSON configuration
+    void Config::parseJsonConfig(const nlohmann::json& jsonConfig) {
+        if (!jsonConfig.is_object()) {
+            return;
+        }
+        
+        for (const auto& it : jsonConfig.items()) {
+            std::string key = it.key();
+            
+            try {
+                if (it.value().is_boolean()) {
+                    set(key, it.value().get<bool>(), ConfigSource::File);
+                } else if (it.value().is_number_integer()) {
+                    set(key, it.value().get<int64_t>(), ConfigSource::File);
+                } else if (it.value().is_number_float()) {
+                    set(key, it.value().get<double>(), ConfigSource::File);
+                } else if (it.value().is_string()) {
+                    set(key, it.value().get<std::string>(), ConfigSource::File);
+                } else if (it.value().is_array()) {
+                    // Handle arrays
+                    nlohmann::json array = it.value();
+                    if (!array.empty()) {
+                        std::string firstType = array[0].type_name();
+                        if (firstType == "number_integer") {
+                            std::vector<int64_t> intArray;
+                            for (const auto& item : array) {
+                                intArray.push_back(item.get<int64_t>());
+                            }
+                            set(key, intArray, ConfigSource::File);
+                        } else if (firstType == "number_float") {
+                            std::vector<double> floatArray;
+                            for (const auto& item : array) {
+                                floatArray.push_back(item.get<double>());
+                            }
+                            set(key, floatArray, ConfigSource::File);
+                        } else if (firstType == "string") {
+                            std::vector<std::string> stringArray;
+                            for (const auto& item : array) {
+                                stringArray.push_back(item.get<std::string>());
+                            }
+                            set(key, stringArray, ConfigSource::File);
+                        }
+                    }
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse config key '" + key + "': " + std::string(e.what()));
+            }
+        }
+    }

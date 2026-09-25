@@ -55,8 +55,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both simple key=value and JSON formats)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from simple key=value file (backward compatibility)
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Load from JSON file (Phase 2)
+    bool loadFromJsonFile(const std::string& filepath);
+    
+    // Internal JSON parsing
+    void parseJsonConfig(const nlohmann::json& jsonConfig);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -93,6 +102,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    std::vector<std::string> validate() const;
+    
+    // Set default values
+    void setDefaults();
+    
+    // Get value type name
+    static std::string getValueTypeName(const ConfigValue& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +119,3 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm
