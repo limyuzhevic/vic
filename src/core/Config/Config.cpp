@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,10 +20,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Try to parse as JSON first (prefer JSON for modern config)
+    try {
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        
+        // Check if it's JSON format
+        if (isJsonFormat(content)) {
+            return parseJson(content);
+        }
+        
+        // Try YAML format
+        file.open(filepath);
+        if (file.is_open() && isYamlFormat(content)) {
+            return parseYaml(content);
+        }
+        
+        // Fall back to simple key=value format
+        file.close();
+        file.open(filepath);
+    } catch (const std::exception&) {
+        file.close();
+        // Fall back to simple format
+        file.open(filepath);
+    }
+    
     if (!file.is_open()) {
         return false;
     }
@@ -43,8 +70,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == \'\' && value.back() == \'\'))) {
                 value = value.substr(1, value.size() - 2);
             }
             
@@ -53,6 +80,128 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::isJsonFormat(const std::string& content) const {
+    // Simple check for JSON: starts with { or [ and contains : and },
+    if (content.empty()) return false;
+    
+    // Trim whitespace
+    size_t start = content.find_first_not_of(" \t\r\n");
+    size_t end = content.find_last_not_of(" \t\r\n");
+    if (start == std::string::npos) return false;
+    
+    std::string trimmed = content.substr(start, end - start + 1);
+    
+    // Check if it looks like JSON (starts with { and contains "key": "value" pattern)
+    return (trimmed.front() == '{' && 
+            (trimmed.find("\":")) != std::string::npos);
+}
+
+bool Config::isYamlFormat(const std::string& content) const {
+    // Simple check for YAML: contains key: value patterns
+    if (content.empty()) return false;
+    
+    // Look for YAML patterns (key: value) with proper indentation
+    std::istringstream stream(content);
+    std::string line;
+    bool hasKeyValuePairs = false;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '-') {
+            continue;
+        }
+        
+        // Check for key: value pattern (with colon not inside quotes)
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos && colonPos > 0) {
+            // Check if it's a comment (colon after # in some formats)
+            size_t commentPos = line.find('#');
+            if (commentPos == std::string::npos || commentPos > colonPos) {
+                hasKeyValuePairs = true;
+            }
+        }
+    }
+    
+    return hasKeyValuePairs;
+}
+
+bool Config::parseJson(const std::string& json) {
+    try {
+        // Simple JSON parsing for common types
+        // In a real implementation, we'd use a proper JSON parser like nlohmann/json
+        
+        // Remove whitespace for simple parsing
+        std::string cleaned = json;
+        cleaned.erase(std::remove(cleaned.begin(), cleaned.end(), '\n'), cleaned.end());
+        cleaned.erase(std::remove(cleaned.begin(), cleaned.end(), '\r'), cleaned.end());
+        cleaned.erase(std::remove(cleaned.begin(), cleaned.end(), ' '), cleaned.end());
+        
+        if (cleaned.front() != '{' || cleaned.back() != '}') {
+            return false;
+        }
+        
+        // Simple key:value parsing (very basic)
+        size_t pos = cleaned.find('"');
+        while (pos != std::string::npos) {
+            size_t endQuote = cleaned.find('"', pos + 1);
+            if (endQuote == std::string::npos) break;
+            
+            std::string key = cleaned.substr(pos + 1, endQuote - pos - 1);
+            pos = cleaned.find('"', endQuote + 1);
+            if (pos == std::string::npos) break;
+            
+            endQuote = cleaned.find('"', pos + 1);
+            if (endQuote == std::string::npos) break;
+            
+            std::string value = cleaned.substr(pos + 1, endQuote - pos - 1);
+            
+            set(key, value, ConfigSource::File);
+            
+            pos = cleaned.find('"', endQuote + 1);
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::parseYaml(const std::string& yaml) {
+    try {
+        // Simple YAML parsing for common types
+        std::istringstream stream(yaml);
+        std::string line;
+        
+        while (std::getline(stream, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '-') {
+                continue;
+            }
+            
+            // Check for key: value pattern
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos && colonPos > 0) {
+                // Extract key (before colon, remove any leading/trailing spaces)
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Remove quotes from value if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == \'\' && value.back() == \'\'))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +233,50 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save entries in a format that can be reloaded
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << arg << '"';
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << '"' << arg[i] << '"';
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

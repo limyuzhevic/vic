@@ -100,6 +100,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Advanced file format parsing
+    bool isJsonFormat(const std::string& content) const;
+    bool isYamlFormat(const std::string& content) const;
+    bool parseJson(const std::string& json);
+    bool parseYaml(const std::string& yaml);
 };
 
 } // namespace nlm

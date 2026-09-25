@@ -53,8 +53,13 @@ public:
     bool getUseColors() const;
     
     // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
+    void setOutputFile(const std::string& filepath, bool append = true, size_t maxFileSize = 10 * 1024 * 1024); // 10MB default
+    
+    // Close output file
     void closeOutputFile();
+    
+    // Get file size
+    size_t getFileSize() const;
     
 private:
     struct Impl;

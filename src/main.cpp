@@ -28,24 +28,50 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelpAndExit() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM - Neural Learning Machine
+Usage: ./nlm [OPTIONS]
+
+Basic Options:
+  --config=file.cfg     Load configuration from file (JSON/YAML/key=value)
+  --help                Display this help message
+
+Advanced Options:
+  --log=file.log        Enable logging to file (default: nlm.log)
+  --logfile=file.log    Alias for --log
+  --debug               Enable debug mode with detailed logging
+  --perf                Enable performance metrics collection
+
+Configuration Overrides (via --config or command line):
+  --neuron_count=N      Set number of neurons (default: 500)
+  --region_count=N      Set number of regions (default: 1)
+  --simulation_timestep=T Set simulation timestep in seconds (default: 0.001)
+  --random_seed=N       Set random seed for reproducible results (default: 42)
+  --connection_probability=P Set connection probability (default: 0.15)
+  --stdp_ltp_weight=W    Set STDP LTP weight (default: 0.02)
+  --stdp_ltd_weight=W    Set STDP LTD weight (default: 0.015)
+  --synaptogenesis_rate=R Set structural plasticity rate (default: 0.0001)
+  --pruning_rate=R      Set structural pruning rate (default: 0.00001)
+
+File Format Examples:
+  # Simple key=value format:
+    neuron_count = 1000
+    connection_probability = 0.2
+  
+  # JSON format:
+  {"neuron_count": 1000, "connection_probability": 0.2}
+  
+  # YAML format:
+  neuron_count: 1000
+  connection_probability: 0.2
+
+Examples:
+  ./nlm --debug --log=nlm_debug.log
+  ./nlm --config=my_config.json --neuron_count=2000
+  ./nlm --perf --log=performance.log
+)" << std::endl;
+    exit(0);
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -326,25 +352,16 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
+    // Load configuration with improved command-line argument parsing
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool enableLoggingToFile = false;
+    std::string logFilePath = "nlm.log";
+    bool enableDebugMode = false;
+    bool enablePerformanceMetrics = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -353,6 +370,26 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 7) == "--logfile") {
+            enableLoggingToFile = true;
+            if (arg.find('=') != std::string::npos) {
+                logFilePath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFilePath = argv[++i];
+            }
+        } else if (arg.substr(0, 4) == "--log") {
+            enableLoggingToFile = true;
+            if (arg.find('=') != std::string::npos) {
+                logFilePath = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFilePath = argv[++i];
+            }
+        } else if (arg == "--debug") {
+            enableDebugMode = true;
+        } else if (arg == "--perf") {
+            enablePerformanceMetrics = true;
+        } else if (arg == "--help") {
+            printHelpAndExit();
         }
     }
     
@@ -363,8 +400,34 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Enhanced command line argument parsing
     config->loadFromArgs(argc, argv);
+    
+    // Apply user command line flags to configuration
+    if (enableDebugMode) {
+        config->set("debug_mode", true, ConfigSource::CommandLine);
+        config->set("log_level", "DEBUG", ConfigSource::CommandLine);
+    }
+    
+    if (enablePerformanceMetrics) {
+        config->set("performance_metrics", true, ConfigSource::CommandLine);
+    }
+    
+    // Configure logging with advanced options
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    
+    // Enable file logging if requested
+    if (enableLoggingToFile) {
+        if (!consoleLogger->setOutputFile(logFilePath, true, 5 * 1024 * 1024)) { // 5MB max file size
+            NLM_LOG_WARNING("Failed to enable file logging to: " + logFilePath);
+        } else {
+            NLM_LOG_INFO("Logging to file: " + logFilePath);
+        }
+    }
+    
+    Logger::setGlobal(logger);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

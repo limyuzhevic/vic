@@ -12,6 +12,8 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string currentFilePath;
+    size_t maxFileSize = 10 * 1024 * 1024; // 10MB default
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -70,13 +72,70 @@ bool ConsoleLogger::getUseColors() const {
     return pImpl->useColors;
 }
 
+bool ConsoleLogger::setOutputFile(const std::string& filepath, bool append, size_t maxFileSize) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Check if file exists and get its size
+    std::error_code ec;
+    bool fileExists = std::filesystem::exists(filepath, ec);
+    size_t currentSize = 0;
+    
+    if (fileExists && !ec) {
+        currentSize = std::filesystem::file_size(filepath, ec);
+    }
+    
+    // Handle file rotation if needed
+    if (fileExists && currentSize >= maxFileSize) {
+        std::string rotatedPath = filepath + ".rotated";
+        std::filesystem::rename(filepath, rotatedPath, ec);
+        
+        // Create new empty file
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_ERROR("Failed to open log file: " + filepath);
+            return false;
+        }
+        
+        NLM_LOG_WARNING("Log file rotated: " + filepath + " -> " + rotatedPath);
+    } else {
+        // Open file with specified append mode
+        std::ios::openmode mode = std::ios::out;
+        if (append) {
+            mode |= std::ios::app;
+        } else {
+            mode |= std::ios::trunc;
+        }
+        
+        pImpl->fileOut.open(filepath, mode);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_ERROR("Failed to open log file: " + filepath);
+            return false;
+        }
+    }
+    
+    pImpl->currentFilePath = filepath;
+    pImpl->maxFileSize = maxFileSize;
+    
+    NLM_LOG_INFO("Log file opened: " + filepath + " (append: " + 
+                 std::string(append ? "true" : "false") + ")");
+    return true;
+}
+
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    setOutputFile(filepath, true);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        pImpl->currentFilePath.clear();
+        NLM_LOG_INFO("Log file closed");
     }
 }
 
