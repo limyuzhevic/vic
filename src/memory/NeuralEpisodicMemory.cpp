@@ -221,9 +221,39 @@ float NeuralEpisodicMemory::getAverageReward() const {
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
     // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    // For now, use a combination of age and reward as relevance metric
+    
+    std::vector<std::tuple<float, size_t>> scored;  // (relevance, index)
+    
+    for (size_t i = 0; i < episodes_.size(); ++i) {
+        // Calculate relevance: recent + rewarding + novel
+        float recency = 1.0f / (episodes_[i].age + 1.0f);  // More recent = higher relevance
+        float reward = episodes_[i].reward;  // Higher reward = higher relevance
+        float novelty = episodes_[i].novelty;  // Higher novelty = higher relevance
+        
+        float relevance = recency * 0.4f + reward * 0.4f + novelty * 0.2f;
+        scored.emplace_back(relevance, i);
+    }
+    
+    // Sort by relevance (descending)
+    std::sort(scored.begin(), scored.end(),
+              [](const auto& a, const auto& b) {
+                  return std::get<0>(a) > std::get<0>(b);
+              });
+    
+    // Remove episodes with lowest relevance to maintain capacity
+    size_t targetSize = std::min(static_cast<size_t>(maxEpisodes_ * 0.7f), episodes_.size());
+    while (episodes_.size() > targetSize) {
+        // Remove the least relevant episode
+        episodes_.erase(episodes_.begin() + std::get<1>(scored.back()));
+        scored.pop_back();
+        
+        // Update indices in scored vector
+        for (auto& item : scored) {
+            if (std::get<1>(item) > std::get<1>(scored.back())) {
+                std::get<1>(item) -= 1;
+            }
+        }
     }
 }
 
@@ -239,25 +269,54 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForRepla
     // 1. Recency (more recent episodes)
     // 2. Reward (higher reward episodes)
     // 3. Unpredictability (higher prediction error episodes)
+    // 4. Novelty (newly formed, less consolidated episodes)
     
-    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    std::vector<std::tuple<float, float, float, size_t>> scored;  // (score, reward, novelty, index)
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
         float recencyScore = 1.0f / (episodes_[i].age + 1);
         float rewardScore = episodes_[i].reward;
-        float score = recencyScore * 0.5f + rewardScore * 0.5f;
-        scored.emplace_back(score, rewardScore, i);
+        float noveltyScore = episodes_[i].novelty;
+        
+        // More sophisticated scoring that balances:
+        // - Recency for integration of recent experiences
+        // - Reward for consolidation of beneficial experiences
+        // - Novelty for exploration and generalization
+        // - Age for prioritizing less consolidated memories
+        
+        float recencyWeight = 0.3f;
+        float rewardWeight = 0.3f;
+        float noveltyWeight = 0.2f;
+        float ageWeight = 0.2f;
+        
+        // Age weighting: prioritize less consolidated memories
+        float ageScore = 1.0f - (episodes_[i].age / 100.0f);
+        if (ageScore < 0) ageScore = 0;
+        
+        float score = recencyScore * recencyWeight + 
+                     rewardScore * rewardWeight + 
+                     noveltyScore * noveltyWeight +
+                     ageScore * ageWeight;
+        
+        scored.emplace_back(score, rewardScore, noveltyScore, i);
     }
     
     // Sort by score
     std::sort(scored.begin(), scored.end(),
         [](const auto& a, const auto& b) {
-            return std::get<0>(a) > std::get<0>(b);
+            // Sort by overall score first, then by reward, then by novelty
+            if (std::get<0>(a) != std::get<0>(b)) {
+                return std::get<0>(a) > std::get<0>(b);
+            }
+            if (std::get<1>(a) != std::get<1>(b)) {
+                return std::get<1>(a) > std::get<1>(b);
+            }
+            return std::get<2>(a) > std::get<2>(b);
         });
     
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
-        results.push_back(&episodes_[std::get<2>(scored[i])]);
+        results.push_back(&episodes_[std::get<3>(scored[i])]);
     }
     
     return results;

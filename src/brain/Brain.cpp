@@ -9,6 +9,10 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Adenosine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -44,11 +48,15 @@ struct Brain::Impl {
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // ========== INTEGRATED NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Adenosine> adenosine;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -124,13 +132,29 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
+        // ========== INTEGRATED NEUROMODULATION SYSTEMS ==========
+        
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        adenosine = std::make_unique<Adenosine>();
         
-        // Configure STDP parameters
+        // Initialize acetylcholine for attention and memory
+        acetylcholine->setLevel(0.5f);
+        
+        // Initialize norepinephrine for arousal and vigilance
+        norepinephrine->setLevel(0.3f);
+        
+        // Initialize serotonin for mood and social behavior
+        serotonin->setLevel(0.4f);
+        
+        // Initialize adenosine for sleep pressure and fatigue
+        adenosine->setLevel(0.0f);
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
@@ -439,6 +463,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Update adenosine (sleep pressure)
+    if (pImpl->adenosine) {
+        pImpl->adenosine->update(pImpl->timestep);
+        
+        // Automatic rest triggering based on adenosine levels
+        if (pImpl->adenosine->shouldTriggerRest() && !pImpl->isResting) {
+            // Check if we should enter rest due to adenosine buildup
+            pImpl->isResting = true;
+            
+            // Log rest entry
+            NLM_LOG_INFO("Brain entering rest state due to adenosine buildup (level: " + 
+                        std::to_string(pImpl->adenosine->getLevel()) + ")");
+        }
+        
+        // End rest if adenosine levels drop
+        if (pImpl->adenosine->shouldEndRest() && pImpl->isResting) {
+            // Log rest exit
+            NLM_LOG_INFO("Brain exiting rest state (adenosine level: " + 
+                        std::to_string(pImpl->adenosine->getLevel()) + ")");
+            
+            pImpl->isResting = false;
+        }
+        
+        // Apply adenosine effects on neural excitability during rest
+        float adenosineLevel = pImpl->adenosine->getLevel();
+        float plasticityMod = pImpl->adenosine->getPlasticityFactor();
+        
+        // Reduce neural excitability during high adenosine (sleep)
+        if (adenosineLevel > 0.5f) {
+            float excitabilityReduction = (adenosineLevel - 0.5f) * 2.0f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Adenosine reduces excitability
+                        float currentReduction = -excitabilityReduction * 0.1f;
+                        neuron->injectCurrent(currentReduction);
+                    }
+                }
+            }
+        }
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
@@ -486,7 +552,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Capture current brain state as an episode
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
+            
+            // Set sensory state from the latest sensory input (if available)
+            // This would require access to the latest sensory input
+            episode.sensoryState = std::vector<float>(pImpl->sensoryNeurons.size(), 0.0f);
+            
+            // Set action based on motor neuron activity
+            auto action = produceAction();
+            if (action) {
+                episode.action = action->type;
+            }
+            
+            // Set position/orientation (would need world coordinates)
+            episode.positionX = 0.0f;
+            episode.positionY = 0.0f;
+            episode.orientation = 0.0f;
+            
+            // Set energy from adenosine levels
+            if (pImpl->adenosine) {
+                episode.energy = 1.0f - pImpl->adenosine->getLevel();  // Higher adenosine = lower energy
+            }
+            
+            // Set novelty from novelty detector
+            if (pImpl->novelty) {
+                episode.novelty = pImpl->novelty->getLevel();
+            }
+            
+            // Set reward from dopamine
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Set result state (would need to track previous state)
+            episode.resultingSensoryState = episode.sensoryState;
+            episode.resultingReward = episode.reward;
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
@@ -502,17 +599,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->isResting) {
+        // The prediction system predicts next state based on current sensory input
+        // This is the core of predictive processing
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Extract current sensory state from sensory neurons
+            std::vector<float> sensoryState;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 2.0f) {
+                    sensoryState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                }
+            }
+            
+            // Create sensory input for prediction
+            SensoryInput currentSensoryInput(sensoryState);
+            
+            // Make prediction using prediction system
+            auto predictedState = pImpl->predictionSystem->predictNextState(currentSensoryInput);
+            
+            if (predictedState) {
+                // Compare prediction with actual sensory input
+                pImpl->predictionSystem->updatePredictions(currentSensoryInput, *predictedState);
+                
+                // Prediction error drives learning through neuromodulators
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (pImpl->predictionError) {
+                    // Get current sensory state for error computation
+                    std::vector<float> currentSensoryState;
+                    for (auto* neuron : pImpl->sensoryNeurons) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 2.0f) {
+                            currentSensoryState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                        }
+                    }
+                    // Compute the prediction error
+                    if (!currentSensoryState.empty()) {
+                        float avgPredictionError = 0.0f;
+                        size_t count = 0;
+                        for (float val : currentSensoryState) {
+                            avgPredictionError += std::abs(val);
+                            count++;
+                        }
+                        if (count > 0) {
+                            avgPredictionError /= count;
+                        }
+                        // Use the error in the prediction error neuromodulator
+                        float currentPE = pImpl->predictionError->getError();
+                        pImpl->predictionError->computeError(currentPE, avgPredictionError);
+                    }
+                }
+                
+                // Novelty detection responds to prediction errors
+                if (pImpl->novelty) {
+                    pImpl->novelty->update(pImpl->timestep);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -751,6 +898,11 @@ void Brain::reset() {
     
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
+    
+    // Reset adenosine (sleep pressure)
+    if (pImpl->adenosine) {
+        pImpl->adenosine->setLevel(0.0f);
+    }
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
@@ -1067,6 +1219,10 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+Adenosine* Brain::getAdenosine() {
+    return pImpl->adenosine.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
