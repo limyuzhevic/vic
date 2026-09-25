@@ -60,16 +60,23 @@ bool Config::loadFromArgs(int argc, char** argv) {
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 2 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else if (pos == std::string::npos) {
+                // Handle --key value format (no equals sign)
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    std::string key = arg.substr(2);
+                    std::string value = argv[++i];
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg.size() > 1 && arg[0] == '-' && i + 1 < argc && argv[i + 1][0] != '-') {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
