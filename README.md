@@ -75,7 +75,22 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2 Demo (Legacy)
+```bash
+./nlm
+```
+
+### Phase 3 Demo (World Interaction)
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+### Phase 4 Demo (Emerging Cognition)
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+### Phase 6 Demo (Final Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
