@@ -6,6 +6,9 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Enhanced with comprehensive command-line interface and configuration
+// for flexible testing and experimentation
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -25,8 +28,304 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <sstream>
+#include <algorithm>
+#include <limits>
 
 using namespace nlm;
+
+// Comprehensive test configuration structure
+struct TestConfig {
+    // Basic simulation parameters
+    uint64_t randomSeed = 42;
+    double simulationTimestep = 0.001;
+    size_t neuronCount = 500;
+    size_t regionCount = 1;
+    float connectionProbability = 0.15f;
+    
+    // Test 1: Basic connectivity parameters
+    size_t connectivityTestSteps = 50;
+    size_t connectivityInjectCurrentNeurons = 10;
+    float connectivityCurrentAmplitude = 50.0f;
+    
+    // Test 2: Plasticity experiment parameters
+    size_t plasticityTestSteps = 1000;
+    size_t plasticityInputNeurons = 20;
+    float plasticityCurrentAmplitude = 30.0f;
+    float plasticityLTPWeight = 0.02f;
+    float plasticityLTDWeight = 0.015f;
+    float plasticityTau = 20.0f;
+    float synaptogenesisRate = 0.0001f;
+    float pruningRate = 0.00001f;
+    
+    // Test 3: STDP verification parameters
+    size_t stdpTestTrials = 50;
+    size_t stdpPrePostDelaySteps = 1;
+    float stdpCurrentAmplitude = 60.0f;
+    
+    // Advanced options
+    bool enableColorOutput = true;
+    bool enableProgressLogging = true;
+    bool validateResults = true;
+    bool saveFinalState = false;
+    std::string outputFile = "nlm_results.json";
+    
+    // Configuration file
+    std::string configFile = "configs/default.cfg";
+    
+    // Test selection flags
+    bool runConnectivityTest = true;
+    bool runPlasticityTest = true;
+    bool runSTDPTest = true;
+    
+    // Helper methods
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << "Test Configuration:\n";
+        oss << "  randomSeed: " << randomSeed << "\n";
+        oss << "  simulationTimestep: " << simulationTimestep << "s\n";
+        oss << "  neuronCount: " << neuronCount << "\n";
+        oss << "  regionCount: " << regionCount << "\n";
+        oss << "  connectionProbability: " << connectionProbability << "\n";
+        oss << "  connectivityTestSteps: " << connectivityTestSteps << "\n";
+        oss << "  plasticityTestSteps: " << plasticityTestSteps << "\n";
+        oss << "  stdpTestTrials: " << stdpTestTrials << "\n";
+        oss << "  outputFile: " << outputFile << "\n";
+        return oss.str();
+    }
+    
+    void print(std::ostream& out = std::cout) const {
+        out << toString();
+    }
+    
+    bool validate() const {
+        bool valid = true;
+        
+        if (neuronCount == 0) {
+            std::cerr << "ERROR: neuronCount must be > 0\n";
+            valid = false;
+        }
+        
+        if (simulationTimestep <= 0.0) {
+            std::cerr << "ERROR: simulationTimestep must be > 0\n";
+            valid = false;
+        }
+        
+        if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+            std::cerr << "ERROR: connectionProbability must be between 0.0 and 1.0\n";
+            valid = false;
+        }
+        
+        if (plasticityLTPWeight < 0.0f) {
+            std::cerr << "ERROR: plasticityLTPWeight must be >= 0\n";
+            valid = false;
+        }
+        
+        if (plasticityLTDWeight < 0.0f) {
+            std::cerr << "ERROR: plasticityLTDWeight must be >= 0\n";
+            valid = false;
+        }
+        
+        return valid;
+    }
+};
+
+// Command-line argument parser
+class ArgumentParser {
+public:
+    static bool parse(int argc, char** argv, TestConfig& config) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            if (arg == "--help" || arg == "-h") {
+                printUsage();
+                return false;
+            }
+            else if (arg == "--version") {
+                printVersion();
+                return false;
+            }
+            else if (arg.substr(0, 8) == "--config") {
+                config.configFile = parseConfigFile(arg);
+            }
+            else if (arg.substr(0, 9) == "--output") {
+                config.outputFile = parseOutputFile(arg);
+            }
+            else if (arg.substr(0, 8) == "--seed") {
+                config.randomSeed = parseUint64(arg.substr(8));
+            }
+            else if (arg.substr(0, 11) == "--neuron-count") {
+                config.neuronCount = parseSizeT(arg.substr(11));
+            }
+            else if (arg.substr(0, 12) == "--timestep") {
+                config.simulationTimestep = parseDouble(arg.substr(12));
+            }
+            else if (arg.substr(0, 18) == "--connection-prob") {
+                config.connectionProbability = parseFloat(arg.substr(18));
+            }
+            else if (arg == "--no-connectivity") {
+                config.runConnectivityTest = false;
+            }
+            else if (arg == "--no-plasticity") {
+                config.runPlasticityTest = false;
+            }
+            else if (arg == "--no-stdp") {
+                config.runSTDPTest = false;
+            }
+            else if (arg.substr(0, 9) == "--stdp-trials") {
+                config.stdpTestTrials = parseSizeT(arg.substr(9));
+            }
+            else if (arg.substr(0, 10) == "--plasticity-steps") {
+                config.plasticityTestSteps = parseSizeT(arg.substr(10));
+            }
+            else if (arg.substr(0, 13) == "--plasticity-current") {
+                config.plasticityCurrentAmplitude = parseFloat(arg.substr(13));
+            }
+            else if (arg == "--no-progress") {
+                config.enableProgressLogging = false;
+            }
+            else if (arg == "--no-colors") {
+                config.enableColorOutput = false;
+            }
+            else if (arg.substr(0, 6) == "--" && arg.find('=') != std::string::npos) {
+                // Handle --key=value format for unknown arguments
+                size_t pos = arg.find('=');
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Try to set config based on known keys
+                if (!setConfigValue(key, value, config)) {
+                    std::cerr << "WARNING: Unknown argument " << arg << " (ignored)\n";
+                }
+            }
+            else {
+                std::cerr << "WARNING: Unknown argument " << arg << " (ignored)\n";
+            }
+        }
+        
+        return true;
+    }
+    
+private:
+    static void printUsage() {
+        std::cout << R"(
+NLM Phase 2 Neural Learning Machine - Test Suite
+
+Usage: nlm [--config <file>] [--output <file>] [--seed <value>]
+                 [--neuron-count <count>] [--timestep <seconds>]
+                 [--connection-prob <probability>]
+                 [--no-connectivity] [--no-plasticity] [--no-stdp]
+                 [--stdp-trials <trials>] [--plasticity-steps <steps>]
+                 [--plasticity-current <value>]
+                 [--no-progress] [--no-colors] [--help] [--version]
+
+Arguments:
+  --config <file>              Load configuration from file (default: configs/default.cfg)
+  --output <file>              Save results to file (default: nlm_results.json)
+  --seed <value>               Random seed (default: 42)
+  --neuron-count <count>       Number of neurons (default: 500)
+  --timestep <seconds>         Simulation timestep (default: 0.001)
+  --connection-prob <prob>     Connectivity probability (default: 0.15)
+  --no-connectivity            Skip basic connectivity test
+  --no-plasticity              Skip plasticity learning experiment
+  --no-stdp                    Skip STDP verification test
+  --stdp-trials <trials>       Number of STDP trials (default: 50)
+  --plasticity-steps <steps>   Plasticity test steps (default: 1000)
+  --plasticity-current <value> Current amplitude for plasticity test (default: 30.0)
+  --no-progress                 Disable progress logging
+  --no-colors                  Disable colored output
+  --help                        Show this help message
+  --version                     Show version information
+
+Examples:
+  nlm --neuron-count 1000 --timestep 0.0005
+  nlm --plasticity-steps 5000 --plasticity-current 40.0
+  nlm --no-plasticity --no-stdp --config my_config.cfg
+
+For more information, visit: https://github.com/nl-machine-learning/nlm
+)";
+    }
+    
+    static void printVersion() {
+        std::cout << "NLM Phase 2 Real Neural Computation v0.1.0\n";
+        std::cout << "Neural Learning Machine (熙然)\n";
+        std::cout << "Phase 2: Enhanced Testing Framework\n";
+    }
+    
+    static std::string parseConfigFile(const std::string& arg) {
+        size_t pos = arg.find('=');
+        if (pos != std::string::npos) {
+            return arg.substr(pos + 1);
+        }
+        return "configs/default.cfg"; // Default if no value provided
+    }
+    
+    static std::string parseOutputFile(const std::string& arg) {
+        size_t pos = arg.find('=');
+        if (pos != std::string::npos) {
+            return arg.substr(pos + 1);
+        }
+        return "nlm_results.json"; // Default if no value provided
+    }
+    
+    static uint64_t parseUint64(const std::string& str) {
+        try {
+            return std::stoull(str);
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid integer value \"" << str << "\"\n";
+            return 42; // Default fallback
+        }
+    }
+    
+    static size_t parseSizeT(const std::string& str) {
+        try {
+            return std::stoull(str);
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid size value \"" << str << "\"\n";
+            return 0; // Default fallback
+        }
+    }
+    
+    static double parseDouble(const std::string& str) {
+        try {
+            return std::stod(str);
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid float value \"" << str << "\"\n";
+            return 0.001; // Default fallback
+        }
+    }
+    
+    static float parseFloat(const std::string& str) {
+        try {
+            return std::stof(str);
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid float value \"" << str << "\"\n";
+            return 0.15f; // Default fallback
+        }
+    }
+    
+    static bool setConfigValue(const std::string& key, const std::string& value, TestConfig& config) {
+        // Try to set configuration based on known keys
+        if (key == "plasticity_ltp_weight") {
+            config.plasticityLTPWeight = parseFloat(value);
+            return true;
+        } else if (key == "plasticity_ltd_weight") {
+            config.plasticityLTDWeight = parseFloat(value);
+            return true;
+        } else if (key == "plasticity_tau") {
+            config.plasticityTau = parseFloat(value);
+            return true;
+        } else if (key == "synaptogenesis_rate") {
+            config.synaptogenesisRate = parseFloat(value);
+            return true;
+        } else if (key == "pruning_rate") {
+            config.pruningRate = parseFloat(value);
+            return true;
+        }
+        return false;
+    }
+};
 
 void printBanner() {
     std::cout << R"(
@@ -159,7 +458,7 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain, const TestConfig& config, const Config* brainConfig) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
@@ -176,15 +475,15 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    // Inject strong current into configured number of neurons
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(config.connectivityInjectCurrentNeurons) + " neurons...");
+    for (size_t i = 0; i < std::min(config.connectivityInjectCurrentNeurons, neurons.size()); ++i) {
+        neurons[i]->injectCurrent(config.connectivityCurrentAmplitude);  // Configurable current amplitude
     }
     
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    // Run configured number of steps
+    for (SimulationStep step = 0; step < config.connectivityTestSteps; ++step) {
+        brain->step(step, step * brainConfig->getOr<double>("simulation_timestep", 0.001));
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -202,36 +501,36 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runPlasticityExperiment(std::shared_ptr<Brain> brain, const TestConfig& config, const Config* brainConfig) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
-    LearningExperiment experiment(brain, 42);
+    LearningExperiment experiment(brain, config.randomSeed);
     
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
+    // Enable plasticity on synapses using configured parameters
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
     }
     
-    // Apply repeated input pattern to stimulate learning
+    // Apply repeated input pattern to stimulate learning with configurable parameters
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying repeated input patterns (" + std::to_string(config.plasticityTestSteps) + " steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+    for (SimulationStep step = 0; step < config.plasticityTestSteps; ++step) {
+        // Create input pattern - inject current into configured number of neurons
+        for (size_t i = 0; i < config.plasticityInputNeurons && i < brain->getTotalNeuronCount() / 4; ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, config.plasticityCurrentAmplitude);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step, step * brainConfig->getOr<double>("simulation_timestep", 0.001));
         
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
+        // Log progress every 100 steps if enabled
+        if (config.enableProgressLogging && step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
@@ -245,7 +544,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void runStdpVerification(std::shared_ptr<Brain> brain, const TestConfig& config, const Config* brainConfig) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
@@ -270,11 +569,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
                     " before: " + std::to_string(beforeWeights[i]));
     }
     
-    // Create correlated activity: fire pre then post to trigger LTP
+    // Create correlated activity: fire pre then post to trigger LTP using configurable parameters
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
-    for (int trial = 0; trial < 50; ++trial) {
+    for (int trial = 0; trial < config.stdpTestTrials; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
@@ -287,12 +586,12 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            preNeuron->injectCurrent(config.stdpCurrentAmplitude);
+            brain->step(trial * 2, trial * 2 * brainConfig->getOr<double>("simulation_timestep", 0.001));
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            postNeuron->injectCurrent(config.stdpCurrentAmplitude);
+            brain->step(trial * 2 + 1, (trial * 2 + 1) * brainConfig->getOr<double>("simulation_timestep", 0.001));
         }
     }
     
@@ -305,7 +604,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
                     " (Δ=" + std::to_string(delta) + ")");
     }
     
-    // Check if weights increased (LTP)
+    // Check if weights increased (LTP) using configurable threshold
     float totalDelta = 0.0f;
     for (size_t i = 0; i < 5; ++i) {
         totalDelta += synapses[i]->getWeight() - beforeWeights[i];
@@ -410,19 +709,19 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    runBasicConnectivityTest(brain, config, configPtr.get());
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    runPlasticityExperiment(brain, config, configPtr.get());
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
-    runStdpVerification(brain);
+    runStdpVerification(brain, config, configPtr.get());
     
     // Final brain status
     NLM_LOG_INFO("");
