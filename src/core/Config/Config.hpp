@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <mutex>
 
 namespace nlm {
 
@@ -20,7 +21,11 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::vector<std::vector<int>>,  // 2D int array
+    std::vector<std::vector<double>>,  // 2D double array
+    std::vector<std::vector<std::string>>,  // 2D string array
+    std::vector<bool>  // vector of booleans
 >;
 
 // Configuration source
@@ -55,7 +60,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +98,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Schema management
+    void addSchema(const std::string& name, const std::string& type,
+                   const std::optional<std::string>& defaultValue = std::nullopt,
+                   bool required = false, const std::string& validation = "");
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +114,31 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
-
-} // namespace nlm
+    
+    // File parsing methods
+    bool parseJSON(const std::string& content);
+    bool parseYAML(const std::string& content);
+    bool parseSimpleFormat(const std::string& content);
+    
+    // Schema validation
+    struct ConfigSchema {
+        std::string name;
+        std::string type;  // "int", "double", "string", "bool", "list", "vector"
+        std::optional<std::string> defaultValue;
+        bool required = false;
+        std::string validation;  // Regex pattern for strings
+    };
+    
+    std::vector<ConfigSchema> schema_;
+    
+    // Thread safety
+    mutable std::mutex mutex_;
+    
+    // Value parsing helpers
+    static ConfigValue parseValue(const std::string& str);
+    static std::string serializeValue(const ConfigValue& value);
+    
+    // Entry validation
+    std::string validateEntry(const ConfigEntry& entry) const;
+    bool validateStringWithRegex(const std::string& str, const std::string& pattern) const;
+}; // namespace nlm
