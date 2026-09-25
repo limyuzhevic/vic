@@ -1,0 +1,29 @@
+class RewardModulatedSTDP : public PlasticityRule {
+public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // R-STDP specific parameters
+    void setLTPWeight(float weight);    // Long-term potentiation weight
+    float getLTPWeight() const;
+    void setLTDWeight(float weight);    // Long-term depression weight
+    float getLTDWeight() const;
+    void setTimeConstant(float tau);    // STDP time constant (ms)
+    float getTimeConstant() const;
+    void setLearningRate(float rate);   // Reward modulation factor
+    float getLearningRate() const;
+    
+    // Update parameters from config
+    void configure(float ltpWeight, float ltdWeight, float tau, float learningRate);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
