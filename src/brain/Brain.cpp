@@ -406,7 +406,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+    // ========== STEP 5: Enhanced neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -434,6 +434,116 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
+                    
+                    // Enhanced dopamine effects on memory systems
+                    if (dopamineLevel > 0.3f) {
+                        // Dopamine enhances working memory encoding
+                        if (pImpl->workingMemory) {
+                            float memoryBoost = (dopamineLevel - 0.3f) / 0.7f;
+                            pImpl->workingMemory->setEncodingStrength(1.0f + memoryBoost * 0.5f);
+                        }
+                        
+                        // Dopamine enhances episodic memory consolidation
+                        if (pImpl->episodicMemory) {
+                            float consolidationBoost = (dopamineLevel - 0.3f) / 0.7f;
+                            pImpl->episodicMemory->setConsolidationFactor(1.0f + consolidationBoost * 2.0f);
+                        }
+                        
+                        // Dopamine enhances associative memory strength
+                        if (pImpl->associativeMemory) {
+                            float associationBoost = (dopamineLevel - 0.3f) / 0.7f;
+                            pImpl->associativeMemory->setAssociationStrength(1.0f + associationBoost);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Enhanced curiosity effects
+    if (pImpl->curiosity) {
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        // Curiosity increases behavioral exploration
+        if (curiosityLevel > 0.5f) {
+            float explorationBoost = (curiosityLevel - 0.5f) / 0.5f;
+            // Make action selection more random to encourage exploration
+            // This would be implemented in the action selection logic
+            pImpl->curiosity->setExplorationBias(explorationBoost * 0.3f);
+        }
+        
+        // Curiosity affects novelty detection
+        if (pImpl->novelty && curiosityLevel > 0.3f) {
+            float noveltyBoost = (curiosityLevel - 0.3f) / 0.7f;
+            pImpl->novelty->setSensitivity(noveltyBoost);
+        }
+        
+        // Curiosity enhances learning rate
+        if (curiosityLevel > 0.4f) {
+            float learningBoost = (curiosityLevel - 0.4f) / 0.6f;
+            if (pImpl->stdp) {
+                float currentLTP = pImpl->stdp->getLTPWeight();
+                float currentLTD = pImpl->stdp->getLTDWeight();
+                pImpl->stdp->setLTPWeight(currentLTP * (1.0f + learningBoost * 0.3f));
+                pImpl->stdp->setLTDWeight(currentLTD * (1.0f + learningBoost * 0.2f));
+            }
+        }
+    }
+    
+    // Enhanced novelty effects
+    if (pImpl->novelty) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        
+        // Novelty captures attention and enhances encoding
+        if (noveltyLevel > 0.7f) {
+            float attentionBoost = (noveltyLevel - 0.7f) / 0.3f;
+            
+            // Enhance attentional selection
+            if (pImpl->attention) {
+                pImpl->attention->setGain(1.0f + attentionBoost * 2.0f);
+                pImpl->attention->setInhibitionStrength(0.5f * (1.0f - attentionBoost));
+            }
+            
+            // Enhance memory encoding of novel stimuli
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->setNoveltyEnhancement(attentionBoost);
+            }
+        }
+    }
+    
+    // Prediction error effects on learning
+    float predictionError = 0.0f;
+    if (pImpl->predictionSystem) {
+        predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        if (predictionError > 0.0f) {
+            // Prediction error enhances plasticity
+            if (pImpl->dopamine) {
+                float errorModulation = std::min(1.0f, predictionError * 2.0f);
+                float currentDopamine = pImpl->dopamine->getLevel();
+                pImpl->dopamine->setLevel(currentDopamine + errorModulation * 0.1f);
+            }
+            
+            // Prediction error affects curiosity
+            if (pImpl->curiosity) {
+                float currentCuriosity = pImpl->curiosity->getLevel();
+                pImpl->curiosity->increaseLevel(predictionError * 0.05f);
+            }
+            
+            // Prediction error enhances attention
+            if (pImpl->attention) {
+                pImpl->attention->increaseAlertness(predictionError * 0.2f);
+            }
+            
+            // Prediction error enhances learning rate in plasticity
+            if (predictionError > 0.5f) {
+                // Strong prediction error -> higher learning rate
+                float learningBoost = (predictionError - 0.5f) / 0.5f;
+                if (pImpl->stdp) {
+                    float currentLTP = pImpl->stdp->getLTPWeight();
+                    float currentLTD = pImpl->stdp->getLTDWeight();
+                    pImpl->stdp->setLTPWeight(currentLTP * (1.0f + learningBoost));
+                    pImpl->stdp->setLTDWeight(currentLTD * (1.0f + learningBoost * 0.5f));
                 }
             }
         }
@@ -511,8 +621,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // Create a representation of current brain state for prediction
+        std::vector<float> currentState;
+        
+        // Collect current neural activity for prediction
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    // Normalize neural activity to range [0, 1]
+                    float activation = 0.0f;
+                    if (neuron->isFiring()) {
+                        activation = 1.0f;
+                    } else {
+                        float potential = neuron->getMembranePotential();
+                        float resting = neuron->getRestingPotential();
+                        activation = std::max(0.0f, std::min(1.0f, 
+                            (potential - resting) / 20.0f)); // Normalize to 0-1
+                    }
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        // Update prediction system with current state
+        pImpl->predictionSystem->train(currentState);
+        
+        // Generate next state prediction
+        auto prediction = pImpl->predictionSystem->predictNextState(currentState);
+        if (prediction) {
+            // Store prediction for later use in action selection
+            // prediction->getData() contains predicted next state
+            // This would be used by the agent/brain to guide behavior
+            
+            // Update prediction error based on difference between prediction and actual
+            // For now, use a simple prediction error calculation
+            if (!currentState.empty()) {
+                float predictionError = 0.0f;
+                // Calculate prediction error (simplified)
+                for (size_t i = 0; i < std::min(currentState.size(), 
+                                               pImpl->predictionSystem->getErrorHistory().size()); ++i) {
+                    float predicted = pImpl->predictionSystem->getErrorHistory()[i];
+                    float actual = currentState[i];
+                    predictionError += std::abs(predicted - actual);
+                }
+                
+                // Apply prediction error to neuromodulation
+                if (predictionError > 0.1f) {
+                    // High prediction error -> increase exploration/curiosity
+                    float explorationBoost = std::min(1.0f, predictionError * 2.0f);
+                    if (pImpl->curiosity) {
+                        pImpl->curiosity->increaseLevel(explorationBoost * 0.1f);
+                    }
+                    if (pImpl->dopamine) {
+                        pImpl->dopamine->increaseLevel(explorationBoost * 0.05f);
+                    }
+                }
+            }
+        }
+        
+        // Record prediction error for learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (predictionError > 0.0f) {
+            // Use prediction error to drive plasticity
+            if (pImpl->dopamine) {
+                float modulation = std::min(1.0f, predictionError * 0.5f);
+                pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * (1.0f + modulation * 0.5f));
+                pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * (1.0f + modulation * 0.5f));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,11 +705,90 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Collect current neural activity for concept learning
+        std::vector<float> currentPattern;
+        
+        // Collect neural activations from sensory and internal neurons
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory || 
+                    pop->getNeuronType() == NeuronType::Internal) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        // Get current activation
+                        float activation = 0.0f;
+                        if (neuron->isFiring()) {
+                            activation = 1.0f;
+                        } else {
+                            float potential = neuron->getMembranePotential();
+                            float resting = neuron->getRestingPotential();
+                            activation = std::max(0.0f, std::min(1.0f, 
+                                (potential - resting) / 20.0f));
+                        }
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with current patterns
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->updatePattern(currentPattern);
+        }
+        
+        // Get current concepts from concept formation
+        auto concepts = pImpl->conceptFormation->getCurrentConcepts();
+        
+        // Store concepts in working memory for access by attention/planner
+        if (pImpl->workingMemory && !concepts.empty()) {
+            for (size_t i = 0; i < std::min(concepts.size(), size_t(10)); ++i) {
+                pImpl->workingMemory->storeConcept(concepts[i], 0.5f + (i * 0.05f));
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner evaluates action sequences based on current state
+        // This helps with forward planning and action selection
+        
+        // Collect current motor neuron state
+        std::vector<float> motorState;
+        for (auto* neuron : pImpl->motorNeurons) {
+            float activation = 0.0f;
+            if (neuron->isFiring()) {
+                activation = 1.0f;
+            } else {
+                float potential = neuron->getMembranePotential();
+                float resting = neuron->getRestingPotential();
+                activation = std::max(0.0f, std::min(1.0f, 
+                    (potential - resting) / 20.0f));
+            }
+            motorState.push_back(activation);
+        }
+        
+        // Get current action sequence
+        auto currentAction = produceAction();
+        
+        // Update planner with current state and action
+        if (!motorState.empty()) {
+            pImpl->planner->updateState(motorState);
+            pImpl->planner->updateAction(currentAction.get());
+            
+            // Get recommended action sequence from planner
+            auto recommendedActions = pImpl->planner->getRecommendedActions();
+            
+            // Store recommended actions in working memory
+            if (pImpl->workingMemory && !recommendedActions.empty()) {
+                for (size_t i = 0; i < std::min(recommendedActions.size(), size_t(5)); ++i) {
+                    pImpl->workingMemory->storeAction(recommendedActions[i], 
+                                                      0.8f - (i * 0.1f)); // Higher confidence for earlier actions
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -585,6 +841,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 16: Sleep/rest cycle management ==========
+    
+    // Simple rest cycle - toggle resting state every 1000 steps
+    if (currentStep > 0 && currentStep % 1000 == 0) {
+        pImpl->isResting = !pImpl->isResting;
+        if (pImpl->isResting) {
+            NLM_LOG_INFO("Entering rest phase for memory consolidation...");
+            // Enhanced memory consolidation during rest
+            if (pImpl->episodicMemory) {
+                float consolidationBoost = 3.0f; // 3x consolidation during rest
+                pImpl->episodicMemory->setConsolidationFactor(pImpl->episodicMemory->getConsolidationFactor() * consolidationBoost);
+            }
+            // More frequent replay during rest
+            pImpl->replayInterval = 50; // Replay every 50 steps during rest
+        } else {
+            NLM_LOG_INFO("Exiting rest phase...");
+            // Restore normal consolidation during active phase
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->setConsolidationFactor(1.0f);
+            }
+            // Restore normal replay frequency
+            pImpl->replayInterval = 100; // Replay every 100 steps normally
+        }
+    }
+    
+    // Enhanced memory consolidation during rest phase
+    if (pImpl->isResting && pImpl->episodicMemory) {
+        // During rest, enhance consolidation of recent memories
+        pImpl->episodicMemory->consolidate(0.8f); // Higher consolidation during rest
+        
+        // Replay important memories during rest more frequently
+        if (currentStep % pImpl->replayInterval == 0) {
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(10); // More episodes during rest
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
+        }
+    }
+    
+    // Restore neuromodulator levels during rest to prevent exhaustion
+    if (pImpl->isResting) {
+        if (pImpl->dopamine) {
+            float currentDopamine = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLevel(std::max(currentDopamine, 0.2f)); // Maintain baseline
+        }
+        if (pImpl->curiosity) {
+            float currentCuriosity = pImpl->curiosity->getLevel();
+            pImpl->curiosity->setLevel(currentCuriosity * 0.98f); // Gradual decrease
+        }
     }
 }
 
