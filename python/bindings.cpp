@@ -405,7 +405,9 @@ PYBIND11_MODULE(pynlm, m) {
     }, "Create a default configuration");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
     }, py::arg("config"), "Create a new brain with configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {

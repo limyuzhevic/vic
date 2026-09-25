@@ -19,7 +19,7 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -151,7 +151,7 @@ public:
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    NeuralPrediction* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     
@@ -190,10 +190,16 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Apply action to motor neurons based on action type
+    void applyActionToMotorNeurons(ActionType action);
+    
+    // Extract features from neural activity pattern
+    std::vector<float> extractFeatures(const std::vector<float>& neuralPattern) const;
     
 private:
+    // Helper functions for step()
+    void applyActionToMotorNeurons(ActionType action);
+    std::vector<float> extractFeatures(const std::vector<float>& neuralPattern) const;
     struct Impl;
     Impl* pImpl;
 };
