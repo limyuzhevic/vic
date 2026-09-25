@@ -49,7 +49,7 @@ add_library(nlm_core STATIC
     src/development/Pruning.cpp
     src/development/Maturation.cpp
     # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Dopamine.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
