@@ -1,21 +1,33 @@
+# pyproject.toml for NLM Python Package
+
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["pybind11>=2.11.0", "scikit-build-core>=0.5.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+version = "2.0.0"
+description = "Python bindings for NLM (Neural Learning Machine) - a brain-inspired spiking neural network simulator with real neuron dynamics, plasticity, memory, and cognitive systems"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.8"
+license = {text = "MIT"}
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = [
+    "neural",
+    "simulation", 
+    "spiking",
+    "brain",
+    "learning",
+    "ai",
+    "cognitive",
+    "neuroscience"
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +37,32 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Framework :: Pytest",
 ]
-
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
+    "pybind11>=2.11.0",
+    "scikit-build-core>=0.5.0",
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "numpy>=1.20",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issues" = "https://github.com/nlm-project/nlm/issues"
+"Discussions" = "https://github.com/nlm-project/nlm/discussions"
+"Twitter" = "https://twitter.com/nlm_project"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -46,7 +70,7 @@ cmake.build-type = "Release"
 cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
+    "-DPYTHON_EXECUTABLE=${python}",
 ]
 
 [tool.scikit-build.cmake.define]
@@ -55,3 +79,105 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=pynlm",
+    "--cov-report=term-missing",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C",   # flake8-comprehensions
+    "N",   # pep8-naming
+    "Q",   # flake8-quotes
+    "S",   # flake8-bandit
+    "T",   # flake8-print
+    "UP",  # pyupgrade
+    "YTT", # flake8-2020
+    "ANN", # flake8-annotations
+    "ASYNC", # flake8-async
+    "BLE", # flake8-blind-except
+    "FBT", # flake8-boolean-trap
+    "ICN", # flake8-import-conventions
+    "INP", # flake8-no-pep420
+    "LOG", # flake8-logging
+    "NPY", # NumPy specific rules
+    "PD",  # pandas-vet
+    "PGH", # pghints
+    "PIE", # flake8-pie
+    "PL",  # pylint
+    "PT",  # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "PYI", # flake8-pyi
+    "RET", # flake8-return
+    "RSE", # flake8-raise
+    "SLF", # flake8-self
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "TID", # flake8-tidy-imports
+    "TRY", # tryceratops
+    "EXE", # flake8-executable
+    "FPY", # flake8-format
+]
+ignore = [
+    "E501",  # line too long, handled by line-length
+    "E741",  # ambiguous variable name
+    "W503",  # line break before binary operator
+    "S101",  # assert used
+    "S603",  # subprocess call
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = [
+    'tests/',
+    'build/',
+    'dist/',
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/ (
+    __pycache__
+  | \*\\.pyc
+  | \*\\.pyo
+  | \*\\._pycache*
+  | \*_\\.so
+  | \*_\\.pyd
+  | \*\\.egg-info
+  | \*\\.egg
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+tskip_glob = []

@@ -1,5 +1,7 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Error/Error.hpp"
+#include "../core/Factory/Factory.hpp"
 #include <algorithm>
 #include <cmath>
 

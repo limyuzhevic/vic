@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Error/Error.hpp"
+#include "../core/Factory/Factory.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <stdexcept>
 
 namespace nlm {
 

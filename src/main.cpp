@@ -7,7 +7,11 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
+#pragma once
+
 #include "core/Config/Config.hpp"
+#include "core/Error/Error.hpp"
+#include "core/Error/ErrorUtilities.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -322,6 +326,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Initialize error handling system
+    nlm::initializeErrorHandling();
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

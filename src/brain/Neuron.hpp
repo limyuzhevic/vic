@@ -1,8 +1,12 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Error/Error.hpp"
+#include "../core/Factory/Factory.hpp"
 #include <vector>
 #include <array>
+#include <memory>
+#include <stdexcept>
 
 namespace nlm {
 
