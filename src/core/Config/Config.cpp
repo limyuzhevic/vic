@@ -114,13 +114,53 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Set values with validation
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find('=') != std::string::npos || key.find('\n') != std::string::npos) {
+        throw std::invalid_argument("Invalid configuration key: '" + key + "'. Key cannot be empty and cannot contain '=' or '\\n'.");
+    }
+    
+    // Validate value based on type
+    std::visit([](const auto& val, const std::string& keyRef) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+            // Integer values should be reasonable for simulation parameters
+            if (std::is_same_v<T, int64_t>) {
+                if (val < 0) {
+                    throw std::invalid_argument("Negative int64_t configuration value is invalid for key: '" + keyRef + "'");
+                }
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Floating point values should be reasonable
+            if (std::isinf(val) || std::isnan(val)) {
+                throw std::invalid_argument("Invalid floating point value (inf or nan) for key: '" + keyRef + "'");
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // Boolean values are always valid
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            // String values should not be empty for most parameters
+            if (keyRef == "config" && val.empty()) {
+                throw std::invalid_argument("Empty config file path is invalid.");
+            }
+        }
+    }, value, key);
+    
+    // Check for duplicate keys with validation
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        // Validate that we're not changing a critical configuration after use
+        if (it->source == ConfigSource::Default) {
+            // Allow default values to be changed (e.g., for testing)
+            it->value = value;
+            it->source = source;
+        } else {
+            // For non-default sources, validate the change is reasonable
+            throw std::runtime_error("Cannot modify configuration key '" + key + "' after it has been set. "
+                                    "Use ConfigSource::Runtime for runtime changes.");
+        }
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }

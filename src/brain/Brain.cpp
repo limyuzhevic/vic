@@ -154,7 +154,11 @@ struct Brain::Impl {
     }
     
     DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+    RegionId nextRegionId{1}; // Start at 1 for backward compatibility (0 is often INVALID)
+    // Add overflow protection - if initialized to invalid value, reset to valid
+    if (nextRegionId == INVALID_REGION_ID) {
+        nextRegionId = RegionId(1);
+    }
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -1105,12 +1109,36 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
+    // Helper function implementations
+void Brain::iterateNeurons(std::function<void(Neuron*, RegionId, PopulationId)> func) const {
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        for (const auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                func(neuron, region->getId(), pop->getId());
+            }
+        }
+    }
+}
+
+void Brain::iterateSynapses(std::function<void(Synapse*, RegionId)> func) const {
+    for (const auto& region : pImpl->regions) {
+        for (auto* syn : region->getSynapses()) {
+            func(syn, region->getId());
+        }
+    }
+}
+
+void Brain::iteratePopulations(std::function<void(NeuralPopulation*, RegionId)> func) const {
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            func(pop.get(), region->getId());
+        }
+    }
+}
+
+void Brain::iterateRegions(std::function<void(NeuralRegion*)> func) const {
+    for (const auto& region : pImpl->regions) {
+        func(region.get());
     }
 }
 

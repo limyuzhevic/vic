@@ -193,6 +193,12 @@ public:
     // Logging
     void logStatus() const;
     
+    // Helper functions for code consolidation (internal)
+    void iterateNeurons(std::function<void(Neuron*, RegionId, PopulationId)> func) const;
+    void iterateSynapses(std::function<void(Synapse*, RegionId)> func) const;
+    void iteratePopulations(std::function<void(NeuralPopulation*, RegionId)> func) const;
+    void iterateRegions(std::function<void(NeuralRegion*)> func) const;
+    
 private:
     struct Impl;
     Impl* pImpl;

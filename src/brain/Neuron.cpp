@@ -54,6 +54,10 @@ void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
 
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
 void Neuron::setMembranePotential(MembranePotential potential) {
     pImpl->state.membranePotential = potential;
 }
