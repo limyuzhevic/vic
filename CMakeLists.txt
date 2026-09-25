@@ -139,6 +139,20 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# CLI tool
+add_executable(nlm_cli
+    src/CLI.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+
+# Benchmark tool (use existing file)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/benchmark.cpp)
+    add_executable(nlm_benchmark
+        src/benchmark.cpp
+    )
+    target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+endif()
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

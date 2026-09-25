@@ -3,11 +3,228 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <cctype>
+#include <regex>
+#include <iostream>
 
 namespace nlm {
 
+// JSON parsing helper functions
+namespace JsonParser {
+    // Simple JSON value parser (supports basic types)
+    ConfigValue parseJsonValue(const std::string& valueStr) {
+        std::string trimmed = Config::trim(valueStr);
+        
+        // Remove surrounding whitespace
+        if (trimmed.empty()) {
+            return std::string();
+        }
+        
+        // Parse string
+        if ((trimmed.front() == '"' && trimmed.back() == '"') ||
+            (trimmed.front() == '\'' && trimmed.back() == '\'')) {
+            return trimmed.substr(1, trimmed.size() - 2);
+        }
+        
+        // Parse boolean
+        if (trimmed == "true") return true;
+        if (trimmed == "false") return false;
+        
+        // Parse numbers
+        try {
+            // Check for float
+            size_t pos;
+            double d = std::stod(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                return d;
+            }
+            
+            // Check for int64_t
+            int64_t l = std::stoll(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                return l;
+            }
+            
+            // Check for int
+            int i = std::stoi(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                return i;
+            }
+        } catch (...) {
+            // If parsing fails, return as string
+        }
+        
+        // Try to parse arrays
+        if (trimmed.front() == '[' && trimmed.back() == ']') {
+            std::string inner = trimmed.substr(1, trimmed.size() - 2);
+            std::vector<double> array;
+            
+            size_t start = 0;
+            size_t pos = 0;
+            while ((pos = inner.find(',', start)) != std::string::npos) {
+                std::string item = Config::trim(inner.substr(start, pos - start));
+                try {
+                    double val = std::stod(item);
+                    array.push_back(val);
+                } catch (...) {
+                    // Skip invalid items
+                }
+                start = pos + 1;
+            }
+            
+            // Add last item
+            if (start < inner.size()) {
+                std::string item = Config::trim(inner.substr(start));
+                try {
+                    double val = std::stod(item);
+                    array.push_back(val);
+                } catch (...) {
+                    // Skip invalid items
+                }
+            }
+            
+            return array;
+        }
+        
+        // If all else fails, return as string
+        return trimmed;
+    }
+    
+    // Parse JSON object from file
+    bool parseJsonFromFile(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string content((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+        file.close();
+        
+        // Remove whitespace for simplicity (in real implementation, would parse properly)
+        std::string cleaned;
+        for (char c : content) {
+            if (!std::isspace(c)) {
+                cleaned += c;
+            }
+        }
+        
+        // Simple JSON object parsing: {"key1": "value1", "key2": 123, "key3": [1,2,3]}
+        if (cleaned.front() != '{' || cleaned.back() != '}') {
+            return false;
+        }
+        
+        std::string inner = cleaned.substr(1, cleaned.size() - 2);
+        size_t pos = 0;
+        
+        while (pos < inner.size()) {
+            // Find key
+            size_t keyStart = inner.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = inner.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = inner.substr(keyStart + 1, keyEnd - keyStart - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace
+            while (pos < inner.size() && std::isspace(inner[pos])) pos++;
+            
+            if (pos >= inner.size() || inner[pos] != ':') break;
+            pos++;
+            
+            // Skip whitespace
+            while (pos < inner.size() && std::isspace(inner[pos])) pos++;
+            
+            // Find value end
+            size_t valueEnd = inner.find(',', pos);
+            if (valueEnd == std::string::npos) {
+                valueEnd = inner.size();
+            }
+            
+            std::string valueStr = inner.substr(pos, valueEnd - pos);
+            ConfigValue value = parseJsonValue(Config::trim(valueStr));
+            
+            entries.emplace_back(key, value, ConfigSource::File);
+            
+            pos = valueEnd + 1;
+            while (pos < inner.size() && std::isspace(inner[pos])) pos++;
+        }
+        
+        return true;
+    }
+    
+    // Format value as JSON string
+    std::string formatJsonValue(const ConfigValue& value) {
+        std::ostringstream oss;
+        
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << escapeString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << escapeString(arg[i]) << "\"";
+                }
+                oss << "]";
+            }
+        }, value);
+        
+        return oss.str();
+    }
+    
+    // Escape string for JSON
+    std::string escapeString(const std::string& str) {
+        std::ostringstream oss;
+        for (char c : str) {
+            switch (c) {
+                case '\\': oss << "\\\\"; break;
+                case '\"': oss << "\\\""; break;
+                case '\b': oss << "\\b"; break;
+                case '\f': oss << "\\f"; break;
+                case '\n': oss << "\\n"; break;
+                case '\r': oss << "\\r"; break;
+                case '\t': oss << "\\t"; break;
+                default:
+                    if (c < 32 || c > 126) {
+                        oss << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (int)c;
+                    } else {
+                        oss << c;
+                    }
+                    break;
+            }
+        }
+        return oss.str();
+    }
+}
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // For future validation and schema support
+    std::map<std::string, std::function<bool(const ConfigValue&)>> validators;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,9 +236,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // First try to parse as JSON
+    std::vector<ConfigEntry> jsonEntries;
+    if (JsonParser::parseJsonFromFile(filepath, jsonEntries)) {
+        // Clear existing entries and load JSON entries
+        clear();
+        pImpl->entries = std::move(jsonEntries);
+        return true;
+    }
     
+    // Fall back to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,7 +272,8 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse as number or boolean
+            set(key, JsonParser::parseJsonValue(value), ConfigSource::File);
         }
     }
     
@@ -56,6 +281,8 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,17 +292,24 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                set(key, JsonParser::parseJsonValue(value), ConfigSource::CommandLine);
+            } else {
+                std::cerr << "Error: Missing value for argument " << arg << std::endl;
+                success = false;
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            set(key, JsonParser::parseJsonValue(value), ConfigSource::CommandLine);
+        } else {
+            std::cerr << "Error: Invalid argument format " << arg << std::endl;
+            success = false;
         }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -84,10 +318,22 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Start JSON object
+    file << "{" << std::endl;
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "  \"" << entry.key << "\": " << JsonParser::formatJsonValue(entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << "," << std::endl;
+        } else {
+            file << std::endl;
+        }
     }
+    
+    file << "}" << std::endl;
     
     return true;
 }
@@ -115,13 +361,22 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate value type
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Update existing entry
         it->value = value;
         it->source = source;
+        
+        // Run validator if any
+        auto validatorIt = pImpl->validators.find(key);
+        if (validatorIt != pImpl->validators.end() && !validatorIt->second(value)) {
+            std::cerr << "Warning: Value for key '" << key << "' failed validation" << std::endl;
+        }
     } else {
+        // Add new entry
         pImpl->entries.emplace_back(key, value, source);
     }
 }
@@ -153,6 +408,9 @@ void Config::remove(const std::string& key) {
             [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
+    
+    // Remove validator if any
+    pImpl->validators.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -166,6 +424,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->validators.clear();
 }
 
 std::string Config::summary() const {
