@@ -19,6 +19,28 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , physicsEnabled_(true)
+    , actionLoggingEnabled_(false)
+    , x_(0.0f)
+    , y_(0.0f)
+    , orientation_(0.0f)
+    , velocityX_(0.0f)
+    , velocityY_(0.0f)
+    , angularVelocity_(0.0f)
+    , maxSpeed_(1.0f)
+    , health_(100.0f)
+    , energy_(100.0f)
+    , activeTime_(0.0)
+    , lastPositionUpdate_(0.0)
+    , motorThreshold_(0.5f)
+    , explorationRate_(0.2f)
+    , developmentSpeed_(1.0f)
+    , sensoryGain_(1.0f)
+    , spikeCount_(0)
+    , lastSpikeTime_(0.0)
+    , cumulativeScore_(0.0f)
+    , stateChanged_(false)
+    , stateVersion_(1)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -279,59 +301,175 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+size_t AgentBrain::getActiveMotorNeurons() const {
+    size_t count = 0;
+    for (const auto& neuron : motorForward_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : motorBackward_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : motorTurnLeft_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : motorTurnRight_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : motorInteract_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : motorWait_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    return count;
+}
+
+size_t AgentBrain::getActiveSensoryNeurons() const {
+    size_t count = 0;
+    for (const auto& neuron : sensoryVision_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : sensoryTouch_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : sensoryInternal_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    for (const auto& neuron : sensoryProprioception_) {
+        if (neuron && neuron->getState().isActive) count++;
+    }
+    return count;
+}
+
+std::string AgentBrain::getNeuralActivityStats() const {
+    std::string stats = "Neural Activity Statistics:\n";
+    stats += "  Motor neurons: " + std::to_string(getActiveMotorNeurons()) + "/" + 
+             std::to_string(motorForward_.size() + motorBackward_.size() + 
+                           motorTurnLeft_.size() + motorTurnRight_.size() +
+                           motorInteract_.size() + motorWait_.size()) + " active\n";
+    stats += "  Sensory neurons: " + std::to_string(getActiveSensoryNeurons()) + "/" +
+             std::to_string(sensoryVision_.size() + sensoryTouch_.size() +
+                           sensoryInternal_.size() + sensoryProprioception_.size()) + " active\n";
+    stats += "  Neuromodulation: dopamine=" + std::to_string(dopamineLevel_) + ", " +
+             "curiosity=" + std::to_string(curiosityLevel_) + ", " +
+             "novelty=" + std::to_string(noveltyLevel_) + "\n";
+    stats += "  Development stage: " + std::to_string(static_cast<int>(developmentalAge_ / 60.0)) + "\n";
+    return stats;
+}
+
+void AgentBrain::updatePhysics(double timestep) {
+    if (!physicsEnabled_) return;
     
-    developmentalAge_ += timestep;
+    // Update position based on velocity
+    x_ += velocityX_ * timestep;
+    y_ += velocityY_ * timestep;
+    orientation_ += angularVelocity_ * timestep;
     
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
-        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
-        plasticityModifier_ = 0.8f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
-        brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
-    } else {
-        plasticityModifier_ = 0.2f;  // Adult - more stable
-        brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    // Clamp orientation
+    orientation_ = std::fmod(orientation_, 2.0f * M_PI);
+    if (orientation_ < 0.0f) orientation_ += 2.0f * M_PI;
+    
+    // Apply energy decay
+    energy_ = std::max(0.0f, energy_ - energy_ * 0.01f * timestep);
+    
+    // Update active time
+    activeTime_ += timestep;
+    
+    // Log position if enabled
+    if (actionLoggingEnabled_) {
+        NLM_LOG_DEBUG("Agent position: x=" + std::to_string(x_) + ", y=" + 
+                     std::to_string(y_) + ", heading=" + std::to_string(orientation_));
+    }
+}
+
+void AgentBrain::applyForce(float fx, float fy) {
+    if (!physicsEnabled_) return;
+    
+    // Apply force (simplified physics)
+    velocityX_ += fx * 0.01f;
+    velocityY_ += fy * 0.01f;
+    
+    // Limit speed
+    float speed = std::sqrt(velocityX_ * velocityX_ + velocityY_ * velocityY_);
+    if (speed > maxSpeed_) {
+        velocityX_ = velocityX_ * maxSpeed_ / speed;
+        velocityY_ = velocityY_ * maxSpeed_ / speed;
+    }
+}
+
+void AgentBrain::setPosition(float x, float y) {
+    x_ = x;
+    y_ = y;
+    lastPositionUpdate_ = activeTime_;
+}
+
+std::pair<float, float> AgentBrain::getPosition() const {
+    return std::make_pair(x_, y_);
+}
+
+float AgentBrain::getDirection() const {
+    return orientation_;
+}
+
+void AgentBrain::setDirection(float heading) {
+    orientation_ = heading;
+    std::fmod(orientation_, 2.0f * M_PI);
+    if (orientation_ < 0.0f) orientation_ += 2.0f * M_PI;
+}
+
+std::pair<float, float> AgentBrain::getVelocity() const {
+    return std::make_pair(velocityX_, velocityY_);
+}
+
+void AgentBrain::setMaxSpeed(float speed) {
+    maxSpeed_ = speed;
+}
+
+float AgentBrain::getMaxSpeed() const {
+    return maxSpeed_;
+}
+
+std::vector<Action> AgentBrain::getActionHistory(size_t maxHistory) const {
+    if (actionHistory_.size() <= maxHistory) {
+        return actionHistory_;
     }
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
-        }
+    size_t startIdx = actionHistory_.size() - maxHistory;
+    return std::vector<Action>(actionHistory_.begin() + startIdx, actionHistory_.end());
+}
+
+std::vector<SensoryPercept> AgentBrain::getSensoryHistory(size_t maxHistory) const {
+    if (sensoryHistory_.size() <= maxHistory) {
+        return sensoryHistory_;
     }
+    
+    size_t startIdx = sensoryHistory_.size() - maxHistory;
+    return std::vector<SensoryPercept>(sensoryHistory_.begin() + startIdx, sensoryHistory_.end());
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
-}
-
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
-
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
-
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
-
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+AgentBrain::PerformanceMetrics AgentBrain::getPerformanceMetrics() const {
+    PerformanceMetrics metrics = metrics_;
+    
+    // Calculate efficiency (reward per action)
+    if (metrics.actionCount > 0) {
+        metrics.efficiency = metrics.totalReward / metrics.actionCount;
+    }
+    
+    // Calculate exploration score (based on random actions vs planned actions)
+    metrics.explorationScore = curiosityLevel_ * 0.7f + 
+                              (noveltyLevel_ > 0.5f ? 0.3f : 0.0f);
+    
+    // Calculate learning progress (based on prediction error reduction)
+    static float previousPredictionError = predictionError_;
+    if (activeTime_ > 0.0) {
+        float errorChange = std::abs(predictionError_ - previousPredictionError_);
+        metrics.learningProgress = std::min(1.0f, errorChange * 10.0f);
+    }
+    
+    // Calculate session duration
+    metrics.sessionDuration = activeTime_;
+    
+    return metrics;
 }
 
 void AgentBrain::reset() {
@@ -342,9 +480,33 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    physicsEnabled_ = true;
+    actionLoggingEnabled_ = false;
+    x_ = 0.0f;
+    y_ = 0.0f;
+    orientation_ = 0.0f;
+    velocityX_ = 0.0f;
+    velocityY_ = 0.0f;
+    angularVelocity_ = 0.0f;
+    maxSpeed_ = 1.0f;
+    health_ = 100.0f;
+    energy_ = 100.0f;
+    activeTime_ = 0.0;
+    lastPositionUpdate_ = 0.0;
+    motorThreshold_ = 0.5f;
+    explorationRate_ = 0.2f;
+    developmentSpeed_ = 1.0f;
+    sensoryGain_ = 1.0f;
+    
+    // Clear history
+    actionHistory_.clear();
+    sensoryHistory_.clear();
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset metrics
+    resetMetrics();
 }
 
 } // namespace nlm

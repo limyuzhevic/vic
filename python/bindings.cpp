@@ -150,8 +150,13 @@ PYBIND11_MODULE(pynlm, m) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
+        .def("loadFromString", &Config::loadFromString, py::arg("jsonString"),
+             "Load configuration from a JSON string")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("saveToString", [](const Config& self) {
+            return self.saveToString();
+        }, "Save configuration to a JSON string")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -162,7 +167,29 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source"),
+             "Set a configuration value with source")
+        .def("get", py::overload_cast<const std::string&>(&Config::get, std::type_index(typeid(std::string))),
+             py::arg("key"), "Get configuration value as string")
+        .def("get", py::overload_cast<const std::string&, bool>(&Config::get, std::type_index(typeid(bool))),
+             py::arg("key"), "Get configuration value as bool")
+        .def("get", py::overload_cast<const std::string&, int64_t>(&Config::get, std::type_index(typeid(int64_t))),
+             py::arg("key"), "Get configuration value as int64_t")
+        .def("get", py::overload_cast<const std::string&, double>(&Config::get, std::type_index(typeid(double))),
+             py::arg("key"), "Get configuration value as double")
+        .def("get", py::overload_cast<const std::string&, float>(&Config::get, std::type_index(typeid(float))),
+             py::arg("key"), "Get configuration value as float")
+        .def("getOr", py::overload_cast<const std::string&, const std::string&>(&Config::getOr, std::type_index(typeid(std::string))),
+             py::arg("key"), py::arg("defaultValue"), "Get configuration value with string default")
+        .def("getOr", py::overload_cast<const std::string&, bool>(&Config::getOr, std::type_index(typeid(bool))),
+             py::arg("key"), py::arg("defaultValue"), "Get configuration value with bool default")
+        .def("getOr", py::overload_cast<const std::string&, int64_t>(&Config::getOr, std::type_index(typeid(int64_t))),
+             py::arg("key"), py::arg("defaultValue"), "Get configuration value with int64_t default")
+        .def("getOr", py::overload_cast<const std::string&, double>(&Config::getOr, std::type_index(typeid(double))),
+             py::arg("key"), py::arg("defaultValue"), "Get configuration value with double default")
+        .def("getOr", py::overload_cast<const std::string&, float>(&Config::getOr, std::type_index(typeid(float))),
+             py::arg("key"), py::arg("defaultValue"), "Get configuration value with float default");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -398,7 +425,71 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("setMotorThreshold", &AgentBrain::setMotorThreshold,
+             py::arg("threshold"),
+             "Set motor activity threshold for action selection")
+        .def("setExplorationRate", &AgentBrain::setExplorationRate,
+             py::arg("rate"),
+             "Set exploration rate for curiosity-driven behavior")
+        .def("setDevelopmentSpeed", &AgentBrain::setDevelopmentSpeed,
+             py::arg("speed"),
+             "Set developmental progression speed")
+        .def("setSensoryGain", &AgentBrain::setSensoryGain,
+             py::arg("gain"),
+             "Set sensory input gain (0.0-1.0)")
+        .def("getMotorThreshold", &AgentBrain::getMotorThreshold,
+             "Get current motor activity threshold")
+        .def("getExplorationRate", &AgentBrain::getExplorationRate,
+             "Get current exploration rate")
+        .def("getDevelopmentSpeed", &AgentBrain::getDevelopmentSpeed,
+             "Get current development speed")
+        .def("getSensoryGain", &AgentBrain::getSensoryGain,
+             "Get current sensory gain")
+        .def("getActiveMotorNeurons", &AgentBrain::getActiveMotorNeurons,
+             "Get number of currently active motor neurons")
+        .def("getActiveSensoryNeurons", &AgentBrain::getActiveSensoryNeurons,
+             "Get number of currently active sensory neurons")
+        .def("getNeuralActivityStats", &AgentBrain::getNeuralActivityStats,
+             "Get comprehensive neural activity statistics")
+        .def("updatePhysics", &AgentBrain::updatePhysics,
+             py::arg("dt"), "Update physical state of agent")
+        .def("applyForce", &AgentBrain::applyForce,
+             py::arg("fx"), py::arg("fy"), "Apply external force to agent")
+        .def("setPosition", &AgentBrain::setPosition,
+             py::arg("x"), py::arg("y"), "Set agent position directly")
+        .def("getPosition", &AgentBrain::getPosition,
+             "Get current agent position as (x, y)")
+        .def("getDirection", &AgentBrain::getDirection,
+             "Get current agent direction (heading)")
+        .def("setDirection", &AgentBrain::setDirection,
+             py::arg("heading"), "Set agent direction")
+        .def("getVelocity", &AgentBrain::getVelocity,
+             "Get current velocity vector")
+        .def("setMaxSpeed", &AgentBrain::setMaxSpeed,
+             py::arg("speed"), "Set maximum agent speed")
+        .def("getMaxSpeed", &AgentBrain::getMaxSpeed,
+             "Get current maximum speed")
+        .def("getHealth", &AgentBrain::getHealth,
+             "Get current agent health")
+        .def("setHealth", &AgentBrain::setHealth,
+             py::arg("health"), "Set agent health")
+        .def("getEnergy", &AgentBrain::getEnergy,
+             "Get current agent energy")
+        .def("setEnergy", &AgentBrain::setEnergy,
+             py::arg("energy"), "Set agent energy")
+        .def("getAge", &AgentBrain::getAge,
+             "Get current agent age (in simulation time)")
+        .def("getActiveTime", &AgentBrain::getActiveTime,
+             "Get total active time since reset")
+        .def("getActionHistory", &AgentBrain::getActionHistory,
+             "Get recent action history")
+        .def("getSensoryHistory", &AgentBrain::getSensoryHistory,
+             "Get recent sensory history")
+        .def("getPerformanceMetrics", &AgentBrain::getPerformanceMetrics,
+             "Get performance metrics (reward, efficiency, etc.)")
+        .def("resetMetrics", &AgentBrain::resetMetrics,
+             "Reset performance metrics counters");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -363,33 +363,71 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Enhanced configuration
+    bool enablePhysics = true;
+    bool enableActionLogging = false;
+    bool enableAdvancedVisualization = false;
+    int32_t experimentType = 1;  // 1=basic, 2=plasticity, 3=stdp, 4=curiosity, 5=full
+    float explorationRate = 0.2f;
+    float developmentSpeed = 1.0f;
+    float sensoryGain = 1.0f;
+    bool saveResults = false;
+    std::string resultsPath = ".";
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Parse enhanced command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--enable-physics" || arg == "-p") {
+            enablePhysics = true;
+        } else if (arg == "--disable-physics") {
+            enablePhysics = false;
+        } else if (arg == "--enable-action-logging" || arg == "-l") {
+            enableActionLogging = true;
+        } else if (arg == "--enable-advanced-visualization" || arg == "-v") {
+            enableAdvancedVisualization = true;
+        } else if (arg.substr(0, 3) == "--exp") {
+            if (arg.find('=') != std::string::npos) {
+                experimentType = std::stoi(arg.substr(arg.find('=') + 1));
+            }
+        } else if (arg.substr(0, 4) == "--explore") {
+            if (arg.find('=') != std::string::npos) {
+                explorationRate = std::stof(arg.substr(arg.find('=') + 1));
+            }
+        } else if (arg.substr(0, 4) == "--dev-speed") {
+            if (arg.find('=') != std::string::npos) {
+                developmentSpeed = std::stof(arg.substr(arg.find('=') + 1));
+            }
+        } else if (arg.substr(0, 4) == "--sensory-gain") {
+            if (arg.find('=') != std::string::npos) {
+                sensoryGain = std::stof(arg.substr(arg.find('=') + 1));
+            }
+        } else if (arg == "--save-results" || arg == "-s") {
+            saveResults = true;
+        } else if (arg == "--results-path" && i + 1 < argc) {
+            resultsPath = argv[++i];
+        } else if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
+    // Log enhanced configuration
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("Enhanced Configuration:");
+    NLM_LOG_INFO("  Physics simulation: " + std::string(enablePhysics ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Action logging: " + std::string(enableActionLogging ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Advanced visualization: " + std::string(enableAdvancedVisualization ? "enabled" : "disabled"));
+    NLM_LOG_INFO("  Experiment type: " + std::to_string(experimentType));
+    NLM_LOG_INFO("  Exploration rate: " + std::to_string(explorationRate));
+    NLM_LOG_INFO("  Development speed: " + std::to_string(developmentSpeed));
+    NLM_LOG_INFO("  Sensory gain: " + std::to_string(sensoryGain));
+    NLM_LOG_INFO("  Save results: " + std::string(saveResults ? "yes" : "no"));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
