@@ -122,71 +122,214 @@ struct PlasticityFlags {
                                   eligible(false) {}
 };
 
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
-};
-
-// Spike event for event-driven computation
-struct SpikeEvent {
-    NeuronId source_neuron;
-    Timestamp timestamp;
-    SimulationStep step;
+// Synaptic plasticity state flags
+struct PlasticityFlags {
+    bool hebbian : 1;
+    bool stdp : 1;
+    bool reward_modulated : 1;
+    bool structural : 1;
+    bool eligible : 1;
     
-    SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
-    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
-        : source_neuron(nid), timestamp(ts), step(s) {}
+    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
+                                  reward_modulated(false), structural(false), 
+                                  eligible(false) {}
 };
 
-// Delayed spike event for synaptic transmission with delay
-struct DelayedSpikeEvent {
-    NeuronId source_neuron;
-    NeuronId destination_neuron;
-    SynapseId synapse_id;
-    SynapticWeight weight;  // Weight at time of spike (frozen)
-    SynapseType synapse_type;
-    Timestamp timestamp;      // When spike occurs
-    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
-    SimulationStep step;      // Current simulation step
-    SimulationStep delivery_step;  // Step when spike should be delivered
-    bool is_excitatory;  // Cached for quick lookup
+// Simulation constants
+namespace SimConstants {
+    // Default timestep for real-time simulation (seconds)
+    constexpr TimestepDuration DEFAULT_TIMESTEP = 0.001;  // 1ms
     
-    DelayedSpikeEvent()
-        : source_neuron(), destination_neuron(), synapse_id()
-        , weight(0.0f), synapse_type(SynapseType::Excitatory)
-        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
-        , is_excitatory(true) {}
+    // Default simulation steps for experiment runs
+    constexpr SimulationStep DEFAULT_STEPS = 1000;
     
-    DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,
-                      SynapticWeight w, SynapseType type,
-                      Timestamp ts, Timestamp delivery, SimulationStep s, SimulationStep deliveryS)
-        : source_neuron(src), destination_neuron(dst), synapse_id(syn)
-        , weight(w), synapse_type(type)
-        , timestamp(ts), delivery_time(delivery)
-        , step(s), delivery_step(deliveryS)
-        , is_excitatory(type == SynapseType::Excitatory) {}
-};
+    // Default refractory period (steps)
+    constexpr SimulationStep DEFAULT_REFECTORY_STEPS = 5;
+    
+    // Default refractory period (milliseconds)
+    constexpr SimulationStep DEFAULT_REFECTORY_MS = 5;
+    
+    // Learning threshold for weight changes
+    constexpr float WEIGHT_CHANGE_THRESHOLD = 0.01f;
+    
+    // Learning accumulation threshold for learning detection
+    constexpr float LEARNING_ACCUMULATION_THRESHOLD = 0.001f;
+    
+    // Default neuron count for testing
+    constexpr size_t DEFAULT_TEST_NEURON_COUNT = 20;
+    
+    // Default number of synapses for STDP test
+    constexpr size_t DEFAULT_STDP_SYNAPSE_COUNT = 5;
+    
+    // Default number of trials for learning experiments
+    constexpr size_t DEFAULT_LEARNING_TRIALS = 50;
+    
+    // Default number of neurons for current injection tests
+    constexpr size_t DEFAULT_CURRENT_INJECTION_COUNT = 10;
+    
+    // Log progress every N steps
+    constexpr SimulationStep LOG_INTERVAL = 100;
+}
 
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
-};
+// Neuron simulation constants
+namespace NeuronConstants {
+    // Membrane capacitance (nF)
+    constexpr MembranePotential MEMBRANE_CAPACITANCE = 1.0f;
+    
+    // Membrane time constant (ms)
+    constexpr float TIME_CONSTANT = 20.0f;
+    
+    // Maximum spike history size
+    constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    // Spike-frequency adaptation parameters
+    constexpr float ADAPTATION_DECAY_RATE = 0.95f;  // per ms
+    constexpr float ADAPTATION_EFFECT = 0.01f;     // mV per unit adaptation
+    
+    // Adaptation variable change per spike
+    constexpr float ADAPTATION_INCREMENT = 1.0f;
+    
+    // Membrane potential clamp limits (mV)
+    constexpr MembranePotential V_MIN = -100.0f;
+    constexpr MembranePotential V_MAX = 50.0f;
+    
+    // Default firing rate initial value (Hz)
+    constexpr FiringRate DEFAULT_FIRING_RATE = 0.0f;
+    
+    // Default adaptation variable initial value
+    constexpr float DEFAULT_ADAPTATION = 0.0f;
+    
+    // Default last spike time (timestamp)
+    constexpr float DEFAULT_LAST_SPIKE_TIME = -1.0f;
+}
 
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
+// Synapse simulation constants
+namespace SynapseConstants {
+    // Default synaptic weight
+    constexpr SynapticWeight DEFAULT_WEIGHT = 1.0f;
+    
+    // Current injection for excitation (nA)
+    constexpr MembranePotential EXCITATORY_CURRENT = 60.0f;
+    
+    // Current injection for inhibition (nA)
+    constexpr MembranePotential INHIBITORY_CURRENT = 60.0f;
+    
+    // Current injection for strong tests (nA)
+    constexpr MembranePotential STRONG_CURRENT = 50.0f;
+    
+    // Current injection for STDP potentiation (nA)
+    constexpr MembranePotential STDP_POTENTIATION_CURRENT = 60.0f;
+    
+    // Default synaptic delay (steps)
+    constexpr Delay DEFAULT_DELAY = 0;
+    
+    // Default synaptic type
+    constexpr SynapseType DEFAULT_SYNAPSE_TYPE = SynapseType::Excitatory;
+    
+    // Default plasticity flags
+    constexpr PlasticityFlags DEFAULT_PLASTICITY = PlasticityFlags();
+}
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Neuromodulation constants
+namespace NeuromodulationConstants {
+    // Dopamine parameters for plasticity factor
+    constexpr float DOPAMINE_BASELINE = 0.0f;
+    constexpr float DOPAMINE_PEAK = 1.0f;
+    constexpr float DOPAMINE_DECAY_RATE = 0.1f;  // per ms
+    constexpr float DOPAMINE_RELEASE_RATE = 1.0f; // per reward unit
+    
+    // Default neuromodulation level
+    constexpr float DEFAULT_NEUMODULATION_LEVEL = 0.0f;
+    
+    // Plasticity factor baseline
+    constexpr float PLASTICITY_FACTOR_BASE = 0.5f;
+    
+    // Plasticity factor modulation strength
+    constexpr float PLASTICITY_FACTOR_MODULATION = 0.5f;
+}
 
-} // namespace nlm
+// Memory constants
+namespace MemoryConstants {
+    // Default working memory capacity
+    constexpr size_t WORKING_MEMORY_CAPACITY = 100;
+    
+    // Default working memory initial capacity
+    constexpr size_t INITIAL_WORKING_MEMORY_CAPACITY = 100;
+    
+    // Default consolidation interval (steps)
+    constexpr SimulationStep CONSOLIDATION_INTERVAL = 10;
+}
+
+// Motor system constants
+namespace MotorConstants {
+    // Default motor system planning depth
+    constexpr size_t DEFAULT_PLANNING_DEPTH = 5;
+    
+    // Default motor system planning confidence
+    constexpr float DEFAULT_PLANNING_CONFIDENCE = 0.5f;
+    
+    // Default curiosity level
+    constexpr float DEFAULT_CURIOUSITY_LEVEL = 0.5f;
+    
+    // Default prediction error
+    constexpr float DEFAULT_PREDICTION_ERROR = 0.0f;
+}
+
+// Development constants
+namespace DevelopmentConstants {
+    // Maturation parameters
+    constexpr float MATURATION_PROGRESS_STEP = 0.01f;
+    constexpr float MATURE_THRESHOLD = -55.0f;
+    constexpr float MATURE_RESTING_POTENTIAL = -70.0f;
+    constexpr float MATURE_TIME_CONSTANT = 20.0f;
+}
+
+// Plasticity constants
+namespace PlasticityConstants {
+    // STDP parameters
+    constexpr float STDP_LTP_THRESHOLD = 0.0f;  // Post-synaptic firing after pre-synaptic
+    constexpr float STDP_LTD_THRESHOLD = -0.01f; // Post-synaptic firing before pre-synaptic
+    constexpr float STDP_MAX_WEIGHT_CHANGE = 0.05f;
+    constexpr float STDP_NORMALIZATION_FACTOR = 0.01f;
+    
+    // Hebbian parameters
+    constexpr float HEBBIAN_WEIGHT_INCREMENT = 0.01f;
+    constexpr float HEBBIAN_WEIGHT_DECREMENT = 0.01f;
+}
+
+// Reward constants
+namespace RewardConstants {
+    // Reward computation parameters
+    constexpr float REWARD_SCALING_FACTOR = 1.0f;
+    constexpr float REWARD_HISTORY_SIZE = 100;
+    
+    // Reward thresholds
+    constexpr float POSITIVE_REWARD_THRESHOLD = 1.0f;
+    constexpr float NEGATIVE_REWARD_THRESHOLD = -1.0f;
+}
+
+// Experiment constants
+namespace ExperimentConstants {
+    // Phase 1: Basic connectivity
+    constexpr size_t PHASE1_NEURONS = 10;
+    constexpr size_t PHASE1_STEPS = 50;
+    
+    // Phase 2: Plasticity
+    constexpr size_t PHASE2_INPUT_NEURONS = 20;
+    constexpr size_t PHASE2_STEPS = 1000;
+    
+    // Phase 3: STDP
+    constexpr size_t PHASE3_SYNAPSES = 5;
+    constexpr size_t PHASE3_TRIALS = 50;
+    
+    // Phase 4: Learning
+    constexpr size_t PHASE4_TRIALS = 100;
+    constexpr float PHASE4_SUCCESS_THRESHOLD = 0.8f;
+    
+    // Phase 5: Development
+    constexpr size_t PHASE5_DEVELOPMENT_STEPS = 500;
+    
+    // Phase 6: Integration
+    constexpr size_t PHASE6_EXPERIMENTS = 5;
+    constexpr size_t PHASE6_RUNS_PER_EXPERIMENT = 10;
+}

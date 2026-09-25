@@ -1,3 +1,6 @@
+#ifndef SENSORY_PERCEPT_HPP
+#define SENSORY_PERCEPT_HPP
+
 #include "SensoryPercept.hpp"
 
 namespace nlm {
@@ -36,3 +39,5 @@ std::vector<float> SensoryPercept::getAllSignals() const {
 }
 
 } // namespace nlm
+
+#endif // SENSORY_PERCEPT_HPP

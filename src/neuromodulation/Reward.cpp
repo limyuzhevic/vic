@@ -33,9 +33,10 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    // Basic reward computation
+    // This is a placeholder implementation that can be enhanced with
+    // more sophisticated reward functions based on observations
+    return pImpl->accumulatedReward;
 }
 
 const std::vector<float>& Reward::getHistory() const {

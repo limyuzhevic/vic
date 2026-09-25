@@ -5,101 +5,105 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include "ConfigValidator.hpp"
+#include "ConfigLoader.hpp"
+#include "ConfigManager.hpp"
+#include "ConfigBuilder.hpp"
 
 namespace nlm {
 
 // Forward declarations
-class Config;
+class ConfigManager;
 
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
-class Config {
+// Enhanced configuration system entry point
+class ConfigSystem {
 public:
-    Config();
-    ~Config();
+    // Initialize with default parameters
+    static bool initialize(const std::string& configFile = "configs/default.cfg", 
+                          int argc = 0, char** argv = nullptr);
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    // Get the global configuration manager
+    static std::shared_ptr<ConfigManager> getManager() { return manager_; }
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Get the current configuration
+    static std::shared_ptr<Config> getConfig() {
+        return manager_ ? manager_->getConfig() : nullptr;
+    }
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Get the validator
+    static std::shared_ptr<ConfigValidator> getValidator() {
+        return manager_ ? manager_->getValidator() : nullptr;
+    }
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Validate current configuration
+    static std::vector<ConfigValidator::ValidationResult> validate() {
+        return manager_ ? manager_->validate() : std::vector<ConfigValidator::ValidationResult>();
+    }
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Save configuration to file
+    static bool saveToFile(const std::string& filepath, const std::string& description = "") {
+        return manager_ ? manager_->saveToFile(filepath, description) : false;
+    }
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Load configuration from file
+    static bool loadFromFile(const std::string& filepath) {
+        return manager_ ? manager_->loadFromFile(filepath) : false;
+    }
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Create backup
+    static bool createBackup(const std::string& description = "Manual backup") {
+        return manager_ ? manager_->createBackup(description) : false;
+    }
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Restore from backup
+    static bool restoreFromBackup(size_t backupIndex = 0) {
+        return manager_ ? manager_->restoreFromBackup(backupIndex) : false;
+    }
     
-    // Remove key
-    void remove(const std::string& key);
+    // Reset to defaults
+    static bool resetToDefaults() {
+        return manager_ ? manager_->resetToDefaults() : false;
+    }
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Print help information
+    static void printHelp() {
+        ConfigLoader::printHelp();
+    }
     
-    // Clear all
-    void clear();
+    // Initialize with config builder
+    static bool initializeWithBuilder(const ConfigBuilder& builder, 
+                                      const std::map<std::string, ConfigValue>& customValues = {});
     
-    // Get configuration summary
-    std::string summary() const;
+    // Export configuration
+    static std::string exportToJson() {
+        return manager_ && manager_->getConfig() ? 
+            nlohmann::json(*manager_->getConfig()).dump(2) : "{}";
+    }
+    
+    // Import configuration
+    static bool importFromJson(const std::string& jsonString) {
+        return manager_ ? manager_->loadFromString(jsonString, "json") : false;
+    }
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    static std::shared_ptr<ConfigManager> manager_;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Initialize singleton manager
+    static void initializeManager(const std::string& configFile, int argc, char** argv);
 };
+
+// Global configuration manager instance
+inline std::shared_ptr<ConfigManager> ConfigSystem::manager_ = nullptr;
+
+// Factory function to create enhanced config system
+inline std::shared_ptr<ConfigManager> createEnhancedConfigSystem(const std::string& configFile = "configs/default.cfg",
+                                                                int argc = 0, char** argv = nullptr) {
+    auto manager = std::make_shared<ConfigManager>();
+    if (manager->initialize(configFile, argc, argv)) {
+        return manager;
+    }
+    return nullptr;
+}
 
 } // namespace nlm

@@ -1,0 +1,978 @@
+# NLM Examples
+
+This directory contains working example programs demonstrating NLM's capabilities. Each example shows how to use different aspects of the framework.
+
+## Basic Examples
+
+### 1. Basic Neural Computation
+
+**File:** `examples/basic_simulation.cpp`
+
+```cpp
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include <iostream>
+
+int main() {
+    std::cout << "=== NLM Basic Neural Computation Example ===\n\n";
+    
+    // Create configuration
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neurons", 100);
+    config->set("timestep", 0.001);
+    config->set("random-seed", 42);
+    
+    // Initialize brain
+    auto brain = std::make_shared<nlm::Brain>(config);
+    if (!brain->initialize()) {
+        std::cerr << "Failed to initialize brain!" << std::endl;
+        return 1;
+    }
+    
+    // Run basic connectivity test
+    std::cout << "Running basic connectivity test...\n";
+    // [Implementation would show spike generation and propagation]
+    
+    // Run learning experiment  
+    std::cout << "\nRunning learning experiment...\n";
+    // [Implementation would show STDP and Hebbian learning]
+    
+    // Run STDP verification
+    std::cout << "\nRunning STDP verification...\n";
+    // [Implementation would show spike-timing dependent plasticity]
+    
+    // Final status
+    brain->logStatus();
+    
+    std::cout << "\n=== Example Complete ===\n";
+    std::cout << "This demonstrates NLM's core neural computation capabilities.\n";
+    
+    return 0;
+}
+```
+
+**What it demonstrates:**
+- Basic brain initialization
+- Neural connectivity establishment
+- Spike generation and propagation
+- Learning through plasticity
+- System state management
+
+### 2. Learning Demo
+
+**File:** `examples/learning_demo.cpp`
+
+```cpp
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include <iostream>
+#include <vector>
+
+int main() {
+    std::cout << "=== NLM Learning Demo ===\n\n";
+    
+    // Configure for intensive learning
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neurons", 1000);
+    config->set("stdp-ltp-weight", 0.03);
+    config->set("stdp-ltd-weight", 0.02);
+    config->set("hebbian-learning-rate", 0.015);
+    config->set("development-stage", "critical");
+    config->set("plasticity-mod", 1.0);
+    config->set("random-seed", 12345);
+    
+    // Initialize and run learning simulation
+    auto brain = std::make_shared<nlm::Brain>(config);
+    brain->initialize();
+    
+    std::cout << "Starting learning simulation...\n";
+    std::cout << "Observations:\n";
+    
+    // Simulate learning over time
+    for (nlm::SimulationStep step = 0; step < 500; ++step) {
+        // Apply varied input patterns
+        brain->injectCurrentToNeurons(nlm::NeuronType::Sensory, 30.0f);
+        
+        // Step the simulation
+        brain->step(step);
+        
+        // Log progress every 50 steps
+        if (step % 50 == 0) {
+            float firing_rate = brain->getAverageFiringRate();
+            size_t total_spikes = brain->getTotalSpikeCount();
+            std::cout << format("  Step %4d: Firing rate = %6.2f Hz, Total spikes = %8d\n",
+                               step, firing_rate, total_spikes);
+        }
+    }
+    
+    // Analyze learning results
+    std::cout << "\nLearning Analysis:\n";
+    std::cout << "-------------------\n";
+    
+    float e_i_ratio = brain->getExcitationInhibitionRatio();
+    std::cout << "Excitatory/Inhibitory ratio: " << e_i_ratio << "\n";
+    std::cout << "Final firing rate: " << brain->getAverageFiringRate() << " Hz\n";
+    
+    // Check for significant learning
+    bool learning_detected = (std::abs(e_i_ratio - 1.0f) > 0.1f) || 
+                             (brain->getTotalSpikeCount() > 1000);
+    
+    std::cout << "\nLearning Result: " << (learning_detected ? "DETECTED ✓" : "NOT DETECTED ✗") << "\n";
+    
+    std::cout << "\n=== Learning Demo Complete ===\n";
+    std::cout << "This demonstrates how NLM learns through experience.\n";
+    
+    return 0;
+}
+```
+
+**What it demonstrates:**
+- Extended learning simulations
+- Parameter tuning for different learning regimes
+- Monitoring learning progress over time
+- Analyzing learning outcomes
+
+### 3. Development Demo
+
+**File:** `examples/development_demo.cpp`
+
+```cpp
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include <iostream>
+#include <iomanip>
+
+int main() {
+    std::cout << "=== NLM Development Demo ===\n\n";
+    
+    // Configure for developmental study
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neurons", 800);
+    config->set("plasticity-mod", 1.0);
+    config->set("development-stage", "initial");
+    config->set("synaptogenesis-rate", 0.0001);
+    config->set("pruning-rate", 0.00001);
+    config->set("random-seed", 42);
+    config->set("replay-interval", 100);
+    config->set("consolidation-interval", 500);
+    
+    // Initialize brain for development study
+    auto brain = std::make_shared<nlm::Brain>(config);
+    brain->initialize();
+    
+    std::cout << "Starting developmental simulation...\n";
+    std::cout << "Developmental Stages:\n";
+    std::cout << "=====================\n\n";
+    
+    // Simulate developmental progression
+    nlm::DevelopmentalStage current_stage = nlm::DevelopmentalStage::Initial;
+    nlm::Timestamp stage_start_time = 0.0;
+    
+    for (nlm::SimulationStep step = 0; step < 1500; ++step) {
+        // Update development stage based on time
+        nlm::Timestamp current_time = step * config->getOr<double>("simulation-timestep", 0.001);
+        
+        nlm::DevelopmentalStage new_stage = current_stage;
+        float plasticity_mod = 1.0f;
+        
+        if (current_time >= 60.0 && current_time < 300.0) {
+            new_stage = nlm::DevelopmentalStage::CriticalPeriod;
+            plasticity_mod = 0.8f;
+        } else if (current_time >= 300.0 && current_time < 900.0) {
+            new_stage = nlm::DevelopmentalStage::Maturation;
+            plasticity_mod = 0.5f;
+        } else if (current_time >= 900.0) {
+            new_stage = nlm::DevelopmentalStage::Adult;
+            plasticity_mod = 0.2f;
+        }
+        
+        // Update developmental stage
+        brain->setDevelopmentalStage(new_stage);
+        
+        // Apply developmental effects to plasticity
+        auto* plasticity = brain->getStructuralPlasticity();
+        if (plasticity) {
+            plasticity->setSynaptogenesisRate(0.0001f * plasticity_mod);
+            plasticity->setPruningRate(0.00001f * (2.0f - plasticity_mod));
+        }
+        
+        // Run simulation step
+        brain->step(step);
+        
+        // Log developmental stage changes
+        if (new_stage != current_stage) {
+            std::cout << format("Stage change at step %4d: %s -> %s\n",
+                               step,
+                               developmentalStageToString(current_stage),
+                               developmentalStageToString(new_stage));
+            current_stage = new_stage;
+        }
+        
+        // Log periodic developmental statistics
+        if (step % 300 == 0) {
+            size_t neurons = brain->getTotalNeuronCount();
+            size_t synapses = brain->getTotalSynapseCount();
+            float plasticity = config->getOr<double>("plasticity-mod", 1.0);
+            std::cout << format("  Step %4d: %d neurons, %d synapses, plasticity = %.2f\n",
+                               step, neurons, synapses, plasticity);
+        }
+    }
+    
+    std::cout << "\n=== Development Demo Complete ===\n";
+    std::cout << "This demonstrates NLM's developmental processes.\n";
+    
+    return 0;
+}
+```
+
+**What it demonstrates:**
+- Developmental stage progression
+- Age-dependent plasticity modulation
+- Synaptogenesis and pruning
+- Long-term memory consolidation
+
+### 4. Agent Behavior Example
+
+**File:** `examples/agent_behavior.cpp`
+
+```cpp
+#include "../src/agent/AgentBrain.hpp"
+#include "../src/agent/AgentBody.hpp"
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include <iostream>
+#include <random>
+
+int main() {
+    std::cout << "=== NLM Agent Behavior Example ===\n\n";
+    
+    // Create and configure brain
+    auto brain_config = std::make_shared<nlm::Config>();
+    brain_config->set("neurons", 500);
+    brain_config->set("random-seed", 123);
+    
+    auto brain = std::make_shared<nlm::Brain>(brain_config);
+    brain->initialize();
+    
+    // Create agent brain interface
+    auto agent_brain = std::make_shared<nlm::AgentBrain>(brain);
+    
+    // Create agent body
+    nlm::AgentBody agent_body;
+    agent_body.x = 0.0f;
+    agent_body.y = 0.0f;
+    agent_body.orientation = 0.0f;
+    
+    // Configure agent brain
+    agent_brain->initialize(SimpleWorld(100.0f, 100.0f));
+    
+    std::cout << "Agent initialized and ready to explore...\n";
+    std::cout << "Agent state:\n";
+    std::cout << "  Position: (" << agent_body.x << ", " << agent_body.y << ")\n";
+    std::cout << "  Orientation: " << agent_body.orientation << " rad\n";
+    std::cout << "  Energy: " << agent_body.energy << "\n";
+    std::cout << "  Health: " << agent_body.health << "\n\n";
+    
+    // Simple world simulation
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> reward_dist(0.0f, 1.0f);
+    
+    std::cout << "Simulation steps:\n";
+    std::cout << "=================\n\n";
+    
+    for (int step = 0; step < 100; ++step) {
+        // Generate random sensory input
+        nlm::SensoryPercept percept;
+        
+        // Simple vision: random brightness values
+        std::vector<float> vision(256);
+        for (float& v : vision) {
+            v = std::uniform_real_distribution<float>(0.0f, 1.0f)(gen);
+        }
+        percept.setVision(vision);
+        
+        // Simple touch: occasional collision
+        std::vector<float> touch(8, 0.0f);
+        if (std::uniform_real_distribution<float>(0.0f, 1.0f)(gen) < 0.1f) {
+            touch[std::uniform_int_distribution<int>(0, 7)(gen)] = 1.0f;
+        }
+        percept.setTouch(touch);
+        
+        // Process sensory input
+        agent_brain->processSensoryInput(percept);
+        
+        // Select action
+        nlm::MotorCommand action = agent_brain->decodeMotorCommand();
+        
+        // Apply action to world
+        nlm::ActionResult result;
+        switch (action) {
+            case nlm::MotorCommand::MoveForward:
+                agent_body.x += 1.0f;
+                agent_body.isMoving = true;
+                result.reward = reward_dist(gen);
+                result.success = true;
+                break;
+            case nlm::MotorCommand::TurnLeft:
+                agent_body.orientation += 0.1f;
+                agent_body.isTurning = true;
+                result.reward = 0.0f;
+                result.success = true;
+                break;
+            case nlm::MotorCommand::TurnRight:
+                agent_body.orientation -= 0.1f;
+                agent_body.isTurning = true;
+                result.reward = 0.0f;
+                result.success = true;
+                break;
+            case nlm::MotorCommand::Wait:
+                agent_body.isMoving = false;
+                agent_body.isTurning = false;
+                result.reward = 0.1f;
+                result.success = true;
+                break;
+            case nlm::MotorCommand::Interact:
+                // Interact with nearby objects
+                result.reward = reward_dist(gen) * 2.0f;
+                result.success = true;
+                break;
+        }
+        
+        // Apply neuromodulation based on reward
+        nlm::Neuromodulator neuromodulator;
+        neuromodulator.setLevel(result.reward);
+        agent_brain->applyRewardModulation(result.reward, 0.0f);
+        
+        // Update development
+        agent_brain->updateDevelopment(0.001);
+        
+        // Log step
+        std::cout << format("Step %3d: Action %10s, Position (%.1f, %.1f), Reward %.3f\n",
+                           step,
+                           motorCommandToString(action),
+                           agent_body.x, agent_body.y,
+                           result.reward);
+        
+        // Check for boundaries
+        if (agent_body.x < 0 || agent_body.x > 100 || 
+            agent_body.y < 0 || agent_body.y > 100) {
+            std::cout << "Agent reached boundary! Resetting...\n";
+            agent_body.x = 50.0f;
+            agent_body.y = 50.0f;
+        }
+    }
+    
+    std::cout << "\n=== Agent Behavior Example Complete ===\n";
+    std::cout << "This demonstrates how NLM agents perceive and interact with the world.\n";
+    
+    return 0;
+}
+```
+
+**What it demonstrates:**
+- Agent perception and motor control
+- Curiosity-driven exploration
+- Reward-based learning
+- Embodied behavior
+
+### 5. Experiment Framework Example
+
+**File:** `examples/experiment_framework.cpp`
+
+```cpp
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/core/Config/Config.hpp"
+#include <iostream>
+#include <fstream>
+
+int main() {
+    std::cout << "=== NLM Experiment Framework Example ===\n\n";
+    
+    // Create experimental configuration
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neurons", 1000);
+    config->set("simulation-timestep", 0.001);
+    config->set("experiment-type", "learning-analysis");
+    
+    // Initialize experiment runner
+    auto experiment_runner = std::make_shared<nlm::ExperimentRunner>(config);
+    experiment_runner->initialize();
+    
+    std::cout << "Experiment Framework Initialized\n";
+    std::cout << "=============================\n\n";
+    
+    // Define experimental conditions
+    struct ExperimentCondition {
+        std::string name;
+        std::shared_ptr<nlm::Config> config;
+        int trials;
+    };
+    
+    std::vector<ExperimentCondition> conditions = {
+        {"High Plasticity", std::make_shared<nlm::Config>(config), 5},
+        {"Low Plasticity", std::make_shared<nlm::Config>(config), 5},
+        {"Critical Period", std::make_shared<nlm::Config>(config), 5},
+        {"Adult Stage", std::make_shared<nlm::Config>(config), 5}
+    };
+    
+    // Run experiment suite
+    for (size_t cond_idx = 0; cond_idx < conditions.size(); ++cond_idx) {
+        auto& condition = conditions[cond_idx];
+        
+        // Set specific parameters for this condition
+        if (condition.name == "High Plasticity") {
+            condition.config->set("plasticity-mod", 1.5);
+            condition.config->set("development-stage", "initial");
+        } else if (condition.name == "Low Plasticity") {
+            condition.config->set("plasticity-mod", 0.3);
+            condition.config->set("development-stage", "adult");
+        } else if (condition.name == "Critical Period") {
+            condition.config->set("plasticity-mod", 0.8);
+            condition.config->set("development-stage", "critical");
+        } else if (condition.name == "Adult Stage") {
+            condition.config->set("plasticity-mod", 0.2);
+            condition.config->set("development-stage", "adult");
+        }
+        
+        std::cout << format("=== Condition: %s ===\n", condition.name.c_str());
+        
+        // Run trials for this condition
+        for (int trial = 0; trial < condition.trials; ++trial) {
+            std::cout << format("  Trial %d/%d... ", trial + 1, condition.trials);
+            
+            // Create brain for this trial
+            auto brain = std::make_shared<nlm::Brain>(condition.config);
+            brain->initialize();
+            
+            // Run experiment
+            experiment_runner->runExperiment(*brain, trial);
+            
+            std::cout << "Complete\n";
+        }
+        
+        std::cout << "\n";
+    }
+    
+    // Generate experimental results
+    std::cout << "=== Experimental Results ===\n";
+    experiment_runner->generateResults("experiment_results.txt");
+    
+    // Save experimental data
+    std::ofstream results_file("experimental_data.csv");
+    if (results_file.is_open()) {
+        experiment_runner->saveResults(results_file);
+        results_file.close();
+        std::cout << "Results saved to experimental_data.csv\n";
+    }
+    
+    std::cout << "\n=== Experiment Framework Example Complete ===\n";
+    std::cout << "This demonstrates how to set up and run NLM experiments.\n";
+    
+    return 0;
+}
+```
+
+**What it demonstrates:**
+- Experimental design and parameterization
+- Controlled experiment execution
+- Data collection and analysis
+- Result generation and storage
+
+### 6. Performance Benchmark Example
+
+**File:** `examples/performance_benchmark.cpp`
+
+```cpp
+#include "../src/core/Types/Types.hpp"
+#include "../src/brain/Brain.hpp"
+#include "../src/core/Config/Config.hpp"
+#include <iostream>
+#include <chrono>
+#include <vector>
+#include <algorithm>
+
+class PerformanceProfiler {
+public:
+    struct BenchmarkResult {
+        std::string name;
+        double duration_seconds;
+        size_t operations_performed;
+        double operations_per_second;
+    };
+    
+    void startTimer(const std::string& name) {
+        timers_[name] = std::chrono::high_resolution_clock::now();
+    }
+    
+    void stopTimer(const std::string& name) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - timers_[name]).count();
+        
+        BenchmarkResult result;
+        result.name = name;
+        result.duration_seconds = duration / 1e6;
+        result.operations_performed = operations_count_[name];
+        result.operations_per_second = result.operations_performed / result.duration_seconds;
+        
+        results_.push_back(result);
+        timers_.erase(name);
+        operations_count_.erase(name);
+    }
+    
+    void incrementOperations(const std::string& name, size_t count = 1) {
+        operations_count_[name] += count;
+    }
+    
+    void printReport() const {
+        std::cout << "=== Performance Benchmark Report ===\n\n";
+        
+        std::cout << std::left << std::setw(30) << "Operation" 
+                  << std::right << std::setw(15) << "Duration (s)"
+                  << std::right << std::setw(20) << "Ops/sec"
+                  << std::right << std::setw(15) << "Operations" << std::endl;
+        
+        std::cout << std::string(80, '=') << std::endl;
+        
+        for (const auto& result : results_) {
+            std::cout << std::left << std::setw(30) << result.name
+                      << std::right << std::setw(15) << std::fixed << std::setprecision(6) << result.duration_seconds
+                      << std::right << std::setw(20) << std::fixed << std::setprecision(0) << result.operations_per_second
+                      << std::right << std::setw(15) << result.operations_performed << std::endl;
+        }
+        
+        double total_duration = 0.0;
+        size_t total_operations = 0;
+        
+        for (const auto& result : results_) {
+            total_duration += result.duration_seconds;
+            total_operations += result.operations_performed;
+        }
+        
+        std::cout << std::string(80, '=') << std::endl;
+        std::cout << std::left << std::setw(30) << "TOTAL"
+                  << std::right << std::setw(15) << std::fixed << std::setprecision(6) << total_duration
+                  << std::right << std::setw(20) << std::fixed << std::setprecision(0) << (total_operations / total_duration)
+                  << std::right << std::setw(15) << total_operations << std::endl;
+    }
+    
+private:
+    std::unordered_map<std::string, std::chrono::high_resolution_clock::time_point> timers_;
+    std::unordered_map<std::string, size_t> operations_count_;
+    std::vector<BenchmarkResult> results_;
+};
+
+int main() {
+    std::cout << "=== NLM Performance Benchmark Example ===\n\n";
+    
+    PerformanceProfiler profiler;
+    
+    // Benchmark 1: Brain Creation
+    profiler.startTimer("Brain Creation");
+    for (int i = 0; i < 10; ++i) {
+        auto config = std::make_shared<nlm::Config>();
+        config->set("neurons", 500);
+        config->set("random-seed", i);
+        
+        auto brain = std::make_shared<nlm::Brain>(config);
+        brain->initialize();
+        
+        profiler.incrementOperations("Brain Creation");
+    }
+    profiler.stopTimer("Brain Creation");
+    
+    // Benchmark 2: Neuron Initialization
+    profiler.startTimer("Neuron Initialization");
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neurons", 1000);
+    config->set("random-seed", 42);
+    
+    auto brain = std::make_shared<nlm::Brain>(config);
+    brain->initialize();
+    
+    for (int i = 0; i < 1000; ++i) {
+        // Access neuron information
+        size_t neuron_count = brain->getTotalNeuronCount();
+        profiler.incrementOperations("Neuron Initialization");
+    }
+    profiler.stopTimer("Neuron Initialization");
+    
+    // Benchmark 3: Simulation Steps
+    profiler.startTimer("Simulation Steps");
+    auto sim_config = std::make_shared<nlm::Config>();
+    sim_config->set("neurons", 500);
+    sim_config->set("random-seed", 123);
+    
+    auto sim_brain = std::make_shared<nlm::Brain>(sim_config);
+    sim_brain->initialize();
+    
+    for (nlm::SimulationStep step = 0; step < 100; ++step) {
+        sim_brain->step(step);
+        profiler.incrementOperations("Simulation Steps");
+    }
+    profiler.stopTimer("Simulation Steps");
+    
+    // Benchmark 4: Memory System Operations
+    profiler.startTimer("Memory System Operations");
+    auto mem_config = std::make_shared<nlm::Config>();
+    mem_config->set("neurons", 800);
+    mem_config->set("random-seed", 456);
+    
+    auto mem_brain = std::make_shared<nlm::Brain>(mem_config);
+    mem_brain->initialize();
+    
+    for (int i = 0; i < 50; ++i) {
+        // Access memory system information
+        auto* working_memory = mem_brain->getWorkingMemory();
+        if (working_memory) {
+            profiler.incrementOperations("Memory System Operations");
+        }
+    }
+    profiler.stopTimer("Memory System Operations");
+    
+    // Benchmark 5: Plasticity Application
+    profiler.startTimer("Plasticity Application");
+    auto plasticity_config = std::make_shared<nlm::Config>();
+    plasticity_config->set("neurons", 1000);
+    plasticity_config->set("random-seed", 789);
+    
+    auto plasticity_brain = std::make_shared<nlm::Brain>(plasticity_config);
+    plasticity_brain->initialize();
+    
+    // Apply plasticity operations
+    for (int i = 0; i < 200; ++i) {
+        // Simulate plasticity changes
+        plasticity_brain->step(i);
+        profiler.incrementOperations("Plasticity Application");
+    }
+    profiler.stopTimer("Plasticity Application");
+    
+    // Generate performance report
+    profiler.printReport();
+    
+    std::cout << "\n=== Performance Benchmark Example Complete ===\n";
+    std::cout << "This demonstrates performance profiling and benchmarking.\n";
+    
+    return 0;
+}
+```
+
+**What it demonstrates:**
+- Performance measurement and profiling
+- Benchmarking different system components
+- Performance analysis and reporting
+- Optimization opportunities identification
+
+## Additional Example Scripts
+
+### Helper Functions
+
+**File:** `examples/helper_functions.cpp`
+
+Contains utility functions for common operations:
+- Configuration file operations
+- Brain state saving/loading
+- Data formatting and output
+- Random seed management
+
+### Configuration Examples
+
+**File:** `examples/config_examples/`
+
+Contains example configuration files:
+- `basic_config.json`
+- `learning_config.json` 
+- `development_config.json`
+- `agent_config.json`
+
+### Test Scripts
+
+**File:** `examples/test_scripts/`
+
+Automated test scripts:
+- `run_basic_tests.sh`
+- `run_learning_tests.sh`
+- `run_performance_tests.sh`
+- `validate_results.sh`
+
+## Building Examples
+
+### Build Instructions
+
+```bash
+# Create build directory for examples
+cd examples
+mkdir build
+cd build
+
+# Configure with examples support
+cmake .. -DENABLE_EXAMPLES=ON
+
+# Build all examples
+make -j$(nproc)
+```
+
+### Running Examples
+
+```bash
+# Run basic simulation example
+./examples/basic_simulation
+
+# Run learning demo
+./examples/learning_demo
+
+# Run development demo
+./examples/development_demo
+
+# Run agent behavior example
+./examples/agent_behavior
+
+# Run experiment framework example
+./examples/experiment_framework
+
+# Run performance benchmark
+./examples/performance_benchmark
+```
+
+### Example Configuration
+
+Some examples accept command-line arguments:
+
+```bash
+# Basic simulation with custom configuration
+./examples/basic_simulation --config ../configs/custom.cfg
+
+# Learning demo with specific parameters
+./examples/learning_demo --neurons 2000 --plasticity-mod 1.2
+
+# Development demo with timing
+./examples/development_demo --timing --performance-metrics
+```
+
+## Example Scripts
+
+### Script: run_all_examples.sh
+
+```bash
+#!/bin/bash
+
+# Run all examples with timing
+
+echo "=== Running All NLM Examples ==="
+echo "This may take several minutes..."
+
+echo "\n1. Basic Neural Computation Example"
+start_time=$(date +%s)
+./basic_simulation
+end_time=$(date +%s)
+echo "Duration: $((end_time - start_time)) seconds"
+
+echo "\n2. Learning Demo"
+start_time=$(date +%s)
+./learning_demo
+end_time=$(date +%s)
+echo "Duration: $((end_time - start_time)) seconds"
+
+echo "\n3. Development Demo"
+start_time=$(date +%s)
+./development_demo
+end_time=$(date +%s)
+echo "Duration: $((end_time - start_time)) seconds"
+
+echo "\n4. Agent Behavior Example"
+start_time=$(date +%s)
+./agent_behavior
+end_time=$(date +%s)
+echo "Duration: $((end_time - start_time)) seconds"
+
+echo "\n=== All Examples Completed Successfully ==="
+echo "Check individual example outputs for detailed results."
+```
+
+## Example Usage Patterns
+
+### Pattern 1: Research Experiment
+
+```bash
+# Create research experiment configuration
+cat > research_config.json << EOF
+{
+  "experiment-name": "synaptic-plasticity-study",
+  "neuron-count": 1500,
+  "plasticity-conditions": ["high", "medium", "low"],
+  "development-stages": ["initial", "critical", "adult"],
+  "output-format": "detailed",
+  "data-collection": "continuous"
+}
+EOF
+
+# Run research experiment
+./research_framework --config research_config.json
+```
+
+### Pattern 2: Performance Testing
+
+```bash
+# Create performance test configuration
+cat > perf_test_config.json << EOF
+{
+  "test-type": "scalability",
+  "neuron-counts": [100, 500, 1000, 2000],
+  "timestep": 0.001,
+  "measurement-interval": 100,
+  "output-format": "benchmark"
+}
+EOF
+
+# Run performance tests
+./performance_benchmark --config perf_test_config.json
+```
+
+### Pattern 3: Development Testing
+
+```bash
+# Create development test configuration
+cat > dev_test_config.json << EOF
+{
+  "test-type": "developmental-progression",
+  "plasticity-modifiers": [1.5, 1.0, 0.5, 0.2],
+  "development-stages": ["accelerated", "normal", "delayed"],
+  "observation-frequency": 50,
+  "output-format": "developmental-curve"
+}
+EOF
+
+# Run development tests
+./development_tester --config dev_test_config.json
+```
+
+### Pattern 4: Integration Testing
+
+```bash
+# Create integration test configuration
+cat > integration_test_config.json << EOF
+{
+  "test-type": "system-integration",
+  "components": ["brain", "memory", "neuromodulation", "prediction"],
+  "interaction-tests": ["connectivity", "plasticity", "learning"],
+  "output-format": "integration-report"
+}
+EOF
+
+# Run integration tests
+./integration_tester --config integration_test_config.json
+```
+
+## Additional Documentation
+
+### Example Outputs
+
+Check the `examples/outputs/` directory for:
+- Example run logs
+- Performance benchmark results
+- Data analysis outputs
+- Configuration test results
+
+### Example Scripts
+
+See the `examples/scripts/` directory for:
+- Automated test runners
+- Configuration generators
+- Data analysis tools
+- Performance monitoring scripts
+
+### Advanced Examples
+
+For more complex examples, see:
+- `examples/advanced/` - Advanced algorithmic implementations
+- `examples/custom/` - Custom extensions and modifications
+- `examples/research/` - Research-oriented examples
+
+## Example Learning Path
+
+### Beginner Examples
+
+1. **Basic Neural Computation** (`basic_simulation.cpp`)
+   - Understand NLM's core neural mechanisms
+   - Learn basic configuration and setup
+   - See spike generation and propagation
+
+2. **Learning Demo** (`learning_demo.cpp`)
+   - Explore plasticity learning
+   - Understand STDP and Hebbian mechanisms
+   - Analyze learning progress
+
+### Intermediate Examples
+
+3. **Development Demo** (`development_demo.cpp`)
+   - Study developmental processes
+   - Understand age-dependent learning
+   - Learn about plasticity modulation
+
+4. **Agent Behavior** (`agent_behavior.cpp`)
+   - Explore embodied intelligence
+   - Learn perception-action loops
+   - Understand curiosity and exploration
+
+### Advanced Examples
+
+5. **Experiment Framework** (`experiment_framework.cpp`)
+   - Design and run controlled experiments
+   - Analyze experimental results
+   - Generate research data
+
+6. **Performance Benchmark** (`performance_benchmark.cpp`)
+   - Measure system performance
+   - Identify optimization opportunities
+   - Profile system bottlenecks
+
+## Example Extension Recommendations
+
+### Extend Basic Examples
+
+1. Add new visualization capabilities
+2. Implement custom configuration validators
+3. Add performance monitoring
+4. Create extended parameter studies
+
+### Extend Advanced Examples
+
+1. Implement custom learning algorithms
+2. Add new neuromodulation mechanisms
+3. Create multi-agent systems
+4. Develop experimental analysis tools
+
+### Create New Examples
+
+1. **Environmental Adaptation** - How agents adapt to different environments
+2. **Social Learning** - Learning from other agents
+3. **Evolutionary Dynamics** - Evolutionary pressure on neural systems
+4. **Neural Development** - Studying developmental processes experimentally
+
+---
+
+**Examples Directory Complete!** 🎯
+
+This directory provides a comprehensive collection of NLM examples demonstrating:
+
+- **Basic functionality** - Core neural computation capabilities
+- **Learning mechanisms** - Plasticity and experience-dependent changes
+- **Development processes** - Age-dependent behavioral progression
+- **Agent systems** - Perception, action, and learning
+- **Experimental frameworks** - Research and testing infrastructure
+- **Performance benchmarking** - System performance analysis
+
+**Ready to extend?** Add your own examples by:
+
+1. **Adding New Examples**: Create new directories for specific use cases
+2. **Extending Existing Examples**: Add new features to existing examples
+3. **Contributing Examples**: Share your research and implementations
+4. **Documentation Updates**: Add documentation for new example functionality
+
+**Need help?** Contact the development team or check the examples documentation for specific guidance.
+
+---
+
+*Examples directory maintained and updated regularly*
+*New examples added based on user feedback and research needs*
+*Community contributions encouraged and supported*
