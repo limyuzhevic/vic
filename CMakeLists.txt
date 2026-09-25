@@ -18,6 +18,52 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# SIMD support for neural computations
+if(MSVC)
+    add_compile_options(/arch:AVX2)  # AVX2 for Intel/AMD
+else()
+    # Detect available SIMD instruction sets
+    include(CheckCXXCompilerFlag)
+    
+    # AVX2 (Advanced Vector Extensions 2) - great balance of performance and compatibility
+    check_cxx_compiler_flag(-mavx2 HAS_AVX2)
+    if(HAS_AVX2)
+        add_compile_options(-mavx2)
+        message(STATUS "Enabling AVX2 SIMD optimizations")
+    endif()
+    
+    # AVX (Advanced Vector Extensions) - older but more widely supported
+    check_cxx_compiler_flag(-mavx HAS_AVX)
+    if(HAS_AVX)
+        add_compile_options(-mavx)
+        message(STATUS "Enabling AVX SIMD optimizations")
+    endif()
+    
+    # SSE4.2 (Streaming SIMD Extensions 4.2) - very widely supported
+    check_cxx_compiler_flag(-msse4.2 HAS_SSE42)
+    if(HAS_SSE42)
+        add_compile_options(-msse4.2)
+        message(STATUS "Enabling SSE4.2 SIMD optimizations")
+    endif()
+    
+    # SSE4.1 (Streaming SIMD Extensions 4.1)
+    check_cxx_compiler_flag(-msse4.1 HAS_SSE41)
+    if(HAS_SSE41)
+        add_compile_options(-msse4.1)
+        message(STATUS "Enabling SSE4.1 SIMD optimizations")
+    endif()
+endif()
+
+# Memory pool configuration
+option(MEMORY_POOLS "Enable memory pools for better performance" ON)
+if(MEMORY_POOLS)
+    message(STATUS "Enabling memory pools for object allocation optimization")
+endif()
+
+# Add SIMD optimization header file
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/simd_optimization.h 
+    ${CMAKE_CURRENT_BINARY_DIR}/simd_optimization.h COPYONLY)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 

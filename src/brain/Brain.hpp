@@ -190,8 +190,22 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Step execution methods (extracted from large step() method)
+    void executeStep1_DelayedSpikeDelivery(SimulationStep currentStep, Timestamp currentTime);
+    void executeStep2_UpdateNeuronDynamics(Timestamp currentTime);
+    void executeStep3_DetectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void executeStep4_UpdateWorkingMemory();
+    void executeStep5_ApplyNeuromodulationEffects();
+    void executeStep6_ApplyPlasticityRules(float plasticityMod);
+    void executeStep7_UpdateEpisodicMemory();
+    void executeStep8_UpdatePredictionSystem();
+    void executeStep9_UpdateAttentionSystem();
+    void executeStep10_UpdateConceptFormation();
+    void executeStep11_ApplyStructuralPlasticity(SimulationStep currentStep);
+    void executeStep12_ReplayImportantMemories(SimulationStep currentStep);
+    void executeStep13_ApplyDevelopmentEffects(SimulationStep currentStep);
+    void executeStep14_ConsolidateMemories(SimulationStep currentStep);
+    void executeStep15_CheckpointManagement(SimulationStep currentStep, Timestamp currentTime);
     
 private:
     struct Impl;

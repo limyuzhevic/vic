@@ -1,0 +1,108 @@
+// Compile commands for NLM project
+// This file provides optimized compilation flags for the NLM brain simulator
+
+# General compiler flags
+cmake_minimum_required(VERSION 3.16)
+project(NLM VERSION 0.1.0 LANGUAGES CXX)
+
+# C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Enable all warnings
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Debug vs Release configurations
+option(BUILD_DEBUG "Build with debug information" OFF)
+if(BUILD_DEBUG)
+    add_compile_options(-g -O0 -DDEBUG)
+else()
+    add_compile_options(-O3 -DNDEBUG)
+endif()
+
+# Performance optimizations
+add_compile_options(
+    -march=native              # Optimize for current CPU
+    -ffast-math               # Enable aggressive floating-point optimizations
+    -fomit-frame-pointer      # Save register usage
+    -funroll-loops            # Loop unrolling
+)
+
+# SIMD support
+find_package(OpenMP REQUIRED)
+target_link_libraries(nlm_core PUBLIC OpenMP::OpenMP_CXX)
+
+# Memory safety
+add_compile_options(
+    -Wall -Wextra -Wpedantic
+    -Werror=maybe-uninitialized
+    -Werror=bounds-security-risk
+)
+
+# Build type configurations
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type")
+
+# Install configuration
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+# Packaging
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Documentation
+set(DOXYGEN_USE_MATHJAX ON)
+set(DOXYGEN_PROJECT_NAME "NLM")
+set(DOXYGEN_PROJECT_NUMBER "0.1.0")
+set(DOXYGEN_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
+
+# Find Doxygen
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+    doxygen_add_docs(docs "${DOXYGEN_INPUT_DIR}" COMMENT "Generate API documentation")
+endif()
+
+# Testing configuration
+enable_testing()
+add_subdirectory(tests)
+
+# Memory profiling
+option(ENABLE_MEMORY_PROFILING "Enable memory profiling" OFF)
+if(ENABLE_MEMORY_PROFILING)
+    add_compile_options(-fsanitize=address,undefined)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
+# Thread safety
+option(THREAD_SAFE "Build thread-safe version" OFF)
+if(THREAD_SAFE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(nlm_core PUBLIC Threads::Threads)
+endif()
+
+# Error handling
+add_compile_options(
+    -Werror=return-type
+    -Werror=switch
+    -Werror=uninitialized
+    -Werror=sign-compare
+)
+
+# Configuration file location
+set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/nlm" CACHE PATH "Configuration directory")
+
+# Enable runtime checks
+add_compile_options(
+    -Werror=pointer-arith
+    -Werror=vla-bound
+    -Werror=clobbers-static
+)
