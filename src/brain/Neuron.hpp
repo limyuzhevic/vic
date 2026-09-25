@@ -134,7 +134,9 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements real integrate-and-fire dynamics with LIF equations:
+    // dV/dt = (V_rest - V)/tau + I/C
+    // Where: V = membrane potential, I = total input current
     void step(Timestamp currentTime);
     
     // Reset to initial state

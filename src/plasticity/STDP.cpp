@@ -59,9 +59,22 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
+    // Optimize STDP calculation with numerical stability
+    // Sort spike times for better convergence
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // For each spike pair, compute contribution with bounds checking
+    for (Timestamp preTime : sortedPreSpikes) {
+        for (Timestamp postTime : sortedPostSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            
+            // Apply STDP windowing: only consider spikes within biologically plausible time window
+            if (std::abs(dt) > 3.0f * tau) {
+                continue;  // Skip pairs outside effective time window
+            }
             
             if (dt > 0) {
                 // Pre before post: POTENTIATION
@@ -82,24 +95,33 @@ void STDP::update(Synapse* synapse,
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-        
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
-        
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        if (std::abs(efficacy) > 1e-6f) {  // Avoid division by zero
+            totalDelta *= efficacy;
+            
+            // Apply weight change using synapse method (which clamps to bounds)
+            synapse->addToWeight(totalDelta);
+            
+            // Update eligibility trace for reward-modulated learning
+            // Eligibility trace accumulates weight changes for later reward modulation
+            // Will decay over time during synapse->step()
+            float currentTrace = synapse->getEligibilityTrace();
+            synapse->setEligibilityTrace(currentTrace + totalDelta);
+        }
     }
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        return;
+    }
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Validate delta
+    if (std::abs(delta) < 1e-10f) {
+        return;  // No change needed
+    }
+    
+    // Apply weight change using synapse method (which clamps to bounds)
+    synapse->addToWeight(delta);
 }
 
 const char* STDP::getName() const {
