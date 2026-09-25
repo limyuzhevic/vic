@@ -254,6 +254,16 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
     pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
     
+pImpl->efficacy = 1.0f;
+    }
+    
+    // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    
+    // Initialize short-term plasticity state
+    pImpl->shortTermDepression = 1.0f;  // Fully recovered
+    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+    
     // Initialize eligibility trace to 0
     pImpl->eligibilityTrace = 0.0f;
     

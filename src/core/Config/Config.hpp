@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include "Exception.hpp"
 
 namespace nlm {
 
@@ -56,13 +57,13 @@ public:
     Config& operator=(Config&&) noexcept;
     
     // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    bool loadFromFile(const std::string& filepath) throws(ConfigParseException);
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    bool loadFromArgs(int argc, char** argv) throws(ConfigParseException);
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    bool saveToFile(const std::string& filepath) const throws(ConfigException);
     
     // Get values
     template<typename T>
