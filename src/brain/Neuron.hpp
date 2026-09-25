@@ -94,12 +94,14 @@ public:
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
     
-    // Spike detection
+    // Advanced numerical integration methods
+    bool stepRK4(Timestamp currentTime, TimestepDuration dt);  // Runge-Kutta 4th order
+    bool stepEuler(Timestamp currentTime, TimestepDuration dt); // Basic Euler method
+    bool stepExponentialEuler(Timestamp currentTime, TimestepDuration dt); // Current implementation
+    
+    // Spike detection and management
     bool checkThreshold() const;
     float getLastSpikeTime() const;
-    
-    // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
     // Incoming signals (post-synaptic potentials)
     void receiveExcitatoryInput(MembranePotential amplitude);
@@ -142,6 +144,10 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Configuration utilities
+    static bool configureDefaultParameters(std::shared_ptr<Config> config);
+    static bool validateParameters(const Config& config);
     
 private:
     struct Impl;

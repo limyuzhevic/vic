@@ -65,17 +65,100 @@ void testConfigRemove() {
     std::cout << "    testConfigRemove passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigJsonLoad() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Create a test JSON file
+    std::string testFile = "test_config.json";
+    {
+        std::ofstream file(testFile);
+        file << "{\n";
+        file << "    \"int_value\": 42,\n";
+        file << "    \"double_value\": 3.14,\n";
+        file << "    \"bool_value\": true,\n";
+        file << "    \"string_value\": \"hello world\",\n";
+        file << "    \"int_array\": [1, 2, 3, 4, 5],\n";
+        file << "    \"double_array\": [1.1, 2.2, 3.3],\n";
+        file << "    \"string_array\": [\"a\", \"b\", \"c\"]\n";
+        file << "}\n";
+    }
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    // Load from JSON file
+    bool loadSuccess = config.loadFromFile(testFile);
+    assert(loadSuccess);
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    // Verify loaded values
+    assert(config.has("int_value"));
+    auto intVal = config.get<int>("int_value");
+    assert(intVal.has_value() && *intVal == 42);
+    
+    assert(config.has("double_value"));
+    auto doubleVal = config.get<double>("double_value");
+    assert(doubleVal.has_value() && (*doubleVal > 3.13 && *doubleVal < 3.15));
+    
+    assert(config.has("bool_value"));
+    auto boolVal = config.get<bool>("bool_value");
+    assert(boolVal.has_value() && *boolVal == true);
+    
+    assert(config.has("string_value"));
+    auto stringVal = config.get<std::string>("string_value");
+    assert(stringVal.has_value() && *stringVal == "hello world");
+    
+    assert(config.has("int_array"));
+    auto intArrayVal = config.get<std::vector<int>>("int_array");
+    assert(intArrayVal.has_value() && intArrayVal->size() == 5);
+    
+    // Clean up
+    std::remove(testFile.c_str());
+    
+    std::cout << "    testConfigJsonLoad passed" << std::endl;
+}
+
+void testConfigJsonSave() {
+    nlm::Config config;
+    
+    // Set various values
+    config.set("int_value", 42, nlm::ConfigSource::Runtime);
+    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
+    config.set("bool_value", true, nlm::ConfigSource::Runtime);
+    config.set("string_value", std::string("hello world"), nlm::ConfigSource::Runtime);
+    config.set("int_array", std::vector<int>({1, 2, 3}), nlm::ConfigSource::Runtime);
+    
+    // Save to JSON file
+    std::string testFile = "test_config_save.json";
+    bool saveSuccess = config.saveToFile(testFile);
+    assert(saveSuccess);
+    
+    // Clear config and reload from file
+    config.clear();
+    bool loadSuccess = config.loadFromFile(testFile);
+    assert(loadSuccess);
+    
+    // Verify loaded values match original
+    assert(config.has("int_value"));
+    auto intVal = config.get<int>("int_value");
+    assert(intVal.has_value() && *intVal == 42);
+    
+    assert(config.has("double_value"));
+    auto doubleVal = config.get<double>("double_value");
+    assert(doubleVal.has_value() && (*doubleVal > 3.13 && *doubleVal < 3.15));
+    
+    assert(config.has("bool_value"));
+    auto boolVal = config.get<bool>("bool_value");
+    assert(boolVal.has_value() && *boolVal == true);
+    
+    assert(config.has("string_value"));
+    auto stringVal = config.get<std::string>("string_value");
+    assert(stringVal.has_value() && *stringVal == "hello world");
+    
+    assert(config.has("int_array"));
+    auto intArrayVal = config.get<std::vector<int>>("int_array");
+    assert(intArrayVal.has_value() && intArrayVal->size() == 3);
+    
+    // Clean up
+    std::remove(testFile.c_str());
+    
+    std::cout << "    testConfigJsonSave passed" << std::endl;
 }
 
 void runAll() {
@@ -84,6 +167,8 @@ void runAll() {
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigJsonLoad();
+    testConfigJsonSave();
 }
 
 } // namespace test_config

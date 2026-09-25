@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -58,37 +59,34 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from file (JSON/YAML format)
+    bool loadFromFile(const std::string& filepath, bool useYAML);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load with validation
+    bool loadWithValidation(const std::string& filepath);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Set with validation
+    bool setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Safe getters with default values
+    std::string getSafeString(const std::string& key, const std::string& defaultValue) const;
+    int getSafeInt(const std::string& key, int defaultValue) const;
+    float getSafeFloat(const std::string& key, float defaultValue) const;
+    bool getSafeBool(const std::string& key, bool defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Configuration utilities
+    static bool configureDefaultParameters(std::shared_ptr<Config> config);
+    static bool validateParameters(const Config& config);
     
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
+    // File format utilities
+    std::string trim(const std::string& str);
+    std::string toLower(const std::string& str);
     
     // Get configuration summary
     std::string summary() const;

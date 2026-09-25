@@ -147,6 +147,118 @@ void testReset() {
     std::cout << "    testReset passed" << std::endl;
 }
 
+void testNumericalIntegration() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Configure neuron for integration testing
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-55.0f);
+    neuron.setResetPotential(-70.0f);
+    
+    // Test exponential Euler integration (current implementation)
+    neuron.setMembranePotential(-60.0f);
+    neuron.injectCurrent(5.0f);
+    
+    // Step with exponential Euler
+    bool fired1 = neuron.stepExponentialEuler(0.0, 0.001);
+    assert(!fired1);  // Should not fire at -60mV with threshold -55mV
+    
+    // Test Runge-Kutta integration
+    neuron.setMembranePotential(-60.0f);
+    neuron.injectCurrent(5.0f);
+    
+    bool fired2 = neuron.stepRK4(0.0, 0.001);
+    assert(!fired2);
+    
+    // Test basic Euler integration
+    neuron.setMembranePotential(-60.0f);
+    neuron.injectCurrent(5.0f);
+    
+    bool fired3 = neuron.stepEuler(0.0, 0.001);
+    assert(!fired3);
+    
+    std::cout << "    testNumericalIntegration passed" << std::endl;
+}
+
+void testSpikeGeneration() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Set up neuron to fire
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-55.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setRefractoryPeriod(10);
+    
+    // Start at threshold
+    neuron.setMembranePotential(-55.0f);
+    neuron.injectCurrent(1.0f);  // Small current to trigger spike
+    
+    // Step with sufficient current to cross threshold
+    bool fired = neuron.stepExponentialEuler(0.0, 0.001);
+    assert(fired);  // Should fire
+    
+    // Verify spike was recorded
+    assert(neuron.getSpikeHistory().size() == 1);
+    assert(neuron.getLastSpikeTime() == 0.0f);
+    
+    // Verify neuron is now in refractory state
+    assert(neuron.isRefractory());
+    assert(!neuron.isFiring());
+    
+    std::cout << "    testSpikeGeneration passed" << std::endl;
+}
+
+void testNumericalIntegrationMethods() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    neuron.setRestingPotential(-70.0f);
+    neuron.setThreshold(-55.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setRefractoryPeriod(10);
+    
+    // Test all three integration methods produce similar results
+    neuron.setMembranePotential(-65.0f);
+    neuron.injectCurrent(2.0f);
+    
+    // Record membrane potential before each step
+    float v1 = neuron.getMembranePotential();
+    bool f1 = neuron.stepExponentialEuler(0.0, 0.001);
+    float v2 = neuron.getMembranePotential();
+    
+    neuron.setMembranePotential(-65.0f);
+    neuron.injectCurrent(2.0f);
+    bool f2 = neuron.stepRK4(0.0, 0.001);
+    float v3 = neuron.getMembranePotential();
+    
+    neuron.setMembranePotential(-65.0f);
+    neuron.injectCurrent(2.0f);
+    bool f3 = neuron.stepEuler(0.0, 0.001);
+    float v4 = neuron.getMembranePotential();
+    
+    // All methods should produce similar changes (within numerical tolerance)
+    assert(std::abs(v2 - v3) < 0.01f);  // RK4 and exponential Euler should be close
+    assert(std::abs(v2 - v4) < 0.05f);  // Basic Euler may be less accurate
+    
+    std::cout << "    testNumericalIntegrationMethods passed" << std::endl;
+}
+
+void testConfigurationUtilities() {
+    // Test configuration utilities using Config class
+    nlm::Config config;
+    
+    // Test safe getters with defaults
+    assert(config.getSafeString("missing_key", "default_value") == "default_value");
+    assert(config.getSafeInt("missing_int", 42) == 42);
+    assert(config.getSafeFloat("missing_float", 3.14f) == 3.14f);
+    assert(config.getSafeBool("missing_bool", true) == true);
+    
+    // Test configuration validation
+    bool configValid = nlm::Neuron::configureDefaultParameters(std::make_shared<nlm::Config>());
+    assert(configValid);
+    
+    std::cout << "    testConfigurationUtilities passed" << std::endl;
+}
+
 void runAll() {
     testNeuronCreation();
     testNeuronType();
@@ -158,6 +270,10 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testNumericalIntegration();
+    testSpikeGeneration();
+    testNumericalIntegrationMethods();
+    testConfigurationUtilities();
 }
 
 } // namespace test_neuron

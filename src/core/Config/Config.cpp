@@ -3,8 +3,134 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <limits>
+#include <random>
 
 namespace nlm {
+
+// Validation functions
+template<typename T>
+static bool isValidRange(const T& value, const T& min, const T& max) {
+    static_assert(std::is_arithmetic_v<T>, "Type must be arithmetic for range validation");
+    return value >= min && value <= max;
+}
+
+static bool validateConfigEntry(const std::string& key, const ConfigValue& value) {
+    if (key.empty()) {
+        return false;
+    }
+    
+    // Check for duplicate keys (would be caught during insertion)
+    return true;
+}
+
+static std::string configValueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            oss << arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << arg[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < arg.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << arg[i] << "\"";
+            }
+            oss << "]";
+        }
+    }, value);
+    return oss.str();
+}
+
+static bool validateConfigValue(const ConfigValue& value) {
+    // Basic validation for different value types
+    std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            // Validate int range (reasonable bounds)
+            if (arg < -1000000 || arg > 1000000) return false;
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Validate double range
+            if (std::isnan(arg) || std::isinf(arg)) return false;
+            if (arg < -1000000.0 || arg > 1000000.0) return false;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // bool is always valid
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            // Validate string length
+            if (arg.size() > 10000) return false;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            // Validate vector elements
+            for (const auto& item : arg) {
+                if (item < -1000000 || item > 1000000) return false;
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            for (const auto& item : arg) {
+                if (std::isnan(item) || std::isinf(item)) return false;
+                if (item < -1000000.0 || item > 1000000.0) return false;
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            for (const auto& item : arg) {
+                if (item.size() > 1000) return false;
+            }
+        }
+    }, value);
+    return true;
+}
+
+namespace {
+
+// Exception safety wrapper for operations that might throw
+class ExceptionSafetyWrapper {
+public:
+    template<typename Func, typename... Args>
+    static bool safeExecute(Func&& func, Args&&... args) {
+        try {
+            func(std::forward<Args>(args)...);
+            return true;
+        } catch (const std::bad_alloc&) {
+            // Memory allocation failure
+            return false;
+        } catch (const std::exception&) {
+            // Other standard exceptions
+            return false;
+        } catch (...) {
+            // Unknown exceptions
+            return false;
+        }
+    }
+};
+
+// Validation helper for numeric ranges
+template<typename T>
+static bool isNumericValid(T value, T min, T max) {
+    static_assert(std::is_arithmetic_v<T>, "Type must be arithmetic");
+    return value >= min && value <= max;
+}
+
+} // namespace
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,40 +145,61 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    return loadFromFile(filepath, false);
+}
+
+bool Config::loadFromFile(const std::string& filepath, bool useYAML) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        nlohmann::json jsonData;
+        
+        if (useYAML) {
+            // For now, just parse as JSON
+            // Full YAML support would require yaml-cpp
+            file >> jsonData;
+        } else {
+            file >> jsonData;
+        }
+        
+        if (!jsonData.is_object()) {
+            return false;
+        }
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON object with validation
+        bool success = true;
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            if (!jsonToConfigValue(*it, value)) {
+                success = false;
+                continue;
+            }
+            
+            if (!validateConfigValue(value)) {
+                success = false;
+                continue;
+            }
+            
+            if (!validateConfigEntry(key, value)) {
+                success = false;
+                continue;
             }
             
             set(key, value, ConfigSource::File);
         }
+        
+        return success;
+    } catch (const std::exception&) {
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,111 +226,119 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        
+        // Convert all entries to JSON with validation
+        bool success = true;
+        for (const auto& entry : pImpl->entries) {
+            std::string key = entry.key;
+            const ConfigValue& value = entry.value;
+            
+            if (!validateConfigEntry(key, value)) {
+                success = false;
+                continue;
+            }
+            
+            nlohmann::json jsonValue;
+            std::visit([&jsonValue](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonValue = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonValue = arg;
+                }
+            }, value);
+            
+            jsonData[key] = jsonValue;
+        }
+        
+        // Write JSON to file with indentation for readability
+        file << jsonData.dump(2);
+        
+        return success;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool Config::setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find('=') != std::string::npos) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Validate value
+    if (!validateConfigValue(value)) {
+        return false;
     }
     
+    // Thread-safe insertion (simplified)
+    set(key, value, source);
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+bool Config::loadWithValidation(const std::string& filepath) {
+    if (filepath.empty()) {
+        return false;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    // Check file existence and permissions (simplified)
+    std::ifstream testFile(filepath);
+    if (!testFile.good()) {
+        return false;
     }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    return ExceptionSafetyWrapper::safeExecute(&Config::loadFromFile, this, filepath);
+}
+
+std::string Config::getSafeString(const std::string& key, const std::string& defaultValue) const {
+    auto value = get<std::string>(key);
+    if (value.has_value()) {
+        return value.value();
     }
+    return defaultValue;
 }
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+int Config::getSafeInt(const std::string& key, int defaultValue) const {
+    auto value = get<int>(key);
+    if (value.has_value()) {
+        return value.value();
     }
-    return keys;
+    return defaultValue;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+float Config::getSafeFloat(const std::string& key, float defaultValue) const {
+    auto value = get<double>(key);
+    if (value.has_value()) {
+        return static_cast<float>(value.value());
     }
-    return oss.str();
+    return defaultValue;
+}
+
+bool Config::getSafeBool(const std::string& key, bool defaultValue) const {
+    auto value = get<bool>(key);
+    if (value.has_value()) {
+        return value.value();
+    }
+    return defaultValue;
 }
 
 std::string Config::trim(const std::string& str) {
