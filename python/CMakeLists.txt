@@ -79,6 +79,33 @@ target_compile_options(nlm_core PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
+# Performance optimization options
+option(NLM_ENABLE_VECTORIZATION "Enable SIMD vectorization for performance" ON)
+option(NLM_ENABLE_SPARSE_CONNECTIVITY "Enable sparse connectivity optimization" ON)
+option(NLM_ENABLE_MEMORY_POOLS "Enable memory pools for better allocation" ON)
+option(NLM_ENABLE_EVENT_QUEUES "Enable event-driven computation" ON)
+
+# Vectorization definitions
+if(NLM_ENABLE_VECTORIZATION)
+    target_compile_definitions(nlm_core PRIVATE NLM_ENABLE_VECTORIZATION)
+    target_compile_options(nlm_core PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-msse4 -msse2 -mavx>
+        $<$<CXX_COMPILER_ID:Clang>:-msse4 -msse2 -mavx>
+    )
+endif()
+
+if(NLM_ENABLE_SPARSE_CONNECTIVITY)
+    target_compile_definitions(nlm_core PRIVATE NLM_ENABLE_SPARSE_CONNECTIVITY)
+endif()
+
+if(NLM_ENABLE_MEMORY_POOLS)
+    target_compile_definitions(nlm_core PRIVATE NLM_ENABLE_MEMORY_POOLS)
+endif()
+
+if(NLM_ENABLE_EVENT_QUEUES)
+    target_compile_definitions(nlm_core PRIVATE NLM_ENABLE_EVENT_QUEUES)
+endif()
+
 add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
@@ -87,16 +114,67 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Create a main simulation library that combines all components
+add_library(nlm_simulation STATIC
+    ${NLM_CORE_SOURCES}
+    ${NLM_AGENT_SOURCES}
+    ${NLM_WORLD_SOURCES}
+)
+target_include_directories(nlm_simulation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_link_libraries(pynlm PRIVATE nlm_simulation)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Install targets for Python package
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
 )
+
+# Install headers for Python development
+install(DIRECTORY ${NLM_SOURCE_DIR}/core/Types
+    DESTINATION include/nlm/core/Types
+)
+
+install(DIRECTORY ${NLM_SOURCE_DIR}/core/Config
+    DESTINATION include/nlm/core/Config
+)
+
+install(DIRECTORY ${NLM_SOURCE_DIR}/brain
+    DESTINATION include/nlm/brain
+)
+
+install(DIRECTORY ${NLM_SOURCE_DIR}/agent
+    DESTINATION include/nlm/agent
+)
+
+install(DIRECTORY ${NLM_SOURCE_DIR}/world
+    DESTINATION include/nlm/world
+)
+
+# Create a custom target for building Python bindings
+add_custom_target(build_python_bindings ALL
+    COMMAND ${CMAKE_COMMAND} -E echo "Building NLM Python bindings..."
+    COMMAND ${Python_EXECUTABLE} -c "import pybind11; print('Python bindings configuration complete')"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Configuring NLM Python bindings for development"
+    VERBATIM
+)
+
+# Print build information
+message(STATUS "NLM Python Bindings Configuration:")
+message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Python Executable: ${Python_EXECUTABLE}")
+message(STATUS "  Python Version: ${Python_VERSION}")
+message(STATUS "  Vectorization: ${NLM_ENABLE_VECTORIZATION}")
+message(STATUS "  Sparse Connectivity: ${NLM_ENABLE_SPARSE_CONNECTIVITY}")
+message(STATUS "  Memory Pools: ${NLM_ENABLE_MEMORY_POOLS}")
+message(STATUS "  Event Queues: ${NLM_ENABLE_EVENT_QUEUES}")
+message(STATUS "  Installation Prefix: ${CMAKE_INSTALL_PREFIX}")
