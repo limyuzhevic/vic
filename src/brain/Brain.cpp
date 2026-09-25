@@ -474,6 +474,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Update synapse state
             syn->step(currentTime);
+            }
+    }
+    
+    // ========== STEP 6: Update working memory ==========
+    
+    // Update working memory with current neural activity
+    if (pImpl->workingMemory) {
+        // Store current sensory input in working memory
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention to working memory content
+        if (pImpl->attention) {
+            // Get current active neurons and run attention competition
+            auto competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
+            }
+    }
+    
+    // ========== STEP 6: Update working memory ==========
+    
+    // Update working memory with current neural activity
+    if (pImpl->workingMemory) {
+        // Store current sensory input in working memory
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention to working memory content
+        if (pImpl->attention) {
+            // Get current active neurons and run attention competition
+            auto competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
+    }
+    
+    // ========== STEP 6: Update working memory ==========
+    
+    // Update working memory with current neural activity
+    if (pImpl->workingMemory) {
+        // Store current sensory input in working memory
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention to working memory content
+        if (pImpl->attention) {
+            // Get current active neurons and run attention competition
+            auto competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
         }
     }
     
@@ -505,6 +556,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store current sensory state for pattern matching
+            // This would be populated from the environment in a real implementation
+            
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
@@ -512,7 +566,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // In a real implementation, this would:
+        // 1. Use current sensory input to predict next state
+        // 2. Update predictions based on actual observation
+        // 3. Use prediction error to modulate learning
+        
+        // For now, update based on episode changes
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 1) {
+            // Get last two episodes to compute prediction error
+            auto episodes = pImpl->episodicMemory->getEpisodes();
+            if (episodes.size() >= 2) {
+                const auto* prevEpisode = episodes[episodes.size() - 2];
+                const auto* currentEpisode = episodes.back();
+                
+                // Create a simplified sensory input from episode pattern
+                SensoryInput predictionInput;
+                predictionInput.setData(currentEpisode->neuronActivations);
+                
+                // Get previous episode's sensory pattern
+                SensoryInput actualInput;
+                actualInput.setData(prevEpisode->neuronActivations);
+                
+                // Update prediction system
+                pImpl->predictionSystem->updatePredictions(predictionInput, actualInput);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +606,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation would process current neural activity patterns to form concepts
+        // This requires:
+        // 1. Extracting patterns from working memory
+        // 2. Clustering similar patterns
+        // 3. Creating abstract representations
+        
+        // For now, just update the concept formation system
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

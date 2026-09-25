@@ -1,7 +1,13 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <algorithm>
 #include <cmath>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -18,10 +24,30 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , neuralPlannerEnabled_(true)  // Enable neural planner by default
+    , conceptFormationEnabled_(true)  // Enable concept formation by default
+    , selfModelEnabled_(true)  // Enable self-model by default
+    , socialLearningEnabled_(true)  // Enable social learning by default
     , sensoryNoveltyDecay_(0.99f)
+    , experienceCount_(0)
+    , predictionAccuracy_(0.0f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize cognitive systems
     if (brain_) {
+        // Create and initialize cognitive systems
+        neuralPlanner_ = std::make_unique<NeuralPlanner>();
+        neuralPlanner_->initialize(brain_.get());
+        
+        conceptFormation_ = std::make_unique<ConceptFormation>();
+        conceptFormation_->initialize(brain_.get());
+        
+        selfModel_ = std::make_unique<SelfModel>();
+        selfModel_->initialize(brain_.get());
+        
+        socialLearning_ = std::make_unique<SocialLearning>();
+        socialLearning_->initialize(brain_.get());
+        
+        // Initialize motor and sensory neuron groups
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
@@ -67,11 +93,20 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    experienceCount_ = 0;
+    predictionAccuracy_ = 0.0f;
+    
+    // Initialize cognitive systems if enabled
+    if (neuralPlannerEnabled_ && neuralPlanner_) {
+        neuralPlanner_->setPlanningDepth(5);  // Default planning depth
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                 std::to_string(conceptFormationEnabled_) + " concept formation enabled, " +
+                 std::to_string(neuralPlannerEnabled_) + " neural planner enabled");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {

@@ -4,6 +4,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <memory>
 #include <vector>
 
@@ -69,6 +73,57 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // === COGNITIVE SYSTEM INTEGRATION ===
+    
+    // Neural planner integration
+    void enableNeuralPlanner(bool enable) { neuralPlannerEnabled_ = enable; }
+    bool isNeuralPlannerEnabled() const { return neuralPlannerEnabled_; }
+    void setPlanningDepth(size_t depth) { if (neuralPlanner_) { neuralPlanner_->setPlanningDepth(depth); } }
+    
+    // Concept formation integration
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    
+    // Self-model integration
+    void enableSelfModel(bool enable) { selfModelEnabled_ = enable; }
+    bool isSelfModelEnabled() const { return selfModelEnabled_; }
+    
+    // Social learning integration
+    void enableSocialLearning(bool enable) { socialLearningEnabled_ = enable; }
+    bool isSocialLearningEnabled() const { return socialLearningEnabled_; }
+    
+    // === COGNITIVE SYSTEM ACCESSORS ===
+    
+    NeuralPlanner* getNeuralPlanner() { return neuralPlanner_.get(); }
+    ConceptFormation* getConceptFormation() { return conceptFormation_.get(); }
+    SelfModel* getSelfModel() { return selfModel_.get(); }
+    SocialLearning* getSocialLearning() { return socialLearning_.get(); }
+    
+    // === ADVANCED FUNCTIONALITY ===
+    
+    // Novelty-based learning
+    void processNovelty(const std::vector<float>& currentVision);
+    
+    // Experience encoding for concept formation
+    void encodeExperience(const SensoryPercept& percept, float reward,
+                          SimulationStep currentStep);
+    
+    // Prediction-based action selection
+    MotorCommand decodeWithPrediction(const std::vector<float>& currentState);
+    
+    // Attention control
+    void focusAttention(NeuronId neuron);
+    void releaseAttention();
+    
+    // Cognitive learning
+    void learnFromExperience(const SensoryPercept& percept, ActionResult actionResult,
+                             SimulationStep currentStep);
+    
+    // Get cognitive statistics
+    size_t getConceptCount() const;
+    float getNoveltyLevel() const;
+    float getPredictionAccuracy() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +132,12 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive systems
+    std::unique_ptr<NeuralPlanner> neuralPlanner_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<SelfModel> selfModel_;
+    std::unique_ptr<SocialLearning> socialLearning_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -109,9 +170,20 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Cognitive configuration flags
+    bool neuralPlannerEnabled_;
+    bool conceptFormationEnabled_;
+    bool selfModelEnabled_;
+    bool socialLearningEnabled_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Cognitive state tracking
+    size_t experienceCount_;
+    float predictionAccuracy_;
+    std::vector<float> recentPredictions_;
 };
 
 } // namespace nlm
