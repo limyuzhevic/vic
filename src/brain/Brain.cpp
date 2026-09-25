@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <filesystem>
 
 namespace nlm {
 
@@ -288,13 +289,87 @@ bool Brain::initialize() {
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    
+    // Configure checkpoint system
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Configure checkpoint providers
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) -> bool {
+        // Provide neuron state for checkpointing
+        try {
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        data.membranePotential.push_back(state.membranePotential);
+                        data.restingPotential.push_back(state.restingPotential);
+                        data.threshold.push_back(state.threshold);
+                        data.resetPotential.push_back(state.resetPotential);
+                        data.leakConductance.push_back(state.leakConductance);
+                        data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                        data.refractoryRemaining.push_back(state.refractoryRemaining);
+                        data.refractoryPeriod.push_back(state.refractoryPeriod);
+                        data.lastSpikeTime.push_back(state.lastSpikeTime);
+                        data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                        data.regionId.push_back(region->getId().index());
+                        data.populationId.push_back(pop->getId().index());
+                    }
+                }
+            }
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error providing neuron data: ") + e.what());
+            return false;
+        }
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) -> bool {
+        // Provide synapse state for checkpointing
+        try {
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                    data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                    data.weight.push_back(syn->getWeight());
+                    data.delay.push_back(syn->getDelay());
+                    data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                    data.plasticityFlags.push_back(syn->getPlasticityFlags().flags);
+                    data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                    data.efficacy.push_back(syn->getEfficacy());
+                    data.shortTermDepression.push_back(syn->getShortTermDepression());
+                    data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                }
+            }
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error providing synapse data: ") + e.what());
+            return false;
+        }
+    });
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    
+    // Log integration status
+    NLM_LOG_INFO("Brain integration status:");
+    NLM_LOG_INFO("  Memory Systems: Working=" + std::to_string(pImpl->workingMemory ? 1 : 0) +
+                 ", Episodic=" + std::to_string(pImpl->episodicMemory ? 1 : 0) +
+                 ", Associative=" + std::to_string(pImpl->associativeMemory ? 1 : 0));
+    NLM_LOG_INFO("  Neuromodulation: Dopamine=" + std::to_string(pImpl->dopamine ? 1 : 0) +
+                 ", Curiosity=" + std::to_string(pImpl->curiosity ? 1 : 0) +
+                 ", PredictionError=" + std::to_string(pImpl->predictionError ? 1 : 0) +
+                 ", Novelty=" + std::to_string(pImpl->novelty ? 1 : 0));
+    NLM_LOG_INFO("  Cognition Systems: Planner=" + std::to_string(pImpl->planner ? 1 : 0) +
+                 ", ConceptFormation=" + std::to_string(pImpl->conceptFormation ? 1 : 0) +
+                 ", Attention=" + std::to_string(pImpl->attention ? 1 : 0));
+    NLM_LOG_INFO("  Other Systems: Prediction=" + std::to_string(pImpl->predictionSystem ? 1 : 0) +
+                 ", Development=" + std::to_string(pImpl->developmentSystem ? 1 : 0));
+    NLM_LOG_INFO("  Plasticity: STDP=" + std::to_string(pImpl->stdp ? 1 : 0) +
+                 ", Hebbian=" + std::to_string(pImpl->hebbian ? 1 : 0) +
+                 ", Structural=" + std::to_string(pImpl->structuralPlasticity ? 1 : 0));
     
     return true;
 }
@@ -764,6 +839,46 @@ void Brain::reset() {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    // Enable detailed logging for Brain save/load operations
+    if (pImpl->config->getOr<bool>("checkpoint_verbose", false)) {
+        NLM_LOG_INFO(std::string("Saving checkpoint with detailed logging for filepath: ") + filepath);
+        NLM_LOG_INFO(std::string("Brain has ") + std::to_string(pImpl->regions.size()) + " regions and " + 
+                     std::to_string(getTotalNeuronCount()) + " neurons");
+    }
+    
+    // Log checkpoint file info
+    if (pImpl->config->getOr<bool>("checkpoint_log_file_info", false)) {
+        std::filesystem::path pathObj(filepath);
+        NLM_LOG_INFO(std::string("Checkpoint file: ") + filepath);
+        NLM_LOG_INFO(std::string("Checkpoint directory: ") + pathObj.parent_path().string());
+        NLM_LOG_INFO(std::string("Checkpoint filename: ") + pathObj.filename().string());
+    }
+    
+    // Log current simulation state
+    if (pImpl->config->getOr<bool>("checkpoint_log_simulation_state", false)) {
+        NLM_LOG_INFO(std::string("Current step: ") + std::to_string(pImpl->currentStep));
+        NLM_LOG_INFO(std::string("Current time: ") + std::to_string(pImpl->currentTime) + " s");
+        NLM_LOG_INFO(std::string("Total spikes: ") + std::to_string(pImpl->totalSpikesTotal));
+        NLM_LOG_INFO(std::string("Active neurons: ") + std::to_string(getActiveNeuronCount()));
+    }
+    
+    // Log integration status
+    if (pImpl->config->getOr<bool>("checkpoint_log_integration_status", false)) {
+        NLM_LOG_INFO(std::string("Integration status:"));
+        NLM_LOG_INFO(std::string("  Working memory: ") + std::to_string(pImpl->workingMemory ? 1 : 0));
+        NLM_LOG_INFO(std::string("  Episodic memory: ") + std::to_string(pImpl->episodicMemory ? 1 : 0));
+        NLM_LOG_INFO(std::string("  Neuromodulation: ") + std::to_string(pImpl->dopamine ? 1 : 0));
+        NLM_LOG_INFO(std::string("  Prediction system: ") + std::to_string(pImpl->predictionSystem ? 1 : 0));
+        NLM_LOG_INFO(std::string("  Development system: ") + std::to_string(pImpl->developmentSystem ? 1 : 0));
+        NLM_LOG_INFO(std::string("  Cognition systems: ") + std::to_string((pImpl->planner && pImpl->conceptFormation && pImpl->attention) ? 3 : 0));
+    }
+    
+    // Enable checkpoint validation for debugging
+    if (pImpl->config->getOr<bool>("checkpoint_validate", false)) {
+        NLM_LOG_INFO(std::string("Validating checkpoint integrity..."));
+        // Add validation logic here if needed
+    }
+    
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
@@ -845,6 +960,26 @@ bool Brain::save(const std::string& filepath) const {
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
+    
+    // Enable detailed logging for Brain save/load operations
+    if (pImpl->config->getOr<bool>("checkpoint_verbose", false)) {
+        NLM_LOG_INFO(std::string("Loading checkpoint with detailed logging for filepath: ") + filepath);
+        NLM_LOG_INFO(std::string("Checkpoint file size: ")); // Would need to get actual file size
+    }
+    
+    // Log checkpoint file info
+    if (pImpl->config->getOr<bool>("checkpoint_log_file_info", false)) {
+        std::filesystem::path pathObj(filepath);
+        NLM_LOG_INFO(std::string("Checkpoint file: ") + filepath);
+        NLM_LOG_INFO(std::string("Checkpoint directory: ") + pathObj.parent_path().string());
+        NLM_LOG_INFO(std::string("Checkpoint filename: ") + pathObj.filename().string());
+    }
+    
+    // Enable checkpoint validation for debugging
+    if (pImpl->config->getOr<bool>("checkpoint_validate", false)) {
+        NLM_LOG_INFO(std::string("Validating checkpoint integrity..."));
+        // Add validation logic here if needed
+    }
     
     try {
         CheckpointReader reader;

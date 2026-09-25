@@ -354,7 +354,62 @@ int main(int argc, char** argv) {
                 configFile = argv[++i];
             }
         }
-    }
+        
+        // Checkpointing options
+        else if (arg == "--checkpoint-interval") {
+            if (i + 1 < argc) {
+                config->set("checkpoint_save_interval", std::stoull(argv[++i]), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--checkpoint-dir") {
+            if (i + 1 < argc) {
+                config->set("checkpoint_dir", argv[++i], ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--checkpoint-max-files") {
+            if (i + 1 < argc) {
+                config->set("checkpoint_max_files", std::stoull(argv[++i]), ConfigSource::CommandLine);
+            }
+        }
+        else if (arg == "--checkpoint-compress") {
+            config->set("checkpoint_compress", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--checkpoint-verbose") {
+            config->set("checkpoint_verbose", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--checkpoint-validate") {
+            config->set("checkpoint_validate", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--checkpoint-log-file-info") {
+            config->set("checkpoint_log_file_info", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--checkpoint-log-simulation-state") {
+            config->set("checkpoint_log_simulation_state", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--checkpoint-log-integration-status") {
+            config->set("checkpoint_log_integration_status", "true", ConfigSource::CommandLine);
+        }
+        
+        // Testing options
+        else if (arg == "--test-mode") {
+            config->set("test_mode", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--experiment-type") {
+            if (i + 1 < argc) {
+                config->set("experiment_type", argv[++i], ConfigSource::CommandLine);
+            }
+        }
+        
+        // Debug and verbosity options
+        else if (arg == "--debug") {
+            config->set("debug_mode", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--quiet") {
+            config->set("quiet_mode", "true", ConfigSource::CommandLine);
+        }
+        else if (arg == "--timing") {
+            config->set("enable_timing", "true", ConfigSource::CommandLine);
+        }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
