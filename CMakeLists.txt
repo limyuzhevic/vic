@@ -96,6 +96,13 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/MotorDistribution.cpp
+    src/agent/MotorDecoder.cpp
+    src/agent/SensoryProcessor.cpp
+    src/agent/CuriosityManager.cpp
+    src/agent/RewardModulator.cpp
+    src/agent/DevelopmentalController.cpp
+    src/agent/AgentStateManager.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
@@ -125,7 +132,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
