@@ -293,5 +293,6 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Check `advanced_python_api.md` for comprehensive documentation of all advanced features
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with advanced features.

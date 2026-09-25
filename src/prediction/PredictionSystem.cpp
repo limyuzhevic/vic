@@ -53,8 +53,10 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::initialize() {
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
+    pImpl->errorHistory.clear();
 }
 
 } // namespace nlm

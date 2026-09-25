@@ -37,12 +37,38 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_brain_integration {
+    void runAll();
+}
+
+namespace test_prediction_integration {
+    void runAll();
+}
+
+namespace test_cognition_integration {
+    void runAll();
+}
+
+namespace test_config_integration {
+    void runAll();
+}
+
+namespace test_python_bindings {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== Integration Tests ===" << std::endl;
+    std::cout << "  - Brain-Memory Integration" << std::endl;
+    std::cout << "  - Prediction System Integration" << std::endl;
+    std::cout << "  - Cognition System Integration" << std::endl;
+    std::cout << "  - Enhanced Configuration Integration" << std::endl;
+    std::cout << "  - Python Bindings Integration" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +139,51 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Brain Integration tests..." << std::endl;
+    try {
+        test_brain_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction Integration tests..." << std::endl;
+    try {
+        test_prediction_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Cognition Integration tests..." << std::endl;
+    try {
+        test_cognition_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Config Integration tests..." << std::endl;
+    try {
+        test_config_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python Bindings tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

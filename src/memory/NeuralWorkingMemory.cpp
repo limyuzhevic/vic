@@ -22,6 +22,12 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -35,6 +41,12 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
+    
+    // If no memory neurons exist, nothing to store to
+    if (memoryNeurons_.empty()) {
+        NLM_LOG_WARN("NeuralWorkingMemory: No memory neurons available for storage");
+        return;
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -142,6 +154,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {

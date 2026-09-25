@@ -218,6 +218,22 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
+void NeuralEpisodicMemory::updateRelevance(SimulationStep episodeId, float relevanceDelta) {
+    if (episodeId < episodes_.size()) {
+        // In a full implementation, episodes would have a relevance field
+        // For now, this would age the episode differently
+        // Update the episode's age based on relevance change
+        if (relevanceDelta > 0.0f) {
+            // Positive relevance - keep episode fresher longer
+            episodes_[episodeId].age = std::max(0, episodes_[episodeId].age - 
+                                                static_cast<SimulationStep>(relevanceDelta * 10));
+        } else {
+            // Negative relevance - age episode faster
+            episodes_[episodeId].age += static_cast<SimulationStep>(-relevanceDelta * 10);
+        }
+    }
+}
+
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
     // In a full implementation, episodes would have relevance scores

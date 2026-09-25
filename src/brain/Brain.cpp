@@ -121,6 +121,11 @@ struct Brain::Impl {
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        // Initialize cognition systems with brain reference
+        if (planner) planner->initialize(this);
+        if (conceptFormation) conceptFormation->initialize(this);
+        if (attention) attention->initialize(this);
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
@@ -243,7 +248,9 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize();
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -258,6 +265,9 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    if (pImpl->predictionError) {
+        pImpl->predictionError->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -510,9 +520,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->isResting) {
+        // The prediction system predicts next state based on current sensory input
+        // This is the core of predictive processing
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Extract current sensory state from sensory neurons
+            std::vector<float> sensoryState;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 2.0f) {
+                    sensoryState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                }
+            }
+            
+            // Create sensory input for prediction
+            std::unique_ptr<InternalSignals> currentSensoryInput = std::make_unique<InternalSignals>();
+            for (float val : sensoryState) {
+                currentSensoryInput->addSignal(val);
+            }
+            
+            // Make prediction using prediction system
+            auto predictedState = pImpl->predictionSystem->predictNextState(*currentSensoryInput);
+            
+            if (predictedState) {
+                // Compare prediction with actual sensory input
+                pImpl->predictionSystem->updatePredictions(*currentSensoryInput, *predictedState);
+                
+                // Prediction error drives learning through neuromodulators
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (pImpl->predictionError) {
+                    // Use the error in the prediction error neuromodulator
+                    float currentPE = pImpl->predictionError->getError();
+                    pImpl->predictionError->computeError(currentPE, predictionError);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +570,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract sensory pattern from neural activity
+        std::vector<float> sensoryPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 2.0f) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                    sensoryPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Present pattern to concept formation system
+        if (!sensoryPattern.empty()) {
+            // Create empty features (could be extended to include more detailed features)
+            std::vector<float> features(sensoryPattern.size(), 0.5f);
+            
+            // Get reward from dopamine system or use default
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+            
+            // Present experience to concept formation
+            size_t conceptId = pImpl->conceptFormation->presentExperience(sensoryPattern, features, reward, currentStep);
+            
+            // Log if new concept formed
+            if (conceptId > 0) {
+                NLM_LOG_DEBUG("ConceptFormation formed new concept with ID: " + std::to_string(conceptId));
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -693,23 +761,29 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
-    
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Extract current state from sensory neurons (similar to prediction system)
+        std::vector<float> currentState;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 2.0f) {
+                    currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                }
+            }
         }
-    }
-    
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
+        
+        // If we have a planner and current state, use it to plan action
+        if (pImpl->planner && !currentState.empty()) {
+            // Use NeuralPlanner to get the best action based on current state
+            ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+            
+            // If NeuralPlanner suggests something other than wait, use it
+            if (plannedAction != ActionType::Wait) {
+                NLM_LOG_DEBUG("NeuralPlanner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+                // Override simple motor selection with planned action
+                type = plannedAction;
+            }
+        }
     
     auto action = std::make_unique<Action>(type);
     
