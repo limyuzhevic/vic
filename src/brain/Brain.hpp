@@ -29,6 +29,16 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declarations for manager classes
+class BrainInitializer;
+class BrainStepProcessor;
+class BrainMemoryManager;
+class BrainNeuromodulationManager;
+class BrainPlasticityManager;
+class BrainCognitionManager;
+class BrainDevelopmentManager;
+class BrainCheckpointManager;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -193,9 +203,29 @@ public:
     // Logging
     void logStatus() const;
     
+    // Accessor for manager classes (for internal use)
+    BrainInitializer* getInitializer();
+    BrainStepProcessor* getStepProcessor();
+    BrainMemoryManager* getMemoryManager();
+    BrainNeuromodulationManager* getNeuromodulationManager();
+    BrainPlasticityManager* getPlasticityManager();
+    BrainCognitionManager* getCognitionManager();
+    BrainDevelopmentManager* getDevelopmentManager();
+    BrainCheckpointManager* getCheckpointManager();
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Manager instances (for internal organization)
+    std::unique_ptr<BrainInitializer> initializer;
+    std::unique_ptr<BrainStepProcessor> stepProcessor;
+    std::unique_ptr<BrainMemoryManager> memoryManager;
+    std::unique_ptr<BrainNeuromodulationManager> neuromodulationManager;
+    std::unique_ptr<BrainPlasticityManager> plasticityManager;
+    std::unique_ptr<BrainCognitionManager> cognitionManager;
+    std::unique_ptr<BrainDevelopmentManager> developmentManager;
+    std::unique_ptr<BrainCheckpointManager> checkpointManager;
 };
 
 } // namespace nlm
