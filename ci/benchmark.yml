@@ -1,0 +1,222 @@
+# ci/benchmark.yml
+# GitHub Actions workflow for NLM performance benchmarks
+
+name: NLM Performance Benchmarks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 6 * * 1'  # Run every Monday at 6:00 AM
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up C++
+      uses: sreimers/action-cmake@v1.1
+      with:
+        cmake_args: '-DCMAKE_BUILD_TYPE=Release -DNLM_ENABLE_BENCHMARKS=ON'
+    
+    - name: Build benchmarks
+      run: |
+        mkdir -p build_benchmarks
+        cd build_benchmarks
+        cmake ..
+        cmake --build . --parallel $(nproc)
+    
+    - name: Run benchmarks
+      run: |
+        cd build_benchmarks
+        ./nlm_benchmarks --output ../benchmarks_results.json
+        mkdir -p benchmarks_results
+        cp *.json benchmarks_results/
+    
+    - name: Analyze benchmarks
+      run: |
+        # Analyze benchmark results
+        python3 << EOF
+        import json
+        import sys
+        
+        try:
+            with open('benchmarks_results.json', 'r') as f:
+                data = json.load(f)
+            
+            # Basic analysis
+            results = data.get('benchmarks', [])
+            
+            print("Benchmark Analysis Summary:")
+            print("===========================")
+            
+            for benchmark in results:
+                print(f"\nBenchmark: {benchmark['name']}")
+                print(f"  Time: {benchmark['time_ms']:.3f} ms")
+                print(f"  Iterations: {benchmark['iterations']}")
+                print(f"  Average: {benchmark['average_time_ms']:.6f} ms")
+                print(f"  Performance: {benchmark['performance_ops_per_ms']:.2f} ops/ms")
+            
+            # Save analysis
+            with open('benchmark_analysis.json', 'w') as f:
+                json.dump({
+                    'summary': {
+                        'total_benchmarks': len(results),
+                        'average_time': sum(b['time_ms'] for b in results) / len(results),
+                        'fastest_benchmark': min(results, key=lambda b: b['time_ms'])['name'],
+                        'slowest_benchmark': max(results, key=lambda b: b['time_ms'])['name']
+                    },
+                    'details': results
+                }, f, indent=2)
+                
+        except FileNotFoundError:
+            print("Benchmark results file not found")
+            sys.exit(1)
+        EOF
+    
+    - name: Generate benchmark report
+      run: |
+        # Generate human-readable benchmark report
+        cd benchmarks_results
+        echo "=== NLM Performance Benchmark Report ===" > benchmark_report.txt
+        echo "Generated on: $(date)" >> benchmark_report.txt
+        echo "" >> benchmark_report.txt
+        
+        for file in *.json; do
+            if [ -f "$file" ]; then
+                echo "Benchmark: $file" >> benchmark_report.txt
+                cat "$file" >> benchmark_report.txt
+                echo "" >> benchmark_report.txt
+            fi
+        done
+    
+    - name: Upload benchmark artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-artifacts
+        path: |
+          benchmarks_results/
+          benchmark_analysis.json
+          benchmark_report.txt
+        retention-days: 30
+    
+    - name: Comment on PR with benchmark results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const benchmarkData = JSON.parse(fs.readFileSync('benchmark_analysis.json', 'utf8'));
+            
+            const summary = `## Performance Benchmark Results
+            
+            **Total Benchmarks**: ${benchmarkData.summary.total_benchmarks}
+            **Average Time**: ${benchmarkData.summary.average_time:.3f} ms
+            **Fastest**: ${benchmarkData.summary.fastest_benchmark}
+            **Slowest**: ${benchmarkData.summary.slowest_benchmark}
+            
+            ### Details:
+            ${benchmarkData.details.map(b => `\n            - **${b.name}**: ${b.time_ms:.3f} ms (${b.performance_ops_per_ms:.2f} ops/ms)`).join('')}
+            `;
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+            
+          } catch (error) {
+            console.log(`Error generating benchmark comment: ${error.message}`);
+          }
+    
+    - name: Compare with baseline
+      run: |
+        # This would typically download the previous benchmark results and compare
+        # For now, we'll just log the action
+        echo "Comparing with baseline benchmarks..."
+        # Implementation would download artifacts from previous runs
+        # and perform statistical analysis
+
+  performance-regression:
+    runs-on: ubuntu-latest
+    needs: benchmarks
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up baseline
+      run: |
+        # Download baseline benchmarks from previous run
+        mkdir -p baseline
+        # This would use the workflow artifacts from the previous run
+        echo "Setting up baseline benchmarks..."
+    
+    - name: Run current benchmarks
+      run: |
+        mkdir -p current
+        cd current
+        # Build and run benchmarks on current code
+        echo "Running benchmarks on current code..."
+    
+    - name: Compare and detect regressions
+      run: |
+        # Perform regression analysis
+        python3 << EOF
+        import json
+        import statistics
+        
+        try:
+            with open('baseline/benchmark_results.json', 'r') as f:
+                baseline = json.load(f)
+            
+            with open('current/benchmark_results.json', 'r') as f:
+                current = json.load(f)
+            
+            # Compare each benchmark
+            regressions = []
+            for bench_name in baseline:
+                if bench_name in current:
+                    baseline_time = baseline[bench_name]['average_time']
+                    current_time = current[bench_name]['average_time']
+                    
+                    # Calculate regression percentage
+                    regression = ((current_time - baseline_time) / baseline_time) * 100
+                    
+                    if regression > 5:  # 5% threshold for significant regression
+                        regressions.append({
+                            'benchmark': bench_name,
+                            'baseline_time': baseline_time,
+                            'current_time': current_time,
+                            'regression_percent': regression
+                        })
+            
+            if regressions:
+                print("PERFORMANCE REGRESSIONS DETECTED!")
+                print("===========================")
+                for reg in regressions:
+                    print(f"\n- {reg['benchmark']}:")
+                    print(f"  Baseline: {reg['baseline_time']:.3f} ms")
+                    print(f"  Current: {reg['current_time']:.3f} ms")
+                    print(f"  Regression: {reg['regression_percent']:.1f}%")
+                
+                # Save regression report
+                with open('performance_regressions.json', 'w') as f:
+                    json.dump(regressions, f, indent=2)
+                
+                exit(1)  # Fail the workflow
+            else:
+                print("✓ No significant performance regressions detected")
+                
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            exit(1)
+        EOF

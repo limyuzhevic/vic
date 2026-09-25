@@ -1,8 +1,10 @@
 // Brain Tests
 #include "brain/Brain.hpp"
 #include "core/Config/Config.hpp"
+#include "core/Error.hpp"
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
 
 namespace test_brain {
 
@@ -24,8 +26,8 @@ void testBrainInitialization() {
     
     nlm::Brain brain(config);
     
-    bool success = brain.initialize();
-    assert(success);
+    // The initialize() method now throws on error instead of returning a bool
+    brain.initialize();
     
     // Verify brain initialized with expected properties
     assert(brain.getRegionCount() == 2);
@@ -121,6 +123,21 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainInvalidConfigError() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", 0, nlm::ConfigSource::Default);  // Invalid: zero neurons
+    config->set("region_count", 5, nlm::ConfigSource::Default);  // Invalid: more regions than neurons
+    
+    try {
+        nlm::Brain brain(config);
+        brain.initialize();
+        assert(false && "Should have thrown an exception due to invalid config");
+    } catch (const nlm::ValidationError& e) {
+        // Expected exception due to validation error
+        std::cout << "    testBrainInvalidConfigError passed" << std::endl;
+    }
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +146,7 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainInvalidConfigError();
 }
 
 } // namespace test_brain

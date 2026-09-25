@@ -1,0 +1,19 @@
+{
+    "app_name": "NLM",
+    "version": "1.0.0",
+    "max_connections": 100,
+    "timeout": 30.5,
+    "enable_logging": true,
+    "log_level": "INFO",
+    "neural_network": {
+        "layers": 5,
+        "neurons_per_layer": [100, 200, 200, 100, 50],
+        "activation_function": "relu"
+    },
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "epochs": 100,
+    "hidden_layers": [128, 64, 32],
+    "dropout_rate": 0.2,
+    "use_gpu": true
+}

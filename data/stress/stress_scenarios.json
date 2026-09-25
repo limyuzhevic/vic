@@ -1,0 +1,105 @@
+# data/stress/stress_scenarios.json
+# Stress test scenarios for NLM
+
+{
+    "stress_scenarios": [
+        {
+            "name": "large_network_density",
+            "description": "Test system performance with dense large networks",
+            "parameters": {
+                "neuron_count": 50000,
+                "connection_probability": 0.05,
+                "max_memory_mb": 2048,
+                "expected_time_ms": 60000
+            },
+            "objectives": [
+                "Verify system stability under high network density",
+                "Measure memory usage efficiency",
+                "Assess performance degradation"
+            ],
+            "expected_results": {
+                "system_should_not_crash": true,
+                "memory_usage_within_limit": true,
+                "performance_degradation_acceptable": true
+            }
+        },
+        {
+            "name": "extended_simulation",
+            "description": "Test system stability over extended simulation time",
+            "parameters": {
+                "simulation_time_ms": 3600000,
+                "neuron_count": 1000,
+                "update_frequency": 1000,
+                "checkpoint_interval": 60000
+            },
+            "objectives": [
+                "Verify system stability over long durations",
+                "Test checkpoint/restart functionality",
+                "Monitor memory leaks"
+            ],
+            "expected_results": {
+                "system_should_not_crash": true,
+                "checkpoints_should_work": true,
+                "memory_usage_should_not_increase": true
+            }
+        },
+        {
+            "name": "plasticity_extremes",
+            "description": "Test system under extreme plasticity conditions",
+            "parameters": {
+                "plasticity_rate": 0.5,
+                "learning_events": 100000,
+                "connection_updates": 1000000,
+                "neuron_count": 2000
+            },
+            "objectives": [
+                "Verify plasticity rule stability",
+                "Test memory management with frequent updates",
+                "Measure performance under high plasticity"
+            ],
+            "expected_results": {
+                "plasticity_rules_should_not_fail": true,
+                "memory_usage_should_be_stable": true,
+                "performance_should_degrade_gracefully": true
+            }
+        },
+        {
+            "name": "neuromodulation_extremes",
+            "description": "Test system under extreme neuromodulation conditions",
+            "parameters": {
+                "neuromodulators": 10,
+                "update_frequency": 10000,
+                "effect_strength": 2.0,
+                "neuron_count": 3000
+            },
+            "objectives": [
+                "Verify neuromodulation system stability",
+                "Test interaction with other systems",
+                "Measure performance under high neuromodulation load"
+            ],
+            "expected_results": {
+                "neuromodulation_should_not_crash": true,
+                "other_systems_should_remain_stable": true,
+                "performance_should_be_acceptable": true
+            }
+        }
+    ],
+    "stress_test_framework": {
+        "monitoring_interval_ms": 1000,
+        "resource_limits": {
+            "max_memory_mb": 4096,
+            "max_cpu_percent": 100,
+            "max_disk_mb": 1024
+        },
+        "failure_criteria": {
+            "max_failures_before_stop": 3,
+            "max_time_without_progress_ms": 300000,
+            "max_memory_growth_mb_per_hour": 100
+        },
+        "recovery_tests": [
+            "system_restart_after_crash",
+            "memory_cleanup_after_stress",
+            "performance_recovery_after_peak_load"
+        ]
+    }
+}

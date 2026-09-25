@@ -1,0 +1,97 @@
+# data/test/test_config.json
+# Test configuration data for NLM
+
+{
+    "test_suites": [
+        {
+            "name": "basic_brain_tests",
+            "description": "Basic brain system tests",
+            "categories": ["unit", "integration"],
+            "test_files": [
+                "src/testing/unit/brain/BrainUnitTests.cpp",
+                "src/testing/integration/full_brain/FullBrainIntegrationTests.cpp"
+            ]
+        },
+        {
+            "name": "memory_system_tests",
+            "description": "Memory system tests",
+            "categories": ["unit", "integration"],
+            "test_files": [
+                "src/testing/unit/memory/MemoryUnitTests.cpp",
+                "src/testing/integration/memory/MemoryIntegrationTests.cpp"
+            ]
+        },
+        {
+            "name": "performance_benchmarks",
+            "description": "Performance benchmarks",
+            "categories": ["performance"],
+            "test_files": [
+                "src/testing/performance/neural/NeuralPerformanceTests.cpp",
+                "src/testing/performance/plasticity/PlasticityPerformanceTests.cpp"
+            ]
+        },
+        {
+            "name": "stress_tests",
+            "description": "Stress testing scenarios",
+            "categories": ["stress"],
+            "test_files": [
+                "src/testing/stress/large_networks/LargeNetworkStressTests.cpp",
+                "src/testing/stress/long_sims/LongSimulationStressTests.cpp"
+            ]
+        }
+    ],
+    "test_parameters": {
+        "default_iterations": 1000,
+        "performance_iterations": 100,
+        "stress_iterations": 50,
+        "coverage_threshold": 80,
+        "max_memory_usage_mb": 1024,
+        "max_time_seconds": 300
+    },
+    "benchmark_datasets": [
+        {
+            "name": "small_network",
+            "neuron_count": 100,
+            "description": "Small neural network for benchmarking"
+        },
+        {
+            "name": "medium_network",
+            "neuron_count": 1000,
+            "description": "Medium neural network for benchmarking"
+        },
+        {
+            "name": "large_network",
+            "neuron_count": 10000,
+            "description": "Large neural network for stress testing"
+        }
+    ],
+    "stress_scenarios": [
+        {
+            "name": "high_activity",
+            "description": "High neural activity stress test",
+            "parameters": {
+                "neuron_count": 5000,
+                "simulation_time": 100.0,
+                "input_frequency": 10.0
+            }
+        },
+        {
+            "name": "memory_pressure",
+            "description": "High memory usage stress test",
+            "parameters": {
+                "memory_capacity_mb": 512,
+                "episodes": 10000,
+                "working_memory_size": 1000
+            }
+        },
+        {
+            "name": "plastic_high",
+            "description": "High plasticity stress test",
+            "parameters": {
+                "plasticity_rate": 0.1,
+                "learning_events": 10000,
+                "connection_updates": 50000
+            }
+        }
+    ]
+}

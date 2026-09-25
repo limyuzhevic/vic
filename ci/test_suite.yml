@@ -1,0 +1,140 @@
+# ci/test_suite.yml
+# GitHub Actions workflow for NLM test suite
+
+name: NLM Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 2 * * *'  # Run every day at 2:00 AM
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Set up C++
+      uses: sreimers/action-cmake@v1.1
+      with:
+        cmake_args: '-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DNLM_ENABLE_TESTS=ON'
+    
+    - name: Run tests
+      run: |
+        mkdir -p build
+        cd build
+        cmake ..
+        cmake --build . --parallel $(nproc)
+        ./nlm_tests
+    
+    - name: Generate coverage report
+      run: |
+        cd build
+        ./coverage_analyzer --output ../coverage_reports/coverage.json
+        # Upload coverage to codecov
+        bash <(curl -s https://codecov.io/bash) -f coverage.json
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.build_type }}
+        path: |
+          build/test_results.json
+          coverage_reports/
+    
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "Test suite failed!"
+        # Send notification (Slack, email, etc.)
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up C++
+      uses: sreimers/action-cmake@v1.1
+      with:
+        cmake_args: '-DCMAKE_BUILD_TYPE=Release -DNLM_ENABLE_BENCHMARKS=ON'
+    
+    - name: Build and run benchmarks
+      run: |
+        mkdir -p build_benchmarks
+        cd build_benchmarks
+        cmake ..
+        cmake --build . --parallel $(nproc)
+        ./nlm_benchmarks
+        mkdir -p benchmarks_results
+        cp *.json benchmarks_results/
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmarks_results/
+    
+    - name: Generate benchmark report
+      run: |
+        # Generate benchmark report (would typically use tools like Apache JMeter or similar)
+        echo "Benchmark report generation would happen here"
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: [test, benchmarks]
+    
+    steps:
+    - name: Download test results
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results-Debug
+    
+    - name: Analyze coverage
+      run: |
+        # Run coverage analysis using the test_coverage.sh script
+        cd scripts
+        ./test_coverage.sh --output ../coverage_reports --min-coverage 80
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: coverage_reports/
+    
+    - name: Comment on PR
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const coverageData = JSON.parse(fs.readFileSync('coverage_reports/coverage.json', 'utf8'));
+          
+          const coverage = coverageData.coverage;
+          const summary = `## Code Coverage Report
+          
+          Coverage: ${coverage}% (minimum required: 80%)
+          
+          **Status**: ${coverage >= 80 ? '✅ PASS' : '❌ FAIL'}
+          `;
+          
+          if (coverage < 80) {
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+          }

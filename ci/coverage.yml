@@ -1,0 +1,263 @@
+# ci/coverage.yml
+# GitHub Actions workflow for NLM code coverage
+
+name: NLM Code Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 4 * * 0'  # Run every Sunday at 4:00 AM
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up C++
+      uses: sreimers/action-cmake@v1.1
+      with:
+        cmake_args: '-DCMAKE_BUILD_TYPE=Debug -DNLM_COVERAGE=ON'
+    
+    - name: Build with coverage
+      run: |
+        mkdir -p build_coverage
+        cd build_coverage
+        cmake ..
+        cmake --build . --parallel $(nproc)
+    
+    - name: Run tests with coverage
+      run: |
+        cd build_coverage
+        ./nlm_tests --coverage
+    
+    - name: Generate coverage report
+      run: |
+        cd build_coverage
+        ./coverage_analyzer --output ../coverage_reports/coverage.json
+        # Also generate XML report for GitHub Actions
+        lcov --capture --directory . --output-file coverage.lcov
+        genhtml coverage.lcov --output-directory coverage_html
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: |
+          coverage_reports/
+          coverage_html/
+        retention-days: 7
+    
+    - name: Calculate coverage
+      run: |
+        # Calculate overall coverage from coverage report
+        cd build_coverage
+        
+        # Parse coverage.json
+        if [ -f ../coverage_reports/coverage.json ]; then
+          COVERAGE=$(python3 << EOF
+          import json
+          import sys
+          try:
+              with open('../coverage_reports/coverage.json', 'r') as f:
+                  data = json.load(f)
+              print(data.get('coverage', 0))
+          except:
+              print('0')
+          EOF
+          )
+          
+          echo "Overall coverage: ${COVERAGE}%"
+          
+          # Create coverage summary
+          cat > coverage_summary.txt << EOF
+          === NLM Code Coverage ===
+          Generated on: $(date)
+          
+          Overall Coverage: ${COVERAGE}%
+          Minimum Required: 80%
+          
+          Status: $(if [ "$COVERAGE" -ge 80 ]; then echo "✅ PASS"; else echo "❌ FAIL"; fi)
+          
+          Files Below Threshold:
+          EOF
+          
+          # List files below threshold
+          python3 << EOF
+          import json
+          try:
+              with open('../coverage_reports/coverage.json', 'r') as f:
+                  data = json.load(f)
+              
+              files = data.get('files', [])
+              for file in files:
+                  if file.get('coverage', 100) < 80:
+                      print(f"  - {file['file']}: {file['coverage']}%" )
+          except:
+              pass
+          EOF
+          
+          echo "$COVERAGE%" > coverage_percentage.txt
+        else
+          echo "Coverage report not found"
+          echo "0" > coverage_percentage.txt
+        fi
+    
+    - name: Upload coverage percentage
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-percentage
+        path: coverage_percentage.txt
+    
+    - name: Comment on PR with coverage status
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let coverage = '0';
+          let status = '❌ FAIL';
+          let color = 'danger';
+          
+          try {
+            if (fs.existsSync('coverage_percentage.txt')) {
+              coverage = fs.readFileSync('coverage_percentage.txt', 'utf8').trim();
+            }
+            
+            if (parseInt(coverage) >= 80) {
+              status = '✅ PASS';
+              color = 'green';
+            }
+            
+            const comment = `## Code Coverage Report
+            
+            **Coverage**: ${coverage}% (minimum required: 80%)
+            
+            **Status**: ${status}
+            
+            **Details**: [View detailed coverage report](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            `;
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+          } catch (error) {
+            console.log(`Error generating coverage comment: ${error.message}`);
+          }
+    
+    - name: Deploy coverage to website
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # Deploy coverage reports to coverage website
+        echo "Deploying coverage reports to website..."
+        # This would use tools like rsync to deploy to a coverage website
+        # For now, we'll just log the action
+    
+    - name: Archive coverage data
+      if: always()
+      run: |
+        # Archive coverage data for long-term storage
+        tar -czf coverage_archive.tar.gz coverage_reports/ coverage_html/ 2>/dev/null || true
+        # Store as workflow artifact
+        mv coverage_archive.tar.gz coverage_data.tar.gz
+
+  trends:
+    runs-on: ubuntu-latest
+    needs: coverage
+    
+    steps:
+    - name: Download previous coverage data
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-percentage
+    
+    - name: Analyze coverage trends
+      run: |
+        # Analyze coverage trends over time
+        python3 << EOF
+        import json
+        import statistics
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        
+        # Load coverage data
+        coverage_data = []
+        for i in range(1, 100):  # Last 100 runs
+            try:
+                with open(f'run_{i}_coverage.txt', 'r') as f:
+                    coverage_data.append(float(f.read().strip()))
+            except FileNotFoundError:
+                break
+        
+        if len(coverage_data) >= 2:
+            # Calculate statistics
+            mean_coverage = statistics.mean(coverage_data)
+            stdev_coverage = statistics.stdev(coverage_data) if len(coverage_data) > 1 else 0
+            min_coverage = min(coverage_data)
+            max_coverage = max(coverage_data)
+            
+            # Generate trend report
+            report = f"""Coverage Trend Analysis
+            ===========================
+            
+            Statistics:
+            - Average Coverage: {mean_coverage:.1f}%
+            - Standard Deviation: {stdev_coverage:.1f}%
+            - Minimum Coverage: {min_coverage:.1f}%
+            - Maximum Coverage: {max_coverage:.1f}%
+            
+            Recent Trend: {"Improving" if len(coverage_data) >= 3 and coverage_data[-1] > coverage_data[-3] else "Stable or Declining"}
+            
+            Coverage Data Points: {len(coverage_data)}
+            """
+            
+            with open('coverage_trends.json', 'w') as f:
+                json.dump({
+                    'statistics': {
+                        'mean': mean_coverage,
+                        'stdev': stdev_coverage,
+                        'min': min_coverage,
+                        'max': max_coverage
+                    },
+                    'data_points': len(coverage_data),
+                    'trend': "improving" if len(coverage_data) >= 3 and coverage_data[-1] > coverage_data[-3] else "stable_or_declining"
+                }, f, indent=2)
+            
+            print(report)
+            
+            # Generate simple plot
+            plt.figure(figsize=(10, 6))
+            plt.plot(range(len(coverage_data)), coverage_data, 'b-')
+            plt.axhline(y=80, color='r', linestyle='--', label='Minimum Required (80%)')
+            plt.axhline(y=mean_coverage, color='g', linestyle='--', label=f'Mean ({mean_coverage:.1f}%)')
+            plt.xlabel('Run Number')
+            plt.ylabel('Coverage (%)')
+            plt.title('NLM Code Coverage Trends')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.savefig('coverage_trends.png', dpi=150)
+            plt.close()
+        
+        else:
+            print("Insufficient data for trend analysis")
+        EOF
+    
+    - name: Upload trend analysis
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-trends
+        path: |
+          coverage_trends.json
+          coverage_trends.png
+        retention-days: 90

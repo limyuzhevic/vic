@@ -1,7 +1,10 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "core/Error.hpp"
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
+#include <fstream>
 
 namespace test_config {
 
@@ -78,12 +81,85 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Add valid config entries
+    config.set("app_name", std::string("TestApp"), nlm::ConfigSource::Runtime);
+    config.set("version", std::string("1.0"), nlm::ConfigSource::Runtime);
+    config.set("max_connections", 100, nlm::ConfigSource::Runtime);
+    config.set("timeout", 5.5, nlm::ConfigSource::Runtime);
+    
+    // Should pass validation
+    assert(config.validate());
+    
+    // Remove required key
+    config.remove("app_name");
+    assert(!config.validate());
+    
+    // Get validation errors
+    auto errors = config.getValidationErrors();
+    assert(errors.size() > 0);
+    assert(errors[0].find("app_name") != std::string::npos);
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
+void testConfigFileLoad() {
+    nlm::Config config;
+    
+    // Create a temporary config file
+    std::ofstream tempFile("test_config.json");
+    if (tempFile.is_open()) {
+        tempFile << "{\n  \"test_key\": 42,\n  \"string_value\": \"test\"\n}";
+        tempFile.close();
+        
+        try {
+            config.loadFromFile("test_config.json");
+            assert(config.has("test_key"));
+            assert(config.has("string_value"));
+            
+            auto val = config.get<int>("test_key");
+            assert(val.has_value() && *val == 42);
+            
+            auto strVal = config.get<std::string>("string_value");
+            assert(strVal.has_value() && *strVal == "test");
+            
+            std::cout << "    testConfigFileLoad passed" << std::endl;
+        } catch (const std::exception& e) {
+            std::cout << "    testConfigFileLoad failed: " << e.what() << std::endl;
+            throw;
+        }
+    }
+    
+    // Clean up
+    std::remove("test_config.json");
+}
+
+void testConfigErrorHandling() {
+    nlm::Config config;
+    
+    try {
+        // Try to load a non-existent file
+        config.loadFromFile("non_existent_file.json");
+        assert(false && "Should have thrown an exception");
+    } catch (const nlm::ConfigError& e) {
+        // Expected exception
+        assert(std::string(e.what()).find("test_config.cpp") != std::string::npos ||
+               std::string(e.what()).find("non_existent_file.json") != std::string::npos);
+        std::cout << "    testConfigErrorHandling passed" << std::endl;
+    }
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigFileLoad();
+    testConfigErrorHandling();
 }
 
 } // namespace test_config

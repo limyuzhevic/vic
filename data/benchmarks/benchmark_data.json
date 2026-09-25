@@ -1,0 +1,80 @@
+# data/benchmarks/benchmark_data.json
+# Benchmark datasets for NLM performance testing
+
+{
+    "benchmark_scenarios": [
+        {
+            "name": "neural_firing_rate",
+            "description": "Benchmark neural firing rate performance",
+            "iterations": 1000,
+            "neuron_count": 100,
+            "spike_rate": 10.0,
+            "test_function": "benchmark_neural_firing_rate"
+        },
+        {
+            "name": "synaptic_connectivity",
+            "description": "Benchmark synaptic connectivity patterns",
+            "iterations": 500,
+            "neuron_count": 500,
+            "connection_probability": 0.1,
+            "test_function": "benchmark_synaptic_connectivity"
+        },
+        {
+            "name": "memory_operations",
+            "description": "Benchmark memory operations",
+            "iterations": 1000,
+            "memory_capacity": 1000,
+            "access_pattern": "random",
+            "test_function": "benchmark_memory_operations"
+        },
+        {
+            "name": "plasticity_rules",
+            "description": "Benchmark plasticity rule application",
+            "iterations": 100,
+            "plasticity_rules": 5,
+            "neuron_connections": 10000,
+            "test_function": "benchmark_plasticity_rules"
+        },
+        {
+            "name": "prediction_system",
+            "description": "Benchmark prediction system performance",
+            "iterations": 200,
+            "prediction_window": 10,
+            "context_size": 50,
+            "test_function": "benchmark_prediction_system"
+        }
+    ],
+    "performance_targets": {
+        "neural_firing_rate": {
+            "target_time_ms": 100,
+            "target_ops_per_ms": 1000,
+            "performance_grade": "A"
+        },
+        "synaptic_connectivity": {
+            "target_time_ms": 50,
+            "target_ops_per_ms": 500,
+            "performance_grade": "B"
+        },
+        "memory_operations": {
+            "target_time_ms": 10,
+            "target_ops_per_ms": 10000,
+            "performance_grade": "A"
+        },
+        "plasticity_rules": {
+            "target_time_ms": 1,
+            "target_ops_per_ms": 100000,
+            "performance_grade": "A"
+        },
+        "prediction_system": {
+            "target_time_ms": 5,
+            "target_ops_per_ms": 20000,
+            "performance_grade": "A"
+        }
+    },
+    "stress_test_parameters": {
+        "max_memory_mb": 2048,
+        "max_time_minutes": 60,
+        "network_sizes": [100, 1000, 10000],
+        "simulation_times": [1.0, 10.0, 100.0]
+    }
+}

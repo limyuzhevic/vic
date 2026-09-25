@@ -1,16 +1,19 @@
 #pragma once
-
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
+ 
+ #include "../core/Types/Types.hpp"
+ #include "../core/Config/Config.hpp"
+ #include "../core/Logger/Logger.hpp"
+ #include "../core/Error.hpp"
+ #include "../core/Validation.hpp"
+ #include "../dynamics/SpikeSystem.hpp"
+ #include "../plasticity/STDP.hpp"
+ #include "../plasticity/Hebbian.hpp"
+ #include "../plasticity/StructuralPlasticity.hpp"
+ #include <memory>
+ #include <string>
+ 
+ namespace nlm {
+ 
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -61,8 +64,8 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
-    bool initialize();
+    // Initialize brain with configuration - throws on error
+    void initialize();
     
     // Main simulation step
     void step(SimulationStep currentStep);
@@ -110,10 +113,10 @@ public:
     void reset();
     
     // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    void save(const std::string& filepath) const;
     
     // Load brain state from file
-    bool load(const std::string& filepath);
+    void load(const std::string& filepath);
     
     // Region management
     RegionId addRegion(const std::string& name = "");
