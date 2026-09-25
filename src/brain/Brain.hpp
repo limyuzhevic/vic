@@ -28,6 +28,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -130,6 +134,12 @@ public:
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
+    // Get current neural state for cognition and planning
+    std::vector<float> getCurrentState() const;
+    
+    // Extract sensory state from sensory neurons
+    std::vector<float> extractSensoryStateFromNeurons() const;
+    
     // Global statistics
     size_t getTotalNeuronCount() const;
     size_t getTotalSynapseCount() const;
@@ -160,6 +170,18 @@ public:
     
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
+    
+    // Self-model for self-awareness
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation for navigation
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relation tracking
+    TemporalRelation* getTemporalRelation();
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();

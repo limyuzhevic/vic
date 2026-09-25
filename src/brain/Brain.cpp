@@ -40,6 +40,10 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -74,6 +78,7 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    size_t workingMemoryUpdateInterval;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -120,6 +125,10 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -148,6 +157,7 @@ struct Brain::Impl {
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        workingMemoryUpdateInterval = config->getOr<size_t>("working_memory_update_interval", 10);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -254,6 +264,12 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize additional cognition systems
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
+    pImpl->spatialRepresentation->initialize(this);
+    pImpl->temporalRelation->initialize(this);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -401,10 +417,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
+        // Update working memory - store sensory patterns as they come in
+        if (pImpl->workingMemory && currentStep % pImpl->workingMemoryUpdateInterval == 0) {
+            auto currentState = getCurrentState();
+            pImpl->workingMemory->store(currentState, 1.0f);  // Strength = 1.0
+        }
+        
+        // Apply working memory to boost selected neurons
+        if (pImpl->workingMemory) {
+            auto activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+            auto activations = pImpl->workingMemory->retrieve();
+            for (size_t i = 0; i < activeNeurons.size() && i < activations.size(); ++i) {
+                float activation = activations[i];
+                if (activation > 0.5f) {  // Strong enough activation
+                    pImpl->workingMemory->storeToNeuron(activeNeurons[i], activation);
+                }
+            }
+        }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
@@ -510,9 +539,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        // Update prediction system with current state and predict next state
+        auto currentState = getCurrentState();
+        pImpl->predictionSystem->updatePrediction(currentState);
+        
+        // Calculate prediction error
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Update dopamine with prediction error (reward prediction error)
+        pImpl->dopamine->signalRewardPredictionError(predictionError);
+        
+        // Use prediction error to guide attention
+        if (pImpl->attention && predictionError > 0.1f) {
+            pImpl->attention->applyBottomUpSalience(NeuronId(1), predictionError * 2.0f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +567,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 9: Update concept formation ==========
+    if (pImpl->conceptFormation && pImpl->episodicMemory && pImpl->dopamine) {
+        // Extract relevant sensory experiences from episodic memory
+        auto currentSensoryState = extractSensoryStateFromNeurons();
+        
+        // Present experiences to concept formation for learning
+        float reward = pImpl->dopamine->getLevel();
+        SimulationStep currentTime = currentStep * pImpl->timestep;
+        
+        // Get recent episodes to process
+        auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+        for (const auto* episode : recentEpisodes) {
+            if (!episode->sensoryState.empty()) {
+                pImpl->conceptFormation->presentExperience(
+                    episode->sensoryState, episode->neuronActivations, 
+                    episode->reward, episode->timestamp);
+            }
+        }
+        
+        // Apply concept formation to current state
+        pImpl->conceptFormation->presentExperience(currentSensoryState, {}, reward, currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -990,8 +1048,28 @@ size_t Brain::getActiveNeuronCount() const {
     return total;
 }
 
-size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+std::vector<float> Brain::getCurrentState() const {
+    std::vector<float> state;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                float activation = neuron->getState().membranePotential;
+                state.push_back(activation);
+            }
+        }
+    }
+    return state;
+}
+
+std::vector<float> Brain::extractSensoryStateFromNeurons() const {
+    std::vector<float> sensoryState;
+    for (auto* neuron : pImpl->sensoryNeurons) {
+        if (neuron) {
+            float activation = neuron->getState().membranePotential;
+            sensoryState.push_back(activation);
+        }
+    }
+    return sensoryState;
 }
 
 float Brain::getAverageFiringRate() const {
@@ -1031,6 +1109,22 @@ NeuralPlanner* Brain::getPlanner() {
 
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
+}
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
+SpatialRepresentation* Brain::getSpatialRepresentation() {
+    return pImpl->spatialRepresentation.get();
+}
+
+TemporalRelation* Brain::getTemporalRelation() {
+    return pImpl->temporalRelation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
