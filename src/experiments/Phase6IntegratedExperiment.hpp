@@ -35,8 +35,19 @@ struct Phase6IntegrationResult {
     bool neuromodulationIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
+    bool curiosityIntegrated;
+    bool noveltyIntegrated;
+    bool rewardIntegrated;
+    bool planningIntegrated;
+    bool attentionIntegrated;
+    bool structuralPlasticityIntegrated;
+    bool synaptogenesisIntegrated;
+    bool pruningIntegrated;
+    bool homeostaticPlasticityIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
+    bool crossSystemConnectivity;
+    bool feedbackLoopsFunctional;
     
     // Metrics
     float totalReward;
@@ -46,6 +57,12 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float serotoninLevel;
+    float acetylcholineLevel;
+    float learningRate;
+    float plasticityStrength;
+    float memoryStability;
+    float cognitiveFlexibility;
     
     // Timestamps
     time_t startTime;
@@ -58,8 +75,19 @@ struct Phase6IntegrationResult {
         , neuromodulationIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
+        , curiosityIntegrated(false)
+        , noveltyIntegrated(false)
+        , rewardIntegrated(false)
+        , planningIntegrated(false)
+        , attentionIntegrated(false)
+        , structuralPlasticityIntegrated(false)
+        , synaptogenesisIntegrated(false)
+        , pruningIntegrated(false)
+        , homeostaticPlasticityIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , crossSystemConnectivity(false)
+        , feedbackLoopsFunctional(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
@@ -67,6 +95,12 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , serotoninLevel(0.0f)
+        , acetylcholineLevel(0.0f)
+        , learningRate(0.0f)
+        , plasticityStrength(0.0f)
+        , memoryStability(0.0f)
+        , cognitiveFlexibility(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -83,7 +117,16 @@ struct Phase6Config {
     bool enableCheckpointing;
     bool enableReplay;
     bool enableDevelopment;
+    bool enableAdvancedTesting;
+    bool enableCrossSystemValidation;
+    bool enableFeedbackAnalysis;
+    bool enableStressTesting;
+    float stressTestMultiplier;
+    bool enableRealisticScenarios;
     std::string checkpointPath;
+    std::string outputPath;
+    uint64_t dataCollectionInterval;
+    size_t validationSampleSize;
     
     Phase6Config()
         : maxSteps(10000)
@@ -93,7 +136,16 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , enableAdvancedTesting(false)
+        , enableCrossSystemValidation(false)
+        , enableFeedbackAnalysis(false)
+        , enableStressTesting(false)
+        , stressTestMultiplier(1.0f)
+        , enableRealisticScenarios(false)
+        , checkpointPath("./checkpoint_test.bin")
+        , outputPath("./integration_results.json")
+        , dataCollectionInterval(100)
+        , validationSampleSize(10) {}
 };
 
 /**
