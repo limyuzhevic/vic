@@ -690,29 +690,31 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
-    
+    // Intelligent action selection based on motor neuron group activity
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
+    // Calculate firing rate of all motor neurons
+    float totalFiringRate = 0.0f;
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
-            ++firingMotor;
+            // Use membrane potential deviation from rest as firing intensity
+            totalFiringRate += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
         }
     }
     
-    // Return a simple action
+    // Determine action based on firing rate
     ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
+    if (totalFiringRate > 10.0f) {
         type = ActionType::MoveForward;
+    } else if (totalFiringRate > 5.0f) {
+        type = ActionType::MoveRight;
+    } else if (totalFiringRate > 2.0f) {
+        type = ActionType::TurnRight;
     }
     
     auto action = std::make_unique<Action>(type);
-    
     return action;
 }
 

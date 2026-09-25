@@ -160,9 +160,45 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        
+        // Python convenience methods for config
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            auto val = self.get<float>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("default_value") = 0.0f,
+           "Get configuration value as float, returns default if not found")
+        
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto val = self.get<int64_t>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("default_value") = 0,
+           "Get configuration value as int, returns default if not found")
+        
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, ConfigValue(value), ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value from float")
+        
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, ConfigValue(value), ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value from int")
+        
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, ConfigValue(value), ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value from string")
+        
+        .def("configureWorld", [](const std::shared_ptr<SimpleWorld> world,
+                                 float width, float height,
+                                 size_t visionWidth, size_t visionHeight,
+                                 float energyDecayRate) {
+            world->configure(width, height, visionWidth, visionHeight);
+            world->setEnergyDecayRate(energyDecayRate);
+            return world;
+        }, py::arg("width"), py::arg("height"), py::arg("visionWidth"),
+           py::arg("visionHeight"), py::arg("energyDecayRate") = 0.01f,
+           "Configure a world with common parameters");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -420,6 +456,112 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Factory and utility functions
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+    
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+    
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Global convenience functions
+    m.def("resetConfigToDefaults", [](std::shared_ptr<Config> config) {
+        config->clear();
+        config->set("random_seed", int64_t(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", int64_t(500), ConfigSource::Default);
+        config->set("region_count", int64_t(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }, py::arg("config"), "Reset configuration to default Phase 2 values");
+    
+    m.def("quickStartExperiment", []() {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", int64_t(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", int64_t(500), ConfigSource::Default);
+        config->set("region_count", int64_t(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Quick start function for a typical experiment");
+    
+    // Utility functions for common operations
+    m.def("normalizeConfigForExperiment", [](std::shared_ptr<Config> config, 
+                                           const std::string& experimentType) {
+        config->clear();
+        
+        if (experimentType == "phase2" || experimentType.empty()) {
+            config->set("random_seed", int64_t(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", int64_t(500), ConfigSource::Default);
+            config->set("region_count", int64_t(1), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+            config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        } else if (experimentType == "phase3") {
+            config->set("random_seed", int64_t(123), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", int64_t(1000), ConfigSource::Default);
+            config->set("region_count", int64_t(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("experimentType") = "", "Normalize configuration for a specific experiment type");
+    
+    m.def("createWorldWithObjects", [](float width, float height,
+                                      const std::vector<WorldObject>& objects) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 16, 16);
+        
+        for (const auto& obj : objects) {
+            world->addObject(obj);
+        }
+        
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("objects"),
+       "Create a world with predefined objects");
+    
+    m.def("createStandardTestWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(100.0f, 100.0f, 16, 16);
+        
+        // Add some standard test objects
+        std::vector<WorldObject> objects;
+        
+        // Add resources
+        objects.push_back(WorldObject(10, 10, WorldObjectType::Resource, 1.0f, 0.5f));
+        objects.push_back(WorldObject(30, 20, WorldObjectType::Resource, 0.5f, 0.3f));
+        
+        // Add hazards
+        objects.push_back(WorldObject(50, 50, WorldObjectType::Hazard, 0.8f, 0.4f));
+        
+        // Add walls around the perimeter
+        float wallThickness = 1.0f;
+        for (float x = 0; x <= 100; x += 5) {
+            objects.push_back(WorldObject(x, 0, WorldObjectType::Wall, 1.0f, wallThickness));
+            objects.push_back(WorldObject(x, 100, WorldObjectType::Wall, 1.0f, wallThickness));
+        }
+        for (float y = 0; y <= 100; y += 5) {
+            objects.push_back(WorldObject(0, y, WorldObjectType::Wall, 1.0f, wallThickness));
+            objects.push_back(WorldObject(100, y, WorldObjectType::Wall, 1.0f, wallThickness));
+        }
+        
+        return world;
+    }, "Create a standard test world with common objects");
 }
 
 } // namespace nlm

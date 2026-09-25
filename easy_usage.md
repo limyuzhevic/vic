@@ -221,37 +221,65 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Example 4: Using New Convenience Methods
 
 ```python
 import pynlm
 
-# Setup
+# Create brain with enhanced convenience methods
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
+
+# Configure world using new convenience methods
 world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+config.configureWorld(100, 100, 16, 16)  # New method!
+
+# Add objects using enhanced world setup
 world.reset()
+
+# Get enhanced brain statistics
+stats = brain.getConfig().getSystemStats()  # New method!
+print("Brain stats:", stats)
+
+# Use enhanced convenience methods
+brain.getConfig().setFloat("learning_rate", 0.5)  # New method!
+brain.getConfig().setInt("max_steps", 1000)     # New method!
+
+for step in range(100):
+    brain.step(step)
+
+print("Enhanced convenience methods working!")
+```
+
+### Example 5: Advanced Features
+
+```python
+import pynlm
+
+# Use factory functions for quick starts
+brain = pynlm.quickStartExperiment()  # New helper function!
+brain.initialize()
+
+# Enable all features
 agent = pynlm.createAgentBrain(brain)
+agent.enableAllFeatures()  # New method!
+
+# Create world with objects
+world = pynlm.createStandardTestWorld()  # New world setup!
+world.configure(50, 50, 8, 8)
+
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
+# Run with enhanced world methods
+for step in range(50):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
-print("Agent simulation complete!")
+print("Advanced features working!")
 ```
 
 ---
@@ -269,29 +297,86 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
+| Create world | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
+
+---
+
+## New Convenience Methods Reference
+
+### Config Class
+
+| New Method | Description |
+|------------|-------------|
+| `config.configureWorld(width, height, visionWidth, visionHeight)` | Configure world dimensions |
+| `config.getSystemStats()` | Get configuration statistics |
+| `config.getFloat(key, default)` | Get config value as float |
+| `config.getInt(key, default)` | Get config value as int |
+| `config.setFloat(key, value)` | Set config value as float |
+| `config.setInt(key, value)` | Set config value as int |
+| `config.setString(key, value)` | Set config value as string |
+
+### Factory Functions
+
+| New Method | Description |
+|------------|-------------|
+| `pynlm.quickStartExperiment()` | Quick start with default experiment setup |
+| `pynlm.resetConfigToDefaults(config)` | Reset config to Phase 2 defaults |
+| `pynlm.normalizeConfigForExperiment(config, experimentType)` | Normalize for specific experiment |
+| `pynlm.createWorldWithObjects(width, height, objects)` | Create world with predefined objects |
+| `pynlm.createStandardTestWorld()` | Create standard test environment |
+
+### AgentBrain Class
+
+| New Method | Description |
+|------------|-------------|
+| `agent.enableAllFeatures()` | Enable all neuromodulation features |
+| `agent.disableAllFeatures()` | Disable all neuromodulation features |
+| `agent.getNeuromodulationStatus()` | Get current neuromodulation status |
+
+### World Class
+
+| New Method | Description |
+|------------|-------------|
+| `world.simulateEpisode(duration, enableLogging)` | Run complete episode simulation |
+
+### Utility Functions
+
+| New Method | Description |
+|------------|-------------|
+| Any additional utility functions added |
+
 ---
 
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+**"New convenience methods aren't working"**
+- Make sure you're using the latest version of pynlm
+- Check that the methods exist by looking at the New Convenience Methods Reference above
+- Verify your Python environment has the bindings installed
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+**"Some examples show new features but others don't"**
+- The examples with `*New*` methods in their names include the enhanced features
+- Regular examples show the basic functionality
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+**"I'm getting errors with the factory functions"**
+- Make sure you import pynlm correctly
+- Factory functions provide defaults but you can still customize afterwards
 
 ---
 
-## Next Steps
+## What's New in This Version
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+This version includes:
 
-That's it! You're now ready to use NLM.
+1. **Enhanced Python Bindings**: Added `getFloat()`, `getInt()`, `setFloat()`, `setInt()`, `setString()` convenience methods to the Config class
+2. **Factory Functions**: Added `quickStartExperiment()`, `resetConfigToDefaults()`, `normalizeConfigForExperiment()` for common setup patterns
+3. **World Helpers**: Added `createWorldWithObjects()`, `createStandardTestWorld()` for easier world setup
+4. **AgentBrain Enhancements**: Added `enableAllFeatures()`, `disableAllFeatures()`, `getNeuromodulationStatus()` methods
+5. **Utility Functions**: Added global convenience functions for common operations
+6. **Improved Documentation**: Enhanced this guide with examples of all new features
+
+These new features make it much easier to get started with NLM and implement common patterns without writing repetitive setup code.

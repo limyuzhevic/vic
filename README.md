@@ -187,39 +187,156 @@ Phase 6 DOES investigate:
 - Whether replay can reinforce memory consolidation
 - Whether the complete brain loop functions coherently
 
+## Python Bindings Enhancement
+
+NLM now includes enhanced Python bindings (`pynlm`) that make it much easier to work with the neural simulation framework. The Python bindings provide a user-friendly interface with convenient convenience methods and factory functions.
+
+### Key Python Enhancements
+
+#### 1. Enhanced Config Class
+- **Type-safe methods**: `getFloat()`, `getInt()`, `setFloat()`, `setInt()`, `setString()` for working with configuration values
+- **Configuration helpers**: `configureWorld()`, `getSystemStats()` for common setup patterns
+- **Better serialization**: Fixed `saveToFile()` to properly save actual configuration values (previously had placeholder values)
+
+#### 2. Factory Functions
+- **Quick starts**: `createDefaultConfig()`, `createBrain()`, `createSimpleWorld()`, `createAgentBrain()`
+- **Helper functions**: `quickStartExperiment()`, `resetConfigToDefaults()`, `normalizeConfigForExperiment()`
+- **World setup**: `createWorldWithObjects()`, `createStandardTestWorld()`
+
+#### 3. Enhanced AgentBrain
+- **Feature management**: `enableAllFeatures()`, `disableAllFeatures()`, `getNeuromodulationStatus()`
+- **Batch operations**: `updateAllNeuromodulators(reward, prediction_error, novelty, curiosity)`
+
+#### 4. Convenience Methods
+- **Type conversion**: Automatic type conversion when getting configuration values
+- **Validation**: Better error handling and type safety
+- **Documentation**: Comprehensive docstrings for all methods
+
+### Python Usage Examples
+
+#### Basic Usage (Unchanged)
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+for step in range(100):
+    brain.step(step)
+```
+
+#### Enhanced Configuration
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.configureWorld(100, 100, 16, 16)  # Set up world dimensions
+config.setFloat("learning_rate", 0.5)   # Set float parameter
+config.setInt("max_steps", 1000)       # Set integer parameter
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+#### Quick Start Helper
+```python
+import pynlm
+
+# One-liner for common experiment setup
+brain = pynlm.quickStartExperiment()  # New method!
+brain.initialize()
+```
+
+#### Advanced Setup
+```python
+import pynlm
+
+# Create world with objects
+world = pynlm.createStandardTestWorld()  # New method!
+world.configure(50, 50, 8, 8)
+
+# Create brain with experiment-specific config
+config = pynlm.normalizeConfigForExperiment(pynlm.createDefaultConfig(), "phase2")  # New method!
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create and initialize agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableAllFeatures()  # New method!
+```
+
+### Installation
+
+The Python bindings are included in the main package. To use the enhanced bindings:
+
+```bash
+pip install -e .  # Install in development mode
+```
+
+### Enhanced Convenience Methods Reference
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `config.getFloat(key, default)` | Get config as float with type conversion | `rate = config.getFloat("learning_rate", 0.01)` |
+| `config.getInt(key, default)` | Get config as int with type conversion | `steps = config.getInt("max_steps", 1000)` |
+| `config.setFloat(key, value)` | Set config from float | `config.setFloat("param", 0.5)` |
+| `config.setInt(key, value)` | Set config from int | `config.setInt("count", 42)` |
+| `config.configureWorld(width, height, visionWidth, visionHeight)` | Configure world dimensions | `config.configureWorld(100, 100, 16, 16)` |
+| `config.getSystemStats()` | Get configuration statistics | `stats = config.getSystemStats()` |
+| `pynlm.quickStartExperiment()` | Quick start for common experiments | `brain = pynlm.quickStartExperiment()` |
+| `agent.enableAllFeatures()` | Enable all neuromodulation | `agent.enableAllFeatures()` |
+
+### What's New in This Version
+
+This version includes significant improvements to the Python bindings:
+
+1. **Fixed Critical Bug**: `Config.saveToFile()` now properly saves actual configuration values instead of hardcoded "PLACEHOLDER_VALUE"
+2. **Enhanced Performance**: Optimized `AgentBrain` constructor from O(n²) to O(n) complexity
+3. **Improved Action Selection**: Enhanced `Brain.produceAction()` to use intelligent motor neuron activity patterns
+4. **Better Python Interface**: Added 15+ convenience methods for common Python operations
+5. **Factory Functions**: Added helper functions for common setup patterns
+6. **World Helpers**: Added convenient world setup functions
+7. **Improved Documentation**: Enhanced examples and documentation in `easy_usage.md`
+
+These improvements make NLM much more accessible to Python users while maintaining full backward compatibility with existing code.
+
+### Migration Guide
+
+#### Existing Code (No Changes Required)
+
+All existing Python code continues to work without any modifications:
+
+```python
+# This still works exactly the same
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+brain.step(0)
+```
+
+#### Using New Features (Optional)
+
+To take advantage of the new features, simply add the enhanced convenience methods to your code:
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.configureWorld(100, 100, 16, 16)  # New method!
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Use new helper functions
+brain = pynlm.quickStartExperiment()  # Alternative quick start
+```
+
+All new methods are optional and do not affect existing code.
+
 ## Architecture Philosophy
 
 The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
 
 ## License
 
