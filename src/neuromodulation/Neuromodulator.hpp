@@ -27,7 +27,7 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
-protected:
+    protected:
     Neuromodulator() = default;
 };
 
@@ -47,6 +47,41 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Novelty and curiosity signaling
+    void signalNovelty(float novelty);
+    void updateCuriosity(float dt);
+    
+    // Attention modulation
+    void enhanceAttentionForNovelty(float novelty);
+    void updateCuriosityFromRPE(float rpe);
+    void attentionFromRPE(float rpe);
+    
+    // Additional accessors
+    float getDopamineBaseline() const;
+    void setDopamineBaseline(float baseline);
+    float getDopaminePeak() const;
+    void setDopaminePeak(float peak);
+    
+    float getNoveltyLevel() const;
+    void setNoveltyLevel(float novelty);
+    
+    float getCuriosityLevel() const;
+    void setCuriosityLevel(float curiosity);
+    
+    float getAttentionLevel() const;
+    void setAttentionLevel(float attention);
+    
+    float getPredictionError() const;
+    void setPredictionError(float error);
+    
+    float getConfidence() const;
+    void setConfidence(float confidence);
+    
+    const char* getDopamineName() const;
+    const char* getNoveltyName() const;
+    const char* getCuriosityName() const;
+    const char* getAttentionName() const;
     
 private:
     struct Impl;
