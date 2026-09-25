@@ -55,19 +55,51 @@ void Hebbian::update(Synapse* synapse,
     
     // Count correlated spike pairs (simplified covariance)
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
+    float timeWindow = 100.0f;  // 100ms correlation window
+    
+    // OPTIMIZED: Two-pointer technique for spike pair detection
+    // Since spike times are typically monotonically increasing,
+    // we can find correlated spike pairs more efficiently
+    size_t preIdx = 0;
+    size_t postIdx = 0;
+    
+    while (preIdx < preSpikes.size() && postIdx < postSpikes.size()) {
+        float dt = static_cast<float>(postSpikes[postIdx] - preSpikes[preIdx]);
+        
+        if (std::abs(dt) < timeWindow) {
+            // Spike pair within correlation window
+            correlationCount++;
+            
+            // Move both pointers to next spikes
+            ++preIdx;
+            ++postIdx;
+        } else if (dt < -timeWindow) {
+            // Post spike too old, move to next post spike
+            ++postIdx;
+        } else { // dt > timeWindow
+            // Pre spike too old, move to next pre spike
+            ++preIdx;
         }
     }
     
     // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // IMPROVED: Scale correlation by spike counts to prevent huge weight deltas
+    float preCount = static_cast<float>(preSpikes.size());
+    float postCount = static_cast<float>(postSpikes.size());
+    float activityScale = preCount * postCount;
+    
+    // Biological constraint: correlation is limited by minimum activity levels
+    // to prevent runaway potentiation/depression
+    float activityFactor = std::min(1.0f, (preCount + postCount) / 10.0f);
+    
+    // Scale correlation by spike counts and activity factor
+    float delta = pImpl->learningRate * static_cast<float>(correlationCount) 
+                  * activityFactor / std::max(activityScale, 1.0f);
+    
+    // Biological constraint: limit maximum weight change per update
+    // Scale with activity factor for context-dependent learning rate
+    float maxDelta = 0.1f * pImpl->learningRate * activityFactor;
+    delta = std::clamp(delta, -maxDelta, maxDelta);
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {

@@ -19,16 +19,19 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // IMPROVED: Enhanced file loading with better error handling and validation
+    // Still uses simple key=value format for Phase 2, but with robust error handling
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,20 +40,34 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + 
+                          ": missing '=' in file " + filepath);
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty key found in line " + std::to_string(lineNumber) + 
+                          ". Skipping.");
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
     }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(getKeys().size()) + 
+                " configuration entries from: " + filepath);
     
     return true;
 }
@@ -92,6 +109,12 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+// ========= ENHANCED CONFIGURATION MANAGEMENT =========
+
+// Add comprehensive validation and type safety for configuration values
+// This improves upon the simple key=value parser with robust error handling
+
+// Get configuration value with type validation and error handling
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -102,10 +125,119 @@ std::optional<T> Config::get(const std::string& key) const {
     }
     
     try {
+        // Type-safe access with comprehensive error handling
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Log type mismatch error for debugging
+        NLM_LOG_WARNING("Config type mismatch for key: " + key + 
+                       " (expected different type)");
         return std::nullopt;
     }
+}
+
+// ========= CONFIG SOURCE PRIORITIZATION =========
+
+// New method to determine which configuration source should take precedence
+// This helps resolve conflicts when the same key is set from multiple sources
+ConfigSource Config::getEffectiveSource(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return ConfigSource::Default;
+    }
+    
+    // Priority order: CommandLine > File > Default > Runtime
+    ConfigSource source = it->source;
+    
+    if (source == ConfigSource::CommandLine) {
+        return ConfigSource::CommandLine;
+    } else if (source == ConfigSource::File) {
+        // Check if any command line override exists
+        for (const auto& entry : pImpl->entries) {
+            if (entry.key == key && entry.source == ConfigSource::CommandLine) {
+                return ConfigSource::CommandLine;
+            }
+        }
+        return ConfigSource::File;
+    } else if (source == ConfigSource::Default) {
+        // Check if any runtime or file override exists
+        for (const auto& entry : pImpl->entries) {
+            if (entry.key == key && 
+                (entry.source == ConfigSource::File || entry.source == ConfigSource::Runtime)) {
+                return entry.source;
+            }
+        }
+        return ConfigSource::Default;
+    } else { // Runtime
+        // Check if any higher priority source has this key
+        for (const auto& entry : pImpl->entries) {
+            if (entry.key == key && entry.source != ConfigSource::Runtime) {
+                return entry.source;
+            }
+        }
+        return ConfigSource::Runtime;
+    }
+}
+
+// ========= CONFIGURATION VALIDATION =========
+
+// Validate configuration values against expected ranges
+// This helps catch configuration errors early
+bool Config::validate(const std::string& key, 
+                     const std::string& expectedType) const {
+    auto value = get<std::string>(key);
+    if (!value) {
+        return false; // Key doesn't exist
+    }
+    
+    // Type-specific validation
+    if (expectedType == "int") {
+        auto intVal = get<int>(key);
+        return intVal.has_value();
+    } else if (expectedType == "double") {
+        auto doubleVal = get<double>(key);
+        return doubleVal.has_value();
+    } else if (expectedType == "bool") {
+        auto boolVal = get<bool>(key);
+        return boolVal.has_value();
+    } else if (expectedType == "string") {
+        auto stringVal = get<std::string>(key);
+        return stringVal.has_value();
+    }
+    
+    return false;
+}
+
+// ========= ADVANCED CONFIG UTILITIES =========
+
+// Get all configuration keys with specified source
+std::vector<std::string> Config::getKeysBySource(ConfigSource source) const {
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.source == source) {
+            keys.push_back(entry.key);
+        }
+    }
+    return keys;
+}
+
+// Check if configuration would cause conflicts
+bool Config::hasConflicts() const {
+    // A key with multiple sources is a conflict unless overridden
+    std::map<std::string, ConfigSource> sources;
+    for (const auto& entry : pImpl->entries) {
+        auto it = sources.find(entry.key);
+        if (it != sources.end()) {
+            // Conflict if different sources
+            if (it->second != entry.source) {
+                return true;
+            }
+        } else {
+            sources[entry.key] = entry.source;
+        }
+    }
+    return false;
 }
 
 template<typename T>
