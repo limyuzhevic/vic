@@ -76,6 +76,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Self Model: " << (result.selfModelIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+    std::cout << "Social Learning: " << (result.socialLearningIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
     std::cout << std::endl;
     

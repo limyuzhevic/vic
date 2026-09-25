@@ -117,6 +117,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    result.selfModelIntegrated = (brain->getSelfModel() != nullptr);
+    result.socialLearningIntegrated = (brain->getSocialLearning() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
@@ -124,6 +126,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Self Model: " + std::string(result.selfModelIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Social Learning: " + std::string(result.socialLearningIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
     if (config.enableCheckpointing) {
@@ -225,6 +229,20 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         NLM_LOG_INFO("[PASS] Concept formation is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSelfModel() != nullptr) {
+        NLM_LOG_INFO("[PASS] Self model is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Self model is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSocialLearning() != nullptr) {
+        NLM_LOG_INFO("[PASS] Social learning is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Social learning is NOT integrated");
         success = false;
     }
     

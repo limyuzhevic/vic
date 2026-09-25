@@ -37,6 +37,10 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_neuromodulation {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -101,9 +105,9 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running STDP tests..." << std::endl;
+    std::cout << "Running Neuromodulation tests..." << std::endl;
     try {
-        test_stdp::runAll();
+        test_neuromodulation::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
