@@ -58,6 +58,28 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // ========== ADVANCED LEARNING MECHANISMS ==========
+    
+    // Apply Bayesian learning with uncertainty quantification
+    void applyBayesianLearning(float predictionError, float confidence);
+    
+    // Apply compensation learning to reduce systematic errors
+    void applyCompensationLearning(float error, float learningRate);
+    
+    // Apply meta-learning to adapt learning strategies
+    void applyMetaLearning(float reward, float predictionError, float timeStep);
+    
+    // Enable/disable advanced learning mechanisms
+    void enableAdvancedLearning(bool enableBayesian, bool enableCompensation, bool enableMeta);
+    
+    // Check if advanced learning mechanisms are enabled
+    bool isBayesianLearningEnabled() const;
+    bool isCompensationLearningEnabled() const;
+    bool isMetaLearningEnabled() const;
+    
+    // Reset advanced learning state
+    void resetAdvancedLearning();
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
@@ -92,6 +114,9 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
+    // Helper method for cleanup
+    void cleanupNeuronGroups();
+    
     // Neuromodulation state
     float dopamineLevel_;
     float noveltyLevel_;
@@ -112,6 +137,13 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced learning state
+    bool enableBayesianLearning_;
+    bool enableCompensationLearning_;
+    bool enableMetaLearning_;
+    
+    // Learning-related statistics
+    float accumulatedError_;
+    float recentPerformance_;
 };
-
-} // namespace nlm
