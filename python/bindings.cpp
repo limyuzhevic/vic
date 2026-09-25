@@ -19,14 +19,67 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception types for better error handling in Python
+class ConfigValidationError : public std::runtime_error {
+public:
+    explicit ConfigValidationError(const std::string& message) 
+        : std::runtime_error("Configuration Error: " + message) {}
+};
+
+class BrainInitializationError : public std::runtime_error {
+public:
+    explicit BrainInitializationError(const std::string& message)
+        : std::runtime_error("Brain Initialization Error: " + message) {}
+};
+
+class SimulationStepError : public std::runtime_error {
+public:
+    explicit SimulationStepError(const std::string& message)
+        : std::runtime_error("Simulation Step Error: " + message) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Phase 6: Fully integrated artificial brain with memory, prediction, and cognition
+        - Real spiking neural networks with event-driven dynamics
+        - Advanced plasticity mechanisms (STDP, Hebbian, structural)
+        - Neuromodulation systems (dopamine, curiosity, reward)
+        - Developmental stages and learning
+        - Checkpoint saving and loading
+        - Comprehensive error handling
+        
+        Usage Example:
+        ```python
+        import pynlm
+        
+        # Create and configure brain
+        config = pynlm.createDefaultConfig()
+        config.set("neuron_count", 1000)
+        config.set("brain.synapse_density", 0.1)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(1000):
+            brain.step(step)
+            
+        print(f"Simulation complete. Total spikes: {brain.getTotalSpikeCount()}")
+        ```
     )pbdoc";
 
+    // Register custom exceptions
+    py::register_exception<ConfigValidationError>(m, "ConfigValidationError");
+    py::register_exception<BrainInitializationError>(m, "BrainInitializationError");
+    py::register_exception<SimulationStepError>(m, "SimulationStepError");
+    
+    // Register standard exception for backward compatibility
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
