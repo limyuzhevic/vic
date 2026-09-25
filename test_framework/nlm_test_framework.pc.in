@@ -1,0 +1,16 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: NLM Test Framework
+Description: Modern C++ testing framework for NLM neural simulation
+Version: @PROJECT_VERSION@
+Requires: nlm_core
+Cflags: -I${includedir}/nlm_test_framework
+Libs: -lnlm_test_framework
+Cflags.private: -I${includedir}/nlm_test_framework/base
+                     -I${includedir}/nlm_test_framework/types
+                     -I${includedir}/nlm_test_framework/utils
+                     -I${includedir}/nlm_test_framework/benchmarks
+                     -I${includedir}/nlm_test_framework/main
