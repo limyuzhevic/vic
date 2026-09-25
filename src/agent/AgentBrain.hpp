@@ -57,17 +57,29 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    const Brain* getBrain() const { return brain_.get(); }
+    
+    // Get configuration
+    std::shared_ptr<Config> getConfig() const;
     
     // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Status
+    bool isInitialized() const { return brain_ != nullptr; }
+    size_t getMotorNeuronCount() const { return motorForward_.size() + motorBackward_.size() + 
+                                              motorTurnLeft_.size() + motorTurnRight_.size() +
+                                              motorInteract_.size() + motorWait_.size(); }
+    size_t getSensoryNeuronCount() const { return sensoryVision_.size() + sensoryTouch_.size() + 
+                                            sensoryInternal_.size() + sensoryProprioception_.size(); }
     
 private:
     // Motor decoding: convert neural activity to motor command

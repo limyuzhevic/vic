@@ -287,7 +287,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Advanced simulation control
+        .def("step", &SimpleWorld::update, py::arg("timestep"), R"pbdoc(Advance simulation by timestep seconds)pbdoc")
+        .def("isRunning", &SimpleWorld::getSimulationTime, R"pbdoc(Check if simulation is running)pbdoc")
+        .def("getTime", &SimpleWorld::getSimulationTime, R"pbdoc(Get current simulation time)pbdoc")
+        .def("setTime", [](SimpleWorld& self, double time) {
+            // This would require a setSimulationTime method
+            // For now, we'll just document the limitation
+            throw std::runtime_error("Direct time setting not supported - use configure() and reset()");
+        }, py::arg("time"), R"pbdoc(Set simulation time (not directly supported))pbdoc");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))

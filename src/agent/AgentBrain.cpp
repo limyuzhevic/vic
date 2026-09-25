@@ -345,6 +345,31 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+std::shared_ptr<Config> AgentBrain::getConfig() const {
+    if (!brain_) return nullptr;
+    return brain_->getConfig();
 }
 
-} // namespace nlm
+void AgentBrain::enableStructuralPlasticity(bool enable) {
+    structuralPlasticityEnabled_ = enable;
+    if (enable && brain_) {
+        auto* sp = brain_->getStructuralPlasticity();
+        if (sp) {
+            // Adjust rates based on development stage
+            float plasticityFactor = plasticityModifier_ > 0.5f ? 1.0f : 0.5f;
+            sp->setSynaptogenesisRate(0.0001f * plasticityFactor);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityFactor));
+        }
+    }
+}
+
+void AgentBrain::enableCuriosity(bool enable) {
+    curiosityEnabled_ = enable;
+    if (enable) {
+        // Boost novelty detection sensitivity when curiosity is enabled
+        sensoryNoveltyDecay_ = 0.95f;
+    } else {
+        // Reset to conservative values
+        sensoryNoveltyDecay_ = 0.99f;
+    }
+}
