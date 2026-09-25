@@ -15,10 +15,14 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/Monitor.hpp"
+#include "../performance/Benchmark.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
+#include <thread>
 
 namespace nlm {
 
@@ -27,6 +31,10 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // ========== PERFORMANCE MONITORING ==========
+    std::unique_ptr<nlm::PerformanceMonitor> performanceMonitor;
+    std::unique_ptr<nlm::Benchmark> benchmark;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -93,6 +101,25 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Initialize performance monitoring if enabled
+        bool perfMonitoringEnabled = config->getOr<bool>("performance.monitoring.enabled", true);
+        if (perfMonitoringEnabled) {
+            performanceMonitor = std::make_unique<nlm::PerformanceMonitor>();
+            benchmark = std::make_unique<nlm::Benchmark>();
+            
+            // Configure performance monitoring
+            double snapshotInterval = config->getOr<double>("performance.monitoring.snapshot_interval", 1.0);
+            performanceMonitor->setMonitoringInterval(snapshotInterval);
+            performanceMonitor->setSnapshotInterval(snapshotInterval);
+            
+            // Configure benchmarking
+            benchmark->enable(true);
+            
+            // Integrate performance monitoring with NLM systems
+            performanceMonitor->integrateWithBrain(this);
+            benchmark->integrateWithBrain(this);
+        }
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
