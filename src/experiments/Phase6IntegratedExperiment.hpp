@@ -93,7 +93,7 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("/tmp/nlm_checkpoint_test.bin") {}
 };
 
 /**
