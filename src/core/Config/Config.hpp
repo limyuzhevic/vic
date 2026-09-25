@@ -100,6 +100,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File parsing methods
+    bool parseJSON(const std::string& content);
+    bool parseYAML(const std::string& content);
+    bool parseSimpleFormat(const std::string& content);
+    
+    // Helper conversion methods
+    bool stringToBool(const std::string& str) const;
+    double stringToDouble(const std::string& str) const;
+    int stringToInt(const std::string& str) const;
 };
 
 } // namespace nlm
