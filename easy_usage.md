@@ -2,15 +2,23 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is an **experimental computational brain project** designed to simulate how biological brains work using spiking neural networks.
 
 Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+- **Neurons** = Brain cells that send electrical signals
+- **Synapses** = Connections between neurons that transmit signals
+- **Learning** = Synaptic plasticity (strengthening/weakening connections based on activity)
+- **Memory** = Neural memory systems that store experiences and patterns
 
-That's it! NLM simulates all of this.
+NLM simulates **event-driven neural computation** using Leaky Integrate-and-Fire (LIF) neurons with:
+
+- **Real neural dynamics** and spike timing
+- **Multiple memory systems** (working, episodic, associative)
+- **Advanced cognitive functions** (prediction, attention, planning)
+- **Neuromodulation** (curiosity, novelty, reward processing)
+- **Development** over time
+
+That's it! NLM simulates the complete brain loop: sensory input → neural processing → memory → action selection.
 
 ---
 
@@ -221,37 +229,188 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+# Advanced Examples (Memory Systems & Development)
+
+## Example 4: Brain with Memory and Development
 
 ```python
 import pynlm
 
-# Setup
+# Create a default brain configuration
 config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # More neurons for complex tasks
 brain = pynlm.createBrain(config)
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
+
+# Get access to memory systems and configure them
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+
+if working_memory:
+    working_memory.setCapacity(brain.getTotalNeuronCount() // 10)
+    
+if episodic_memory:
+    episodic_memory.setMaxEpisodes(5000)
+
+# Enable advanced features
 agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)    # Learn from rewards
+agent.enableDevelopment(True)         # Brain matures over time
+agent.enableCuriosity(True)           # Explore new things
+agent.enableStructuralPlasticity(True) # Grow new connections
+
+# Simple world for testing
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+world.setAgentStart(10.0, 10.0)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
+# Run simulation with monitoring
+for step in range(1000):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
     brain.step(step)
+    
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+        if working_memory:
+            print(f"  Memory traces active: {working_memory.getActiveTraces()}")
+        if episodic_memory:
+            print(f"  Episodes stored: {episodic_memory.getEpisodeCount()}")
+        print(f"  Development stage: {agent.getDevelopmentalStage()}")
+        print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
 
-print("Agent simulation complete!")
+print("Advanced simulation complete!")
+```
+
+## Example 5: Using Prediction and Planning
+
+```python
+import pynlm
+
+# Create brain with prediction capabilities
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Get access to prediction system
+prediction_system = brain.getPredictionSystem()
+planner = brain.getPlanner()
+
+# Configure prediction system
+if prediction_system:
+    # Enable temporal sequence learning
+    pass
+
+if planner:
+    planner.setPlanningDepth(3)  # Look 3 steps ahead
+
+agent = pynlm.createAgentBrain(brain)
+agent.enableDevelopment(True)
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+print("Running prediction and planning simulation...")
+for step in range(500):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        pred_error = agent.getPredictionError()
+        curiosity = agent.getCuriosityLevel()
+        if prediction_system:
+            # Would check prediction accuracy here
+            pass
+        print(f"Step {step}: Prediction Error={pred_error:.3f}, Curiosity={curiosity:.3f}")
+
+print("Prediction and planning simulation complete!")
+```
+
+## Example 6: Advanced Memory Management
+
+```python
+import pynlm
+
+# Create brain with enhanced memory configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 3000)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Configure all memory systems
+if brain.getWorkingMemory():
+    brain.getWorkingMemory().setCapacity(500)
+    brain.getWorkingMemory().setDecayRate(0.95)  # Decay over time
+
+if brain.getEpisodicMemory():
+    brain.getEpisodicMemory().setMaxEpisodes(2000)
+
+if brain.getAssociativeMemory():
+    pass  # Would configure associative memory
+
+# Create agent with full cognitive capabilities
+agent = pynlm.createAgentBrain(brain)
+agent.enableDevelopment(True)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Create a more complex world with dynamic elements
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+world.setMaxEnergy(1000.0)
+world.setEnergyDecayRate(0.1)
+world.reset()
+agent.initialize(world)
+
+print("Starting advanced memory management simulation...")
+for step in range(2000):
+    world.update(0.1)
+    
+    # Get sensory input and let agent process it
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Run brain step
+    brain.step(step)
+    
+    # Get action and apply to world
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Update development periodically
+    agent.updateDevelopment(0.1)
+    
+    if step % 500 == 0:
+        print(f"Step {step}:")
+        print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Development stage: {agent.getDevelopmentalStage()}")
+        print(f"  Neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+        
+        # Check memory stats
+        working_mem = brain.getWorkingMemory()
+        episodic_mem = brain.getEpisodicMemory()
+        if working_mem:
+            print(f"  Working memory active traces: {working_mem.getActiveTraces()}")
+        if episodic_mem:
+            print(f"  Episodic memory episodes: {episodic_mem.getEpisodeCount()}")
+
+print("Advanced memory management simulation complete!")
 ```
 
 ---
