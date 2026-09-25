@@ -25,6 +25,12 @@ public:
     // Get motor output size expected
     size_t getMotorOutputSize() const;
     
+    // Get current sensory percept
+    const SensoryPercept& getSensoryPercept() const;
+    
+    // Get current time
+    double getCurrentTime() const;
+    
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     

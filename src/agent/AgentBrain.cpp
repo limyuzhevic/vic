@@ -334,6 +334,25 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+// Get current sensory percept
+const SensoryPercept& AgentBrain::getSensoryPercept() const {
+    // This method should be called with the current world state
+    // The actual implementation would need access to the world
+    // For now, we'll return a default-constructed percept
+    // In the real implementation, this would be set by the world
+    static SensoryPercept defaultPercept;
+    return defaultPercept;
+}
+
+// Get current time
+ double AgentBrain::getCurrentTime() const {
+    // This method should be called with the current world state
+    // The actual implementation would need access to the world
+    // For now, we'll return 0.0
+    // In the real implementation, this would be set by the world
+    return 0.0;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

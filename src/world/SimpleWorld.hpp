@@ -54,6 +54,12 @@ public:
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
+    // Compute current reward based on agent state and world objects
+    float computeCurrentReward() const;
+    
+    // Get current simulation time
+    double getCurrentTime() const { return simTime_; }
+    
     // Add object to world
     void addObject(const WorldObject& obj);
     

@@ -392,6 +392,41 @@ void SimpleWorld::generateVision() {
     sensory_.setAudio({});
 }
 
+float SimpleWorld::computeCurrentReward() const {
+    // Compute reward based on agent health and current objects
+    float reward = 0.0f;
+    
+    // Negative reward for low health
+    if (agent_.health < 0.5f) {
+        reward -= 10.0f;
+    }
+    
+    // Check for objects in interaction range and add their value
+    // This is similar to what happens in the interact() method
+    const float interactRange = 1.0f;
+    
+    for (const auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dx = obj.x - agent_.x;
+        float dy = obj.y - agent_.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        
+        if (dist < interactRange + obj.radius) {
+            // If object would be consumed, add its value as reward
+            // This matches the logic in the interact() method
+            reward += obj.value;
+            // Only count it once (even though it might be consumed later)
+            break;
+        }
+    }
+    
+    // Small negative reward for movement cost
+    reward -= 0.01f;
+    
+    return reward;
+}
+
 void SimpleWorld::checkCollisions() {
     // Passive collision check (for damage when moving into objects)
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);

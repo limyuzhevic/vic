@@ -6,6 +6,9 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// The implementation provides a realistic artificial neural substrate
+// capable of learning through synaptic modification.
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -28,6 +31,13 @@
 
 using namespace nlm;
 
+/**
+ * @brief Prints the NLM system banner with version and phase information.
+ * 
+ * Displays the ASCII art banner for the Neural Learning Machine system
+ * along with information about the current phase (Phase 2: Real Neural Computation)
+ * and highlights the key features implemented in this phase.
+ */
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -44,22 +54,42 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+/**
+ * @brief Structure for recording and analyzing learning experiments.
+ * 
+ * Contains comprehensive data for tracking synaptic changes and neural
+ * activity over time to quantify learning effects in the brain.
+ * 
+ * @note Used in plasticity experiments to measure weight changes and
+ *       spike activity patterns before and after learning periods.
+ */
 struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+    std::shared_ptr<Brain> brain;              ///< Reference to the simulated brain
+    uint64_t seed;                             ///< Random seed for reproducibility
+    size_t initialSynapseCount;                ///< Number of synapses before experiment
+    std::vector<float> initialWeights;         ///< Initial synaptic weights for comparison
+    std::vector<float> finalWeights;           ///< Final synaptic weights after experiment
+    std::vector<NeuronId> mostActiveNeurons;   ///< Neuron IDs with highest activity
     
+    /**
+     * @brief Constructs a learning experiment structure.
+     * 
+     * @param b Shared pointer to the brain to simulate
+     * @param s Random seed for experiment reproducibility
+     */
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    /**
+     * @brief Records the initial state of the brain for comparison.
+     * 
+     * Captures baseline synaptic connectivity and weight statistics
+     * from the first region of the brain for later analysis.
+     */
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
@@ -80,6 +110,12 @@ struct LearningExperiment {
         }
     }
     
+    /**
+     * @brief Records the final state after learning/experimentation.
+     * 
+     * Captures the post-experiment synaptic state and identifies the most
+     * active neurons based on spike history.
+     */
     void recordFinalState() {
         finalWeights.clear();
         
@@ -101,6 +137,12 @@ struct LearningExperiment {
         }
     }
     
+    /**
+     * @brief Computes and logs detailed statistics about learning changes.
+     * 
+     * Analyzes weight changes, synaptic strengthening/weakening, and spike
+     * activity to quantify the magnitude and direction of learning.
+     */
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
@@ -159,6 +201,14 @@ struct LearningExperiment {
     }
 };
 
+/**
+ * @brief Runs a basic connectivity test to verify neural network functionality.
+ * 
+ * Injects current into sensory neurons and verifies that spikes propagate
+ * through the network, demonstrating basic neural connectivity and transmission.
+ * 
+ * @param brain Shared pointer to the brain to test
+ */
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -202,6 +252,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
+/**
+ * @brief Runs a comprehensive plasticity learning experiment.
+ * 
+ * Demonstrates Hebbian and STDP learning rules by applying repeated input
+ * patterns and measuring synaptic weight changes over time.
+ * 
+ * @param brain Shared pointer to the brain to run the experiment on
+ */
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
@@ -245,6 +303,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
+/**
+ * @brief Verifies spike-timing dependent plasticity (STDP) functionality.
+ * 
+ * Tests the STDP rule by creating correlated pre-post spike patterns
+ * and verifying that synaptic weights change according to the STDP learning rule.
+ * 
+ * @param brain Shared pointer to the brain to test STDP on
+ */
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
@@ -321,6 +387,20 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+/**
+ * @brief Main function implementing the NLM Phase 2 demonstration.
+ * 
+ * This function serves as the primary entry point for the NLM Phase 2
+ * implementation, demonstrating real spiking neural computation through
+ * three distinct experimental tests:
+ * 1. Basic neural connectivity verification
+ * 2. Plasticity learning experiments
+ * 3. STDP rule verification
+ * 
+ * @param argc Number of command line arguments
+ * @param argv Array of command line argument strings
+ * @return int Exit status (0 for success)
+ */
 int main(int argc, char** argv) {
     printBanner();
     
