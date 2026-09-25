@@ -6,20 +6,17 @@
 namespace nlm {
 
 struct NeuralWorkingMemory::Impl {
-    Brain* brain;
-    
     // Maintenance connections (recurrent)
     std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
     
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    Impl() {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
@@ -28,7 +25,6 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }

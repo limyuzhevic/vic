@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../agent/AttentionalSelection.hpp"
 #include <memory>
 #include <string>
 
@@ -22,7 +23,6 @@ class NeuralAssociativeMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
-class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;

@@ -289,6 +289,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Convenience methods for world operations
+    m.def("createAndConfigureWorld", [](int width, int height, int visionWidth, int visionHeight, 
+                                       float maxEnergy = 100.0f, float energyDecayRate = 0.01f,
+                                       int randomSeed = 42) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        world->setEnergyDecayRate(energyDecayRate);
+        world->setRandomSeed(randomSeed);
+        world->reset();
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+         py::arg("maxEnergy") = 100.0f, py::arg("energyDecayRate") = 0.01f,
+         py::arg("randomSeed") = 42,
+         "Create and configure a world with specified parameters")
+    
+    .def("createAgentWorldSetup", []() {
+        return m.attr("createAndConfigureWorld")(20, 20, 8, 8);
+    }, "Create a standard-sized world for agent testing");
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -353,6 +373,54 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // Convenience methods for common operations
+    m.def("runBrainSimulation", [](std::shared_ptr<Brain> brain, size_t steps, bool logProgress = false) {
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+            if (logProgress && i % 100 == 0) {
+                std::cout << "Step " << i << ": " << brain->getFiringNeuronCount() << " firing neurons" << std::endl;
+            }
+        }
+    }, py::arg("brain"), py::arg("steps"), py::arg("logProgress") = false,
+         "Run a simulation for multiple steps")
+    
+    .def("getBrainStatistics", [](const std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"),
+         "Get comprehensive statistics about the brain")
+    
+    .def("createDefaultAgentSetup", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable common learning systems
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        py::dict setup;
+        setup["brain"] = brain;
+        setup["world"] = world;
+        setup["agent"] = agent;
+        return setup;
+    }, "Create a complete agent setup with default configuration");
+
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -399,6 +467,95 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Convenience methods for agent operations
+    m.def("runAgentEpisode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                              size_t steps, bool logProgress = false) {
+        for (size_t i = 0; i < steps; ++i) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            auto brain = agent->getBrain();
+            brain->step(i);
+            
+            // Get motor command
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply motor command
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            auto internal = percept->getInternal();
+            float reward = internal && !internal->empty() ? (*internal)[0] : 0.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            if (logProgress && i % 100 == 0) {
+                std::cout << "Step " << i << ": Firing neurons: " << brain->getFiringNeuronCount() 
+                          << ", Curiosity: " << agent->getCuriosityLevel() 
+                          << ", Novelty: " << agent->getNoveltyLevel() 
+                          << ", Dev Stage: " << static_cast<int>(agent->getDevelopmentalStage()) << std::endl;
+            }
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"), py::arg("logProgress") = false,
+         "Run a complete agent episode")
+    
+    .def("enableAllLearningSystems", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"),
+         "Enable all learning systems (reward modulation, structural plasticity, development, curiosity)")
+    
+    .def("getAgentMetrics", [](const std::shared_ptr<AgentBrain> agent, const std::shared_ptr<Brain> brain) {
+        py::dict metrics;
+        metrics["curiosity_level"] = agent->getCuriosityLevel();
+        metrics["novelty_level"] = agent->getNoveltyLevel();
+        metrics["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        metrics["prediction_error"] = agent->getPredictionError();
+        metrics["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        metrics["reward_modulation_enabled"] = agent->isRewardModulationEnabled();
+        metrics["structural_plasticity_enabled"] = agent->isStructuralPlasticityEnabled();
+        metrics["development_enabled"] = agent->isDevelopmentEnabled();
+        metrics["curiosity_enabled"] = agent->isCuriosityEnabled();
+        metrics["brain_firing_neurons"] = brain->getFiringNeuronCount();
+        metrics["brain_total_spikes"] = brain->getTotalSpikeCount();
+        return metrics;
+    }, py::arg("agent"), py::arg("brain"),
+         "Get comprehensive metrics for the agent and its brain")
+    
+    .def("createConfiguredAgentSetup", [](int worldWidth = 20, int worldHeight = 20, 
+                                        int visionWidth = 8, int visionHeight = 8) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldWidth, worldHeight, visionWidth, visionHeight);
+        world->reset();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable all learning by default
+        agent->enableAllLearningSystems();
+        
+        py::dict setup;
+        setup["brain"] = brain;
+        setup["world"] = world;
+        setup["agent"] = agent;
+        return setup;
+    }, py::arg("worldWidth") = 20, py::arg("worldHeight") = 20,
+         py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+         "Create a configured agent setup with specified world dimensions");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
