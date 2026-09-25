@@ -1,5 +1,7 @@
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Constants.hpp"
+#include "../core/Utils.hpp"
 #include <cmath>
 
 namespace nlm {
@@ -7,11 +9,11 @@ namespace nlm {
 struct PredictionError::Impl {
     class Brain* brain;
     float error;
-    float predictedValue;
-    float actualValue;
+    float predicted_value;
+    float actual_value;
     std::vector<float> history;
     
-    Impl() : brain(nullptr), error(0.0f), predictedValue(0.0f), actualValue(0.0f) {}
+    Impl() : brain(nullptr), error(0.0f), predicted_value(0.0f), actual_value(0.0f) {}
 };
 
 PredictionError::PredictionError() : pImpl(new Impl) {}
@@ -28,14 +30,14 @@ float PredictionError::getError() const {
 }
 
 void PredictionError::computeError(float predicted, float actual) {
-    pImpl->predictedValue = predicted;
-    pImpl->actualValue = actual;
+    pImpl->predicted_value = predicted;
+    pImpl->actual_value = actual;
     pImpl->error = actual - predicted;
     pImpl->history.push_back(pImpl->error);
 }
 
-void PredictionError::updatePrediction(float newPrediction) {
-    pImpl->predictedValue = newPrediction;
+void PredictionError::updatePrediction(float new_prediction) {
+    pImpl->predicted_value = new_prediction;
 }
 
 const std::vector<float>& PredictionError::getHistory() const {

@@ -57,18 +57,18 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
     return popId;
 }
 
-NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
+std::shared_ptr<NeuralPopulation> NeuralRegion::getPopulation(PopulationId id) {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[id.index() - 1];
 }
 
-const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
+std::shared_ptr<const NeuralPopulation> NeuralRegion::getPopulation(PopulationId id) const {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[id.index() - 1];
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -79,11 +79,11 @@ const std::vector<std::unique_ptr<NeuralPopulation>>& NeuralRegion::getPopulatio
     return pImpl->populations;
 }
 
-std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
-    std::vector<NeuralPopulation*> result;
+std::vector<std::shared_ptr<NeuralPopulation>> NeuralRegion::getAllPopulations() {
+    std::vector<std::shared_ptr<NeuralPopulation>> result;
     result.reserve(pImpl->populations.size());
     for (auto& pop : pImpl->populations) {
-        result.push_back(pop.get());
+        result.push_back(std::move(pop));
     }
     return result;
 }
@@ -128,12 +128,12 @@ const std::vector<std::unique_ptr<Synapse>>& NeuralRegion::getSynapses() const {
     return pImpl->synapses;
 }
 
-std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
-    std::vector<Synapse*> result;
+std::vector<std::shared_ptr<Synapse>> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
+    std::vector<std::shared_ptr<Synapse>> result;
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
         for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
+            if (auto syn = getSynapse(synId)) {
                 result.push_back(syn);
             }
         }
@@ -141,12 +141,12 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     return result;
 }
 
-std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
-    std::vector<Synapse*> result;
+std::vector<std::shared_ptr<Synapse>> NeuralRegion::getSynapsesTo(NeuronId neuron) {
+    std::vector<std::shared_ptr<Synapse>> result;
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {
         for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
+            if (auto syn = getSynapse(synId)) {
                 result.push_back(syn);
             }
         }
@@ -295,20 +295,25 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     }
 }
 
-std::vector<Neuron*> NeuralRegion::getAllNeurons() {
-    std::vector<Neuron*> result;
+std::vector<std::shared_ptr<Neuron>> NeuralRegion::getAllNeurons() {
+    std::vector<std::shared_ptr<Neuron>> result;
     for (auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        for (const auto& sharedNeuron : popNeurons) {
+            result.push_back(sharedNeuron);
+        }
     }
     return result;
 }
 
-std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
-    std::vector<const Neuron*> result;
+std::vector<std::shared_ptr<const Neuron>> NeuralRegion::getAllNeurons() const {
+    std::vector<std::shared_ptr<const Neuron>> result;
     for (const auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
-        result.insert(result.end(), popNeurons.begin(), popNeurons.end());
+        for (const auto& sharedNeuron : popNeurons) {
+            // For const neurons, we need to cast the const version
+            result.push_back(std::const_pointer_cast<const Neuron>(sharedNeuron));
+        }
     }
     return result;
 }

@@ -1,17 +1,21 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "core/Constants.hpp"
+#include "core/Utils.hpp"
 #include <algorithm>
 
 namespace nlm {
 
 struct Hebbian::Impl {
-    float learningRate;
-    float maxWeight;
-    float minWeight;
-    float covarianceThreshold;  // For covariance rule
+    float learning_rate;
+    float max_weight;
+    float min_weight;
+    float covariance_threshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+    Impl() : learning_rate(Constants::DEFAULT_LEARNING_RATE), 
+             max_weight(Constants::MAX_WEIGHT), 
+             min_weight(Constants::MIN_WEIGHT),
+             covariance_threshold(0.0f) {}
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -33,8 +37,8 @@ void Hebbian::update(Synapse* synapse,
      * 
      * Where:
      *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
+     *   baseline = learning_rate * mean activity
+     *   
      * This implements "neurons that fire together, wire together"
      * but with a threshold to prevent runaway potentiation.
      * 
@@ -49,28 +53,29 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate inputs using common utility
+    if (!Utils::validateUpdateInputs(synapse, preSpikes, postSpikes, dt)) {
         return;
     }
     
     // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
+    size_t correlation_count = 0;
+    for (Timestamp pre_time : preSpikes) {
+        for (Timestamp post_time : postSpikes) {
+            float dt_val = static_cast<float>(post_time - pre_time);
             // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            if (std::abs(dt_val) < Constants::CORRELATION_WINDOW_MS) {
+                ++correlation_count;
             }
         }
     }
     
     // Compute weight change based on correlation
     // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    float delta = pImpl->learning_rate * static_cast<float>(correlation_count);
     
     // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
+    if (std::abs(delta) > Constants::EPSILON_FOR_NORMALS) {
         applyWeightChange(synapse, delta);
     }
 }
@@ -78,9 +83,10 @@ void Hebbian::update(Synapse* synapse,
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Apply with bounds using common utility
+    float new_weight = synapse->getWeight() + delta;
+    new_weight = Utils::clampWeight(new_weight);
+    synapse->setWeight(new_weight);
 }
 
 const char* Hebbian::getName() const {
@@ -88,19 +94,19 @@ const char* Hebbian::getName() const {
 }
 
 void Hebbian::setLearningRate(float rate) {
-    pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
+    pImpl->learning_rate = Utils::clampLearningRate(rate);
 }
 
 float Hebbian::getLearningRate() const {
-    return pImpl->learningRate;
+    return pImpl->learning_rate;
 }
 
-void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+void Hebbian::setMaxWeight(float max_weight) {
+    pImpl->max_weight = Utils::clampWeight(max_weight);
 }
 
 float Hebbian::getMaxWeight() const {
-    return pImpl->maxWeight;
+    return pImpl->max_weight;
 }
 
 } // namespace nlm

@@ -1,19 +1,24 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "core/Constants.hpp"
+#include "core/Utils.hpp"
 #include <cmath>
 #include <algorithm>
 
 namespace nlm {
 
 struct STDP::Impl {
-    float ltpWeight;      // A+ for potentiation
-    float ltdWeight;      // A- for depression
-    float timeConstant;   // Tau for exponential window (ms)
-    float minWeight;      // Minimum synaptic weight
-    float maxWeight;      // Maximum synaptic weight
+    float ltp_weight;      // A+ for potentiation
+    float ltd_weight;      // A- for depression
+    float time_constant;   // Tau for exponential window (ms)
+    float min_weight;      // Minimum synaptic weight
+    float max_weight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    Impl() : ltp_weight(Constants::STDP_LTP_WEIGHT), 
+             ltd_weight(Constants::STDP_LTD_WEIGHT), 
+             time_constant(Constants::STDP_TIME_WINDOW_MS),
+             min_weight(Constants::MIN_WEIGHT), 
+             max_weight(Constants::MAX_WEIGHT) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -35,12 +40,12 @@ void STDP::update(Synapse* synapse,
      *   
      * If Δt < 0 (post before pre): DEPRESSION
      *   Δw = A- * exp(Δt / τ-)
-     * 
+     *   
      * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
+     *   A+ = ltp_weight (potentiation amplitude)
+     *   A- = ltd_weight (depression amplitude)  
+     *   τ+ = τ- = time_constant (STDP time window)
+     *   
      * Biological inspiration:
      *   - Reflects NMDA receptor-mediated calcium signaling
      *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
@@ -52,54 +57,55 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate inputs using common utility
+    if (!Utils::validateUpdateInputs(synapse, preSpikes, postSpikes, dt)) {
         return;
     }
     
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
+    float total_delta = 0.0f;
+    float tau = pImpl->time_constant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    for (Timestamp pre_time : preSpikes) {
+        for (Timestamp post_time : postSpikes) {
+            float dt_val = static_cast<float>(post_time - pre_time);  // Δt in ms
             
-            if (dt > 0) {
+            if (dt_val > 0) {
                 // Pre before post: POTENTIATION
                 // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
+                float delta = pImpl->ltp_weight * std::exp(-dt_val / tau);
+                total_delta += delta;
+            } else if (dt_val < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+                float delta = -pImpl->ltd_weight * std::exp(dt_val / tau);  // dt is negative, so this subtracts
+                total_delta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)
         }
     }
     
     // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
+    if (std::abs(total_delta) > Constants::EPSILON_FOR_NORMALS) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
+        total_delta *= efficacy;
         
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
+        // Apply weight change using common utility
+        synapse->addToWeight(total_delta);
         
         // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        float current_trace = synapse->getEligibilityTrace();
+        synapse->setEligibilityTrace(Utils::clampWeight(current_trace + total_delta));
     }
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // Clamp weight to bounds using common utility
+    float new_weight = synapse->getWeight() + delta;
+    new_weight = Utils::clampWeight(new_weight);
+    synapse->setWeight(new_weight);
 }
 
 const char* STDP::getName() const {
@@ -107,27 +113,27 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltp_weight = Utils::clampLearningRate(weight);
 }
 
 float STDP::getLTPWeight() const {
-    return pImpl->ltpWeight;
+    return pImpl->ltp_weight;
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltd_weight = Utils::clampLearningRate(weight);
 }
 
 float STDP::getLTDWeight() const {
-    return pImpl->ltdWeight;
+    return pImpl->ltd_weight;
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    pImpl->time_constant = std::clamp(tau, 1.0f, 100.0f);
 }
 
 float STDP::getTimeConstant() const {
-    return pImpl->timeConstant;
+    return pImpl->time_constant;
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {

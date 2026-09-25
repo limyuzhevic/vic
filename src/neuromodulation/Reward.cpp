@@ -1,13 +1,16 @@
 #include "Reward.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Constants.hpp"
+#include "../core/Utils.hpp"
 
 namespace nlm {
 
 struct Reward::Impl {
-    float currentValue;
-    float accumulatedReward;
+    float current_value;
+    float accumulated_reward;
     std::vector<float> history;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    Impl() : current_value(0.0f), accumulated_reward(0.0f) {}
 };
 
 Reward::Reward() : pImpl(new Impl) {}
@@ -15,21 +18,21 @@ Reward::Reward() : pImpl(new Impl) {}
 Reward::~Reward() = default;
 
 float Reward::getValue() const {
-    return pImpl->currentValue;
+    return pImpl->current_value;
 }
 
 void Reward::setValue(float value) {
-    pImpl->currentValue = value;
+    pImpl->current_value = value;
 }
 
 void Reward::add(float delta) {
-    pImpl->accumulatedReward += delta;
-    pImpl->currentValue += delta;
+    pImpl->accumulated_reward += delta;
+    pImpl->current_value += delta;
 }
 
 void Reward::reset() {
-    pImpl->currentValue = 0.0f;
-    pImpl->accumulatedReward = 0.0f;
+    pImpl->current_value = 0.0f;
+    pImpl->accumulated_reward = 0.0f;
 }
 
 float Reward::computeReward(const Observation& observation) const {

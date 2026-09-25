@@ -1,5 +1,7 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Constants.hpp"
+#include "../core/Utils.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -18,10 +20,10 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // LIF parameters (using Constants)
+    static constexpr float membrane_capacitance = Constants::DEFAULT_LEAK_CONDUCTANCE_NS;  // nF
+    static constexpr float time_constant = Constants::TIME_CONSTANT_MS;  // ms
+    static constexpr size_t max_spike_history = Constants::MAX_SPIKE_HISTORY;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -222,20 +224,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+// Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (pImpl->state.adaptation_variable > 0.0f) {
+        V -= pImpl->state.adaptation_variable * Constants::ADAPTATION_EFFECT;
+        pImpl->state.adaptation_variable *= Constants::ADAPTATION_DECAY;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    V = Utils::clampMembranePotential(V);
     
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        pImpl->state.firing_state = FiringState::Active;
+        pImpl->state.last_spike_time = static_cast<float>(current_time);
         
         // Record spike
         recordSpike(currentTime);
@@ -244,13 +246,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         V = V_reset;
         
         // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
+        pImpl->state.refractory_remaining = pImpl->state.refractory_period;
+        pImpl->state.firing_state = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        pImpl->state.adaptation_variable += Constants::ADAPTATION_INCREMENT;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firing_state = FiringState::Active;
     }
     
     // Clear synaptic input for next step

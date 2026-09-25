@@ -1,21 +1,23 @@
 #include "Curiosity.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Constants.hpp"
+#include "../core/Utils.hpp"
 
 namespace nlm {
 
 struct Curiosity::Impl {
     class Brain* brain;
     float level;
-    float noveltyWeight;
-    float predictionErrorWeight;
-    float decayRate;
+    float novelty_weight;
+    float prediction_error_weight;
+    float decay_rate;
     
     Impl() 
         : brain(nullptr)
         , level(0.0f)
-        , noveltyWeight(0.5f)
-        , predictionErrorWeight(0.5f)
-        , decayRate(0.05f) {}
+        , novelty_weight(Constants::NOVELTY_THRESHOLD)  // Using as placeholder
+        , prediction_error_weight(Constants::NOVELTY_THRESHOLD)  // Using as placeholder
+        , decay_rate(Constants::CURIOSITY_DECAY_MS) {}
 };
 
 Curiosity::Curiosity() : pImpl(new Impl) {}
@@ -31,16 +33,16 @@ float Curiosity::getLevel() const {
     return pImpl->level;
 }
 
-void Curiosity::update(float novelty, float predictionError, TimestepDuration dt) {
+void Curiosity::update(float novelty, float prediction_error, TimestepDuration dt) {
     // Curiosity increases with novelty and prediction error
-    float target = pImpl->noveltyWeight * novelty + 
-                   pImpl->predictionErrorWeight * predictionError;
+    float target = pImpl->novelty_weight * novelty + 
+                   pImpl->prediction_error_weight * prediction_error;
     
     // Smooth update
     pImpl->level += (target - pImpl->level) * 0.1f;
     
     // Decay
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decay_rate * static_cast<float>(dt));
 }
 
 float Curiosity::getExplorationDrive() const {
@@ -48,11 +50,11 @@ float Curiosity::getExplorationDrive() const {
 }
 
 void Curiosity::setNoveltyWeight(float weight) {
-    pImpl->noveltyWeight = weight;
+    pImpl->novelty_weight = weight;
 }
 
 void Curiosity::setPredictionErrorWeight(float weight) {
-    pImpl->predictionErrorWeight = weight;
+    pImpl->prediction_error_weight = weight;
 }
 
 void Curiosity::reset() {
