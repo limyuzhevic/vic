@@ -6,15 +6,28 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <cmath>
+#include <random>
 
 namespace nlm {
 
+// AgentBrain: Connects NLM brain to the world
+// Handles sensory transduction and motor decoding
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Copy operations
+    AgentBrain(const AgentBrain& other);
+    AgentBrain& operator=(const AgentBrain& other);
+    
+    // Move operations
+    AgentBrain(AgentBrain&& other) noexcept;
+    AgentBrain& operator=(AgentBrain&& other) noexcept;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -69,12 +82,55 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced initialization with distribution system
+    void initializeNeuronGroups();
+    
+    // Helper methods for sensory processing
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    
+    // Configuration constants for better maintainability
+    static constexpr float DEFAULT_SENORY_NOVELTY_DECAY = 0.99f;
+    static constexpr float DEFAULT_SENORY_SCALE_VISION = 5.0f;
+    static constexpr float DEFAULT_SENORY_SCALE_TOUCH = 8.0f;
+    static constexpr float DEFAULT_SENORY_SCALE_INTERNAL = 5.0f;
+    static constexpr float DEFAULT_SENORY_SCALE_PROPRIO = 3.0f;
+    
+    // Constants for motor decoding
+    static constexpr float MOTOR_ACTIVITY_THRESHOLD = 0.5f;
+    static constexpr float MOTOR_EXPLORATION_CHANCE = 0.3f;
+    static constexpr float MOTOR_EXPLORATION_CURIOUSNESS = 0.5f;
+    
+    // Constants for neuromodulation
+    static constexpr float DOPAMINE_CLAMP_MIN = -1.0f;
+    static constexpr float DOPAMINE_CLAMP_MAX = 1.0f;
+    static constexpr float PLASTICITY_MODIFIER_MIN = 0.1f;
+    static constexpr float PLASTICITY_MODIFIER_MAX = 2.0f;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Enhanced neuron distribution using smart pointers
+    void distributeMotorNeurons(NeuralPopulation* population);
+    void distributeSensoryNeurons(NeuralPopulation* population);
+    
+    // Optimized neuron activity calculation
+    float calculateNeuronGroupActivity(const std::vector<Neuron*>& neurons) const;
+    
+    // Enhanced novelty detection with exponential moving average
+    void updateNovelty(const std::vector<float>& currentVision);
+    
+    // Scale input values to neuron-appropriate ranges
+    float scaleVisionInput(float value) const;
+    float scaleTouchInput(float value) const;
+    float scaleInternalInput(float value) const;
+    float scaleProprioceptionInput(float value) const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +168,7 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Random generator for exploration behavior
+    std::mt19937 randomGenerator_;
 };
-
-} // namespace nlm

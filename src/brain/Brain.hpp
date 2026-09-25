@@ -48,6 +48,10 @@ struct InterRegionConnection {
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
 
+// Brain: The central coordinator of the neural system
+// Implements real spiking neural computation with event-driven dynamics
+// and integrated memory, prediction, cognition, and neuromodulation systems
+
 class Brain {
 public:
     // Create brain with configuration
@@ -58,8 +62,8 @@ public:
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
-    Brain(Brain&&) noexcept;
-    Brain& operator=(Brain&&) noexcept;
+    Brain(Brain&& other) noexcept;
+    Brain& operator=(Brain&& other) noexcept;
     
     // Initialize brain with configuration
     bool initialize();
