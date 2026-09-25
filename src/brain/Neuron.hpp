@@ -3,6 +3,8 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <stdexcept>
+#include <limits>
 
 namespace nlm {
 
@@ -40,12 +42,132 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
+// Neuron configuration structure
+struct NeuronConfig {
+    // LIF parameters
+    float restingPotential = -70.0f;      // mV
+    float threshold = -55.0f;           // mV
+    float resetPotential = -70.0f;      // mV
+    float leakConductance = 10.0f;      // nS
+    float refractoryPeriod = 5.0f;      // ms (converted to steps)
+    float timeConstant = 20.0f;         // ms
+    float membraneCapacitance = 1.0f;   // nF
+    
+    // Plasticity parameters
+    float adaptationRate = 0.01f;
+    float homeostasisTarget = 0.0f;
+    float synapticScalingFactor = 1.0f;
+    
+    // Initialization validation
+    void validate() const {
+        if (threshold <= restingPotential) {
+            throw std::invalid_argument("Threshold must be greater than resting potential");
+        }
+        if (resetPotential > threshold) {
+            throw std::invalid_argument("Reset potential must be less than or equal to threshold");
+        }
+        if (refractoryPeriod <= 0.0f) {
+            throw std::invalid_argument("Refractory period must be positive");
+        }
+        if (timeConstant <= 0.0f) {
+            throw std::invalid_argument("Time constant must be positive");
+        }
+        if (membraneCapacitance <= 0.0f) {
+            throw std::invalid_argument("Membrane capacitance must be positive");
+        }
+    }
+};
+
+// Advanced plasticity flags
+struct AdvancedPlasticityFlags {
+    bool hebbian = true;                     // Standard Hebbian learning
+    bool stdp = true;                       // Spike-timing dependent plasticity
+    bool rewardModulated = false;          // Reward-modulated plasticity
+    bool homeostatic = false;               // Homeostatical plasticity
+    bool synapticScaling = false;           // Synaptic scaling
+    bool intrinsicPlasticity = false;       // Intrinsic plasticity
+    bool adaptiveThreshold = false;         // Adaptive threshold plasticity
+    
+    // Validate plasticity configuration
+    void validate() const {
+        if (!hebbian && !stdp && !rewardModulated && !homeostatic && 
+            !synapticScaling && !intrinsicPlasticity && !adaptiveThreshold) {
+            throw std::invalid_argument("At least one plasticity mechanism must be enabled");
+        }
+    }
+};
+
+// Reward-modulated STDP parameters
+struct RewardModulatedSTDP {
+    float stdpLtpWeight = 0.02f;            // STDP LTP weight
+    float stdpLtdWeight = 0.015f;          // STDP LTD weight
+    float stdpTau = 20.0f;                 // STDP time constant (ms)
+    float rewardLtpScale = 1.0f;           // Reward modulation of LTP
+    float rewardLtdScale = 0.5f;           // Reward modulation of LTD
+    float eligibilityDecayRate = 0.01f;   // Eligibility trace decay rate
+    float predictionErrorWeight = 0.1f;   // Weight of prediction error
+    
+    // Validate parameters
+    void validate() const {
+        if (stdpTau <= 0.0f) {
+            throw std::invalid_argument("STDP time constant must be positive");
+        }
+        if (eligibilityDecayRate <= 0.0f || eligibilityDecayRate >= 1.0f) {
+            throw std::invalid_argument("Eligibility decay rate must be in (0, 1)");
+        }
+    }
+};
+
+// Homeostatical plasticity parameters
+struct HomeostaticalPlasticity {
+    float targetFiringRate = 10.0f;        // Target firing rate (Hz)
+    float adaptationRate = 0.001f;         // Adaptation rate
+    float scalingFactor = 0.1f;           // Scaling factor
+    float minWeight = 0.1f;                // Minimum synaptic weight
+    float maxWeight = 1.0f;                // Maximum synaptic weight
+    
+    // Validate parameters
+    void validate() const {
+        if (targetFiringRate < 0.0f) {
+            throw std::invalid_argument("Target firing rate must be non-negative");
+        }
+        if (adaptationRate <= 0.0f || adaptationRate >= 1.0f) {
+            throw std::invalid_argument("Adaptation rate must be in (0, 1)");
+        }
+        if (scalingFactor <= 0.0f) {
+            throw std::invalid_argument("Scaling factor must be positive");
+        }
+        if (minWeight < 0.0f || minWeight > maxWeight) {
+            throw std::invalid_argument("Invalid weight bounds");
+        }
+    }
+};
+
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with advanced plasticity
 class Neuron {
 public:
-    // Create neuron with ID
+    // Configuration for neuron creation
+    struct Config {
+        NeuronId id;
+        NeuronType type = NeuronType::Internal;
+        NeuronConfig neuronConfig;
+        AdvancedPlasticityFlags plasticityFlags;
+        RewardModulatedSTDP rewardStdp;
+        HomeostaticalPlasticity homeostatic;
+        
+        // Validate configuration
+        void validate() const {
+            neuronConfig.validate();
+            plasticityFlags.validate();
+            rewardStdp.validate();
+            homeostatic.validate();
+        }
+    };
+    
+    // Create neuron with ID and configuration
     explicit Neuron(NeuronId id);
+    explicit Neuron(const Config& config);
     
     ~Neuron();
     
@@ -57,6 +179,10 @@ public:
     
     // Identity
     NeuronId getId() const;
+    
+    // Configuration access
+    const NeuronConfig& getNeuronConfig() const;
+    void setNeuronConfig(const NeuronConfig& config);
     
     // Type
     NeuronType getType() const;
@@ -127,6 +253,16 @@ public:
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
+    // Advanced plasticity control
+    const AdvancedPlasticityFlags& getAdvancedPlasticityFlags() const;
+    void setAdvancedPlasticityFlags(const AdvancedPlasticityFlags& flags);
+    
+    const RewardModulatedSTDP& getRewardModulatedSTDP() const;
+    void setRewardModulatedSTDP(const RewardModulatedSTDP& params);
+    
+    const HomeostaticalPlasticity& getHomeostaticalPlasticity() const;
+    void setHomeostaticalPlasticity(const HomeostaticalPlasticity& params);
+    
     // Region/population membership
     void setRegionId(RegionId region);
     RegionId getRegionId() const;
@@ -143,9 +279,21 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Advanced methods
+    void applyHomeostaticPlasticity(float currentFiringRate);
+    void applySynapticScaling(const std::vector<float>& weights);
+    void adaptThreshold(float error);
+    void updateEligibilityTraces(float reward, float predictionError);
+    
+    // Statistics and monitoring
+    float getFiringRate() const;  // Average firing rate
+    size_t getTotalSpikeCount() const;  // Total spikes in history
+    float getWeightHistorySum() const;  // Sum of synaptic weights
+    bool isStable() const;  // Check if neuron is in stable state
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

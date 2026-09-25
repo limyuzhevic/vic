@@ -2,6 +2,8 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -18,16 +20,30 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
+    // Advanced plasticity state
+    AdvancedPlasticityFlags advancedPlasticityFlags;
+    RewardModulatedSTDP rewardModulatedSTDP;
+    HomeostaticalPlasticity homeostaticPlasticity;
+    
+    // Eligibility traces for reward-modulated learning
+    float eligibilityTrace;
+    float predictionErrorTrace;
+    
+    // Synaptic weight history for homeostatic plasticity
+    std::vector<float> weightHistory;
+    
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr size_t MAX_WEIGHT_HISTORY = 1000;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    Impl() noexcept : id(), type(NeuronType::Internal), regionId(), populationId(),
+             totalCurrent(0.0f), synapticInput(0.0f), eligibilityTrace(0.0f),
+             predictionErrorTrace(0.0f), weightHistory() {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -35,17 +51,38 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
+Neuron::Neuron(const Config& config) : pImpl(std::make_unique<Impl>()) {
+    try {
+        pImpl->id = config.id;
+        pImpl->type = config.type;
+        pImpl->regionId = INVALID_REGION_ID;
+        pImpl->populationId = INVALID_POPULATION_ID;
+        pImpl->totalCurrent = 0.0f;
+        
+        // Set advanced plasticity flags
+        pImpl->advancedPlasticityFlags = config.plasticityFlags;
+        pImpl->rewardModulatedSTDP = config.rewardStdp;
+        pImpl->homeostaticPlasticity = config.homeostatic;
+        
+        // Validate configuration
+        config.validate();
+        pImpl->advancedPlasticityFlags.validate();
+        pImpl->rewardModulatedSTDP.validate();
+        pImpl->homeostaticPlasticity.validate();
+        
+    } catch (const std::exception&) {
+        pImpl.reset();
+        throw;
+    }
+}
+
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -265,12 +302,7 @@ void Neuron::step(Timestamp currentTime) {
     stepLIF(currentTime, dt);
 }
 
-void Neuron::reset() {
-    pImpl->state = NeuronState();
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
-}
-
+// Neuron methods with exception safety
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
@@ -297,6 +329,31 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+void Neuron::reset() noexcept {
+    pImpl->state = NeuronState();
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
+}
+
+void Neuron::recordSpike(Timestamp timestamp) {
+    pImpl->spikeHistory.push_back(timestamp);
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+void Neuron::clearSpikeHistory() noexcept {
+    pImpl->spikeHistory.clear();
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
 }
 
 } // namespace nlm
