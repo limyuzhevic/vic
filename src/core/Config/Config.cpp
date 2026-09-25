@@ -19,40 +19,59 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Try to parse as JSON first (preferred)
+    try {
+        return loadFromJSON(filepath);
+    } catch (...) {
+        // Fall back to simple key=value format
+        NLM_LOG_INFO("Failed to parse " + filepath + " as JSON, trying simple format");
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot open config file: " + filepath);
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        size_t lineNum = 0;
+        while (std::getline(file, line)) {
+            lineNum++;
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Validate key format (no spaces, reasonable length)
+                if (key.empty() || key.find(' ') != std::string::npos || key.length() > 100) {
+                    NLM_LOG_WARNING("Skipping invalid key on line " + std::to_string(lineNum) +
+                                   ": '" + key + "'");
+                    continue;
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else if (!line.empty()) {
+                NLM_LOG_WARNING("Skipping malformed line " + std::to_string(lineNum) +
+                               ": '" + line + "'");
+            }
         }
+        
+        NLM_LOG_INFO("Loaded configuration from " + filepath + " (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,31 +100,201 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot create config file: " + filepath);
         return false;
     }
     
+    // Write in JSON format for better readability and future parsing
+    file << "{\n";
+    
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        file << "  \"" << entry.key << "\": \"" << escapeJSONString(entry.value) << "\"";
+        if (!entry.description.empty()) {
+            file << " // " << entry.description;
+        }
     }
     
+    file << "\n}\n";
+    
+    NLM_LOG_INFO("Saved configuration to " + filepath + " (" + 
+                std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+std::string Config::escapeJSONString(const std::string& str) const {
+    std::string result;
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32 || c == '\x7f') {
+                    // Control character, use hex escape
+                    char hex[10];
+                    snprintf(hex, sizeof(hex), "\\u%04x", static_cast<unsigned char>(c));
+                    result += hex;
+                } else {
+                    result += c;
+                }
+        }
+    }
+    return result;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Simple JSON parser for configuration files
+    // Supports basic types: numbers, strings, booleans
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file for JSON parsing: " + filepath);
+        return false;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    // Strip BOM if present
+    if (content.size() >= 3 && content[0] == '\xEF' && content[1] == '\xBB' && content[2] == '\xBF') {
+        content = content.substr(3);
     }
+    
+    // Parse key-value pairs
+    size_t pos = 0;
+    bool inObject = false;
+    std::string currentKey;
+    bool isFirstPair = true;
+    
+    auto trimWhitespace = [](const std::string& str) -> std::string {
+        size_t start = str.find_first_not_of(" \t\n\r");
+        size_t end = str.find_last_not_of(" \t\n\r");
+        if (start == std::string::npos) return "";
+        return str.substr(start, end - start + 1);
+    };
+    
+    // Simple JSON parsing - handle object at top level
+    while (pos < content.size()) {
+        char c = content[pos];
+        
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            // Skip whitespace
+            pos++;
+            continue;
+        }
+        
+        if (c == '"') {
+            // Parse quoted string as key
+            size_t keyEnd = content.find('"', pos + 1);
+            if (keyEnd == std::string::npos) {
+                NLM_LOG_ERROR("Unterminated string literal in JSON config");
+                return false;
+            }
+            
+            currentKey = content.substr(pos + 1, keyEnd - pos - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace after key
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+                pos++;
+            }
+            
+            if (pos >= content.size() || content[pos] != ':') {
+                NLM_LOG_ERROR("Missing ':' after key '" + currentKey + "' in JSON config");
+                return false;
+            }
+            pos++;
+            
+            // Skip whitespace after colon
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+                pos++;
+            }
+            
+            // Parse value
+            std::string value;
+            if (pos < content.size() && content[pos] == '"') {
+                // String value
+                size_t valueEnd = content.find('"', pos + 1);
+                if (valueEnd == std::string::npos) {
+                    NLM_LOG_ERROR("Unterminated string literal for value of key '" + currentKey + "'");
+                    return false;
+                }
+                value = content.substr(pos + 1, valueEnd - pos - 1);
+                pos = valueEnd + 1;
+            } else if (pos < content.size() && (content[pos] == '-' || std::isdigit(content[pos]))) {
+                // Number value (int or float)
+                size_t valueEnd = pos;
+                while (valueEnd < content.size() && (std::isdigit(content[valueEnd]) || content[valueEnd] == '.' || content[valueEnd] == '-')) {
+                    valueEnd++;
+                }
+                value = content.substr(pos, valueEnd - pos);
+                pos = valueEnd;
+            } else if (pos < content.size() && (content[pos] == 't' || content[pos] == 'f')) {
+                // Boolean value
+                if (content.substr(pos, 4) == "true") {
+                    value = "1";
+                    pos += 4;
+                } else if (content.substr(pos, 5) == "false") {
+                    value = "0";
+                    pos += 5;
+                } else {
+                    NLM_LOG_ERROR("Invalid boolean value for key '" + currentKey + "' in JSON config");
+                    return false;
+                }
+            } else if (pos < content.size() && content[pos] == ',') {
+                NLM_LOG_ERROR("Missing value for key '" + currentKey + "' in JSON config");
+                return false;
+            }
+            
+            if (!currentKey.empty() && !value.empty()) {
+                set(currentKey, value, ConfigSource::File);
+                currentKey.clear();
+            }
+            
+            // Skip whitespace after value
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+                pos++;
+            }
+            
+            if (pos < content.size() && content[pos] == ',') {
+                pos++;
+                // Skip whitespace after comma
+                while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r')) {
+                    pos++;
+                }
+            }
+            
+        } else if (c == '}') {
+            // End of object
+            pos++;
+            break;
+        } else if (c == '{') {
+            // Start of object (for future support)
+            pos++;
+            // Skip to closing brace
+            while (pos < content.size() && content[pos] != '}') {
+                pos++;
+            }
+            if (pos < content.size()) {
+                pos++;  // Skip closing brace
+            }
+        } else {
+            pos++;
+        }
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from " + filepath + " (" + 
+                std::to_string(pImpl->entries.size()) + " entries) using JSON parser");
+    return true;
 }
 
 template<typename T>
