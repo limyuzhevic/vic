@@ -3,93 +3,156 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string lastError;
 };
+
+std::string Config::lastError_ = "";
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    NLM_LOG_INFO("Loading configuration from: " + filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        lastError_ = "Configuration file not found: " + filepath;
+        NLM_LOG_ERROR(lastError_);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    try {
+        std::string line;
+        int lineNumber = 0;
+        while (std::getline(file, line)) {
+            ++lineNumber;
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+                NLM_LOG_INFO("  Line " + std::to_string(lineNumber) + ": " + key + " = [" + value + "]");
+            } else {
+                NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": " + line);
+            }
         }
+        
+        NLM_LOG_INFO("Configuration loaded successfully from " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        lastError_ = "Exception loading configuration file " + filepath + ": " + std::string(e.what());
+        NLM_LOG_ERROR(lastError_);
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+    NLM_LOG_INFO("Loading configuration from command line arguments");
+    
+    try {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                    NLM_LOG_INFO("  CLI argument: " + arg);
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_INFO("  CLI argument: " + arg + " " + value);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        NLM_LOG_INFO("Configuration loaded successfully from command line");
+        return true;
+        
+    } catch (const std::exception& e) {
+        lastError_ = "Exception loading configuration from command line: " + std::string(e.what());
+        NLM_LOG_ERROR(lastError_);
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    NLM_LOG_INFO("Saving configuration to: " + filepath);
+    
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            lastError_ = "Failed to create configuration file: " + filepath;
+            NLM_LOG_ERROR(lastError_);
+            return false;
+        }
+        
+        file << "# NLM Configuration File\n";
+        file << "# Generated by NLM brain system\n\n";
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+        }
+        
+        file.close();
+        NLM_LOG_INFO("Configuration saved successfully to " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        lastError_ = "Exception saving configuration file " + filepath + ": " + std::string(e.what());
+        NLM_LOG_ERROR(lastError_);
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -98,12 +161,16 @@ std::optional<T> Config::get(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        lastError_ = "Configuration key not found: " + key;
+        NLM_LOG_WARNING(lastError_);
         return std::nullopt;
     }
     
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        lastError_ = "Configuration value type mismatch for key: " + key;
+        NLM_LOG_ERROR(lastError_);
         return std::nullopt;
     }
 }
@@ -111,7 +178,12 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return val.value();
+    }
+    lastError_ = "Using default value for key " + key + " (not found)";
+    NLM_LOG_INFO(lastError_);
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -121,8 +193,10 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_INFO("Updated configuration key: " + key);
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_INFO("Added configuration key: " + key);
     }
 }
 
@@ -131,6 +205,10 @@ void Config::set(const std::string& key, const std::string& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
@@ -143,16 +221,25 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+    bool result = std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (!result) {
+        lastError_ = "Configuration key not found: " + key;
+        NLM_LOG_DEBUG(lastError_);
+    }
+    
+    return result;
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    size_t erased = std::erase_if(pImpl->entries, [&key](const ConfigEntry& e) { return e.key == key; });
+    if (erased > 0) {
+        NLM_LOG_INFO("Removed configuration key: " + key);
+    } else {
+        lastError_ = "Configuration key not found for removal: " + key;
+        NLM_LOG_WARNING(lastError_);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -165,7 +252,11 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    size_t erased = pImpl->entries.size();
     pImpl->entries.clear();
+    if (erased > 0) {
+        NLM_LOG_INFO("Cleared " + std::to_string(erased) + " configuration entries");
+    }
 }
 
 std::string Config::summary() const {
@@ -184,6 +275,14 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+std::string Config::getLastError() {
+    return lastError_;
+}
+
+void Config::clearLastError() {
+    lastError_.clear();
 }
 
 std::string Config::trim(const std::string& str) {

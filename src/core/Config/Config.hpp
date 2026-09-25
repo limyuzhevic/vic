@@ -1,10 +1,10 @@
 #pragma once
 
+#include "ErrorHandling.hpp"
 #include <string>
 #include <memory>
 #include <vector>
 #include <variant>
-#include <optional>
 
 namespace nlm {
 
@@ -93,6 +93,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling
+    static std::string getLastError();
+    static void clearLastError();
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +104,22 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Error handling
+    static std::string lastError_;
 };
+
+// Explicit template instantiations
+extern template std::optional<int> Config::get<int>(const std::string&) const;
+extern template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+extern template std::optional<double> Config::get<double>(const std::string&) const;
+extern template std::optional<bool> Config::get<bool>(const std::string&) const;
+extern template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+extern template int Config::getOr<int>(const std::string&, const int&) const;
+extern template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+extern template double Config::getOr<double>(const std::string&, const double&) const;
+extern template bool Config::getOr<bool>(const std::string&, const bool&) const;
+extern template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

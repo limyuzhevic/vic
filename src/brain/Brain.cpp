@@ -69,6 +69,9 @@ struct Brain::Impl {
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
     
+    // Last sensory input for prediction system
+    std::shared_ptr<const SensoryInput> lastSensoryInput;
+    
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
@@ -510,9 +513,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->lastSensoryInput) {
+        // The prediction system predicts next state based on current sensory input
+        auto predictedState = pImpl->predictionSystem->predictNextState(*pImpl->lastSensoryInput);
+        
+        if (predictedState) {
+            // Update predictions using actual future sensory input
+            // This will compute prediction error for learning
+            pImpl->predictionSystem->updatePredictions(*predictedState, *pImpl->lastSensoryInput);
+            
+            // Integrate prediction with neuromodulation systems
+            integratePredictionWithNeuromodulation();
+            
+            // Log prediction status
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            if (predictionError > 0.5f) {
+                NLM_LOG_WARNING("High prediction error: " + std::to_string(predictionError) + 
+                              ", confidence: " + std::to_string(confidence));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -597,6 +617,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Store last sensory input for prediction system
+    pImpl->lastSensoryInput = input.clone();
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -1021,6 +1044,41 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
+}
+
+std::shared_ptr<const SensoryInput> Brain::getLastSensoryInput() const {
+    return pImpl->lastSensoryInput;
+}
+
+void Brain::integratePredictionWithNeuromodulation() {
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Use prediction error to modulate dopamine
+        // Positive prediction error (worse than expected) decreases dopamine
+        // Negative prediction error (better than expected) increases dopamine
+        float dopamineModulation = 1.0f - predictionError;
+        float modulatedDopamine = pImpl->dopamine->getLevel() * dopamineModulation;
+        
+        // Apply prediction-based neuromodulation
+        // Prediction error affects reward prediction and learning
+        float predictionBasedLearning = predictionError * confidence;
+        
+        // Update dopamine with prediction-based modulation
+        pImpl->dopamine->setLevel(modulatedDopamine);
+        
+        // Store prediction error in prediction error neuromodulator
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setLevel(predictionError);
+        }
+        
+        // Update prediction error history and confidence
+        if (confidence < 0.5f) {
+            // Low confidence - increase exploration
+            pImpl->curiosity->increaseLevel(0.1f);
+        }
+    }
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

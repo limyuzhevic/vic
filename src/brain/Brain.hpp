@@ -148,10 +148,11 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // Add method to get last sensory input for prediction
+    std::shared_ptr<const SensoryInput> getLastSensoryInput() const;
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Integrate prediction with neuromodulation
+    void integratePredictionWithNeuromodulation();
     
     // ========== COGNITION SYSTEMS ==========
     
