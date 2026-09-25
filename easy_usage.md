@@ -71,6 +71,130 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+## New High-Level Convenience Functions
+
+The updated NLM Python bindings now include powerful high-level functions that make it easier to:
+
+- Create complete agent setups with a single function call
+- Run simulations with built-in learning and statistics
+- Create worlds with obstacles and resources
+- Get detailed simulation statistics
+
+### Example 3: Using High-Level Convenience Functions
+
+```python
+import pynlm
+
+# Create a complete agent with learning features
+brain, world, agent = pynlm.createLearningAgent(width=20, height=20)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run simulation with statistics
+stats = pynlm.runSimulationWithStats(brain, world, agent, 500)
+print(stats.toString())
+
+# Create world with obstacles and resources
+world = pynlm.createWorldWithObstacles(
+    width=30, height=30,
+    obstacles=[(5, 5), (10, 10), (15, 15)]
+)
+
+# Use simulation runner for progress tracking
+runner = pynlm.createSimulationRunner(width=25, height=25)
+runner.runWithProgress(1000, progressCallback=lambda progress: print(f"Progress: {progress * 100:.0f}%"))
+
+# Get simulation statistics
+brain = runner.getBrain()
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Example 4: Advanced Agent Control
+
+```python
+import pynlm
+
+# Create agent with custom settings
+brain, world, agent = pynlm.createLearningAgent(
+    width=40, height=40,
+    enableStructuralPlasticity=True,
+    enableNovelty=True,
+    enableDevelopment=True
+)
+
+# Run simple agent controller
+controller = pynlm.createSimpleAgentController(width=40, height=40)
+controller.run()
+
+print(f"Simulation results:")
+print(f"  Average firing rate: {controller.getAverageFiringRate():.2f}")
+print(f"  Total spikes: {controller.getTotalSpikeCount()}")
+print(f"  Region count: {controller.getRegionCount()}")
+```
+
+### Example 5: Training and Saving
+
+```python
+import pynlm
+
+# Train a brain and save it
+brain = pynlm.trainAndSaveBrain(
+    filepath="trained_brain.pkl",
+    width=20, height=20,
+    trainingSteps=2000
+)
+
+# Load the trained brain
+loaded_brain = pynlm.loadTrainedBrain("trained_brain.pkl")
+loaded_brain.initialize()
+
+# Run the trained brain
+for step in range(100):
+    loaded_brain.step(step)
+```
+
+### Example 6: Exploration Simulation
+
+```python
+import pynlm
+
+# Run exploration simulation
+brain, world, agent = pynlm.runExplorationSimulation(
+    worldWidth=50, worldHeight=50,
+    steps=1000,
+    enableCuriosity=True
+)
+
+print("Exploration complete!")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Example 7: Debug and Diagnostic Tools
+
+```python
+import pynlm
+
+# Create a demo environment
+demo_brain, demo_world, demo_agent = pynlm.createDemoEnvironment()
+
+# Print detailed statistics
+pynlm.printBrainStats(demo_brain)
+
+# Run a quick simulation
+demo_agent.enableRewardModulation(True)
+for step in range(50):
+    demo_world.update(0.1)
+    demo_agent.processSensoryInput(demo_world.getSensoryPercept())
+    demo_brain.step(step)
+    action = demo_agent.decodeMotorCommand()
+    demo_world.applyMotorCommand(action, demo_world.getSimulationTime())
+
+print("Demo simulation complete!")
+```
+
 ---
 
 ## Simple Analogy
@@ -287,6 +411,51 @@ print("Agent simulation complete!")
 
 ---
 
+## New High-Level Functions Reference
+
+### Factory Functions
+
+| Function | Description |
+|----------|-------------|
+| `pynlm.createLearningAgent()` | Create agent with learning features |
+| `pynlm.createSimulationRunner()` | Create simulation runner with progress tracking |
+| `pynlm.createWorldWithObstacles()` | Create world with obstacles |
+| `pynlm.createWorldWithResources()` | Create world with resources |
+| `pynlm.createSimpleAgentController()` | Create simple agent controller |
+
+### Simulation Utilities
+
+| Function | Description |
+|----------|-------------|
+| `pynlm.runSimulation()` | Run complete simulation loop |
+| `pynlm.runSimulationWithStats()` | Run simulation and collect statistics |
+| `pynlm.runExplorationSimulation()` | Run exploration with curiosity |
+
+### Training and Checkpointing
+
+| Function | Description |
+|----------|-------------|
+| `pynlm.trainAndSaveBrain()` | Train and save brain to file |
+| `pynlm.loadTrainedBrain()` | Load trained brain from file |
+
+### Debug and Diagnostics
+
+| Function | Description |
+|----------|-------------|
+| `pynlm.printBrainStats()` | Print detailed brain statistics |
+| `pynlm.createDemoEnvironment()` | Create demo environment |
+| `pynlm.validateAgentSetup()` | Validate agent setup |
+
+### Information
+
+| Function | Description |
+|----------|-------------|
+| `pynlm.getVersion()` | Get version information |
+| `pynlm.getFeatures()` | Get list of features |
+| `pynlm.getExamplePatterns()` | Get example patterns |
+
+---
+
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +463,4 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its new high-level convenience functions!
