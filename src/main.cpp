@@ -25,6 +25,9 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <algorithm>
+#include <cctype>
 
 using namespace nlm;
 
@@ -46,6 +49,185 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM Neural Learning Machine - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --config <file>              Load configuration from file" << std::endl;
+    std::cout << "  --neuron-count <num>         Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region-count <num>         Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <ms>              Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --random-seed <seed>          Set random seed for reproducibility" << std::endl;
+    std::cout << "  --stdp-ltp-weight <weight>    Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp-ltd-weight <weight>    Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --synaptogenesis-rate <rate>  Set synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning-rate <rate>        Set pruning rate (default: 0.00001)" << std::endl;
+    std::cout << "  --log-level <level>          Set log level (Trace, Debug, Info, Warning, Error, Critical)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "BASIC OPERATION:" << std::endl;
+    std::cout << "  The program runs three demonstration tests:" << std::endl;
+    std::cout << "  1. Basic neural connectivity test" << std::endl;
+    std::cout << "  2. Plasticity learning experiment" << std::endl;
+    std::cout << "  3. STDP verification experiment" << std::endl;
+    std::cout << std::endl;
+    std::cout << "CONFIGURATION FILE FORMAT:" << std::endl;
+    std::cout << "  key = value (e.g., neuron_count = 1000)" << std::endl;
+    std::cout << "  Supported keys: neuron_count, region_count, connection_probability,
+    std::cout << "                 random_seed, simulation_timestep, stdp_ltp_weight,
+    std::cout << "                 stdp_ltd_weight, stdp_tau, synaptogenesis_rate, pruning_rate" << std::endl;
+    std::cout << "  Values: integers, floats, or strings as appropriate" << std::endl;
+    std::cout << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  ./nlm --neuron-count 2000 --region-count 2 --random-seed 12345" << std::endl;
+    std::cout << "  ./nlm --config my_config.cfg --log-level Info" << std::endl;
+}
+
+bool parseCommandLine(int argc, char* argv[], std::map<std::string, std::string>& cliArgs) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            cliArgs["help"] = "true";
+            continue;
+        }
+        
+        if (arg == "--config") {
+            if (i + 1 < argc) {
+                cliArgs["config"] = argv[++i];
+            } else {
+                std::cerr << "Error: --config requires a filename" << std::endl;
+                return false;
+            }
+            continue;
+        }
+        
+        // Handle --key value pairs
+        if (arg.find("--") == 0 && arg.find("=") == std::string::npos) {
+            std::string key = arg.substr(2);  // Remove --
+            // Convert dashes to underscores for consistency
+            std::replace(key.begin(), key.end(), '-', '_');
+            
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                cliArgs[key] = argv[++i];
+            } else {
+                std::cerr << "Error: --" << key << " requires a value" << std::endl;
+                return false;
+            }
+            continue;
+        }
+        
+        // Handle key=value format
+        if (arg.find("=") != std::string::npos) {
+            size_t eqPos = arg.find("=");
+            std::string key = arg.substr(0, eqPos);
+            std::string value = arg.substr(eqPos + 1);
+            
+            // Convert dashes to underscores for consistency
+            std::replace(key.begin(), key.end(), '-', '_');
+            cliArgs[key] = value;
+            continue;
+        }
+        
+        std::cerr << "Error: Unknown argument: " << arg << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool setConfigFromCLI(std::shared_ptr<Config> config, const std::map<std::string, std::string>& cliArgs) {
+    bool configChanged = false;
+    
+    for (const auto& pair : cliArgs) {
+        const std::string& key = pair.first;
+        const std::string& value = pair.second;
+        
+        if (key == "neuron_count") {
+            try {
+                size_t neuronCount = std::stoul(value);
+                config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid neuron_count value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "region_count") {
+            try {
+                size_t regionCount = std::stoul(value);
+                config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid region_count value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "timestep") {
+            try {
+                double timestep = std::stod(value);
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid timestep value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "random_seed") {
+            try {
+                uint64_t seed = std::stoull(value);
+                config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid random_seed value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "stdp_ltp_weight") {
+            try {
+                float weight = std::stof(value);
+                config->set("stdp_ltp_weight", weight, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid stdp_ltp_weight value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "stdp_ltd_weight") {
+            try {
+                float weight = std::stof(value);
+                config->set("stdp_ltd_weight", weight, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid stdp_ltd_weight value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "synaptogenesis_rate") {
+            try {
+                float rate = std::stof(value);
+                config->set("synaptogenesis_rate", rate, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid synaptogenesis_rate value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "pruning_rate") {
+            try {
+                float rate = std::stof(value);
+                config->set("pruning_rate", rate, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid pruning_rate value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "log_level") {
+            // Convert to uppercase for consistency
+            std::string level = value;
+            std::transform(level.begin(), level.end(), level.begin(), ::toupper);
+            config->set("log_level", level, ConfigSource::CommandLine);
+            configChanged = true;
+        }
+    }
+    
+    return true;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -321,7 +503,29 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    std::map<std::string, std::string> cliArgs;
+    
+    if (argc == 1) {
+        // No arguments - show help
+        printBanner();
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    // Parse command line arguments
+    if (!parseCommandLine(argc, argv, cliArgs)) {
+        return 1;
+    }
+    
+    // Handle help request
+    if (cliArgs.find("help") != cliArgs.end()) {
+        printBanner();
+        printUsage(argv[0]);
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -331,6 +535,30 @@ int main(int argc, char** argv) {
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Get log level from CLI args or config
+    std::string logLevel = "Info";
+    if (cliArgs.find("log_level") != cliArgs.end()) {
+        logLevel = cliArgs["log_level"];
+    }
+    
+    // Convert to uppercase for LogLevel enum
+    std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::toupper);
+    
+    // Set log level
+    if (logLevel == "TRACE") {
+        consoleLogger->setLevel(LogLevel::Trace);
+    } else if (logLevel == "DEBUG") {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (logLevel == "WARNING") {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (logLevel == "ERROR") {
+        consoleLogger->setLevel(LogLevel::Error);
+    } else if (logLevel == "CRITICAL") {
+        consoleLogger->setLevel(LogLevel::Critical);
+    } else {
+        consoleLogger->setLevel(LogLevel::Info);  // Default
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -345,15 +573,8 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (cliArgs.find("config") != cliArgs.end()) {
+        configFile = cliArgs["config"];
     }
     
     // Load config from file (ignore if not found)
@@ -363,24 +584,46 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Apply CLI arguments (overrides config file)
+    if (!setConfigFromCLI(config, cliArgs)) {
+        return 1;
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (if not overridden by CLI)
+    if (cliArgs.find("random_seed") == cliArgs.end()) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (cliArgs.find("timestep") == cliArgs.end()) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (cliArgs.find("neuron_count") == cliArgs.end()) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    }
+    if (cliArgs.find("region_count") == cliArgs.end()) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (cliArgs.find("connection_probability") == cliArgs.end()) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // STDP parameters (only if not overridden)
+    if (cliArgs.find("stdp_ltp_weight") == cliArgs.end()) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (cliArgs.find("stdp_ltd_weight") == cliArgs.end()) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (cliArgs.find("stdp_tau") == cliArgs.end()) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters (only if not overridden)
+    if (cliArgs.find("synaptogenesis_rate") == cliArgs.end()) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (cliArgs.find("pruning_rate") == cliArgs.end()) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -390,6 +633,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  log_level: " + logLevel);
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -443,7 +687,150 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+        NLM_LOG_INFO("");
     
     return 0;
+}
+
+bool parseCommandLine(int argc, char* argv[], std::map<std::string, std::string>& cliArgs) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            cliArgs["help"] = "true";
+            continue;
+        }
+        
+        if (arg == "--config") {
+            if (i + 1 < argc) {
+                cliArgs["config"] = argv[++i];
+            } else {
+                std::cerr << "Error: --config requires a filename" << std::endl;
+                return false;
+            }
+            continue;
+        }
+        
+        // Handle --key value pairs
+        if (arg.find("--") == 0 && arg.find("=") == std::string::npos) {
+            std::string key = arg.substr(2);  // Remove --
+            // Convert dashes to underscores for consistency
+            std::replace(key.begin(), key.end(), '-', '_');
+            
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                cliArgs[key] = argv[++i];
+            } else {
+                std::cerr << "Error: --" << key << " requires a value" << std::endl;
+                return false;
+            }
+            continue;
+        }
+        
+        // Handle key=value format
+        if (arg.find("=") != std::string::npos) {
+            size_t eqPos = arg.find("=");
+            std::string key = arg.substr(0, eqPos);
+            std::string value = arg.substr(eqPos + 1);
+            
+            // Convert dashes to underscores for consistency
+            std::replace(key.begin(), key.end(), '-', '_');
+            cliArgs[key] = value;
+            continue;
+        }
+        
+        std::cerr << "Error: Unknown argument: " << arg << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool setConfigFromCLI(std::shared_ptr<Config> config, const std::map<std::string, std::string>& cliArgs) {
+    bool configChanged = false;
+    
+    for (const auto& pair : cliArgs) {
+        const std::string& key = pair.first;
+        const std::string& value = pair.second;
+        
+        if (key == "neuron_count") {
+            try {
+                size_t neuronCount = std::stoul(value);
+                config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid neuron_count value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "region_count") {
+            try {
+                size_t regionCount = std::stoul(value);
+                config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid region_count value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "timestep") {
+            try {
+                double timestep = std::stod(value);
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid timestep value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "random_seed") {
+            try {
+                uint64_t seed = std::stoull(value);
+                config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid random_seed value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "stdp_ltp_weight") {
+            try {
+                float weight = std::stof(value);
+                config->set("stdp_ltp_weight", weight, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid stdp_ltp_weight value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "stdp_ltd_weight") {
+            try {
+                float weight = std::stof(value);
+                config->set("stdp_ltd_weight", weight, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid stdp_ltd_weight value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "synaptogenesis_rate") {
+            try {
+                float rate = std::stof(value);
+                config->set("synaptogenesis_rate", rate, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid synaptogenesis_rate value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "pruning_rate") {
+            try {
+                float rate = std::stof(value);
+                config->set("pruning_rate", rate, ConfigSource::CommandLine);
+                configChanged = true;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid pruning_rate value: " << value << " (" << e.what() << ")" << std::endl;
+                return false;
+            }
+        } else if (key == "log_level") {
+            // Convert to uppercase for consistency
+            std::string level = value;
+            std::transform(level.begin(), level.end(), level.begin(), ::toupper);
+            config->set("log_level", level, ConfigSource::CommandLine);
+            configChanged = true;
+        }
+    }
+    
+    return true;
 }
