@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "ConfigParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,37 +21,48 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Use the new ConfigParser to load from file
+    auto parseResult = ConfigParser::parseFile(filepath);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (!parseResult.success) {
+        NLM_LOG_WARNING("ConfigParser failed: " + parseResult.errorMessage);
+        // Fallback to simple format for backward compatibility
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        return true;
+    }
+    
+    // Successfully parsed with modern parser
+    NLM_LOG_INFO("Configuration loaded from " + filepath + 
+                 " in " + ConfigParser::formatToString(parseResult.detectedFormat) + " format");
+    
+    // Convert parsed JSON to Config entries
+    for (const auto& [key, value] : parseResult.parsedData.items()) {
+        set(key, value);
     }
     
     return true;
@@ -79,16 +92,22 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Try to save as JSON for better compatibility
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Convert Config entries to JSON
+    nlohmann::json jsonData = nlohmann::json::object();
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        jsonData[entry.key] = entry.value;
     }
     
+    // Write JSON with indentation for readability
+    file << jsonData.dump(2);
+    
+    NLM_LOG_INFO("Configuration saved to " + filepath + " in JSON format");
     return true;
 }
 
@@ -200,6 +219,8 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+// Note: ConfigParser usage is handled by loadFromFile method
+// The template instantiations are kept for backward compatibility
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
