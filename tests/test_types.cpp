@@ -1,99 +1,83 @@
 // Types Tests
 #include "core/Types/Types.hpp"
-#include <cassert>
-#include <iostream>
+#include <catch2/catch_test_macros.hpp>
 
 namespace test_types {
 
-void testNeuronId() {
+TEST_CASE("NeuronId equality and ordering operations", "[types][neuron_id]") {
     nlm::NeuronId id1(1);
     nlm::NeuronId id2(2);
     nlm::NeuronId id3(1);
     
-    assert(id1 == id3);
-    assert(id1 != id2);
-    assert(id1 < id2);
-    assert(id2 > id1);
-    assert(id1.index() == 1);
-    
-    std::cout << "    testNeuronId passed" << std::endl;
+    REQUIRE(id1 == id3);
+    REQUIRE(id1 != id2);
+    REQUIRE(id1 < id2);
+    REQUIRE(id2 > id1);
+    REQUIRE(id1.index() == 1);
 }
 
-void testSynapseId() {
+TEST_CASE("SynapseId equality and ordering operations", "[types][synapse_id]") {
     nlm::SynapseId id1(100);
     nlm::SynapseId id2(200);
     
-    assert(id1 != id2);
-    assert(id1 < id2);
-    
-    std::cout << "    testSynapseId passed" << std::endl;
+    REQUIRE(id1 != id2);
+    REQUIRE(id1 < id2);
 }
 
-void testRegionId() {
+TEST_CASE("RegionId equality and ordering operations", "[types][region_id]") {
     nlm::RegionId id1(1);
     nlm::RegionId id2(2);
     
-    assert(id1 != id2);
-    
-    std::cout << "    testRegionId passed" << std::endl;
+    REQUIRE(id1 != id2);
 }
 
-void testPopulationId() {
+TEST_CASE("PopulationId equality and ordering operations", "[types][population_id]") {
     nlm::PopulationId id1(1);
     nlm::PopulationId id2(2);
     
-    assert(id1 != id2);
-    
-    std::cout << "    testPopulationId passed" << std::endl;
+    REQUIRE(id1 != id2);
 }
 
-void testNeuronType() {
-    assert(nlm::NeuronType::Excitatory != nlm::NeuronType::Inhibitory);
-    assert(nlm::NeuronType::Sensory != nlm::NeuronType::Motor);
-    
-    std::cout << "    testNeuronType passed" << std::endl;
+TEST_CASE("NeuronType enum values are distinct", "[types][neuron_type]") {
+    REQUIRE(nlm::NeuronType::Excitatory != nlm::NeuronType::Inhibitory);
+    REQUIRE(nlm::NeuronType::Sensory != nlm::NeuronType::Motor);
 }
 
-void testSynapseType() {
-    assert(nlm::SynapseType::Excitatory != nlm::SynapseType::Inhibitory);
-    
-    std::cout << "    testSynapseType passed" << std::endl;
+TEST_CASE("SynapseType enum values are distinct", "[types][synapse_type]") {
+    REQUIRE(nlm::SynapseType::Excitatory != nlm::SynapseType::Inhibitory);
 }
 
-void testPlasticityFlags() {
+TEST_CASE("PlasticityFlags default initialization", "[types][plasticity_flags]") {
     nlm::PlasticityFlags flags;
-    assert(!flags.hebbian);
-    assert(!flags.stdp);
-    assert(!flags.reward_modulated);
+    
+    REQUIRE(!flags.hebbian);
+    REQUIRE(!flags.stdp);
+    REQUIRE(!flags.reward_modulated);
+}
+
+TEST_CASE("PlasticityFlags mutable properties", "[types][plasticity_flags]") {
+    nlm::PlasticityFlags flags;
     
     flags.hebbian = true;
-    assert(flags.hebbian);
-    
-    std::cout << "    testPlasticityFlags passed" << std::endl;
+    REQUIRE(flags.hebbian);
 }
 
-void testSpikeEvent() {
+TEST_CASE("SpikeEvent structure fields", "[types][spike_event]") {
     nlm::SpikeEvent event;
     event.source_neuron = nlm::NeuronId(1);
     event.timestamp = 0.5;
     event.step = 500;
     
-    assert(event.source_neuron.index() == 1);
-    assert(event.timestamp == 0.5);
-    assert(event.step == 500);
-    
-    std::cout << "    testSpikeEvent passed" << std::endl;
-}
-
-void runAll() {
-    testNeuronId();
-    testSynapseId();
-    testRegionId();
-    testPopulationId();
-    testNeuronType();
-    testSynapseType();
-    testPlasticityFlags();
-    testSpikeEvent();
+    REQUIRE(event.source_neuron.index() == 1);
+    REQUIRE(event.timestamp == 0.5);
+    REQUIRE(event.step == 500);
 }
 
 } // namespace test_types
+
+// Legacy compatibility
+namespace legacy {
+    void runAll() {
+        std::cout << "Legacy test runner called - use Catch2 runner instead" << std::endl;
+    }
+} // namespace legacy

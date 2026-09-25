@@ -1,131 +1,114 @@
 // Synapse Tests
 #include "brain/Synapse.hpp"
 #include "core/Random/Random.hpp"
-#include <cassert>
-#include <iostream>
+#include <catch2/catch_test_macros.hpp>
 #include <cmath>
 
 namespace test_synapse {
 
-void testSynapseCreation() {
+TEST_CASE("Synapse creation with proper identifiers", "[synapse][creation][id]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(synapse.getId() == nlm::SynapseId(1));
-    assert(synapse.getSourceNeuron() == nlm::NeuronId(1));
-    assert(synapse.getDestinationNeuron() == nlm::NeuronId(2));
-    
-    std::cout << "    testSynapseCreation passed" << std::endl;
+    REQUIRE(synapse.getId() == nlm::SynapseId(1));
+    REQUIRE(synapse.getSourceNeuron() == nlm::NeuronId(1));
+    REQUIRE(synapse.getDestinationNeuron() == nlm::NeuronId(2));
 }
 
-void testSynapseWeight() {
+TEST_CASE("Synapse weight management", "[synapse][weight]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(synapse.getWeight() == 0.0f);
+    REQUIRE(synapse.getWeight() == 0.0f);
     
     synapse.setWeight(0.5f);
-    assert(synapse.getWeight() == 0.5f);
+    REQUIRE(synapse.getWeight() == 0.5f);
     
     synapse.addToWeight(0.2f);
-    assert(synapse.getWeight() == 0.7f);
+    REQUIRE(synapse.getWeight() == 0.7f);
     
     synapse.addToWeight(-0.3f);
-    assert(synapse.getWeight() == 0.4f);
-    
-    std::cout << "    testSynapseWeight passed" << std::endl;
+    REQUIRE(synapse.getWeight() == 0.4f);
 }
 
-void testSynapseWeightBounds() {
+TEST_CASE("Synapse weight bounds enforcement", "[synapse][weight][bounds]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
     // Test upper bound
     synapse.setWeight(10.0f);
-    assert(synapse.getWeight() <= 1.0f);  // Should be clamped
+    REQUIRE(synapse.getWeight() <= 1.0f);  // Should be clamped
     
     // Test lower bound
     synapse.setWeight(-10.0f);
-    assert(synapse.getWeight() >= -1.0f);  // Should be clamped
-    
-    std::cout << "    testSynapseWeightBounds passed" << std::endl;
+    REQUIRE(synapse.getWeight() >= -1.0f);  // Should be clamped
 }
 
-void testSynapseType() {
+TEST_CASE("Synapse type management", "[synapse][type]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
     synapse.setType(nlm::SynapseType::Excitatory);
-    assert(synapse.getType() == nlm::SynapseType::Excitatory);
-    assert(synapse.isExcitatory());
-    assert(!synapse.isInhibitory());
+    REQUIRE(synapse.getType() == nlm::SynapseType::Excitatory);
+    REQUIRE(synapse.isExcitatory());
+    REQUIRE(!synapse.isInhibitory());
     
     synapse.setType(nlm::SynapseType::Inhibitory);
-    assert(synapse.getType() == nlm::SynapseType::Inhibitory);
-    assert(synapse.isInhibitory());
-    assert(!synapse.isExcitatory());
-    
-    std::cout << "    testSynapseType passed" << std::endl;
+    REQUIRE(synapse.getType() == nlm::SynapseType::Inhibitory);
+    REQUIRE(synapse.isInhibitory());
+    REQUIRE(!synapse.isExcitatory());
 }
 
-void testSynapseDelay() {
+TEST_CASE("Synapse delay management", "[synapse][delay]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(synapse.getDelay() == 1);  // Default
+    REQUIRE(synapse.getDelay() == 1);  // Default
     
     synapse.setDelay(5);
-    assert(synapse.getDelay() == 5);
-    
-    std::cout << "    testSynapseDelay passed" << std::endl;
+    REQUIRE(synapse.getDelay() == 5);
 }
 
-void testSynapseSpikeHistory() {
+TEST_CASE("Synapse spike history management", "[synapse][history]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(synapse.getPreSpikeHistory().empty());
-    assert(synapse.getPostSpikeHistory().empty());
+    REQUIRE(synapse.getPreSpikeHistory().empty());
+    REQUIRE(synapse.getPostSpikeHistory().empty());
     
     synapse.recordPreSpike(0.1);
     synapse.recordPreSpike(0.2);
     synapse.recordPostSpike(0.15);
     
-    assert(synapse.getPreSpikeHistory().size() == 2);
-    assert(synapse.getPostSpikeHistory().size() == 1);
+    REQUIRE(synapse.getPreSpikeHistory().size() == 2);
+    REQUIRE(synapse.getPostSpikeHistory().size() == 1);
     
     synapse.clearHistory();
-    assert(synapse.getPreSpikeHistory().empty());
-    assert(synapse.getPostSpikeHistory().empty());
-    
-    std::cout << "    testSynapseSpikeHistory passed" << std::endl;
+    REQUIRE(synapse.getPreSpikeHistory().empty());
+    REQUIRE(synapse.getPostSpikeHistory().empty());
 }
 
-void testSynapseEligibilityTrace() {
+TEST_CASE("Synapse eligibility trace management", "[synapse][eligibility]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(synapse.getEligibilityTrace() == 0.0f);
+    REQUIRE(synapse.getEligibilityTrace() == 0.0f);
     
     synapse.setEligibilityTrace(0.5f);
-    assert(synapse.getEligibilityTrace() == 0.5f);
+    REQUIRE(synapse.getEligibilityTrace() == 0.5f);
     
     // Test decay
     synapse.decayEligibilityTrace(0.1f);
-    assert(synapse.getEligibilityTrace() < 0.5f);
-    
-    std::cout << "    testSynapseEligibilityTrace passed" << std::endl;
+    REQUIRE(synapse.getEligibilityTrace() < 0.5f);
 }
 
-void testSynapseEfficacy() {
+TEST_CASE("Synapse efficacy management", "[synapse][efficacy]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(synapse.getEfficacy() == 1.0f);  // Default
+    REQUIRE(synapse.getEfficacy() == 1.0f);  // Default
     
     synapse.setEfficacy(0.5f);
-    assert(synapse.getEfficacy() == 0.5f);
+    REQUIRE(synapse.getEfficacy() == 0.5f);
     
     // Test bounds
     synapse.setEfficacy(5.0f);
-    assert(synapse.getEfficacy() <= 2.0f);  // Clamped
-    
-    std::cout << "    testSynapseEfficacy passed" << std::endl;
+    REQUIRE(synapse.getEfficacy() <= 2.0f);  // Clamped
 }
 
-void testSynapseRandomInitialization() {
+TEST_CASE("Synapse random initialization", "[synapse][random]") {
     nlm::RandomGenerator rng(42);
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
@@ -133,15 +116,13 @@ void testSynapseRandomInitialization() {
     synapse.initializeRandom(rng);
     
     // Weight should be positive for excitatory
-    assert(synapse.getWeight() > 0.0f);
+    REQUIRE(synapse.getWeight() > 0.0f);
     
     // Delay should be in valid range
-    assert(synapse.getDelay() >= 1 && synapse.getDelay() <= 5);
-    
-    std::cout << "    testSynapseRandomInitialization passed" << std::endl;
+    REQUIRE(synapse.getDelay() >= 1 && synapse.getDelay() <= 5);
 }
 
-void testSynapseReset() {
+TEST_CASE("Synapse reset operation", "[synapse][reset]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
     synapse.setWeight(0.5f);
@@ -151,42 +132,23 @@ void testSynapseReset() {
     
     synapse.reset();
     
-    assert(synapse.getWeight() == 0.0f);
-    assert(synapse.getPreSpikeHistory().empty());
-    assert(synapse.getPostSpikeHistory().empty());
-    assert(synapse.getEligibilityTrace() == 0.0f);
-    
-    std::cout << "    testSynapseReset passed" << std::endl;
+    REQUIRE(synapse.getWeight() == 0.0f);
+    REQUIRE(synapse.getPreSpikeHistory().empty());
+    REQUIRE(synapse.getPostSpikeHistory().empty());
+    REQUIRE(synapse.getEligibilityTrace() == 0.0f);
 }
 
-void testSynapsePlasticityFlags() {
+TEST_CASE("Synapse plasticity flags management", "[synapse][plasticity]") {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    assert(!synapse.getPlasticityFlags().hebbian);
-    assert(!synapse.getPlasticityFlags().stdp);
+    REQUIRE(!synapse.getPlasticityFlags().hebbian);
+    REQUIRE(!synapse.getPlasticityFlags().stdp);
     
     synapse.enablePlasticity(true, true, false);
     
-    assert(synapse.getPlasticityFlags().hebbian);
-    assert(synapse.getPlasticityFlags().stdp);
-    assert(!synapse.getPlasticityFlags().reward_modulated);
-    
-    std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
-}
-
-void runAll() {
-    std::cout << "Running Synapse tests..." << std::endl;
-    testSynapseCreation();
-    testSynapseWeight();
-    testSynapseWeightBounds();
-    testSynapseType();
-    testSynapseDelay();
-    testSynapseSpikeHistory();
-    testSynapseEligibilityTrace();
-    testSynapseEfficacy();
-    testSynapseRandomInitialization();
-    testSynapseReset();
-    testSynapsePlasticityFlags();
+    REQUIRE(synapse.getPlasticityFlags().hebbian);
+    REQUIRE(synapse.getPlasticityFlags().stdp);
+    REQUIRE(!synapse.getPlasticityFlags().reward_modulated);
 }
 
 } // namespace test_synapse

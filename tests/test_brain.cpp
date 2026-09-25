@@ -1,22 +1,19 @@
 // Brain Tests
 #include "brain/Brain.hpp"
 #include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
+#include <catch2/catch_test_macros.hpp>
 
 namespace test_brain {
 
-void testBrainCreation() {
+TEST_CASE("Brain creation with configuration", "[brain][creation][config]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     
     nlm::Brain brain(config);
-    
-    std::cout << "    testBrainCreation passed" << std::endl;
 }
 
-void testBrainInitialization() {
+TEST_CASE("Brain initialization and properties", "[brain][initialization]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
@@ -24,18 +21,15 @@ void testBrainInitialization() {
     
     nlm::Brain brain(config);
     
-    bool success = brain.initialize();
-    assert(success);
+    REQUIRE(brain.initialize());
     
     // Verify brain initialized with expected properties
-    assert(brain.getRegionCount() == 2);
-    assert(brain.getTotalNeuronCount() == 100);
-    assert(brain.getTotalSynapseCount() > 0);
-    
-    std::cout << "    testBrainInitialization passed" << std::endl;
+    REQUIRE(brain.getRegionCount() == 2);
+    REQUIRE(brain.getTotalNeuronCount() == 100);
+    REQUIRE(brain.getTotalSynapseCount() > 0);
 }
 
-void testBrainStep() {
+TEST_CASE("Brain step simulation", "[brain][step][simulation]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -49,12 +43,10 @@ void testBrainStep() {
     }
     
     // Just verify it doesn't crash
-    assert(brain.getTotalNeuronCount() == 100);
-    
-    std::cout << "    testBrainStep passed" << std::endl;
+    REQUIRE(brain.getTotalNeuronCount() == 100);
 }
 
-void testBrainReset() {
+TEST_CASE("Brain reset operation", "[brain][reset]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -66,12 +58,10 @@ void testBrainReset() {
     brain.reset();
     
     // Verify reset worked
-    assert(brain.getTotalNeuronCount() == 50);
-    
-    std::cout << "    testBrainReset passed" << std::endl;
+    REQUIRE(brain.getTotalNeuronCount() == 50);
 }
 
-void testBrainRegions() {
+TEST_CASE("Brain regions management", "[brain][regions]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(3), nlm::ConfigSource::Default);
@@ -80,17 +70,15 @@ void testBrainRegions() {
     brain.initialize();
     
     auto regionIds = brain.getRegionIds();
-    assert(regionIds.size() == 3);
+    REQUIRE(regionIds.size() == 3);
     
     for (auto rid : regionIds) {
         auto* region = brain.getRegion(rid);
-        assert(region != nullptr);
+        REQUIRE(region != nullptr);
     }
-    
-    std::cout << "    testBrainRegions passed" << std::endl;
 }
 
-void testBrainActionProduction() {
+TEST_CASE("Brain action production", "[brain][action]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -99,12 +87,10 @@ void testBrainActionProduction() {
     brain.initialize();
     
     auto action = brain.produceAction();
-    assert(action != nullptr);
-    
-    std::cout << "    testBrainActionProduction passed" << std::endl;
+    REQUIRE(action != nullptr);
 }
 
-void testBrainStatus() {
+TEST_CASE("Brain status and statistics", "[brain][status][statistics]") {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -113,22 +99,23 @@ void testBrainStatus() {
     brain.initialize();
     
     // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
-    
-    std::cout << "    testBrainStatus passed" << std::endl;
+    REQUIRE(brain.getTotalNeuronCount() > 0);
+    REQUIRE(brain.getTotalSynapseCount() >= 0);
+    REQUIRE(brain.getFiringNeuronCount() >= 0);
+    REQUIRE(brain.getAverageFiringRate() >= 0.0f);
 }
 
-void runAll() {
-    testBrainCreation();
-    testBrainInitialization();
-    testBrainStep();
-    testBrainReset();
-    testBrainRegions();
-    testBrainActionProduction();
-    testBrainStatus();
+TEST_CASE("Brain with different region counts", "[brain][regions][parametrized]") {
+    for (int regionCount = 1; regionCount <= 5; ++regionCount) {
+        auto config = std::make_shared<nlm::Config>();
+        config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), nlm::ConfigSource::Default);
+        
+        nlm::Brain brain(config);
+        REQUIRE(brain.initialize());
+        REQUIRE(brain.getRegionCount() == regionCount);
+        REQUIRE(brain.getTotalNeuronCount() == 50);
+    }
 }
 
 } // namespace test_brain
