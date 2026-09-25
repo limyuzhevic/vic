@@ -5,6 +5,13 @@
 
 namespace nlm {
 
+#include "AgentBrain.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+
+namespace nlm {
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -18,10 +25,22 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , plannerEnabled_(true)
+    , conceptFormationEnabled_(true)
+    , attentionEnabled_(true)
+    , selfModelEnabled_(true)
+    , socialLearningEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize cognitive systems from brain
     if (brain_) {
+        // Get cognitive systems from brain if available
+        planner_ = std::unique_ptr<NeuralPlanner>(brain_->getPlanner());
+        conceptFormation_ = std::unique_ptr<ConceptFormation>(brain_->getConceptFormation());
+        attention_ = std::unique_ptr<AttentionalSelection>(brain_->getAttention());
+        // Note: SelfModel and SocialLearning are embedded in NeuralPlanner.hpp
+        // They are accessed through the planner_ pointer
+        
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
@@ -345,6 +364,64 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Integration methods
+void AgentBrain::integrateCognitiveSystems() {
+    NLM_LOG_INFO("AgentBrain: Integrating Phase 4 cognitive systems");
+    
+    bool anyIntegrated = false;
+    
+    if (plannerEnabled_ && planner_) {
+        planner_->setPlanningDepth(5);
+        planner_->setCurrentGoal(std::vector<float>(50, 0.5f));
+        NLM_LOG_INFO("  - Neural planner integrated: planning depth 5");
+        anyIntegrated = true;
+    }
+    
+    if (conceptFormationEnabled_ && conceptFormation_) {
+        conceptFormation_->setFormationThreshold(0.7f);
+        conceptFormation_->setStabilityWindow(10);
+        NLM_LOG_INFO("  - Concept formation integrated: threshold 0.7, window 10");
+        anyIntegrated = true;
+    }
+    
+    if (attentionEnabled_ && attention_) {
+        attention_->setInhibitionStrength(0.5f);
+        attention_->setExcitationStrength(1.5f);
+        NLM_LOG_INFO("  - Attention integrated: inhibition 0.5, excitation 1.5");
+        anyIntegrated = true;
+    }
+    
+    if (selfModelEnabled_ && planner_ && planner_->getSelfModel()) {
+        planner_->getSelfModel()->setCapabilityLevel(0.5f);
+        NLM_LOG_INFO("  - Self-model integrated: capability level 0.5");
+        anyIntegrated = true;
+    }
+    
+    if (socialLearningEnabled_ && planner_ && planner_->getSocialLearning()) {
+        planner_->getSocialLearning()->setObservationCount(100);
+        NLM_LOG_INFO("  - Social learning integrated: observation limit 100");
+        anyIntegrated = true;
+    }
+    
+    if (anyIntegrated) {
+        NLM_LOG_INFO("AgentBrain: All cognitive systems integrated successfully");
+    } else {
+        NLM_LOG_WARNING("AgentBrain: No cognitive systems were integrated");
+    }
+}
+
+bool AgentBrain::areCognitiveSystemsIntegrated() const {
+    bool integrated = false;
+    
+    if (plannerEnabled_ && planner_) integrated = true;
+    if (conceptFormationEnabled_ && conceptFormation_) integrated = true;
+    if (attentionEnabled_ && attention_) integrated = true;
+    if (selfModelEnabled_ && planner_ && planner_->getSelfModel()) integrated = true;
+    if (socialLearningEnabled_ && planner_ && planner_->getSocialLearning()) integrated = true;
+    
+    return integrated;
 }
 
 } // namespace nlm

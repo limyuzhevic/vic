@@ -14,6 +14,20 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    
+    # Phase 6 integration tests
+    test_phase6_integration.cpp
+    test_phase6_memory.cpp
+    test_phase6_neuromodulation.cpp
+    test_phase6_prediction.cpp
+    test_phase6_development.cpp
+    test_phase6_checkpoint.cpp
+    test_phase6_replay.cpp
+    
+    # Comprehensive test suite
+    test_full_integration.cpp
+    test_performance_benchmark.cpp
+    test_configuration_validation.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

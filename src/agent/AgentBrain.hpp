@@ -9,8 +9,15 @@
 
 namespace nlm {
 
+// Forward declarations for cognitive systems
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
+
 // AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Handles sensory transduction and motor decoding with cognitive system integration
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -26,9 +33,11 @@ public:
     size_t getMotorOutputSize() const;
     
     // Process sensory percept and inject into brain
+    // Also processes through cognitive systems for integrated behavior
     void processSensoryInput(const SensoryPercept& percept);
     
     // Decode brain motor activity into motor command
+    // Integrates planner decisions and attention for action selection
     MotorCommand decodeMotorCommand();
     
     // Apply neuromodulation based on reward
@@ -58,16 +67,29 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Get cognitive system pointers for integration
+    NeuralPlanner* getPlanner() { return planner_.get(); }
+    ConceptFormation* getConceptFormation() { return conceptFormation_.get(); }
+    AttentionalSelection* getAttention() { return attention_.get(); }
+    SelfModel* getSelfModel() { return selfModel_.get(); }
+    SocialLearning* getSocialLearning() { return socialLearning_.get(); }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Configure cognitive system integration
+    void enablePlanner(bool enable) { plannerEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    void enableAttention(bool enable) { attentionEnabled_ = enable; }
+    void enableSelfModel(bool enable) { selfModelEnabled_ = enable; }
+    void enableSocialLearning(bool enable) { socialLearningEnabled_ = enable; }
+    
+    bool isPlannerEnabled() const { return plannerEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    bool isAttentionEnabled() const { return attentionEnabled_; }
+    bool isSelfModelEnabled() const { return selfModelEnabled_; }
+    bool isSocialLearningEnabled() const { return socialLearningEnabled_; }
+    
+    // Integration methods
+    void integrateCognitiveSystems();
+    bool areCognitiveSystemsIntegrated() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -77,6 +99,24 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive system integration
+    std::unique_ptr<NeuralPlanner> planner_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<AttentionalSelection> attention_;
+    std::unique_ptr<SelfModel> selfModel_;
+    std::unique_ptr<SocialLearning> socialLearning_;
+    
+    // Configuration flags
+    bool rewardModulationEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool developmentEnabled_;
+    bool curiosityEnabled_;
+    bool plannerEnabled_;
+    bool conceptFormationEnabled_;
+    bool attentionEnabled_;
+    bool selfModelEnabled_;
+    bool socialLearningEnabled_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -102,12 +142,6 @@ private:
     // Development state
     double developmentalAge_;
     float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

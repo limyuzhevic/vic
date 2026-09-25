@@ -1,7 +1,9 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
+
+// Forward declaration to avoid circular dependency
+class Brain;
 
 namespace nlm {
 

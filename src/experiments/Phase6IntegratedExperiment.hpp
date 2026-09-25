@@ -38,6 +38,13 @@ struct Phase6IntegrationResult {
     bool checkpointingWorks;
     bool replayWorks;
     
+    // Cognitive system integration status
+    bool plannerIntegrated;
+    bool conceptFormationIntegrated;
+    bool attentionIntegrated;
+    bool selfModelIntegrated;
+    bool socialLearningIntegrated;
+    
     // Metrics
     float totalReward;
     float avgFiringRate;
@@ -46,6 +53,14 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    
+    // Cognitive system metrics
+    float plannerConfidence;
+    float conceptCount;
+    float conceptStability;
+    float attentionSelectivity;
+    float selfModelConfidence;
+    float socialLearningAccuracy;
     
     // Timestamps
     time_t startTime;
@@ -60,6 +75,11 @@ struct Phase6IntegrationResult {
         , developmentIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , plannerIntegrated(false)
+        , conceptFormationIntegrated(false)
+        , attentionIntegrated(false)
+        , selfModelIntegrated(false)
+        , socialLearningIntegrated(false)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)
@@ -67,6 +87,12 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , plannerConfidence(0.0f)
+        , conceptCount(0.0f)
+        , conceptStability(0.0f)
+        , attentionSelectivity(0.0f)
+        , selfModelConfidence(0.0f)
+        , socialLearningAccuracy(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -123,6 +149,26 @@ public:
      * Test neuromodulation integration
      */
     bool testNeuromodulationIntegration();
+    
+    /**
+     * Test cognitive system integration
+     */
+    bool testCognitiveSystemIntegration();
+    
+    /**
+     * Test attention integration
+     */
+    bool testAttentionIntegration();
+    
+    /**
+     * Test self-model integration
+     */
+    bool testSelfModelIntegration();
+    
+    /**
+     * Test social learning integration
+     */
+    bool testSocialLearningIntegration();
     
     /**
      * Test checkpoint save/load

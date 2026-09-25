@@ -114,45 +114,7 @@ NLM/
 └── configs/
 ```
 
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (Complete - Final Integration with Enhanced Cognitive Systems)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
@@ -160,36 +122,74 @@ NLM/
 - Development affects plasticity rates
 - Checkpoint save/load working
 - Replay and consolidation functional
-- Phase 6 integration experiment created
+- **Phase 4 cognitive systems now integrated with AgentBrain**
+- Neural planner, concept formation, attention, self-model, social learning connected
+- **Comprehensive Phase 4 integration tests created**
+- Phase 6 integration experiment updated with cognitive system metrics
 
-## Scientific Limitations
+## Enhanced Cognitive Systems Integration
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+### AgentBrain Cognitive System Integration
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+Phase 4 cognitive systems have been successfully integrated into AgentBrain:
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+#### NeuralPlanner Integration
+- **Connected to AgentBrain**: NeuralPlanner used by AgentBrain::decodeMotorCommand() for action planning
+- **Goal-directed planning**: Plans multi-step action sequences based on current sensory state
+- **Experience-based quality**: Action quality learned through experience and updated with outcomes
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+#### ConceptFormation Integration
+- **Connected to AgentBrain**: ConceptFormation used by AgentBrain::processSensoryInput() to form concepts
+- **Pattern discovery**: Discovers recurring patterns from sensory experience
+- **Category emergence**: Categories emerge through repeated experience, not predefined
 
-## Architecture Philosophy
+#### AttentionalSelection Integration
+- **Connected to AgentBrain**: AttentionalSelection used for sensory filtering and prioritization
+- **Competitive selection**: Competes between neural pathways for focus
+- **Bottom-up and top-down**: Both novelty-driven and goal-driven attention mechanisms
 
-The NLM brain operates as a closed-loop system:
+#### Self-Model Integration
+- **Connected to Agency**: SelfModel provides self-awareness and action consequence prediction
+- **Forward model**: Predicts sensory consequences of actions
+- **Self-other distinction**: Learns to distinguish self-generated vs external events
+
+#### Social Learning Integration
+- **Connected to Agency**: SocialLearning enables learning from observing other agents
+- **Imitation capability**: Can imitate observed actions of other agents
+- **Communication signals**: Learns simple communication from other agents
+
+### Integration Methods Added
+
+AgentBrain now includes:
+
+- **Cognitive system pointers**: Access to NeuralPlanner, ConceptFormation, AttentionalSelection
+- **Integration configuration**: Flags to enable/disable specific cognitive systems
+- **Integration methods**: `integrateCognitiveSystems()` and `areCognitiveSystemsIntegrated()`
+- **Enhanced processing**: Cognitive systems involved in sensory processing and action selection
+- **Metrics collection**: Cognitive system performance tracked in experiments
+
+### Phase 4 Integration Tests
+
+Created comprehensive test suite:
+
+- `test_phase4_integration.cpp` - Tests all Phase 4 systems integration
+- `test_phase4_planner.cpp` - Tests NeuralPlanner functionality  
+- `test_phase4_concept_formation.cpp` - Tests concept formation
+- `test_phase4_attention.cpp` - Tests attentional selection
+- `test_phase4_self_model.cpp` - Tests self-model functionality
+- `test_phase4_social_learning.cpp` - Tests social learning
+
+### Enhanced Phase 6 Integration Experiment
+
+Phase 6 integration experiment now includes:
+
+- **Cognitive system metrics**: Tracks planner confidence, concept count, attention selectivity
+- **Integration verification**: Tests for self-model and social learning integration
+- **Performance monitoring**: Cognitive system performance measured and reported
+
+## Architecture Philosophy (Updated)
+
+The NLM brain with Phase 4 integration operates as:
 
 ```
 WORLD
@@ -202,9 +202,11 @@ INTERNAL STATE (working memory, attention)
   ↓
 MEMORY / PREDICTION
   ↓
+COGNITIVE SYSTEMS (planner, concepts, attention, self, social)
+  ↓
 MOTIVATION / NEUROMODULATION (dopamine, curiosity)
   ↓
-ACTION SELECTION
+ACTION SELECTION (neural decoding + cognitive guidance)
   ↓
 MOTOR OUTPUT
   ↓
@@ -214,7 +216,7 @@ REWARD / SURPRISE / ERROR
   ↓
 PLASTICITY (STDP, Hebbian, structural)
   ↓
-MEMORY / DEVELOPMENT
+MEMORY / DEVELOPMENT / COGNITIVE SYSTEMS
   ↓
 CHANGED BRAIN
   ↓

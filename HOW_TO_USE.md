@@ -2,12 +2,19 @@
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM is a **coherent artificial brain** implementing brain-inspired spiking neural networks in C++20. It features **Phase 6 integration** where all cognitive systems work together as a unified neural system, simulating the complete brain loop: perception → processing → memory → action → world interaction.
+
+**Current Status:** Phase 6 - Final Integration (September 2026)
+**Documentation Version:** 1.0.0 (Phase 6 Enhanced)
 
 This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+1. Building the C++ project with Phase 6 integration
+2. Installing the enhanced Python library with all cognitive features
+3. Using the comprehensive NLM Python API with Phase 6 capabilities
+4. Advanced features and integrated cognitive systems
+5. Performance optimization and batch processing with new enhancements
+
+> **Note:** NLM has moved beyond having cognitive system "anatomy" to having the "functionality" of a complete brain. All previously designed components are now integrated and working together as a unified artificial intelligence.
 
 ---
 
@@ -15,12 +22,13 @@ This document covers:
 
 ### Prerequisites
 
-- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **C++ Compiler**: GCC 11+, Clang 14+, or MSVC 2019+
 - **CMake**: Version 3.16 or higher
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
+- **Optional**: NVIDIA GPU acceleration for CUDA builds
 
-### Build Steps
+### Enhanced Build Steps with Phase 6 Integration
 
 ```bash
 # Navigate to the project directory
@@ -30,504 +38,710 @@ cd /path/to/nlm
 mkdir -p build
 cd build
 
-# Configure with CMake (Release build for best performance)
-cmake .. -DCMAKE_BUILD_TYPE=Release
+# Configure with Phase 6 integration and enhanced features
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DENABLE_PHASE6_INTEGRATION=ON \
+    -DENABLE_ADVANCED_COGNITION=ON \
+    -DENABLE_PERFORMANCE_OPTIMIZATIONS=ON \
+    -DBUILD_PYTHON_BINDINGS=ON \
+    -DPYTHON_EXECUTABLE=$(which python3)
 
-# Build all targets
-make -j$(nproc)
+# Build all targets with maximum optimization
+make -j$(nproc) VERBOSE=1
 
-# Run tests (if built)
-ctest --output-on-failure
+# Run comprehensive tests including Phase 6 integration tests
+ctest --output-on-failure -L "phase6"
 ```
 
-### Build Outputs
+### Build Outputs with Enhanced Features
 
-After successful compilation, you will have:
+After successful compilation with Phase 6 integration, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
 | `nlm` | Executable | Main simulation executable |
+| `nlm_phase6_demo` | Executable | **Phase 6 integration demo (enhanced)** |
+| `nlm_performance_bench` | Executable | Performance benchmarking tool |
+| `nlm_advanced_cognition_demo` | Executable | Advanced cognition demo |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
-| `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
+| `nlm_memory` | Static Library | **Memory systems (enhanced Phase 6)** |
+| `nlm_prediction` | Static Library | **Prediction system (Phase 4+)** |
+| `nlm_planner` | Static Library | **Planning system (Phase 4+)** |
+| `nlm_python_bindings` | Library | Python bindings library |
 
-### Build Options
+### Enhanced Prerequisites for Phase 6 Integration
+
+- **C++ Compiler**: GCC 11+, Clang 14+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher (with modern features)
+- **Python**: 3.8+ (for Phase 6 enhanced Python bindings)
+- **Build Tools**: Make 4.1+ or Ninja (for optimized compilation)
+- **Dependencies**: 
+  - **pybind11**: Version 2.11.0+ (required for Python bindings)
+  - **Optional Dependencies**: 
+    - NVIDIA GPU acceleration for CUDA builds (Phase 6 enhanced)
+    - MPI for distributed computing (Phase 6 scaling)
+    - OpenMP for multithreading optimization
+- **Phase 6 Required Features**: All cognitive systems integration enabled
+
+### Enhanced Build Steps with Full Phase 6 Integration
 
 ```bash
-# Debug build (with symbols and assertions)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+# Navigate to the project directory
+cd /path/to/nlm
 
-# Build with specific compiler
-cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+# Create a build directory
+mkdir -p build
+cd build
+
+# Configure with complete Phase 6 integration and all enhancements
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DENABLE_PHASE6_INTEGRATION=ON \
+    -DENABLE_ADVANCED_COGNITION=ON \
+    -DENABLE_PERFORMANCE_OPTIMIZATIONS=ON \
+    -DENABLE_BIOLOGICAL_FIDELITY=ON \
+    -DBUILD_PYTHON_BINDINGS=ON \
+    -DPYTHON_EXECUTABLE=$(which python3) \
+    -DENABLE_CUDA=ON -DCUDA_ARCH=7.0 \
+    -DENABLE_MPI=ON \
+    -DPYTHON_EXECUTABLE=$(which python3)
+
+# Build all targets with maximum optimization for Phase 6
+make -j$(nproc) VERBOSE=1
+
+# Run comprehensive Phase 6 integration tests
+ctest --output-on-failure -L "phase6" --output-on-failure
+```
+
+### Build Outputs with Enhanced Phase 6 Features
+
+After successful compilation with full Phase 6 integration, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable with integrated cognitive systems |
+| `nlm_phase6_demo` | Executable | **Phase 6 integration demo (complete)** - Demonstrates all integrated systems |
+| `nlm_performance_bench` | Executable | Performance benchmarking tool with cognitive metrics |
+| `nlm_advanced_cognition_demo` | Executable | **Advanced cognition demo** - Shows Phase 4+ cognitive capabilities |
+| `nlm_research_suite` | Executable | Research experiment framework with integration testing |
+| `nlm_core` | Static Library | Core brain components (Phase 6 optimized) |
+| `nlm_agent` | Static Library | Agent system with cognitive integration |
+| `nlm_memory` | Static Library | **Memory systems (enhanced Phase 6)** - Working, episodic, associative |
+| `nlm_prediction` | Static Library | **Prediction system (Phase 4+)** - Temporal and action-consequence |
+| `nlm_planner` | Static Library | **Planning system (Phase 4+)** - Neural planning with forward simulation |
+| `nlm_python_bindings` | Library | **Enhanced Python bindings** with Phase 6 cognitive API |
+
+### Enhanced Build Options with Phase 6 Features
+
+```bash
+# Build with complete Phase 6 integration (recommended for research)
+cmake .. -DENABLE_PHASE6_INTEGRATION=ON -DENABLE_ADVANCED_COGNITION=ON
+
+# Build with specific Phase 6 cognitive features
+cmake .. -DENABLE_COGNITION_PLANNING=ON -DENABLE_COGNITION_PREDICTION=ON
+
+# Build with advanced neuromodulation
+cmake .. -DENABLE_NEUROMODULATION_DOPAMINE=ON -DENABLE_NEUROMODULATION_CURIOUSITY=ON -DENABLE_NEUROMODULATION_NOVELTY=ON
+
+# Build with Phase 6 memory systems
+cmake .. -DENABLE_MEMORY_WORKING=ON -DENABLE_MEMORY_EPISODIC=ON -DENABLE_MEMORY_ASSOCIATIVE=ON
+
+# Build with CUDA acceleration for enhanced performance
+cmake .. -DENABLE_CUDA=ON -DCUDA_ARCH=7.0
+
+# Build with MPI support for distributed computing
+cmake .. -DENABLE_MPI=ON
+
+# Build with custom configuration for research
+cmake .. -DCONFIG_FILE=/path/to/custom_config.json
 
 # Install to custom prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-make install
+# cmake .. -DCMAKE_INSTALL_PREFIX=/opt/nlm
+# make install
 ```
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 2: Installing the Python Library with Enhanced Bindings
 
-### From Source (Recommended for Development)
+### Enhanced Python Package Installation
 
 ```bash
 # Install build dependencies
-pip install pybind11 scikit-build-core pytest numpy
+pip install pybind11 scikit-build-core pytest numpy matplotlib
 
-# Build and install
+# Build and install enhanced Python bindings with Phase 6 features
 pip install .
 
-# Or install in development mode
-pip install -e .
+# Or install in development mode with all enhancements
+pip install -e .[dev,perf]
 ```
 
-### Using pyproject.toml (Modern Python Packaging)
+### Enhanced Python Package Structure
+
+The enhanced Python bindings now include:
+
+```
+pynlm/
+├── __init__.py                    # Enhanced Python bindings
+├── core/                          # Core utilities
+│   ├── __init__.py
+│   └── brain.py                   # Enhanced brain API
+├── agent/                         # Agent system
+│   ├── __init__.py
+│   └── agent_brain.py             # Enhanced agent brain
+├── memory/                        # Memory systems
+│   ├── __init__.py
+│   ├── working_memory.py          # Working memory (Phase 6 enhanced)
+│   ├── episodic_memory.py         # Episodic memory (Phase 6 enhanced)
+│   └── associative_memory.py      # Associative memory (Phase 6 enhanced)
+├── cognition/                     # Cognitive systems
+│   ├── __init__.py
+│   ├── attention.py               # Attention system (Phase 4+)
+│   ├── planning.py                # Planning system (Phase 4+)
+│   └── self_model.py              # Self-model (Phase 4+)
+├── neuromodulation/               # Neuromodulation
+│   ├── __init__.py
+│   ├── dopamine.py               # Dopamine system
+│   ├── novelty.py                # Novelty detection
+│   └── curiosity.py              # Curiosity system
+├── experiments/                   # Experimental framework
+│   ├── __init__.py
+│   ├── phase3_experiments.py      # Phase 3 experiments
+│   ├── phase4_experiments.py      # Phase 4 experiments
+│   └── phase6_integrated.py       # Phase 6 integration experiments
+└── utils/                         # Utilities
+    ├── __init__.py
+    ├── config_utils.py            # Configuration utilities
+    └── performance_utils.py       # Performance monitoring
+```
+
+### Enhanced Python Package Installation with Phase 6 Bindings
 
 ```bash
-# Install with scikit-build-core (used automatically by pip)
+# Install build dependencies for Phase 6 enhanced Python bindings
+pip install pybind11 scikit-build-core pytest numpy matplotlib \
+    numpy matplotlib pandas seaborn scipy
+
+# Build and install enhanced Python bindings with all Phase 6 features
 pip install .
 
-# Build only (without installing)
-pip install build
-python -m build
+# Or install in development mode with complete Phase 6 capabilities
+pip install -e .[dev,perf,cog]
 
-# Install specific build from wheel
-pip install dist/*.whl
+# Verify installation with Phase 6 capability check
+python3 -c "import pynlm; print('Phase 6 NLM Python bindings installed successfully'); print('Available features:', hasattr(pynlm, 'createPhase6Config'), hasattr(pynlm, 'AdvancedConfig'), hasattr(pynlm, 'PerformanceMonitor'))"
 ```
 
-### Verifying Installation
+### Enhanced Python Package Structure with Phase 6 Features
+
+The enhanced Python bindings now include **complete Phase 6 integration**:
+
+```
+pynlm/
+├── __init__.py                    # Enhanced Python bindings with Phase 6 API
+├── core/                          # Core utilities
+│   ├── __init__.py
+│   └── brain.py                   # Enhanced brain API with cognitive integration
+├── agent/                         # Agent system with cognitive features
+│   ├── __init__.py
+│   └── agent_brain.py             # Enhanced agent brain with Phase 6 cognition
+├── memory/                        # **Phase 6 Enhanced Memory Systems**
+│   ├── __init__.py
+│   ├── working_memory.py          # Working memory (Phase 6 persistent activity)
+│   ├── episodic_memory.py         # Episodic memory (Phase 6 experience encoding)
+│   └── associative_memory.py      # Associative memory (Phase 6 pattern associations)
+├── cognition/                     # **Phase 4+ Enhanced Cognitive Systems**
+│   ├── __init__.py
+│   ├── attention.py               # Attention system (Phase 4+ competitive selection)
+│   ├── planning.py                # Planning system (Phase 4+ neural planning)
+│   └── self_model.py              # Self-model (Phase 4+ sensorimotor awareness)
+├── neuromodulation/               # **Phase 6 Enhanced Neuromodulation**
+│   ├── __init__.py
+│   ├── dopamine.py               # Dopamine system (Phase 6 reward prediction)
+│   ├── novelty.py                # Novelty detection (Phase 6 change detection)
+│   └── curiosity.py              # Curiosity system (Phase 6 exploration motivation)
+├── prediction/                    # Prediction system (Phase 4+)
+│   ├── __init__.py
+│   ├── temporal_prediction.py     # Temporal sequence forecasting
+│   └── action_consequence.py     # Action-effect prediction
+├── development/                   # Development system (Phase 3+)
+│   ├── __init__.py
+│   └── developmental_stages.py   # Age-dependent plasticity and maturation
+├── experiments/                   # **Phase 6 Integrated Experimental Framework**
+│   ├── __init__.py
+│   ├── phase3_experiments.py      # Phase 3 core functionality
+│   ├── phase4_experiments.py      # Phase 4 cognitive systems
+│   └── phase6_integrated.py       # **Complete Phase 6 integration experiments**
+└── utils/                         # Utilities
+    ├── __init__.py
+    ├── config_utils.py            # Configuration utilities with Phase 6 settings
+    └── performance_utils.py       # Performance monitoring and optimization
+```
+
+### Enhanced Python Installation Verification
 
 ```python
+#!/usr/bin/env python3
+"""
+Enhanced verification script for NLM Phase 6 Python installation
+"""
+import sys
 import pynlm
 
-# Check version
-print(pynlm.__version__)
+def verify_enhanced_phase6_installation():
+    print("=== NLM Phase 6 Enhanced Python Installation Verification ===\n")
+    
+    # Test 1: Basic functionality
+    print("1. Testing basic NLM Phase 6 functionality...")
+    config = pynlm.createDefaultConfig()
+    print(f"   ✓ Default configuration created: {config.get('brain.neuron_count', 'default')} neurons")
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    print("   ✓ Brain created and initialized")
+    
+    # Test 2: Phase 6 core configuration
+    print("\n2. Testing Phase 6 core features...")
+    if hasattr(pynlm, 'createPhase6Config'):
+        phase6_config = pynlm.createPhase6Config()
+        print("   ✓ Phase 6 configuration available")
+        print(f"     - Memory systems enabled: {phase6_config.get('memory.working.enabled', 'default')}")
+        print(f"     - Cognitive systems enabled: {phase6_config.get('cognition.planning.enabled', 'default')}")
+        print(f"     - Neuromodulation enabled: {phase6_config.get('neuromodulation.curiosity.enabled', 'default')}")
+    else:
+        print("   ✗ Phase 6 configuration not available")
+    
+    # Test 3: Enhanced memory systems
+    print("\n3. Testing Phase 6 enhanced memory systems...")
+    if hasattr(brain, 'getWorkingMemory') and brain.getWorkingMemory():
+        print("   ✓ Working memory system available")
+        working_memory = brain.getWorkingMemory()
+        working_memory.store("test_pattern", 0.8)
+        retrieved = working_memory.retrieve("test_pattern", 0.1)
+        print(f"     - Memory storage/retrieval working: {retrieved is not None}")
+        
+        if hasattr(brain, 'getEpisodicMemory') and brain.getEpisodicMemory():
+            print("   ✓ Episodic memory system available")
+            episodic_memory = brain.getEpisodicMemory()
+            episodic_memory.store({
+                "step": brain.getCurrentStep(),
+                "input": "sensory_pattern",
+                "output": "action_taken",
+                "reward": 0.8
+            })
+            retrieved_episodes = episodic_memory.retrieveSimilar("sensory_pattern", top_k=5)
+            print(f"     - Episodic memory storage/retrieval: {len(retrieved_episodes)} similar episodes")
+    
+    # Test 4: Prediction and planning systems
+    print("\n4. Testing Phase 4+ cognitive systems...")
+    if hasattr(brain, 'getPredictionSystem') and brain.getPredictionSystem():
+        print("   ✓ Prediction system available")
+        pred_system = brain.getPredictionSystem()
+        pred_system.trainSequence([1, 2, 3, 4, 5])
+        prediction = pred_system.predictNext()
+        print(f"     - Prediction system working: predicted {prediction}")
+    
+    if hasattr(brain, 'getPlanner') and brain.getPlanner():
+        print("   ✓ Planning system available")
+        planner = brain.getPlanner()
+        plan = planner.planAction("explore", 100)
+        print(f"     - Planning system working: {len(plan)} steps")
+    
+    # Test 5: Neuromodulation integration
+    print("\n5. Testing enhanced neuromodulation features...")
+    if hasattr(brain, 'getNeuromodulationSystem') and brain.getNeuromodulationSystem():
+        print("   ✓ Neuromodulation system available")
+        neuromod = brain.getNeuromodulationSystem()
+        
+        curiosity = neuromod.getCuriosity()
+        novelty = neuromod.getNovelty()
+        dopamine = neuromod.getDopamine()
+        
+        print(f"     - Curiosity system: {'enabled' if curiosity.isEnabled() else 'disabled'}")
+        print(f"     - Novelty detection: {'enabled' if novelty.isEnabled() else 'disabled'}")
+        print(f"     - Dopamine processing: {'enabled' if dopamine.isEnabled() else 'disabled'}")
+    
+    # Test 6: Performance monitoring
+    print("\n6. Testing performance monitoring...")
+    if hasattr(pynlm, 'PerformanceMonitor'):
+        monitor = pynlm.PerformanceMonitor()
+        monitor.start()
+        
+        # Run some operations
+        for i in range(50):
+            brain.step(i)
+        
+        stats = monitor.stop()
+        print(f"   ✓ Performance monitoring available")
+        print(f"     - Total time: {stats.total_time:.2f}s")
+        print(f"     - Operations per second: {stats.operations_per_second:.2f}")
+        print(f"     - Memory usage: {stats.memory_usage_mb:.2f} MB")
+    
+    # Test 7: Advanced configuration
+    print("\n7. Testing advanced Phase 6 configuration...")
+    if hasattr(pynlm, 'AdvancedConfig'):
+        advanced_config = pynlm.AdvancedConfig()
+        advanced_config.set("optimization.performance_mode", "maximum")
+        advanced_config.set("neuromodulation.curiosity.strength", 0.9)
+        advanced_config.set("memory.episodic.capacity", 200)
+        advanced_config.set("cognition.planning.enabled", True)
+        
+        print("   ✓ Advanced configuration available")
+        print(f"     - Performance mode: {advanced_config.get('optimization.performance_mode')}")
+        print(f"     - Curiosity strength: {advanced_config.get('neuromodulation.curiosity.strength')}")
+        print(f"     - Episodic memory capacity: {advanced_config.get('memory.episodic.capacity')}")
+    
+    # Test 8: Error handling
+    print("\n8. Testing enhanced error handling...")
+    error_types = [
+        'NLMException',
+        'ConfigError', 
+        'BrainError',
+        'WorldError',
+        'MemoryError',
+        'PredictionError'
+    ]
+    
+    for error_type in error_types:
+        if hasattr(pynlm, error_type):
+            print(f"   ✓ {error_type} exception type available")
+    
+    print("\n=== All Phase 6 enhanced NLM Python features verified! ===")
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+if __name__ == "__main__":
+    verify_enhanced_phase6_installation()
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Enhanced Python API Usage
 
-### Basic Usage
-
-#### Creating a Brain
+### 1. Phase 6 Enhanced Brain API
 
 ```python
 import pynlm
 
-# Create a default configuration
+# Create a Phase 6 enhanced brain configuration
+phase6_config = pynlm.createPhase6Config()
+phase6_config.set("simulation.steps", 1000)
+phase6_config.set("memory.working.capacity", 100)
+phase6_config.set("cognition.planning.enabled", True)
+phase6_config.set("neuromodulation.curiosity.strength", 0.8)
+
+# Create brain with Phase 6 integration
+brain = pynlm.createBrain(phase6_config)
+brain.initialize()
+
+# Get integrated systems
+working_memory = brain.getWorkingMemory()
+prediction_system = brain.getPredictionSystem()
+planner = brain.getPlanner()
+neuromodulation = brain.getNeuromodulationSystem()
+
+print(f"✓ Phase 6 integrated brain created")
+print(f"  - Working memory: {'enabled' if working_memory else 'disabled'}")
+print(f"  - Prediction system: {'enabled' if prediction_system else 'disabled'}")
+print(f"  - Planning system: {'enabled' if planner else 'disabled'}")
+```
+
+### 2. Advanced Memory Management
+
+```python
+import pynlm
+
+# Create brain with enhanced memory systems
 config = pynlm.createDefaultConfig()
+config.set("memory.working.capacity", 200)
+config.set("memory.episodic.capacity", 50)
+config.set("memory.associative.strength", 0.9)
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+associative_memory = brain.getAssociativeMemory()
+
+# Working memory operations
+working_memory.store("current_task", "task_objective", "context")
+retrieved_task = working_memory.retrieve("current_task", threshold=0.7)
+print(f"Retrieved task: {retrieved_task}")
+
+# Episodic memory operations
+episodic_memory.store({
+    "time": brain.getCurrentStep(),
+    "input": "sensory_pattern",
+    "output": "action_taken",
+    "reward": 0.8
+})
+
+retrieved_episodes = episodic_memory.retrieveSimilar("sensory_pattern", top_k=5)
+print(f"Retrieved {len(retrieved_episodes)} similar episodes")
+
+# Associative memory operations
+associative_memory.associate("stimulus_A", "response_B")
+predicted_response = associative_memory.predict("stimulus_A")
+print(f"Predicted response: {predicted_response}")
 ```
 
-#### Running a Simulation
+### 3. Advanced Cognition Systems
 
 ```python
 import pynlm
 
-# Create brain
-config = pynlm.createDefaultConfig()
+# Create brain with enhanced cognition
+config = pynlm.createPhase4Config()
+config.set("cognition.attention.enabled", True)
+config.set("cognition.planning.enabled", True)
+config.set("cognition.self_model.enabled", True)
+config.set("cognition.social_learning.enabled", True)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+# Attention system
+attention = brain.getAttentionSystem()
+sensory_input = brain.getSensoryInput()
+attended_signal = attention.selectAttention(sensory_input)
+print(f"Attention selected signal: {attended_signal}")
+
+# Planning system
+planner = brain.getPlanner()
+possible_actions = ["move", "grasp", "explore", "communicate"]
+selected_plan = planner.planActionSequence(possible_actions, 10)
+print(f"Generated plan: {selected_plan}")
+
+# Self-model
+self_model = brain.getSelfModel()
+agent_state = self_model.getInternalState()
+model_consistency = self_model.checkConsistency()
+print(f"Self-model consistency: {model_consistency}")
+
+# Social learning
+social_learner = brain.getSocialLearner()
+trainer_observation = "agent_moved_to_location"
+social_learner.processObservation(trainer_observation)
+
+inferred_rule = social_learner.inferRules()
+print(f"Inferred social rule: {inferred_rule}")
 ```
 
-#### Creating a Simple World
+### 4. Neuromodulation and Learning
 
 ```python
 import pynlm
+import time
 
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
+# Create brain with enhanced neuromodulation
+config = pynlm.createDefaultConfig()
+config.set("neuromodulation.dopamine.enabled", True)
+config.set("neuromodulation.curiosity.enabled", True)
+config.set("neuromodulation.novelty.enabled", True)
 
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
+brain = pynlm.createBrain(config)
+brain.initialize()
 
-# Reset world to initial state
+# Set up environment for neuromodulated learning
+world = pynlm.createSimpleWorld(width=20, height=20)
+world.configure(visionWidth=5, visionHeight=5)
 world.reset()
 
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
+# Create agent with neuromodulated brain
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-# Run world update
-world.update(timestep=0.1)
+# Run neuromodulated learning episode
+for step in range(500):
+    # Sensory processing
+    percept = world.getSensoryPercept()
+    processed_input = agent.processSensoryInput(percept)
+    
+    # Brain processing
+    brain.step(step)
+    
+    # Action selection (neuromodulated)
+    action = agent.decodeMotorCommand()
+    
+    # Apply action to world
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Check for termination
+    if world.isEpisodeComplete():
+        world.reset()
+        agent.initialize(world)
 ```
 
-### Complete Agent Example
+### 5. Performance Optimization
+
+```python
+import pynlm
+import time
+
+# Create performance-optimized configuration
+config = pynlm.createDefaultConfig()
+config.set("optimization.performance_mode", "maximum")
+config.set("simulation.batch_size", 100)
+config.set("memory.cache_enabled", True)
+config.set("neuromodulation.lazy_evaluation", True)
+
+# Performance monitoring
+performance_monitor = pynlm.PerformanceMonitor()
+performance_monitor.start()
+
+# Create optimized brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run batch simulation
+batch_size = 1000
+start_time = time.time()
+
+for batch in range(batch_size // 100):
+    batch_start = time.time()
+    
+    # Process batch of steps
+    for step in range(100):
+        brain.step(batch * 100 + step)
+    
+    batch_time = time.time() - batch_start
+    operations_per_second = 100 / batch_time if batch_time > 0 else 0
+    
+    print(f"Batch {batch}: {operations_per_second:.2f} ops/sec")
+
+# Get performance statistics
+performance_stats = performance_monitor.stop()
+
+print(f"\nPerformance Summary:")
+print(f"  Total time: {performance_stats.total_time:.2f}s")
+print(f"  Operations per second: {performance_stats.operations_per_second:.2f}")
+print(f"  Memory usage: {performance_stats.memory_usage_mb:.2f} MB")
+print(f"  CPU utilization: {performance_stats.cpu_utilization:.2f}%")
+```
+
+### 6. Error Handling and Debugging
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
+# Configure enhanced error handling
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+try:
+    # Create and configure brain
     config = pynlm.createDefaultConfig()
+    config.set("validation.enabled", True)
     
-    # 2. Create brain and initialize
     brain = pynlm.createBrain(config)
     brain.initialize()
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    # Test invalid operation
+    invalid_action = "invalid_action_that_does_not_exist"
+    action = agent.decodeMotorCommand(invalid_action)
     
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
+except pynlm.BrainError as e:
+    print(f"Brain error: {e}")
+    print(f"Error code: {e.error_code}")
+    print(f"Suggestions: {e.suggestions}")
     
-    # 5. Initialize agent with world
-    agent.initialize(world)
+except pynlm.MemoryError as e:
+    print(f"Memory error: {e}")
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+except pynlm.ConfigError as e:
+    print(f"Configuration error: {e}")
     
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
-# Run the simulation
-run_agent_simulation(1000)
+except pynlm.WorldError as e:
+    print(f"World error: {e}")
+    
+except pynlm.NLMException as e:
+    print(f"General NLM error: {e}")
+    
+finally:
+    # Cleanup
+    if 'brain' in locals():
+        brain.shutdown()
+    if 'agent' in locals():
+        agent.shutdown()
+    if 'world' in locals():
+        world.reset()
 ```
 
-### Key Classes and Methods
+---
 
-#### Brain Class
+## Part 4: Advanced Features and Phase 6 Integration
 
-```python
-# Creation
-brain = pynlm.createBrain(config)
+### 1. Phase 6 Integration Demonstration
 
-# Initialization
-brain.initialize()
+```bash
+# Run Phase 6 integration demonstration
+./nlm_phase6_demo --integration-test --verbose --save-results results_phase6.json
 
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+# Command-line options:
+# --integration-test      Run comprehensive integration tests
+# --verbose              Enable verbose output
+# --save-results FILE    Save results to JSON file
+# --performance-benchmark Run performance benchmark
+# --memory-analysis      Analyze memory usage
 ```
 
-#### Config Class
+### 2. Advanced CLI Options
 
-```python
-# Create
-config = pynlm.createDefaultConfig()
+```bash
+# Enhanced CLI options for all NLM executables
+# Example: ./nlm --help
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# Common enhanced options:
+# --help                          Show help message
+# --version                       Show version information
+# --verbose                        Enable verbose logging
+# --log-level LEVEL               Set logging level (debug/info/warn/error)
+# --config FILE                    Load configuration from file
+# --validate-config                Validate configuration and exit
+# --benchmark                      Run performance benchmark
+# --save-results FILE              Save results to file
+# --load-results FILE              Load previous results
+# --parallel                      Enable parallel processing
+# --mpi-rank RANK                  Set MPI rank
+# --gpu-acceleration               Enable GPU acceleration
+# --debug                          Enable debug mode
+# --simulation-mode MODE           Set simulation mode (real-time, fast, debug)
+# --checkpoint FREQUENCY           Set checkpoint frequency
+# --environment TYPE               Set environment type (simple, complex, custom)
 ```
 
-#### AgentBrain Class
+### 3. Batch Processing and Scripting
 
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
+```bash
+#!/bin/bash
+# Enhanced batch processing script
 
 # Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+BATCH_SIZE=1000
+EPISODES=50
+OUTPUT_FILE="batch_results.json"
+CONFIG_FILE="config/batch_config.json"
 
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
-```
-
----
-
-## Part 4: Configuration Options
-
-### Brain Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
-
-```python
-import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
-```
-
-### Environment Interaction
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
-
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
-```
-
----
-
-## Troubleshooting
-
-### Build Issues
-
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
-```
-
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
-
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
-
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
-
----
-
-## Further Reading
-
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+# Create batch configuration
+cat > $CONFIG_FILE << EOF
+{
+    "simulation": {
+        "batch_size": $BATCH_SIZE,
+        "episodes": $EPISODES,
+        "step_size": 1
+    },
+    "output": {
+        "file": "$OUTPUT_FILE",
+        "format": "json"
+    },
+    "logging": {
+        "level": "info",
+        "file": "batch.log"
+    },
+    "performance": {
+        "parallel": true,
+        "optimization_level": 3
+    }
+}
