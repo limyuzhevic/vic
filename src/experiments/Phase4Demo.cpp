@@ -2,6 +2,8 @@
 #include <memory>
 #include <iomanip>
 #include <sstream>
+#include <string>
+#include <fstream>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -13,27 +15,80 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
+// Demo configuration structure
+struct DemoConfig {
+    size_t numTrials = 50;
+    bool verbose = false;
+    bool saveResults = false;
+    std::string resultsFile = "phase4_results.json";
+};
+
+// Pretty print utilities
 void printHeader(const std::string& title) {
     std::cout << "\n" << std::string(60, '=') << "\n";
     std::cout << "  " << title << "\n";
     std::cout << std::string(60, '=') << "\n";
 }
 
-void printResult(const std::string& name, float value, float max = 1.0f) {
+void printSection(const std::string& title) {
+    std::cout << "\n--- " << title << " ---\n";
+}
+
+void printResult(const std::string& name, float value, const std::string& unit = "", 
+                 bool highlight = false, float max = 1.0f) {
     std::cout << "  " << std::left << std::setw(30) << name << ": ";
-    std::cout << std::fixed << std::setprecision(3) << value;
-    if (max > 0) {
-        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
+    std::cout << std::right;
+    if (highlight) {
+        std::cout << std::fixed << std::setprecision(4) << value;
+    } else {
+        std::cout << std::fixed << std::setprecision(3) << value;
+    }
+    if (!unit.empty()) {
+        std::cout << " " << unit;
+    }
+    if (max > 0 && !highlight) {
+        float percent = value / max * 100.0f;
+        std::cout << " (" << std::setprecision(1) << percent << "%)";
     }
     std::cout << "\n";
 }
 
-void printSection(const std::string& title) {
-    std::cout << "\n--- " << title << " ---\n";
+// Parse command line arguments
+DemoConfig parseArguments(int argc, char* argv[]) {
+    DemoConfig config;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "NLM Phase 4 Demo Usage:\n";
+            std::cout << "  nlm_phase4_demo [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  --trials N             Number of trials (default: 50)\n";
+            std::cout << "  --verbose              Enable verbose output\n";
+            std::cout << "  --save                 Save results to JSON file\n";
+            std::cout << "  --output file          Output file for results (default: phase4_results.json)\n";
+            std::cout << "  --help, -h             Show this help message\n";
+            exit(0);
+        }
+        
+        if (arg == "--verbose" || arg == "-v") {
+            config.verbose = true;
+        } else if (arg.substr(0, 9) == "--trials=") {
+            config.numTrials = std::stoul(arg.substr(9));
+        } else if (arg == "--trials" && i + 1 < argc) {
+            config.numTrials = std::stoul(argv[++i]);
+        } else if (arg == "--save") {
+            config.saveResults = true;
+        } else if (arg.substr(0, 10) == "--output=") {
+            config.resultsFile = arg.substr(10);
+        }
+    }
+    
+    return config;
 }
 
 int main(int argc, char* argv[]) {
@@ -41,24 +96,41 @@ int main(int argc, char* argv[]) {
     std::cout << "================================\n\n";
     
     // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    DemoConfig config = parseArguments(argc, argv);
+    
+    // Initialize logging
+    Logger::getInstance().setLevel(config.verbose ? Logger::Level::Debug : Logger::Level::Info);
+    
+    // Display configuration
+    printHeader("PHASE 4 DEMO CONFIGURATION");
+    printResult("Number of trials", static_cast<float>(config.numTrials));
+    printResult("Verbose output", config.verbose ? 1.0f : 0.0f, "", false, 1.0f);
+    printResult("Save results", config.saveResults ? 1.0f : 0.0f, "", false, 1.0f);
+    printResult("Results file", config.resultsFile);
+    
+    // Parse command line arguments (legacy support)
+    size_t numTrials = config.numTrials;
+    if (argc > 1 && numTrials == 50) {
+        try {
+            numTrials = std::stoi(argv[1]);
+        } catch (...) {
+            // Ignore invalid arguments
+        }
     }
     
     // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    auto configPtr = std::make_shared<Config>();
+    configPtr->set("neuron_count", size_t(1000));
+    configPtr->set("region_count", size_t(2));
+    configPtr->set("connection_probability", 0.1f);
+    configPtr->set("random_seed", uint64_t(42));
+    configPtr->set("simulation_timestep", 0.001);
+    configPtr->set("stdp_ltp_weight", 0.01f);
+    configPtr->set("stdp_ltd_weight", 0.012f);
     
     // Create brain
     std::cout << "Initializing brain...\n";
-    auto brain = std::make_shared<Brain>(config);
+    auto brain = std::make_shared<Brain>(configPtr);
     if (!brain->initialize()) {
         std::cerr << "Failed to initialize brain!\n";
         return 1;

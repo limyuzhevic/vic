@@ -6,23 +6,105 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <iostream>
-#include <fstream>
-#include <sstream>
+#include <iomanip>
+#include <string>
 
 namespace nlm {
+
+// Demo configuration structure
+struct DemoConfig {
+    int numEpisodes = 5;
+    int stepsPerEpisode = 200;
+    bool verbose = false;
+    std::string outputFile = "";
+};
+
+// Pretty print utilities
+void printHeader(const std::string& title) {
+    std::cout << "\n" << std::string(60, '=') << "\n";
+    std::cout << "  " << title << "\n";
+    std::cout << std::string(60, '=') << "\n";
+}
+
+void printSection(const std::string& title) {
+    std::cout << "\n--- " << title << " ---\n";
+}
+
+void printResult(const std::string& name, float value, const std::string& unit = "", 
+                 bool highlight = false) {
+    std::cout << "  " << std::left << std::setw(35) << name;
+    std::cout << std::right;
+    if (highlight) {
+        std::cout << " : " << std::fixed << std::setprecision(4) << value;
+    } else {
+        std::cout << " : " << std::fixed << std::setprecision(2) << value;
+    }
+    if (!unit.empty()) {
+        std::cout << " " << unit;
+    }
+    std::cout << "\n";
+}
+
+// Parse command line arguments
+DemoConfig parseArguments(int argc, char* argv[]) {
+    DemoConfig config;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "NLM Phase 3 Demo Usage:\n";
+            std::cout << "  nlm_phase3_demo [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  --episodes N         Number of episodes (default: 5)\n";
+            std::cout << "  --steps N            Steps per episode (default: 200)\n";
+            std::cout << "  --verbose             Enable verbose output\n";
+            std::cout << "  --output file         Output results to file\n";
+            std::cout << "  --help, -h            Show this help message\n";
+            exit(0);
+        }
+        
+        if (arg == "--verbose" || arg == "-v") {
+            config.verbose = true;
+        } else if (arg.substr(0, 10) == "--episodes=") {
+            config.numEpisodes = std::stoi(arg.substr(10));
+        } else if (arg == "--episodes" && i + 1 < argc) {
+            config.numEpisodes = std::stoi(argv[++i]);
+        } else if (arg.substr(0, 8) == "--steps=") {
+            config.stepsPerEpisode = std::stoi(arg.substr(8));
+        } else if (arg == "--steps" && i + 1 < argc) {
+            config.stepsPerEpisode = std::stoi(argv[++i]);
+        } else if (arg.substr(0, 9) == "--output=") {
+            config.outputFile = arg.substr(9);
+        }
+    }
+    
+    return config;
+}
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
 
 class Phase3Demo {
-public:
-    Phase3Demo() {}
-    ~Phase3Demo() {}
+private:
+    DemoConfig config_;
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
-        std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
-        std::cout << "===========================================\n\n";
+public:
+    Phase3Demo(const DemoConfig& config) : config_(config) {}
+    ~Phase3Demo() = default;
+    
+    bool run() {
+        printHeader("NLM PHASE 3 - WORLD INTERACTION DEMO");
+        
+        // Initialize logging
+        Logger::getInstance().setLevel(config_.verbose ? 
+                                       Logger::Level::Debug : Logger::Level::Info);
+        
+        // Display configuration
+        printSection("Configuration");
+        printResult("Number of episodes", static_cast<float>(config_.numEpisodes));
+        printResult("Steps per episode", static_cast<float>(config_.stepsPerEpisode));
+        printResult("Verbose output", config_.verbose ? 1.0f : 0.0f, "", false, 1.0f);
         
         // Create configuration
         auto config = std::make_shared<Config>();
@@ -36,7 +118,10 @@ public:
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain!\n";
+            return false;
+        }
         
         // Create agent brain interface
         AgentBrain agentBrain(brain);
@@ -48,18 +133,18 @@ public:
         agentBrain.enableDevelopment(true);
         agentBrain.enableCuriosity(true);
         
-        std::cout << "Initial brain state:\n";
-        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
-        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
-        std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
-        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
+        printSection("Initial Brain State");
+        printResult("Neurons", static_cast<float>(brain->getTotalNeuronCount()), "");
+        printResult("Synapses", static_cast<float>(brain->getTotalSynapseCount()), "");
+        printResult("Sensory input size", static_cast<float>(agentBrain.getSensoryInputSize()), "");
+        printResult("Motor output size", static_cast<float>(agentBrain.getMotorOutputSize()), "");
         
         // Metrics tracking
         std::vector<ExperimentMetrics> allMetrics;
         
         // Run episodes
-        for (int episode = 0; episode < numEpisodes; ++episode) {
-            std::cout << "--- Episode " << episode << " started ---\n";
+        for (int episode = 0; episode < config_.numEpisodes; ++episode) {
+            printSection("Episode " + std::to_string(episode));
             
             // Reset world
             world.reset();
@@ -72,7 +157,7 @@ public:
             float episodeReward = 0.0f;
             
             // Run steps
-            for (int step = 0; step < stepsPerEpisode; ++step) {
+            for (int step = 0; step < config_.stepsPerEpisode; ++step) {
                 // 1. Get sensory percept from world
                 const SensoryPercept& percept = world.getSensoryPercept();
                 
@@ -139,33 +224,26 @@ public:
             
             allMetrics.push_back(metrics);
             
-            std::cout << "--- Episode " << episode << " ended ---\n";
-            std::cout << "  Steps: " << metrics.steps << "\n";
-            std::cout << "  Total Reward: " << metrics.totalReward << "\n";
-            std::cout << "  Final Energy: " << metrics.finalEnergy << "\n";
-            std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
-            std::cout << "  Action counts: fwd=" << metrics.forwardCount 
-                      << ", bwd=" << metrics.backwardCount
-                      << ", left=" << metrics.turnLeftCount
-                      << ", right=" << metrics.turnRightCount
-                      << ", interact=" << metrics.interactCount
-                      << ", wait=" << metrics.waitCount
-                      << "\n\n";
+            printSection("Episode " + std::to_string(episode) + " Summary");
+            printResult("Steps", static_cast<float>(metrics.steps));
+            printResult("Total Reward", metrics.totalReward);
+            printResult("Final Energy", metrics.finalEnergy);
+            printResult("Synapses", static_cast<float>(metrics.totalSynapses));
+            printResult("Forward actions", static_cast<float>(metrics.forwardCount));
+            printResult("Wait actions", static_cast<float>(metrics.waitCount));
         }
         
         // Summary
-        std::cout << "===========================================\n";
-        std::cout << "SUMMARY\n";
-        std::cout << "===========================================\n";
+        printSection("SUMMARY");
         
         if (allMetrics.size() >= 2) {
             const auto& first = allMetrics.front();
             const auto& last = allMetrics.back();
             
             std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
-            std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
-            std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
-            std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";
+            printResult("  Reward", last.totalReward - first.totalReward);
+            printResult("  Forward actions", static_cast<float>(last.forwardCount - first.forwardCount));
+            printResult("  Exploration (wait)", static_cast<float>(last.waitCount - first.waitCount));
             
             // Calculate behavior change
             float rewardChange = last.totalReward - first.totalReward;
@@ -173,24 +251,47 @@ public:
             
             std::cout << "\nBehavioral change:\n";
             if (rewardChange > 0) {
-                std::cout << "  Reward INCREASED by " << rewardChange << " (positive learning)\n";
+                std::cout << "  ✓ Reward INCREASED by " << rewardChange << " (positive learning)\n";
             } else if (rewardChange < -5) {
-                std::cout << "  Reward DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
+                std::cout << "  ⚠ Reward DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
             }
             
             if (std::abs(actionChange) > 10) {
-                std::cout << "  Forward actions changed by " << actionChange << "\n";
+                std::cout << "  ✓ Forward actions changed by " << actionChange << "\n";
             }
             
             // Synapse change
             if (last.totalSynapses != first.totalSynapses) {
-                std::cout << "  Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
+                std::cout << "  ✓ Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
             }
         }
         
         std::cout << "\nPhase 3 demonstration complete.\n";
         std::cout << "The brain received sensory input, produced actions,\n";
         std::cout << "experienced consequences, and modified its synapses.\n";
+        
+        // Save output to file if requested
+        if (!config_.outputFile.empty()) {
+            std::ofstream file(config_.outputFile);
+            if (file.is_open()) {
+                file << "Phase 3 Demo Results\n";
+                file << "====================\n\n";
+                for (const auto& metrics : allMetrics) {
+                    file << "Episode " << metrics.episode << ":\n";
+                    file << "  Steps: " << metrics.steps << "\n";
+                    file << "  Total Reward: " << metrics.totalReward << "\n";
+                    file << "  Synapses: " << metrics.totalSynapses << "\n";
+                    file << "  Final Novelty: " << metrics.finalNovelty << "\n";
+                    file << "\n";
+                }
+                file.close();
+                std::cout << "Results saved to: " << config_.outputFile << "\n";
+            } else {
+                std::cerr << "WARNING: Could not open output file: " << config_.outputFile << "\n";
+            }
+        }
+        
+        return true;
     }
     
 private:
@@ -240,22 +341,24 @@ private:
     }
 };
 
-} // namespace nlm
-
-// Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    std::cout << "=== NLM Phase 3 Integration Demo ===\n";
+    std::cout << "Starting world interaction test...\n\n";
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    // Parse command line arguments
+    DemoConfig config = parseArguments(argc, argv);
+    
+    // Create and run demo
+    nlm::Phase3Demo demo(config);
+    bool success = demo.run();
+    
+    if (success) {
+        std::cout << "\n✓ Phase 3 demo completed successfully!\n";
+        return 0;
+    } else {
+        std::cerr << "\n✗ Phase 3 demo failed!\n";
+        return 1;
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
-    
-    return 0;
 }
+
+} // namespace nlm
