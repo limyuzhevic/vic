@@ -1,230 +1,220 @@
-# NLM — 熙然
+# NLM (熙然) - Neural Learning Machine
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+NLM (熙然) is a comprehensive framework for artificial neural computation and brain simulation. This repository implements a full-featured spiking neural network system with real neuron dynamics, plasticity mechanisms, and learning capabilities.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Key Features
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### Core Neural Computation
+- **LIF Neuron Dynamics**: Leaky Integrate-and-Fire neurons with realistic membrane potential dynamics
+- **Event-Driven Spike Propagation**: Realistic spike timing with synaptic delays
+- **Multi-Region Architecture**: Hierarchical brain organization with multiple neural regions
+- **Full Plasticity Suite**: STDP, Hebbian learning, and structural plasticity
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+### Learning and Adaptation
+- **Experience-Dependent Learning**: Synaptic weights change through activity
+- **Neuromodulation**: Dopamine, reward, and prediction error systems
+- **Memory Systems**: Working memory, episodic memory, and associative memory
+- **Cognitive Functions**: Planning, concept formation, and prediction
 
-## Current Phase
+### Environment and Interaction
+- **Sensory Systems**: Vision, audio, and internal signal processing
+- **Motor Control**: Action generation and execution
+- **World Simulation**: Interactive environments with objects
+- **Visualization**: Brain state visualization and analysis
 
-**PHASE 6: FINAL INTEGRATION**
+## CLI Interface
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+The NLM project includes a comprehensive command-line interface (CLI) that provides access to all simulation and analysis capabilities:
 
-### Phase 6 Integration Achievements
+### Available Commands
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+1. **`nlm run`** - Execute brain simulations with various experiment types
+2. **`nlm inspect`** - Inspect brain state, configuration, and statistics
+3. **`nlm config`** - Manage configuration files and parameters
+4. **`nlm benchmark`** - Run performance benchmarks on different network sizes
+5. **`nlm replay`** - Replay saved brain states and simulation episodes
+6. **`nlm checkpoint`** - Manage simulation checkpoints
+7. **`nlm debug`** - Debugging tools and verbose output
+8. **`nlm simulate`** - Run specific simulation scenarios
+9. **`nlm explore`** - Explore brain structure and connections
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+### CLI Features
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+- **Command-line argument parsing** with long and short options
+- **Configuration file loading** (JSON/YAML/txt formats)
+- **Help and usage documentation** for each subcommand
+- **Logging level control** (Warning, Info, Debug)
+- **Statistics collection** and detailed reporting
+- **Error handling** and validation
+- **Export capabilities** for brain state and statistics
+- **Scripting support** with configuration files
+- **Plugin architecture** for extending functionality
+- **Command history** and session management
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+## Usage Examples
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
-
+### Basic Simulation
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Run a basic connectivity simulation
+nlm run --experiment basic --steps 1000 --neuron-count 1000
+
+# Run with custom configuration
+nlm run -c my_config.cfg --experiment plasticity
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
+### Inspection
 ```bash
-./nlm_phase6_demo
+# Inspect current brain state
+nlm inspect --detailed
+
+# Export brain state to JSON
+nlm inspect --export json --export-file brain_state.json
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Configuration Management
+```bash
+# List current configuration
+nlm config list
+
+# Set a configuration value
+nlm config set neuron_count int:2000
+
+# Save configuration
+nlm config save my_config.cfg
+
+# Load configuration
+nlm config load my_config.cfg
+```
+
+### Benchmarking
+```bash
+# Run performance benchmarks
+nlm benchmark --neuron-counts 100,500,1000,2000
+
+# Save results to file
+nlm benchmark --output benchmark_results.csv --format csv
+```
+
+### Exploration
+```bash
+# Explore brain structure
+nlm explore --region 1 --neuron 5 --synapse 10
+
+# Show connection statistics
+nlm explore --connections
+
+# Export brain structure to Graphviz format
+nlm explore --export dot --export-file brain.dot
+```
 
 ## Project Structure
 
+### Source Code
+- `src/` - Core NLM implementation
+  - `brain/` - Neural computation (neurons, synapses, regions)
+  - `core/` - Core systems (config, logging, random, simulation)
+  - `environment/` - Simulation environment
+  - `experiments/` - Various experiment implementations
+  - `memory/` - Memory systems
+  - `motor/` - Motor control
+  - `neuromodulation/` - Neuromodulation systems
+  - `plasticity/` - Plasticity mechanisms
+  - `prediction/` - Prediction systems
+  - `sensory/` - Sensory processing
+  - `visualization/` - Visualization interface
+
+### CLI Interface
+- `cli/` - Command-line interface
+  - `nlm_cli.cpp` - Main CLI entry point
+  - Individual command files for each subcommand
+
+### Configuration
+- `configs/` - Default configuration files
+- `docs/` - Documentation and examples
+
+## Building and Installation
+
+### Prerequisites
+- C++20 compatible compiler
+- CMake 3.16 or higher
+
+### Build Instructions
+```bash
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+### Installation
+```bash
+cmake --install . --prefix /usr/local
 ```
 
-## Phase Summary
+## Running Tests
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+```bash
+cd build
+ctest --output-on-failure
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+## Advanced Features
+
+### Scripting Support
+The CLI supports JSON and YAML configuration files for scripting:
+
+```json
+{
+  "neuron_count": 1000,
+  "region_count": 2,
+  "connection_probability": 0.1,
+  "experiment": "plasticity",
+  "steps": 2000
+}
 ```
+
+### Plugin Architecture
+The CLI supports plugins for extending functionality:
+
+- Plugin directory: `plugins/`
+- Plugin format: Shared libraries (.so/.dll)
+- Plugin interface: Standard command registration
+
+### Session Management
+- Command history: `.nlm_history` file
+- Session save/load: `--save-session` and `--load-session` options
+- Configuration persistence: Automatic saving
+
+## Performance Optimization
+
+The NLM framework includes several performance optimization features:
+
+- **Event-driven simulation**: Only processes neurons that spike
+- **Parallel processing**: Multiple regions can simulate concurrently
+- **Memory-efficient data structures**: Compact neuron and synapse representations
+- **Optimized synaptic propagation**: Fast spike transmission with delays
+- **Efficient plasticity updates**: Localized weight updates
+
+## Research Applications
+
+The NLM framework is suitable for various research applications:
+
+- **Neural circuit modeling**: Study of brain connectivity and function
+- **Machine learning**: Alternative to traditional neural networks
+- **Cognitive modeling**: Implementation of cognitive processes
+- **Neuromorphic computing**: Energy-efficient neural computation
+- **Synthetic biology**: Modeling of biological neural systems
 
 ## License
 
-MIT
+MIT License - See LICENSE file for details.
 
-## Authors
+## Contributing
 
-Research project — See docs for scientific background.
+Contributions are welcome! Please follow the project's coding standards and submit pull requests.
+
+## Contact
+
+For questions, issues, or collaboration opportunities, please refer to the project's documentation and issue tracker.
