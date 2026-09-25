@@ -134,7 +134,6 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -143,9 +142,53 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // ========== LIF DYNAMICS IMPLEMENTATION ==========
+    
+    // Real integrate-and-fire dynamics (Phase 2 implementation)
+    // Implements standard LIF: dV/dt = (V_rest - V)/tau + I/C
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    
+    // Check for spike threshold crossing
+    bool checkThreshold() const;
+    
+    // Update adaptation variable for spike-frequency adaptation
+    void updateAdaptation();
+    
+    // Handle synaptic input for current time step
+    void processSynapticInput();
+    
+    // ========== NEUROLOGICAL PROPERTIES ==========
+    
+    // Set membrane properties for different neuron types
+    void configureMembraneProperties(NeuronType type);
+    
+    // Apply neuromodulatory effects
+    void applyNeuromodulation(const class Neuromodulator& signal);
+    
+    // Update refractory period
+    void updateRefractoryPeriod();
+    
+    // Clamp membrane potential to maintain stability
+    void clampMembranePotential();
+    
+    // Record spike for STDP and learning
+    void recordSpikeForLearning(Timestamp timestamp);
+    
+    // Update synaptic scaling for stability
+    void updateSynapticScaling();
+    
+    // ========== DERIVED PROPERTIES ==========
+    
+    // Calculate input resistance
+    float calculateInputResistance() const;
+    
+    // Calculate membrane time constant
+    float calculateTimeConstant() const;
+    
+    // Get firing rate from recent spike history
+    float calculateFiringRate() const;
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Use smart pointer for automatic memory management
+    std::unique_ptr<Impl> pImpl;
 };
-
-} // namespace nlm

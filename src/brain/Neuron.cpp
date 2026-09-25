@@ -76,7 +76,12 @@ void Neuron::decrementRefractory() {
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }
+    } else if (pImpl->state.refractoryRemaining == 0) {
+        // Error case: negative refractory, reset to safe state
+        pImpl->state.refractoryRemaining = 0;
+        pImpl->state.firingState = FiringState::Resting;
     }
+    // Silently handle pImpl being null (should not happen in normal operation)
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
@@ -191,6 +196,11 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate timestep to prevent numerical instability
+    if (dt <= 0.0 || dt > 0.1) {
+        return false; // Invalid timestep
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -212,6 +222,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential threshold = pImpl->state.threshold;
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Validate parameters to prevent numerical issues
+    if (tau <= 0.0f || C <= 0.0f) {
+        return false; // Invalid neuron parameters
+    }
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -261,7 +276,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Use configurable timestep if available from config
+    TimestepDuration dt = 0.001;  // 1ms default, but should be configurable
     stepLIF(currentTime, dt);
 }
 

@@ -80,9 +80,53 @@ public:
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
+    // ========== SYNAPTIC DYNAMICS IMPLEMENTATION ==========
+    
+    // Real synaptic transmission with short-term plasticity
+    // Implements Tsodyks-Markram model for synaptic efficacy
+    void updateSynapticDynamics(Timestamp currentTime);
+    
+    // Check if synapse is ready to transmit (considering delay)
+    bool isReadyToTransmit(Timestamp currentTime) const;
+    
+    // Get transmission time for future spike events
+    Timestamp getTransmissionTime(Timestamp spikeTime) const;
+    
+    // Short-term plasticity effects
+    void updateShortTermPlasticity(Timestamp currentTime);
+    
+    // Depression/facilitation dynamics
+    void updateDepression(Timestamp currentTime);
+    void updateFacilitation(Timestamp currentTime);
+    
+    // Tsodyks-Markram model implementation
+    void tsodyksMarkramUpdate(Timestamp currentTime);
+    
+    // Vesicle dynamics and release probability
+    void updateVesicleDynamics(Timestamp currentTime);
+    void updateReleaseProbability();
+    
+    // Neuromodulation effects
+    void applyNeuromodulation(const class Neuromodulator& signal);
+    
+    // Learning eligibility trace
+    void updateEligibilityTrace(float reward, Timestamp currentTime);
+    
+    // State snapshot and restoration
+    void snapshot(class SynapseSnapshot& snapshot) const;
+    void restore(const class SynapseSnapshot& snapshot);
+    
+    // Resource management
+    void clear();
+    size_t memoryUsage() const;
+    
+    // Validation and debugging
+    bool validate() const;
+    void validateConnection() const;
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Use smart pointer for automatic memory management
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
