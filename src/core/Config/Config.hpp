@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -41,6 +42,14 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration template structure
+struct ConfigTemplate {
+    std::string name;
+    std::string description;
+    std::unordered_map<std::string, ConfigValue> defaults;
+    std::vector<std::string> requiredKeys;
 };
 
 // Main configuration class
@@ -93,6 +102,32 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Additional advanced configuration methods
+    
+    // Get configuration description for a key
+    std::string getDescription(const std::string& key) const;
+    
+    // Validate configuration against constraints
+    std::vector<std::string> validate() const;
+    
+    // Get all available configuration options with descriptions
+    std::vector<ConfigEntry> getAllOptions() const;
+    
+    // Compare two configurations
+    bool equals(const Config& other) const;
+    
+    // Apply configuration template
+    void applyTemplate(const std::string& templateName);
+    
+    // Export configuration to string format (JSON, YAML, etc.)
+    std::string exportConfig(const std::string& format = "json") const;
+    
+    // Import configuration from string
+    bool importConfig(const std::string& configString, const std::string& format = "json");
+    
+    // Get default configuration template names
+    std::vector<std::string> getAvailableTemplates() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,4 +137,4 @@ private:
     static std::string toLower(const std::string& str);
 };
 
-} // namespace nlm
+// namespace nlm
