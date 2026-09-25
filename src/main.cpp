@@ -19,12 +19,7 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <limits>
 
 using namespace nlm;
 
@@ -46,6 +41,26 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+// Utility function to parse integer from string with error handling
+int parseIntArg(const std::string& arg, bool& success) {
+    try {
+        return std::stoi(arg);
+    } catch (const std::exception&) {
+        success = false;
+        return 0;
+    }
+}
+
+// Utility function to parse float from string with error handling
+float parseFloatArg(const std::string& arg, bool& success) {
+    try {
+        return std::stof(arg);
+    } catch (const std::exception&) {
+        success = false;
+        return 0.0f;
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -345,14 +360,31 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configSuccess = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+        // Handle --config=file.cfg or --config file.cfg
+        if (arg.find("--config=") == 0) {
+            // Format: --config=file.cfg
+            configFile = arg.substr(9);  // Skip "--config="
+            if (configFile.empty()) {
+                NLM_LOG_WARNING("Empty config file name specified");
+                configSuccess = false;
             }
+        } else if (arg == "--config" && i + 1 < argc) {
+            // Format: --config file.cfg
+            configFile = argv[++i];
+            if (configFile.empty()) {
+                NLM_LOG_WARNING("Empty config file name specified");
+                configSuccess = false;
+            }
+        } else if (arg == "--help") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
         }
     }
     
@@ -363,24 +395,97 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+        // Load config from file (ignore if not found)
+    if (!configSuccess) {
+        NLM_LOG_WARNING("Config file parsing issues detected, using default configuration");
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Override with command line args
+    bool configArgsSuccess = config->loadFromArgs(argc, argv);
+    
+    // Process command line arguments to override configuration
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --neuron-count=N
+        if (arg.find("--neuron-count=") == 0) {
+            std::string valueStr = arg.substr(15);
+            bool valueSuccess = true;
+            size_t neuronCount = parseIntArg(valueStr, valueSuccess);
+            if (valueSuccess && neuronCount > 0 && neuronCount <= 1000000) {
+                config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+                NLM_LOG_INFO("Overrode neuron_count: " + std::to_string(neuronCount));
+            } else {
+                NLM_LOG_ERROR("Invalid neuron-count value: " + valueStr);
+                configArgsSuccess = false;
+            }
+        } 
+        // Handle --region-count=N
+        else if (arg.find("--region-count=") == 0) {
+            std::string valueStr = arg.substr(14);
+            bool valueSuccess = true;
+            size_t regionCount = parseIntArg(valueStr, valueSuccess);
+            if (valueSuccess && regionCount > 0 && regionCount <= 100) {
+                config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+                NLM_LOG_INFO("Overrode region_count: " + std::to_string(regionCount));
+            } else {
+                NLM_LOG_ERROR("Invalid region-count value: " + valueStr);
+                configArgsSuccess = false;
+            }
+        } 
+        // Handle --simulation-timestep=N
+        else if (arg.find("--simulation-timestep=") == 0) {
+            std::string valueStr = arg.substr(22);
+            bool valueSuccess = true;
+            float timestep = parseFloatArg(valueStr, valueSuccess);
+            if (valueSuccess && timestep > 0.0f && timestep <= 1.0f) {
+                config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Overrode simulation_timestep: " + std::to_string(timestep) + "s");
+            } else {
+                NLM_LOG_ERROR("Invalid simulation-timestep value: " + valueStr);
+                configArgsSuccess = false;
+            }
+        } 
+        // Handle --random-seed=N
+        else if (arg.find("--random-seed=") == 0) {
+            std::string valueStr = arg.substr(13);
+            bool valueSuccess = true;
+            uint64_t seed = parseIntArg(valueStr, valueSuccess);
+            if (valueSuccess && seed <= std::numeric_limits<uint64_t>::max()) {
+                config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+                NLM_LOG_INFO("Overrode random_seed: " + std::to_string(seed));
+            } else {
+                NLM_LOG_ERROR("Invalid random-seed value: " + valueStr);
+                configArgsSuccess = false;
+            }
+        }
+    }
+    
+    if (!configArgsSuccess) {
+        NLM_LOG_WARNING("Some command-line arguments were invalid and ignored");
+    }
+    
+    // Set default values for Phase 2 (only if not already set by config or command line)
+    config->setIfNotSet("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->setIfNotSet("simulation_timestep", 0.001, ConfigSource::Default);
+    config->setIfNotSet("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->setIfNotSet("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->setIfNotSet("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->setIfNotSet("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->setIfNotSet("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->setIfNotSet("stdp_tau", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->setIfNotSet("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->setIfNotSet("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");

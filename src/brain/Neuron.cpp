@@ -28,6 +28,7 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+    NLM_VALIDATE(pImpl != nullptr, "Failed to allocate neuron implementation");
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -51,22 +52,27 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    NLM_VALIDATE(pImpl != nullptr, "Cannot set neuron type: neuron is invalid");
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    NLM_VALIDATE(pImpl != nullptr, "Cannot set membrane potential: neuron is invalid");
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    NLM_VALIDATE(pImpl != nullptr, "Cannot modify membrane potential: neuron is invalid");
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    NLM_VALIDATE(pImpl != nullptr, "Cannot set threshold: neuron is invalid");
     pImpl->state.threshold = threshold;
 }
 
 void Neuron::setFiringState(FiringState state) {
+    NLM_VALIDATE(pImpl != nullptr, "Cannot set firing state: neuron is invalid");
     pImpl->state.firingState = state;
 }
 
