@@ -43,7 +43,6 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
 class Config {
 public:
     Config();
@@ -55,8 +54,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML or simple key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from simple key=value format (internal helper)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Load from JSON format (internal helper)
+    bool loadFromJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);

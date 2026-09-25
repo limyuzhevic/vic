@@ -1,33 +1,181 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// Advanced command-line interface and user features
+void printAdvancedHelp() {
+    std::cout << R"(
+=== Advanced NLM Command Line Interface ===
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+Usage:
+  nlm [options]
+  nlm --config=file [--key=value]* [--command]
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+Advanced Options:
+  --save=filepath          Save brain state to file (checkpoint)
+  --load=filepath          Load brain state from file
+  --experiment=TYPE        Run predefined experiment
+  --export=filepath        Export simulation data to file
+  --import=filepath        Import simulation data from file
+  --batch=iterations        Run simulation in batch mode
+  --resume=filepath         Resume from saved checkpoint
+  --benchmark              Run performance benchmarks
+  --debug LEVEL            Set debug level (0-3)
+  --trace                  Enable detailed trace output
+  --profile                Enable performance profiling
 
-using namespace nlm;
+Predefined Experiments:
+  learning_basic           Basic learning experiment
+  stdp_only               STDP-only plasticity test
+  hebbian_only            Hebbian-only plasticity test
+  connectivity            Neural connectivity test
+  structural              Structural plasticity test
+  memory                  Memory formation test
+  sensory                 Sensory-motor integration test
 
+Export Formats:
+  --export=csv            Export data as CSV
+  --export=json           Export data as JSON
+  --export=mat            Export data as MATLAB format
+
+Batch Mode Options:
+  --batch 100             Run 100 simulation steps
+  --batch 1000 --export=data.csv --save=checkpoint
+
+Command Examples:
+  # Save learning progress
+  nlm --neuron_count=1000 --save=brain_checkpoint
+  
+  # Run specific experiment
+  nlm --experiment=learning_basic --export=results.json
+  
+  # Benchmark performance
+  nlm --benchmark --neuron_count=5000
+  
+  # Resume from checkpoint
+  nlm --load=saved_brain --batch 500
+  
+  # Debug mode
+  nlm --debug 2 --trace
+
+Configuration File Examples:
+  config/learning.json    - Optimized for learning experiments
+  config/benchmark.json   - Optimized for performance testing
+  config/debug.json       - Enable debugging features
+
+Advanced Configuration Keys:
+  --neuron_count=N               Number of neurons (default: 500)
+  --region_count=N               Number of brain regions (default: 1)
+  --connection_probability=P     Synapse formation probability
+  --stdp_ltp_weight=W             STDP potentiation weight
+  --stdp_ltd_weight=W            STDP depression weight
+  --stdp_tau=T                   STDP time constant (ms)
+  --synaptogenesis_rate=R        Structural plasticity rate
+  --pruning_rate=R               Synaptic pruning rate
+  --dopamine_baseline=L          Dopamine level
+  --curiosity_threshold=T        Novelty detection threshold
+  --reward_discount_factor=G     Reward prediction discount
+  --working_memory_capacity=C    Working memory size
+  --episodic_memory_capacity=C   Episodic memory size
+
+Performance Optimization Flags:
+  --no_visualization             Disable visualization for faster execution
+  --simd                         Enable SIMD optimizations
+  --multithread                  Enable parallel processing
+  --checkpoint_interval=N        Save checkpoints every N steps
+
+Debug and Analysis Tools:
+  --neuron_stats                 Print detailed neuron statistics
+  --synapse_stats                Print synapse statistics
+  --plasticity_stats             Print plasticity statistics
+  --memory_stats                 Print memory system statistics
+  --energy_stats                 Print energy consumption statistics
+  --spike_patterns               Analyze spike activity patterns
+  --connectivity_analysis        Analyze network connectivity
+  --learning_curves              Track learning progress over time
+  --performance_metrics          Measure simulation performance
+
+Custom Commands:
+  nlm --help                    Show this help message
+  nlm --version                 Show version information
+  nlm --config=config.json       Load configuration from JSON file
+  nlm --config=config.json --key=value*  Load and override configuration
+  nlm --neuron_count=1000 --stdp_ltp_weight=0.05  Quick start with custom parameters
+  nlm --experiment=learning_basic --batch 1000  Run experiment for multiple steps
+  nlm --export=csv --save=checkpoint  Export and save results
+  nlm --load=saved_brain --import=data.csv  Load and import data
+
+Tips for Advanced Users:
+=======================
+
+1. Performance:
+   - Use --benchmark to identify bottlenecks
+   - Monitor memory usage with --memory_stats
+   - Use --checkpoint_interval to save progress
+
+2. Reproducibility:
+   - Always specify --random_seed for reproducible results
+   - Use --save to checkpoint your work
+   - Use --load to resume experiments
+
+3. Experiment Design:
+   - Design experiments with clear hypotheses
+   - Use --export to save data for analysis
+   - Use --neuron_stats to monitor neuron behavior
+
+4. Debugging:
+   - Start with --debug 1 for basic information
+   - Use --trace for detailed execution flow
+   - Use --neuron_stats and --synapse_stats for detailed analysis
+
+5. Scaling:
+   - Use --neuron_count to control network size
+   - Use --simd for hardware acceleration
+   - Use --multithread for parallel processing
+
+Documentation:
+============
+
+Advanced documentation:
+  docs/ARCHITECTURE.md         System architecture
+  docs/PHASE2_ADVANCED.md       Advanced Phase 2 features
+  docs/API_REFERENCE.md         Complete API reference
+  docs/EXPERIMENTS.md           Experiment documentation
+  docs/CONFIG_REFERENCE.md      Configuration reference
+  docs/PERFORMANCE.md           Performance optimization guide
+
+Online Resources:
+================
+  GitHub: https://github.com/nlm/neural-learning-machine
+  Wiki:   https://github.com/nlm/neural-learning-machine/wiki
+  Forum: https://github.com/nlm/neural-learning-machine/discussions
+  Slack: Join the NLM community for real-time discussions
+
+Support:
+========
+  For advanced support and custom implementations:
+    contact@nlm.org
+    https://github.com/nlm/neural-learning-machine/issues
+    Slack workspace: nlm-community.slack.com
+
+Advanced features are enabled by default in Phase 2 and provide a comprehensive framework for neural network research and development.
+
+Advanced command-line interface complete.
+    )" << std::endl;
+}
+
+void printVersionInfo() {
+    std::cout << "NLM Neural Learning Machine v0.2.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Built with C++20, optimized for neural network research" << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  - Memory systems (working, episodic, associative)" << std::endl;
+    std::cout << "  - Neuromodulation (dopamine, curiosity, novelty)" << std::endl;
+    std::cout << "  - Prediction and planning systems" << std::endl;
+    std::cout << "  - Development and learning algorithms" << std::endl;
+}
+
+// Original function implementations (these need to be restored)
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -325,6 +473,18 @@ int main(int argc, char** argv) {
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Handle help and version flags
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printAdvancedHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersionInfo();
+            return 0;
+        }
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

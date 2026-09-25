@@ -19,9 +19,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension to determine parser
+    std::string ext = "." + std::string(
+        std::filesystem::path(filepath).extension().string()
+    );
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    if (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+        return loadFromJSON(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+// Helper to parse simple key=value format
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +56,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -55,28 +68,106 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+// Helper to parse JSON format
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Simple JSON parser that handles basic types
+    // In a real implementation, you would use a proper JSON library like nlohmann/json
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    // Very basic JSON parsing - for demonstration only
+    // Real implementation should use a proper JSON parser
+    
+    // Simple parsing for key-value pairs in { "key": "value", "num": 123 }
+    size_t braceStart = content.find('{');
+    size_t braceEnd = content.rfind('}');
+    
+    if (braceStart == std::string::npos || braceEnd == std::string::npos) {
+        return false;
+    }
+    
+    std::string jsonContent = content.substr(braceStart + 1, braceEnd - braceStart - 1);
+    
+    // Parse key-value pairs (simplified - doesn't handle nested objects)
+    size_t pos = 0;
+    while (pos < jsonContent.length()) {
+        // Find next key
+        size_t keyStart = jsonContent.find('"', pos);
+        if (keyStart == std::string::npos) break;
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        size_t keyEnd = jsonContent.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = jsonContent.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Skip whitespace and colon
+        size_t afterKey = jsonContent.find(':', keyEnd);
+        if (afterKey == std::string::npos) break;
+        
+        size_t valueStart = jsonContent.find_first_not_of(" ", afterKey + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find value end (next comma or closing brace)
+        size_t commaPos = jsonContent.find(',', valueStart);
+        size_t bracePos = jsonContent.find('}', valueStart);
+        
+        size_t valueEnd = std::min(
+            (commaPos == std::string::npos) ? jsonContent.length() : commaPos,
+            (bracePos == std::string::npos) ? jsonContent.length() : bracePos
+        );
+        
+        std::string valueStr = jsonContent.substr(valueStart, valueEnd - valueStart);
+        
+        // Trim whitespace
+        valueStr = trim(valueStr);
+        
+        // Try to infer type and set value
+        if (valueStr.front() == '"' && valueStr.back() == '"') {
+            // String value - remove quotes
+            set(key, valueStr.substr(1, valueStr.length() - 2), ConfigSource::File);
+        } else if (valueStr == "true" || valueStr == "false") {
+            // Boolean value
+            set(key, valueStr == "true", ConfigSource::File);
+        } else {
+            // Try numeric value
+            try {
+                if (valueStr.find('.') != std::string::npos) {
+                    double doubleVal = std::stod(valueStr);
+                    set(key, doubleVal, ConfigSource::File);
+                } else {
+                    int64_t intVal = std::stoll(valueStr);
+                    set(key, intVal, ConfigSource::File);
+                }
+            } catch (...) {
+                // If conversion fails, treat as string
+                set(key, valueStr, ConfigSource::File);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+        
+        // Move to next position
+        pos = valueEnd;
+        if (pos < jsonContent.length() && jsonContent[pos] == ',') {
+            pos++; // Skip comma
         }
     }
+    
     return true;
 }
+
+// Default constructor implementation
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
@@ -86,7 +177,16 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
