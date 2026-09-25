@@ -159,47 +159,88 @@ struct LearningExperiment {
     }
 };
 
+// Helper functions for basic connectivity test
+namespace {
+    
+    bool validateRegionExists(std::shared_ptr<Brain> brain) {
+        auto* region = brain->getRegion(RegionId(1));
+        return region != nullptr;
+    }
+    
+    std::vector<Neuron*> getNeuronsFromRegion(std::shared_ptr<Brain> brain) {
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) return {};
+        return region->getAllNeurons();
+    }
+    
+    size_t getInitialSpikeCount(std::shared_ptr<Brain> brain) {
+        return brain->getTotalSpikeCount();
+    }
+    
+    void injectCurrentToNeurons(std::vector<Neuron*>& neurons, float current, size_t count) {
+        NLM_LOG_INFO("  Injecting current into " + std::to_string(std::min(count, neurons.size())) + 
+                    " neurons...");
+        for (size_t i = 0; i < std::min(count, neurons.size()); ++i) {
+            neurons[i]->injectCurrent(current);
+        }
+    }
+    
+    void runSimulationSteps(std::shared_ptr<Brain> brain, SimulationStep steps) {
+        for (SimulationStep step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+    }
+    
+    size_t calculateSpikesGenerated(std::shared_ptr<Brain> brain, size_t initialSpikes) {
+        return brain->getTotalSpikeCount() - initialSpikes;
+    }
+    
+    void logSpikeResults(size_t spikes, const std::vector<Neuron*>& neurons) {
+        NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+        
+        if (spikes > 0) {
+            NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        } else {
+            NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+            for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
+        }
+    }
+    
+}
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    // Validate brain and region
+    if (!validateRegionExists(brain)) {
+        NLM_LOG_INFO("  No region found!");
+        return;
+    }
     
-    auto neurons = region->getAllNeurons();
+    // Get neurons from region
+    auto neurons = getNeuronsFromRegion(brain);
     if (neurons.empty()) {
         NLM_LOG_INFO("  No neurons found!");
         return;
     }
     
     // Get initial spike count
-    size_t initialSpikes = brain->getTotalSpikeCount();
+    size_t initialSpikes = getInitialSpikeCount(brain);
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
-    }
+    // Inject current into neurons
+    injectCurrentToNeurons(neurons, 50.0f, 10);
     
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
-    }
+    // Run simulation steps
+    runSimulationSteps(brain, 50);
     
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
-    
-    if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
-    } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
-        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
-        }
-    }
+    // Analyze results
+    size_t spikes = calculateSpikesGenerated(brain, initialSpikes);
+    logSpikeResults(spikes, neurons);
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {

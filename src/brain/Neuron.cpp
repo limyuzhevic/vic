@@ -2,30 +2,85 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <cstdint>
 
 namespace nlm {
 
-struct Neuron::Impl {
-    NeuronId id;
-    NeuronType type;
-    NeuronState state;
-    RegionId regionId;
-    PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
+// Ring buffer implementation for spike history
+namespace {
+template<typename T>
+class RingBuffer {
+public:
+    RingBuffer(size_t capacity) : data(capacity), head(0), tail(0), count(0), capacity(capacity) {}
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    void push(const T& value) {
+        if (count < capacity) {
+            data[tail] = value;
+            tail = (tail + 1) % capacity;
+            count++;
+        } else {
+            head = (head + 1) % capacity;
+            tail = (tail + 1) % capacity;
+        }
+    }
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    void clear() {
+        head = 0;
+        tail = 0;
+        count = 0;
+    }
+    
+    const std::vector<T>& getAll() const {
+        return data;
+    }
+    
+    size_t size() const {
+        return count;
+    }
+    
+    bool empty() const {
+        return count == 0;
+    }
+    
+    const T& operator[](size_t index) const {
+        if (index >= count) {
+            static const T empty;
+            return empty;
+        }
+        return data[(head + index) % capacity];
+    }
+    
+private:
+    std::vector<T> data;
+    size_t head;
+    size_t tail;
+    size_t count;
+    size_t capacity;
 };
+}
+
+    struct Neuron::Impl {
+        NeuronId id;
+        NeuronType type;
+        NeuronState state;
+        RegionId regionId;
+        PopulationId populationId;
+        MembranePotential totalCurrent;  // Total synaptic current input this step
+        MembranePotential synapticInput;  // Accumulated synaptic input
+        RingBuffer<Timestamp> spikeHistory;  // Ring buffer for O(1) spike history management
+        mutable std::vector<Timestamp> cachedSpikeHistory;  // Cache for getSpikeHistory()
+        std::vector<SynapseHandle> incomingSynapses;
+        std::vector<SynapseHandle> outgoingSynapses;
+        PlasticityFlags plasticityFlags;
+        
+        // LIF parameters
+        static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
+        static constexpr float TIME_CONSTANT = 20.0f;  // ms
+        static constexpr size_t MAX_SPIKE_HISTORY = 100;
+        
+        Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
+                 totalCurrent(0.0f), synapticInput(0.0f), spikeHistory(MAX_SPIKE_HISTORY) {}
+    };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->id = id;
@@ -42,27 +97,31 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
+    moveAssignPImpl(other, *this);
     return *this;
 }
 
-void Neuron::setType(NeuronType type) {
-    pImpl->type = type;
-}
-
 void Neuron::setMembranePotential(MembranePotential potential) {
+    // Validate membrane potential (reasonable range: -100mV to +50mV)
+    if (potential < -100.0f || potential > 50.0f) {
+        return; // Invalid value, ignore
+    }
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    // Validate delta (reasonable range)
+    if (std::abs(delta) > 100.0f) {
+        return; // Too large change, ignore
+    }
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    // Validate threshold (reasonable range)
+    if (threshold < -100.0f || threshold > 50.0f) {
+        return; // Invalid threshold, ignore
+    }
     pImpl->state.threshold = threshold;
 }
 
@@ -80,6 +139,10 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
+    // Validate firing rate (reasonable range)
+    if (rate < 0.0f || rate > 1000.0f) { // Max 1000Hz
+        return; // Invalid rate, ignore
+    }
     pImpl->state.firingRate = rate;
 }
 
@@ -92,6 +155,10 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    // Validate refractory period (reasonable range)
+    if (steps > 1000) { // Max 1000ms
+        return; // Too large, ignore
+    }
     pImpl->state.refractoryPeriod = steps;
 }
 
@@ -100,6 +167,10 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    // Validate resting potential (reasonable range)
+    if (potential < -100.0f || potential > 50.0f) {
+        return; // Invalid potential, ignore
+    }
     pImpl->state.restingPotential = potential;
 }
 
@@ -108,10 +179,16 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    // Validate reset potential (reasonable range)
+    if (potential < -100.0f || potential > 50.0f) {
+        return; // Invalid reset potential, ignore
+    }
     pImpl->state.resetPotential = potential;
 }
 
 bool Neuron::checkThreshold() const {
+    // Validate that threshold exists before checking
+    if (pImpl == nullptr) return false;
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
@@ -120,24 +197,40 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    // Validate amplitude (reasonable range)
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        return; // Invalid amplitude, ignore
+    }
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    // Validate amplitude (reasonable range)
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        return; // Invalid amplitude, ignore
+    }
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
+    // Validate amplitude (reasonable range)
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        return; // Invalid amplitude, ignore
+    }
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
+    // Validate current (reasonable range)
+    if (current < -100.0f || current > 100.0f) {
+        return; // Invalid current, ignore
+    }
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
@@ -148,14 +241,21 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    pImpl->spikeHistory.push(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
     pImpl->spikeHistory.clear();
+    pImpl->cachedSpikeHistory.clear();
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    // Return a copy for backward compatibility, but cache it
+    cachedSpikeHistory.clear();
+    for (size_t i = 0; i < pImpl->spikeHistory.size(); ++i) {
+        cachedSpikeHistory.push_back(pImpl->spikeHistory[i]);
+    }
+    return cachedSpikeHistory;
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -269,6 +369,7 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->cachedSpikeHistory.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {

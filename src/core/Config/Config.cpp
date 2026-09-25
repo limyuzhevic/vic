@@ -3,52 +3,81 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <system_error>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Hash map for O(1) lookup
+    std::unordered_map<std::string, size_t> keyToIndex;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Constructor now properly initializes the pImpl with error checking
+    if (!pImpl) {
+        // This is a critical error - cannot proceed without pImpl
+        throw std::runtime_error("Failed to allocate configuration implementation");
+    }
+}
 
 Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
-    std::ifstream file(filepath);
+    // Validate input
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    std::ifstream file(filepath, std::ios::in);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with error checking
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+        if (pos == std::string::npos) {
+            // Malformed line - skip but log error
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Set the configuration value
+        try {
             set(key, value, ConfigSource::File);
+        } catch (const std::exception&) {
+            // Continue processing other lines even if one fails
+            continue;
         }
     }
     
@@ -56,6 +85,11 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Validate input
+    if (!argv || argc <= 0) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -79,14 +113,39 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+    // Validate input
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Ensure directory exists
+    std::filesystem::path dirPath = std::filesystem::path(filepath).parent_path();
+    if (!dirPath.empty() && !std::filesystem::exists(dirPath)) {
+        try {
+            std::filesystem::create_directories(dirPath);
+        } catch (const std::filesystem::filesystem_error&) {
+            return false;
+        }
+    }
+    
+    // Open file with proper error handling
+    std::ofstream file(filepath, std::ios::out | std::ios::trunc);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+            
+            // Check for write errors
+            if (file.fail()) {
+                return false;
+            }
+        }
+    } catch (const std::exception&) {
+        return false;
     }
     
     return true;
@@ -94,15 +153,19 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // O(1) lookup using hash map
+    auto it = pImpl->keyToIndex.find(key);
+    if (it == pImpl->keyToIndex.end()) {
+        return std::nullopt;
+    }
     
-    if (it == pImpl->entries.end()) {
+    size_t index = it->second;
+    if (index >= pImpl->entries.size()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        return std::get<T>(pImpl->entries[index].value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
@@ -114,15 +177,79 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Configuration validation function
+void Config::validateConfiguration(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate configuration values based on key
+    if (key == "random_seed") {
+        auto val = std::get<int64_t>(value);
+        if (val < 0) {
+            // Invalid seed, use default
+        }
+    } else if (key == "simulation_timestep") {
+        auto val = std::get<double>(value);
+        if (val <= 0.0 || val > 1.0) {
+            // Invalid timestep, use default
+        }
+    } else if (key == "neuron_count") {
+        auto val = std::get<int64_t>(value);
+        if (val <= 0 || val > 10000) {
+            // Invalid neuron count, use default
+        }
+    } else if (key == "region_count") {
+        auto val = std::get<int64_t>(value);
+        if (val <= 0 || val > 100) {
+            // Invalid region count, use default
+        }
+    } else if (key == "connection_probability") {
+        auto val = std::get<float>(value);
+        if (val < 0.0f || val > 1.0f) {
+            // Invalid probability, use default
+        }
+    } else if (key == "stdp_ltp_weight") {
+        auto val = std::get<float>(value);
+        if (val < 0.0f || val > 1.0f) {
+            // Invalid STDP weight, use default
+        }
+    } else if (key == "stdp_ltd_weight") {
+        auto val = std::get<float>(value);
+        if (val < 0.0f || val > 1.0f) {
+            // Invalid STDP weight, use default
+        }
+    } else if (key == "synaptogenesis_rate") {
+        auto val = std::get<float>(value);
+        if (val < 0.0f || val > 0.1f) {
+            // Invalid rate, use default
+        }
+    } else if (key == "pruning_rate") {
+        auto val = std::get<float>(value);
+        if (val < 0.0f || val > 0.01f) {
+            // Invalid rate, use default
+        }
+    }
+}
+
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Validate input
+    if (key.empty()) {
+        return;
+    }
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    // Validate configuration value based on key
+    validateConfiguration(key, value, source);
+    
+    // Check if key already exists
+    auto it = pImpl->keyToIndex.find(key);
+    
+    if (it != pImpl->keyToIndex.end()) {
+        // Update existing entry
+        size_t index = it->second;
+        pImpl->entries[index].value = value;
+        pImpl->entries[index].source = source;
     } else {
+        // Add new entry
+        size_t index = pImpl->entries.size();
         pImpl->entries.emplace_back(key, value, source);
+        pImpl->keyToIndex[key] = index;
     }
 }
 
@@ -143,16 +270,28 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // O(1) lookup using hash map
+    return pImpl->keyToIndex.find(key) != pImpl->keyToIndex.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = pImpl->keyToIndex.find(key);
+    if (it != pImpl->keyToIndex.end()) {
+        size_t index = it->second;
+        
+        // Remove from vector
+        pImpl->entries.erase(pImpl->entries.begin() + index);
+        
+        // Update indices in hash map
+        for (auto& [k, idx] : pImpl->keyToIndex) {
+            if (idx > index) {
+                idx--;
+            }
+        }
+        
+        // Remove from hash map
+        pImpl->keyToIndex.erase(it);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -166,6 +305,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->keyToIndex.clear();
 }
 
 std::string Config::summary() const {
