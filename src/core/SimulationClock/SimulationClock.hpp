@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.hpp"
+#include "../src/core/Types/Types.hpp"
 
 namespace nlm {
 

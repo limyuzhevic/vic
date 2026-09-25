@@ -248,7 +248,8 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(
+        static_cast<uint32_t>(1), static_cast<uint32_t>(5)));
     
     // Initialize short-term plasticity state
     pImpl->shortTermDepression = 1.0f;  // Fully recovered

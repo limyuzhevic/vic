@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
 #include <deque>
 #include <memory>

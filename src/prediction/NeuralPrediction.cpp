@@ -271,16 +271,16 @@ void NeuralPrediction::modulatePredictionSynapses(float error, float reward) {
     
     // Apply reward-modulated plasticity to prediction-related synapses
     for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
+        for (const auto& synPtr : region->getSynapses()) {
+            float eligibility = synPtr->getEligibilityTrace();
             
             // If this synapse was recently active in prediction pathway
             if (std::abs(eligibility) > 0.001f) {
                 float delta = eligibility * (reward - 0.5f) * 2.0f;
-                syn->addToWeight(delta);
+                synPtr->addToWeight(delta);
                 
                 // Decay eligibility
-                syn->decayEligibilityTrace(0.1f);
+                synPtr->decayEligibilityTrace(0.1f);
             }
         }
     }

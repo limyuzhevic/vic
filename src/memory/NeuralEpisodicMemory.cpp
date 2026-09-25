@@ -232,6 +232,18 @@ void NeuralEpisodicMemory::clear() {
     pImpl->episodeNeurons.clear();
 }
 
+void NeuralEpisodicMemory::setMaxEpisodes(size_t max) {
+    maxEpisodes_ = max;
+    
+    // If we're above the new limit, we need to prune old episodes
+    while (episodes_.size() > maxEpisodes_) {
+        episodes_.erase(episodes_.begin());
+        if (!pImpl->episodeNeurons.empty()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        }
+    }
+}
+
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
     size_t count) const {
     

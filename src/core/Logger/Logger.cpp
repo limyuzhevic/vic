@@ -182,7 +182,7 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
+    (void)logger; // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../motor/Action.hpp"
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
@@ -66,6 +67,8 @@ public:
     void setActionQuality(ActionType action, float quality) {
         actionQuality_[static_cast<size_t>(action)] = quality;
     }
+    std::vector<float> predictNextState(ActionType action,
+                          const std::vector<float>& currentState);
 
     // Get current goal
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
@@ -74,6 +77,15 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    class SelfModel;
+    class SocialLearning;
+    // Methods that interact with SelfModel and SocialLearning
+    float getSelfModelConfidence(ActionType action) const;
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                      const std::vector<float>& afterState,
+                                      ActionType action) const;
+    float computeSimilarity(const std::vector<float>& a,
+                          const std::vector<float>& b) const;
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -129,7 +141,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -154,6 +166,8 @@ public:
     // Has self-model formed?
     bool hasSelfModel() const { return !actionEffects_.empty(); }
 
+    float computeSimilarity(const std::vector<float>& a,
+                          const std::vector<float>& b) const;
 private:
     // Find best matching previous experience
     std::vector<float> findMatchingEffect(ActionType action,
@@ -230,6 +244,8 @@ public:
     // Get observation count
     size_t getObservationCount() const { return observationCount_; }
 
+    float computeSimilarity(const std::vector<float>& a,
+                          const std::vector<float>& b) const;
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

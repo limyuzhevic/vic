@@ -8,6 +8,7 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -237,7 +238,7 @@ bool Brain::initialize() {
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    // maxEpisodes is set in NeuralEpisodicMemory constructor (1000)
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -414,7 +415,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+            pImpl->curiosity->update(
+                pImpl->novelty->getLevel(), 
+                pImpl->predictionError->getMagnitude(), 
+                pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -455,7 +459,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
                     syn->setWeight(weight);
@@ -468,7 +472,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->hebbian->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                 }
             }
             
@@ -551,7 +555,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
+        auto* sp = pImpl->structuralPlasticity.get();
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
@@ -813,13 +817,13 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
-                synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
-                synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
-                synapseData.weight.push_back(syn->getWeight());
-                synapseData.delay.push_back(syn->getDelay());
-                synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
-                synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            for (const auto& synPtr : region->getSynapses()) {
+                synapseData.sourceNeuron.push_back(synPtr->getSourceNeuron().index());
+                synapseData.destinationNeuron.push_back(synPtr->getDestinationNeuron().index());
+                synapseData.weight.push_back(synPtr->getWeight());
+                synapseData.delay.push_back(synPtr->getDelay());
+                synapseData.synapseType.push_back(static_cast<uint8_t>(synPtr->getType()));
+                synapseData.eligibilityTrace.push_back(synPtr->getEligibilityTrace());
             }
         }
         
