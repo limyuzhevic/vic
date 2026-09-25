@@ -28,6 +28,10 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // ========== SENSORY STATE STORAGE ==========
+    std::vector<SensoryInput> sensoryHistory;
+    size_t maxSensoryHistory;
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -99,6 +103,9 @@ struct Brain::Impl {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Configure sensory history capacity
+        maxSensoryHistory = config->getOr<size_t>("sensory_history_size", 100);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -510,9 +517,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryHistory.empty()) {
+        // Use most recent sensory observation for prediction
+        const SensoryInput& currentSensory = pImpl->sensoryHistory.back();
+        
+        // Predict next sensory state
+        auto predictedSensory = pImpl->predictionSystem->predictNextState(currentSensory);
+        
+        // Get actual next sensory observation (if available)
+        if (pImpl->sensoryHistory.size() >= 2) {
+            const SensoryInput& actualNextSensory = pImpl->sensoryHistory[pImpl->sensoryHistory.size() - 2];
+            pImpl->predictionSystem->updatePredictions(predictedSensory, actualNextSensory);
+        }
+        
+        // Update prediction system confidence based on prediction error
+        float predictionErr = pImpl->predictionSystem->getPredictionError();
+        float confidence = 1.0f / (1.0f + predictionErr);
+        pImpl->predictionSystem->setConfidence(confidence);
+        
+        // Use prediction error to modulate attention and memory
+        if (pImpl->attention) {
+            // High prediction error = high attention focus
+            if (predictionErr > 0.5f) {
+                pImpl->attention->setCompetitionThreshold(0.1f);
+                pImpl->attention->applyBottomUpSalience(0, 2.0f);  // Boost attention
+            } else {
+                pImpl->attention->setCompetitionThreshold(0.5f);  // Normal competition
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +555,85 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention modulation to neural activity
+            float attentionFocus = pImpl->attention->getExcitationFor(competitors[0]);
+            if (attentionFocus > 0.0f) {
+                // Enhance activity of attended neurons
+                for (NeuronId neuron : competitors) {
+                    // Get the neuron from the brain
+                    for (auto& region : pImpl->regions) {
+                        auto neurons = region->getAllNeurons();
+                        for (auto* n : neurons) {
+                            if (n->getId() == neuron) {
+                                n->injectCurrent(attentionFocus * 2.0f);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Apply attention-based neuromodulation
+        if (pImpl->dopamine) {
+            // Attention affects dopamine release
+            if (pImpl->attention->isAttended(0)) {
+                pImpl->dopamine->setLevel(0.8f);  // High reward prediction
+            } else {
+                pImpl->dopamine->setLevel(0.1f);  // Low reward prediction
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->sensoryHistory.empty()) {
+        // Extract features from sensory history for concept formation
+        std::vector<float> conceptFeatures;
+        
+        // Extract simple features from recent sensory inputs
+        for (size_t i = std::max(0UL, pImpl->sensoryHistory.size() - 5); i < pImpl->sensoryHistory.size(); ++i) {
+            const auto& sensory = pImpl->sensoryHistory[i];
+            const auto& data = sensory.getData();
+            for (float value : data) {
+                conceptFeatures.push_back(value);
+            }
+        }
+        
+        if (!conceptFeatures.empty()) {
+            // Use concept formation to discover patterns in sensory input
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                conceptFeatures, conceptFeatures, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f, 
+                currentStep);
+            
+            if (conceptId > 0) {
+                const auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    // Use concept to guide attention
+                    if (pImpl->attention) {
+                        // Get a representative pattern from the concept to guide attention
+                        std::vector<float> prototype = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                        float conceptStability = pImpl->conceptFormation->getConceptStability(conceptId);
+                        
+                        if (conceptStability > 0.7f && !prototype.empty()) {
+                            // Create a dummy neuron ID for top-down bias
+                            NeuronId conceptNeuronId;
+                            conceptNeuronId.value = conceptId + 1000; // Use concept ID + offset
+                            
+                            // Apply top-down bias based on concept stability
+                            pImpl->attention->applyTopDownBias(conceptNeuronId, conceptStability * 2.0f);
+                            
+                            // Also affect working memory based on concept strength
+                            if (pImpl->workingMemory) {
+                                // Boost all working memory traces
+                                pImpl->workingMemory->strengthenMemory(conceptStability);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -576,17 +680,91 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // ========== STEP 14: Produce action using integrated cognition ==========
+    std::unique_ptr<Action> plannedAction = std::make_unique<Action>(ActionType::Wait);
+    
+    if (pImpl->planner) {
+        // Use NeuralPlanner to select action based on current state
+        std::vector<float> currentState;
+        
+        // Extract current state from sensory history
+        if (!pImpl->sensoryHistory.empty()) {
+            const auto& currentSensory = pImpl->sensoryHistory.back();
+            currentState = currentSensory.getData();
+        }
+        
+        // Get planning depth from config
+        size_t planningDepth = 5;
+        if (auto depthOpt = pImpl->config->get<size_t>("planning_depth")) {
+            planningDepth = *depthOpt;
+        }
+        pImpl->planner->setPlanningDepth(planningDepth);
+        
+        // Plan action
+        ActionType plannedActionType = pImpl->planner->planAction(currentState);
+        
+        if (plannedActionType != ActionType::Wait) {
+            plannedAction = std::make_unique<Action>(plannedActionType);
+            
+            // Use concept formation to adjust action selection
+            if (pImpl->conceptFormation) {
+                auto concepts = pImpl->conceptFormation->getConcepts();
+                for (const auto& concept : concepts) {
+                    if (concept.getConceptStability(0) > 0.8f) {
+                        // Concept is stable - reinforce action selection
+                        pImpl->planner->setActionQuality(plannedActionType, 
+                            pImpl->planner->getPlanningConfidence());
+                        break;
+                    }
+                }
+            }
+            
+            // Record this action for learning
+            if (pImpl->selfModel) {
+                pImpl->selfModel->recordSelfAction(plannedActionType, currentState, currentState);
+            }
+        }
+    } else {
+        // Fallback to basic action production if planner not available
+        plannedAction = produceAction();
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // Apply prediction-based action modification
+    if (pImpl->predictionSystem && !pImpl->sensoryHistory.empty()) {
+        float predictionErr = pImpl->predictionSystem->getPredictionError();
+        
+        if (predictionErr > 0.7f) {
+            // High prediction error = explore more
+            // Add some randomness to action selection
+            if (std::rand() % 10 < 3) {  // 30% chance of exploration
+                plannedAction = std::make_unique<Action>(ActionType::Interact);
+            }
+        } else if (predictionErr < 0.2f) {
+            // Low prediction error = exploit known good actions
+            // Keep current action choice
+        }
     }
-}
+    
+    // Store action in working memory for reinforcement learning
+    if (pImpl->workingMemory && plannedAction) {
+        pImpl->workingMemory->storeToNeuron(0, 0.5f);  // Store planned action
+    }
+    
+    // Update developmental state based on prediction error
+    if (pImpl->developmentSystem && currentStep % 100 == 0) {
+        // Developmental stage can be affected by prediction error
+        if (pImpl->predictionSystem) {
+            float predictionErr = pImpl->predictionSystem->getPredictionError();
+            
+            // High prediction error = critical period (high learning)
+            if (predictionErr > 0.6f) {
+                pImpl->developmentalStage = DevelopmentalStage::CriticalPeriod;
+            } else if (predictionErr < 0.1f) {
+                // Low prediction error = adult stability
+                pImpl->developmentalStage = DevelopmentalStage::Adult;
+            }
+        }
+    }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
@@ -597,6 +775,65 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // ========== PREDICTION INTEGRATION ==========
+    // Store sensory input in history for prediction
+    if (pImpl->predictionSystem) {
+        // Store current sensory state
+        pImpl->sensoryHistory.push_back(input);
+        
+        // Trim history if needed
+        if (pImpl->sensoryHistory.size() > pImpl->maxSensoryHistory) {
+            pImpl->sensoryHistory.erase(pImpl->sensoryHistory.begin());
+        }
+        
+        // Predict next state based on history
+        if (pImpl->sensoryHistory.size() >= 2) {
+            // Get recent sensory history for prediction
+            const SensoryInput& lastInput = pImpl->sensoryHistory.back();
+            const SensoryInput& previousInput = pImpl->sensoryHistory[pImpl->sensoryHistory.size() - 2];
+            
+            // Predict next state (placeholder: just use current state)
+            auto predictedInput = pImpl->predictionSystem->predictNextState(lastInput);
+            
+            // Compute prediction error
+            pImpl->predictionSystem->updatePredictions(predictedInput, lastInput);
+            
+            // Update prediction error neuromodulation
+            if (pImpl->predictionError) {
+                float predictionErr = pImpl->predictionSystem->getPredictionError();
+                pImpl->predictionError->update(predictionErr);
+                
+                // Apply prediction error to neuromodulation
+                // High prediction error increases dopamine (learning signal)
+                float errorSignal = std::min(predictionErr * 10.0f, 1.0f);
+                pImpl->dopamine->setLevel(errorSignal);
+                
+                // Prediction error modulates curiosity
+                if (errorSignal > 0.5f) {
+                    pImpl->curiosity->increaseCuriosity(errorSignal);
+                }
+            }
+            
+            // Apply prediction error to attention
+            if (pImpl->attention && errorSignal > 0.3f) {
+                // Focus attention on sensory areas that were predicted incorrectly
+                pImpl->attention->setCompetitionThreshold(0.2f);  // Lower threshold = more focused
+            }
+            
+            // Store prediction error for episodic memory
+            if (pImpl->episodicMemory) {
+                EpisodicMemoryItem episode;
+                episode.timestamp = currentStep;
+                episode.predictionError = predictionErr;
+                episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                
+                // Store a brief representation
+                episode.sensoryInput = input;
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
+        }
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -612,6 +849,18 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+        
+        // Apply novelty detection based on input pattern
+        if (pImpl->novelty && normalizedValue > 0.1f) {
+            pImpl->novelty->updatePattern(normalizedValue);
+        }
+        
+        // Apply curiosity to sensory neurons
+        if (pImpl->curiosity && normalizedValue > 0.2f) {
+            pImpl->curiosity->increaseCuriosity(0.1f);
+            // Inject additional current to enhance exploration
+            pImpl->sensoryNeurons[i]->injectCurrent(0.5f);
         }
     }
 }
