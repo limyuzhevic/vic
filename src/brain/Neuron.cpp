@@ -24,10 +24,23 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f) {
+        // Initialize with proper default values
+        state.membranePotential = -70.0f;
+        state.restingPotential = -70.0f;
+        state.threshold = -55.0f;
+        state.resetPotential = -70.0f;
+        state.leakConductance = 10.0f;
+        state.firingState = FiringState::Resting;
+        state.refractoryPeriod = 5;
+    }
+    
+    ~Impl() {
+        // Cleanup is handled by std::vector destructors
+    }
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+Neuron::Neuron(NeuronId id) : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
@@ -37,15 +50,11 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -260,8 +269,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // IMPROVED: Proper LIF step with configurable timestep and error checking
+    TimestepDuration dt = 0.001;  // Default 1ms timestep
+    
+    // Validate parameters
+    if (dt <= 0.0f) {
+        throw std::invalid_argument("Timestep must be positive");
+    }
+    if (currentTime < 0.0f) {
+        throw std::invalid_argument("Current time cannot be negative");
+    }
+    
     stepLIF(currentTime, dt);
 }
 

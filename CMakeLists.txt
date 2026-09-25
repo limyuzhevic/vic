@@ -34,7 +34,14 @@ add_library(nlm_core STATIC
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/BrainMain.cpp
+    src/brain/BrainInitialization.cpp
+    src/brain/BrainSimulation.cpp
+    src/brain/BrainSystemIntegration.cpp
+    src/brain/BrainIO.cpp
+    src/brain/BrainFileIO.cpp
+    src/brain/BrainRegionManagement.cpp
+    src/brain/BrainStatistics.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
