@@ -318,21 +318,49 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
     return brain_->getDevelopmentalStage();
 }
 
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
-}
+    float AgentBrain::getDopamineLevel() const {
+        return dopamineLevel_;
+    }
 
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
-}
+    float AgentBrain::getCuriosityLevel() const {
+        return curiosityLevel_;
+    }
 
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
-}
+    float AgentBrain::getNoveltyLevel() const {
+        return noveltyLevel_;
+    }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
-}
+    float AgentBrain::getPredictionError() const {
+        return predictionError_;
+    }
+
+    float AgentBrain::getExpectedReward() const {
+        return expectedReward_;
+    }
+
+    double AgentBrain::getDevelopmentalAge() const {
+        return developmentalAge_;
+    }
+
+    float AgentBrain::getPlasticityModifier() const {
+        return plasticityModifier_;
+    }
+
+    bool AgentBrain::isRewardModulationEnabled() const {
+        return rewardModulationEnabled_;
+    }
+
+    bool AgentBrain::isStructuralPlasticityEnabled() const {
+        return structuralPlasticityEnabled_;
+    }
+
+    bool AgentBrain::isDevelopmentEnabled() const {
+        return developmentEnabled_;
+    }
+
+    bool AgentBrain::isCuriosityEnabled() const {
+        return curiosityEnabled_;
+    }
 
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;

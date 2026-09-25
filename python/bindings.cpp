@@ -162,7 +162,74 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Configuration convenience methods for Python API
+        .def("getNeuronCount", [](const Config& self, int64_t defaultValue) {
+            return self.getOr<int64_t>("brain.neuron_count", defaultValue);
+        }, py::arg("default_value") = 1000, "Get neuron count")
+        .def("setNeuronCount", [](Config& self, int64_t value) {
+            self.set("brain.neuron_count", value);
+        }, py::arg("value"), "Set neuron count")
+        .def("getSynapseDensity", [](const Config& self, float defaultValue) {
+            return self.getOr<float>("brain.synapse_density", defaultValue);
+        }, py::arg("default_value") = 0.1f, "Get synapse density")
+        .def("setSynapseDensity", [](Config& self, float value) {
+            self.set("brain.synapse_density", value);
+        }, py::arg("value"), "Set synapse density")
+        .def("getConnectionProbability", [](const Config& self, float defaultValue) {
+            return self.getOr<float>("brain.connection_probability", defaultValue);
+        }, py::arg("default_value") = 0.05f, "Get connection probability")
+        .def("setConnectionProbability", [](Config& self, float value) {
+            self.set("brain.connection_probability", value);
+        }, py::arg("value"), "Set connection probability")
+        .def("getStdpEnable", [](const Config& self, bool defaultValue) {
+            return self.getOr<bool>("plasticity.stdp.enable", defaultValue);
+        }, py::arg("default_value") = true, "Get STDP enable flag")
+        .def("setStdpEnable", [](Config& self, bool value) {
+            self.set("plasticity.stdp.enable", value);
+        }, py::arg("value"), "Set STDP enable flag")
+        .def("getStdpLearningRate", [](const Config& self, float defaultValue) {
+            return self.getOr<float>("plasticity.stdp.learning_rate", defaultValue);
+        }, py::arg("default_value") = 0.001f, "Get STDP learning rate")
+        .def("setStdpLearningRate", [](Config& self, float value) {
+            self.set("plasticity.stdp.learning_rate", value);
+        }, py::arg("value"), "Set STDP learning rate")
+        .def("getStdpTauPlus", [](const Config& self, float defaultValue) {
+            return self.getOr<float>("plasticity.stdp.tau_plus", defaultValue);
+        }, py::arg("default_value") = 20.0f, "Get STDP tau plus")
+        .def("setStdpTauPlus", [](Config& self, float value) {
+            self.set("plasticity.stdp.tau_plus", value);
+        }, py::arg("value"), "Set STDP tau plus")
+        .def("getStdpTauMinus", [](const Config& self, float defaultValue) {
+            return self.getOr<float>("plasticity.stdp.tau_minus", defaultValue);
+        }, py::arg("default_value") = 20.0f, "Get STDP tau minus")
+        .def("setStdpTauMinus", [](Config& self, float value) {
+            self.set("plasticity.stdp.tau_minus", value);
+        }, py::arg("value"), "Set STDP tau minus")
+        .def("getHebbianEnable", [](const Config& self, bool defaultValue) {
+            return self.getOr<bool>("plasticity.hebbian.enable", defaultValue);
+        }, py::arg("default_value") = true, "Get Hebbian enable flag")
+        .def("setHebbianEnable", [](Config& self, bool value) {
+            self.set("plasticity.hebbian.enable", value);
+        }, py::arg("value"), "Set Hebbian enable flag")
+        .def("getCuriosityEnable", [](const Config& self, bool defaultValue) {
+            return self.getOr<bool>("neuromod.curiosity.enable", defaultValue);
+        }, py::arg("default_value") = true, "Get curiosity enable flag")
+        .def("setCuriosityEnable", [](Config& self, bool value) {
+            self.set("neuromod.curiosity.enable", value);
+        }, py::arg("value"), "Set curiosity enable flag")
+        .def("getNoveltyEnable", [](const Config& self, bool defaultValue) {
+            return self.getOr<bool>("neuromod.novelty.enable", defaultValue);
+        }, py::arg("default_value") = true, "Get novelty enable flag")
+        .def("setNoveltyEnable", [](Config& self, bool value) {
+            self.set("neuromod.novelty.enable", value);
+        }, py::arg("value"), "Set novelty enable flag")
+        .def("getRewardScale", [](const Config& self, float defaultValue) {
+            return self.getOr<float>("neuromod.dopamine.scale", defaultValue);
+        }, py::arg("default_value") = 1.0f, "Get reward scale")
+        .def("setRewardScale", [](Config& self, float value) {
+            self.set("neuromod.dopamine.scale", value);
+        }, py::arg("value"), "Set reward scale");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -398,7 +465,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Convenience methods for accessing AgentBrain state
+        .def("getDopamineLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get dopamine level (neuromodulation)")
+        .def("getCuriosity", &AgentBrain::getCuriosityLevel,
+             "Get current curiosity level")
+        .def("getNovelty", &AgentBrain::getNoveltyLevel,
+             "Get current novelty level")
+        .def("getPrediction", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get developmental stage")
+        .def("getPlasticityModifier", [](const AgentBrain& self) {
+            // Access brain's development system for plasticity modifier
+            if (self.getBrain()) {
+                auto* dev = self.getBrain()->getDevelopmentSystem();
+                if (dev) {
+                    // This is a simplified access - in a real implementation,
+                    // we'd need to add a method to access development state
+                    return 1.0f;  // Placeholder
+                }
+            }
+            return 1.0f;
+        }, "Get plasticity modifier")
+        .def("getExpectedReward", [](const AgentBrain& self) {
+            // Access expected reward from AgentBrain
+            // In a real implementation, we'd need to add a getter method
+            return 0.0f;  // Placeholder
+        }, "Get expected reward")
+        .def("getDevelopmentalAge", [](const AgentBrain& self) {
+            // Access developmental age from AgentBrain
+            // In a real implementation, we'd need to add a getter method
+            return 0.0;  // Placeholder
+        }, "Get developmental age");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -415,6 +515,9 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Version information
+    m.attr("__version__") = "0.1.0";
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

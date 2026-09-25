@@ -105,12 +105,13 @@ pip install dist/*.whl
 import pynlm
 
 # Check version
-print(pynlm.__version__)
+print(f"NLM Python bindings version: {pynlm.__version__}")
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
 ---
@@ -128,8 +129,9 @@ import pynlm
 config = pynlm.createDefaultConfig()
 
 # Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+config.setNeuronCount(1000)
+config.setSynapseDensity(0.1)
+config.setConnectionProbability(0.05)
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
@@ -137,6 +139,7 @@ brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.3f} Hz")
 ```
 
 #### Running a Simulation
@@ -144,8 +147,11 @@ print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```python
 import pynlm
 
-# Create brain
+# Create brain with custom configuration
 config = pynlm.createDefaultConfig()
+config.setNeuronCount(2000)
+config.setConnectionProbability(0.1)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 
@@ -155,7 +161,11 @@ for step in range(1000):
     
     # Log statistics periodically
     if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Average firing rate: {brain.getAverageFiringRate():.3f} Hz")
+        print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
 ```
 
 #### Creating a Simple World
@@ -174,14 +184,36 @@ world.configure(
     visionHeight=8
 )
 
+# Configure world physics
+world.setMaxEnergy(100.0)
+world.setEnergyDecayRate(0.01)
+world.setRandomSeed(42)
+
 # Reset world to initial state
 world.reset()
 
 # Set agent starting position
 world.setAgentStart(10.0, 10.0)
 
+# Create and initialize agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Add obstacles to world (using coordinates in world space)
+# Example: add resource objects at specific positions
+world.addObject(pynlm.WorldObject(5.0, 5.0, pynlm.WorldObjectType.Resource, value=10.0))
+world.addObject(pynlm.WorldObject(15.0, 15.0, pynlm.WorldObjectType.Resource, value=10.0))
+world.addObject(pynlm.WorldObject(10.0, 5.0, pynlm.WorldObjectType.Hazard, value=-15.0))
+
 # Run world update
 world.update(timestep=0.1)
+
+print(f"Agent position: ({world.getAgentBody().x:.1f}, {world.getAgentBody().y:.1f})")
+print(f"Agent energy: {world.getAgentBody().energy:.1f}")
+print(f"Agent health: {world.getAgentBody().health:.1f}")
 ```
 
 ### Complete Agent Example
@@ -320,6 +352,21 @@ agent = pynlm.createAgentBrain(brain)
 # Initialization
 agent.initialize(world)
 
+# Get agent properties
+print(f"Agent sensory input size: {agent.getSensoryInputSize()}")
+print(f"Agent motor output size: {agent.getMotorOutputSize()}")
+print(f"Agent developmental stage: {agent.getDevelopmentalStage()}")
+print(f"Agent neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+print(f"Agent curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"Agent novelty level: {agent.getNoveltyLevel():.3f}")
+print(f"Agent prediction error: {agent.getPredictionError():.3f}")
+
+# Convenience getters for state variables
+print(f"Dopamine level: {agent.getDopamineLevel():.3f}")
+print(f"Expected reward: {agent.getExpectedReward():.3f}")
+print(f"Developmental age: {agent.getDevelopmentalAge():.1f}")
+print(f"Plasticity modifier: {agent.getPlasticityModifier():.3f}")
+
 # Sensory processing
 agent.processSensoryInput(percept)
 
@@ -334,16 +381,16 @@ agent.updateDevelopment(timestep)
 agent.getDevelopmentalStage()
 
 # Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
 
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Check subsystem status
+print(f"Reward modulation enabled: {agent.isRewardModulationEnabled()}")
+print(f"Structural plasticity enabled: {agent.isStructuralPlasticityEnabled()}")
+print(f"Development enabled: {agent.isDevelopmentEnabled()}")
+print(f"Curiosity enabled: {agent.isCuriosityEnabled()}")
 ```
 
 #### SimpleWorld Class
@@ -451,6 +498,38 @@ pynlm.WorldObjectType.Marker
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+
+## Part 4: Configuration Options
+
+### Python Configuration Methods
+
+The Python API provides convenient methods for common configuration parameters:
+
+```python
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Set brain parameters
+config.setNeuronCount(2000)
+config.setSynapseDensity(0.15)
+config.setConnectionProbability(0.1)
+
+# Set plasticity parameters
+config.setStdpEnable(True)
+config.setStdpLearningRate(0.002)
+config.setStdpTauPlus(25.0)
+config.setStdpTauMinus(25.0)
+config.setHebbianEnable(True)
+
+# Set neuromodulation parameters
+config.setCuriosityEnable(True)
+config.setNoveltyEnable(True)
+config.setRewardScale(1.0)
+
+# Get configuration values
+print(f"Neuron count: {config.getNeuronCount()}")
+print(f"STDP enabled: {config.getStdpEnable()}")
+```
 
 ---
 

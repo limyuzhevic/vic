@@ -69,6 +69,20 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Convenience getters for all state variables
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionError() const;
+    float getExpectedReward() const;
+    double getDevelopmentalAge() const;
+    float getPlasticityModifier() const;
+    
+    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
+    bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
