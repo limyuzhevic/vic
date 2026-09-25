@@ -401,11 +401,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+// ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Apply attention to working memory through competition
+        if (pImpl->attention) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                pImpl->attention->processCompetition(memoryNeurons);
+            }
+        }
+        
+        // Apply cholinergic modulation to working memory consolidation
+        // Acetylcholine enhances working memory storage
+        if (pImpl->dopamine && pImpl->dopamine->getLevel() > 0.5f) {
+            float achLevel = 0.5f + 0.5f * pImpl->dopamine->getLevel();  // Simplified ACh coupling
+            if (achLevel > 0.8f) {
+                // Strong cholinergic modulation - consolidate working memory
+                pImpl->workingMemory->strengthenMemory(1.2f);
+            }
+        }
     }
-    
+
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -415,6 +433,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+    }
+    
+    // Update prediction error signal
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -437,6 +460,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+    }
+    
+    // Update noradrenergic modulation
+    // Norepinephrine affects arousal and attention
+    if (pImpl->novelty && pImpl->curiosity) {
+        float neLevel = pImpl->novelty->getLevel() * 0.3f + pImpl->curiosity->getLevel() * 0.4f;
+        neLevel = std::clamp(neLevel, 0.0f, 1.0f);
+        
+        // Apply noradrenergic effects on attention
+        if (pImpl->attention) {
+            // Higher norepinephrine increases attention focus
+            pImpl->attention->setInhibitionStrength(0.3f + neLevel * 0.7f);
+        }
+    }
+    
+    // Update serotonergic modulation
+    // Serotonin affects mood, impulsivity, and social behavior
+    float serotoninLevel = 0.5f;  // Default level - could be modulated by experiences
+    if (pImpl->dopamine) {
+        // Serotonin interacts with dopamine
+        float interaction = pImpl->dopamine->getLevel() * 0.2f - 0.1f;
+        serotoninLevel += interaction;
+        serotoninLevel = std::clamp(serotoninLevel, 0.0f, 1.0f);
+    }
+    
+    // Serotonin affects memory consolidation
+    if (serotoninLevel > 0.7f && pImpl->episodicMemory) {
+        // Strong serotonergic modulation - enhance memory consolidation
+        pImpl->episodicMemory->consolidate(0.8f);
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -511,8 +563,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from the first sensory population
+        SensoryInput sensoryInput;
+        std::vector<float> sensoryData;
+        
+        // Collect sensory neuron activations
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        // Use membrane potential deviation from rest as activation
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                        sensoryData.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        if (!sensoryData.empty()) {
+            // Create sensory input from neural activity
+            sensoryInput = SensoryInput(sensoryData);
+            
+            // Update prediction system with current state
+            pImpl->predictionSystem->train(sensoryInput);
+            
+            // Update prediction error signal for brain loop
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setPredictionError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +607,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Collect sensory and internal neural activations as experience
+        std::vector<float> currentExperience;
+        
+        // Include sensory neuron activations (what was perceived)
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory || 
+                    pop->getNeuronType() == NeuronType::Internal) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        // Convert membrane potential to activation (0-1)
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f;
+                        activation = std::min(1.0f, std::max(0.0f, activation));
+                        currentExperience.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Get reward from dopamine for concept reinforcement
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Create simple features (same as pattern for now)
+        std::vector<float> features = currentExperience;
+        
+        // Update concept formation with experience
+        pImpl->conceptFormation->presentExperience(currentExperience, features, reward, pImpl->currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -546,7 +650,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 13: Apply sleep/rest cycle ==========
+    if (pImpl->isResting) {
+        // During rest, focus on memory consolidation and replay
+        pImpl->isResting = false;  // Only rest for one step to prevent infinite loop
+        
+        // Enhanced memory consolidation during rest
+        if (pImpl->episodicMemory) {
+            // Rest increases consolidation strength
+            pImpl->episodicMemory->consolidate(0.9f);  // Higher consolidation during rest
+            
+            // More replay during rest for memory integration
+            if (currentStep % pImpl->replayInterval == 0) {
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);  // More episodes
+                for (const auto* episode : episodesToReplay) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+            }
+        }
+        
+        // Working memory decay during rest
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->clear();  // Clear working memory during rest
+        }
+    }
+    
+    // Check if brain should enter rest state based on neuromodulation
+    // High novelty + high curiosity + low reward = time to rest and consolidate
+    if (pImpl->novelty && pImpl->curiosity && pImpl->dopamine) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Rest when exploration is high and reward is low
+        if (noveltyLevel > 0.7f && curiosityLevel > 0.7f && dopamineLevel < 0.2f) {
+            pImpl->isResting = true;
+        }
+    }
+    
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -576,7 +718,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
