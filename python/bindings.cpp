@@ -25,9 +25,28 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Quick Start:
+        ------------
+        import pynlm
+        
+        # Create and initialize a simple brain
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(100):
+            brain.step(step)
+            
+        print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Register version attribute for the module
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -400,26 +419,108 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Add convenience functions for common patterns
+    m.def("run_brain_simulation", [](std::shared_ptr<Brain> brain, int num_steps, bool verbose = false) {
+        brain->initialize();
+        for (int step = 0; step < num_steps; ++step) {
+            brain->step(step);
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() 
+                          << " firing neurons, " << brain->getTotalSpikeCount() << " total spikes" << std::endl;
+            }
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("num_steps"), py::arg("verbose") = false,
+        "Run a complete brain simulation with optional verbose output");
+    
+    m.def("run_agent_episode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                               int num_steps, bool verbose = false) {
+        agent->initialize(world);
+        world->reset();
+        
+        float total_reward = 0.0f;
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(static_cast<float>(step) * 0.1f);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            auto brain = agent->getBrain();
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            float reward = 0.0f;
+            if (percept.getInternal().size() > 0) {
+                reward = percept.getInternal()[0];
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            total_reward += reward;
+            
+            if (verbose && step % 50 == 0) {
+                std::cout << "Step " << step << ": Reward = " << reward 
+                          << ", Total Reward = " << total_reward
+                          << ", Curiosity = " << agent->getCuriosityLevel()
+                          << ", Novelty = " << agent->getNoveltyLevel() << std::endl;
+            }
+        }
+        
+        return total_reward;
+    }, py::arg("agent"), py::arg("world"), py::arg("num_steps"), py::arg("verbose") = false,
+        "Run a complete agent episode simulation");
+    
+    // Add helper functions for configuration
+    m.def("configure_brain_neuron_count", [](std::shared_ptr<Config> config, uint64_t neuron_count) {
+        config->set("brain.neuron_count", neuron_count);
+    }, py::arg("config"), py::arg("neuron_count"),
+        "Configure the brain to have a specific number of neurons");
+    
+    m.def("configure_brain_synapse_density", [](std::shared_ptr<Config> config, float density) {
+        config->set("brain.synapse_density", density);
+    }, py::arg("config"), py::arg("density"),
+        "Configure the brain synapse connectivity density");
+    
+    m.def("enable_all_features", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"),
+        "Enable all available brain features for advanced learning");
+    
+    // Add validation and helper functions
+    m.def("validate_config", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Config pointer is null");
+        }
+        return config->has("brain.neuron_count");
+    }, py::arg("config"),
+        "Validate that configuration has required settings");
+    
+    m.def("get_simulation_summary", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        std::stringstream ss;
+        ss << "=== NLM Simulation Summary ===\n";
+        ss << "Brain Statistics:\n";
+        ss << "  Total Neurons: " << brain->getTotalNeuronCount() << "\n";
+        ss << "  Total Synapses: " << brain->getTotalSynapseCount() << "\n";
+        ss << "  Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+        ss << "  Average Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+        ss << "  Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+        ss << "  Excitation/Inhibition Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        ss << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        
+        ss << "World Statistics:\n";
+        ss << "  Width: " << world->getWidth() << "\n";
+        ss << "  Height: " << world->getHeight() << "\n";
+        ss << "  Simulation Time: " << world->getSimulationTime() << " s\n";
+        ss << "  Max Energy: " << world->getMaxEnergy() << "\n";
+        
+        return ss.str();
+    }, py::arg("brain"), py::arg("world"),
+        "Get a formatted summary of the current simulation state");
 }
 
 } // namespace nlm
