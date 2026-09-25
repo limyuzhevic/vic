@@ -78,20 +78,42 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Member initializer list for better initialization order and consistency
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
+        , regions()
+        , interRegionConnections()
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , sensoryNeurons()  // Initialize empty vector
+        , motorNeurons()    // Initialize empty vector
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , checkpointManager(nullptr)
+        , developmentalStage(DevelopmentalStage::Initial)
+        , nextRegionId(1)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -162,12 +184,19 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 Brain::~Brain() = default;
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    if (this != &other) {
+        other.pImpl = nullptr;
+    }
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Proper cleanup of current pImpl
+        if (pImpl) {
+            delete pImpl;
+        }
+        
+        // Take ownership of other's pImpl
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -652,11 +681,23 @@ STDP* Brain::getSTDP() {
     return pImpl->stdp.get();
 }
 
+const STDP* Brain::getSTDP() const {
+    return pImpl->stdp.get();
+}
+
 Hebbian* Brain::getHebbian() {
     return pImpl->hebbian.get();
 }
 
+const Hebbian* Brain::getHebbian() const {
+    return pImpl->hebbian.get();
+}
+
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    return pImpl->structuralPlasticity.get();
+}
+
+const StructuralPlasticity* Brain::getStructuralPlasticity() const {
     return pImpl->structuralPlasticity.get();
 }
 
@@ -738,6 +779,7 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    // Reset all state variables
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
@@ -745,11 +787,17 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
-    for (auto& region : pImpl->regions) {
-        region->reset();
-    }
+    // Clear all regions
+    pImpl->regions.clear();
     
+    // Clear sensory and motor neuron vectors (RAII ensures safe clearing)
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    
+    // Reset spike system
     pImpl->spikeSystem->reset();
+    
+    // Reset developmental stage
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -757,6 +805,41 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset inter-region connections
+    pImpl->interRegionConnections.clear();
+    
+    // Reset neuromodulation systems
+    if (pImpl->dopamine) pImpl->dopamine->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    if (pImpl->novelty) pImpl->novelty->reset();
+    
+    // Reset prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->reset();
+    }
+    
+    // Reset development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->reset();
+    }
+    
+    // Reset cognition systems
+    if (pImpl->planner) {
+        pImpl->planner->reset();
+    }
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->reset();
+    }
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+    }
+    
+    // Reset structural plasticity
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->reset();
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1009,11 +1092,23 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
 
+const NeuralWorkingMemory* Brain::getWorkingMemory() const {
+    return pImpl->workingMemory.get();
+}
+
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+const NeuralEpisodicMemory* Brain::getEpisodicMemory() const {
+    return pImpl->episodicMemory.get();
+}
+
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    return pImpl->associativeMemory.get();
+}
+
+const NeuralAssociativeMemory* Brain::getAssociativeMemory() const {
     return pImpl->associativeMemory.get();
 }
 
@@ -1023,9 +1118,17 @@ PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
+const PredictionSystem* Brain::getPredictionSystem() const {
+    return pImpl->predictionSystem.get();
+}
+
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
+    return pImpl->planner.get();
+}
+
+const NeuralPlanner* Brain::getPlanner() const {
     return pImpl->planner.get();
 }
 
@@ -1033,13 +1136,25 @@ ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
 }
 
+const ConceptFormation* Brain::getConceptFormation() const {
+    return pImpl->conceptFormation.get();
+}
+
 AttentionalSelection* Brain::getAttention() {
+    return pImpl->attention.get();
+}
+
+const AttentionalSelection* Brain::getAttention() const {
     return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    return pImpl->developmentSystem.get();
+}
+
+const DevelopmentSystem* Brain::getDevelopmentSystem() const {
     return pImpl->developmentSystem.get();
 }
 
@@ -1057,7 +1172,15 @@ Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
+const Dopamine* Brain::getDopamine() const {
+    return pImpl->dopamine.get();
+}
+
 Curiosity* Brain::getCuriosity() {
+    return pImpl->curiosity.get();
+}
+
+const Curiosity* Brain::getCuriosity() const {
     return pImpl->curiosity.get();
 }
 
@@ -1065,7 +1188,15 @@ Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
 }
 
+const Novelty* Brain::getNovelty() const {
+    return pImpl->novelty.get();
+}
+
 PredictionError* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
+}
+
+const PredictionError* Brain::getPredictionErrorSignal() const {
     return pImpl->predictionError.get();
 }
 
