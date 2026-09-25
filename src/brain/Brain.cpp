@@ -617,18 +617,21 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
+    // Validate parameters
+    if (current == 0.0f) {
+        return;  // No need to inject zero current
     }
+    
+    injectCurrentToNeurons(neuron, current);
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate parameters
+    if (current == 0.0f) {
+        return;  // No need to inject zero current
+    }
+    
+    // Iterate through all regions to find target neurons
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
@@ -637,6 +640,25 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
                 }
             }
         }
+    }
+}
+
+void Brain::injectCurrentToNeurons(NeuronId neuron, MembranePotential current) {
+    // Iterate through all regions to find target neuron
+    for (auto& region : pImpl->regions) {
+        auto neurons = region->getAllNeurons();
+        for (auto* n : neurons) {
+            if (n->getId() == neuron) {
+                n->injectCurrent(current);
+                return;  // Found and injected, exit
+            }
+        }
+    }
+    
+    // Log warning if neuron not found
+    if (current != 0.0f) {
+        NLM_LOG_WARNING("Brain::injectCurrentToNeurons: neuron with ID " + std::to_string(neuron) + 
+                        " not found for current injection");
     }
 }
 

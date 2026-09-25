@@ -85,41 +85,88 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain::processSensoryInput called with null brain pointer");
+        return;
+    }
+    
+    // Get sensory data from percept
+    const auto& vision = percept.getVision();
+    const auto& touch = percept.getTouch();
+    const auto& intern = percept.getInternal();
+    const auto& proprio = percept.getProprioception();
+    
+    // Validate that sensory arrays are not empty
+    if (vision.empty() && touch.empty() && intern.empty() && proprio.empty()) {
+        NLM_LOG_WARNING("AgentBrain::processSensoryInput called with empty sensory percept");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
+            // Check for NaN values
+            if (std::isnan(vision[i])) {
+                NLM_LOG_WARNING("AgentBrain::processSensoryInput vision value is NaN at index " + std::to_string(i));
+                continue;  // Skip this value
+            }
+            
+            // Clamp to reasonable range
+            float currentValue = std::clamp(vision[i], -1.0f, 1.0f);
+            
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = currentValue * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            // Check for NaN values
+            if (std::isnan(touch[i])) {
+                NLM_LOG_WARNING("AgentBrain::processSensoryInput touch value is NaN at index " + std::to_string(i));
+                continue;
+            }
+            
+            // Clamp to reasonable range
+            float currentValue = std::clamp(touch[i], -1.0f, 1.0f);
+            
+            float current = currentValue * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            // Check for NaN values
+            if (std::isnan(intern[i])) {
+                NLM_LOG_WARNING("AgentBrain::processSensoryInput internal value is NaN at index " + std::to_string(i));
+                continue;
+            }
+            
+            // Clamp to reasonable range
+            float currentValue = std::clamp(intern[i], -1.0f, 1.0f);
+            
+            float current = (currentValue * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            // Check for NaN values
+            if (std::isnan(proprio[i])) {
+                NLM_LOG_WARNING("AgentBrain::processSensoryInput proprioception value is NaN at index " + std::to_string(i));
+                continue;
+            }
+            
+            // Clamp to reasonable range
+            float currentValue = std::clamp(proprio[i], -1.0f, 1.0f);
+            
+            float current = (currentValue * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -150,12 +197,21 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    // Decode neural activity into motor commands
+    //
+    // This method:
+    // 1. Calculates activity levels in each motor neuron group
+    // 2. Selects the motor command with highest activity
+    // 3. Applies curiosity-based exploration if enabled
+    
+    // Constants for motor decoding
+    const float MIN_ACTIVITY_THRESHOLD = 0.5f;  // Minimum activity to trigger action
+    const float CURIOSITY_THRESHOLD = 0.3f;     // Minimum curiosity level for exploration
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    if (curiosityEnabled_ && curiosityLevel_ > CURIOSITY_THRESHOLD) {
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -163,6 +219,19 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Decode motor neuron activity into motor commands
+    //
+    // This method analyzes activity across motor neuron populations and selects
+    // the most appropriate motor command based on competitive activation.
+    //
+    // Process:
+    // 1. Calculate activity in each motor group (forward, backward, left, right, interact, wait)
+    // 2. Compare activities and select the most active command
+    // 3. Apply minimum activity threshold to prevent weak commands from being executed
+    
+    // Constants for motor decoding
+    const float MIN_ACTIVITY_THRESHOLD = 0.5f;  // Minimum normalized activity to trigger action
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
@@ -202,7 +271,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity < MIN_ACTIVITY_THRESHOLD) {
         return MotorCommand::Wait;
     }
     
@@ -210,15 +279,27 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    // Exploration behavior: occasionally choose random action when curiosity is high
+    // 
+    // Parameters:
+    // - curiosityLevel_: A value between 0.0 and 1.0 representing the agent's curiosity
+    //   (driven by novelty detection and prediction error)
+    // - defaultCmd: The default motor command to return when not exploring
+    
+    // Constants for exploration behavior
+    const float CURIOSITY_THRESHOLD = 0.5f;      // Minimum curiosity level to trigger exploration
+    const float MAX_EXPLORATION_CHANCE = 0.3f;   // Maximum probability of choosing random action
+    const int MOTOR_COMMAND_COUNT = 8;          // Number of MotorCommand enum values
+    
+    if (curiosityLevel_ > CURIOSITY_THRESHOLD) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * MAX_EXPLORATION_CHANCE;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - map each possible random value to a motor command
+            int choice = brain_->getRandomGenerator()->uniformInt(0, MOTOR_COMMAND_COUNT - 1);
+            // MotorCommand enum has MOTOR_COMMAND_COUNT values, so we can directly map
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,7 +308,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;  // Explicit mapping instead of default
             }
         }
     }
@@ -236,7 +317,38 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        NLM_LOG_ERROR("AgentBrain::applyRewardModulation called with null brain pointer or reward modulation disabled");
+        return;
+    }
+    
+    // Validate parameters
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        NLM_LOG_WARNING("AgentBrain::applyRewardModulation called with NaN values: reward=" + 
+                       std::to_string(reward) + ", predictedReward=" + std::to_string(predictedReward));
+        reward = std::max(0.0f, reward);
+        predictedReward = std::max(0.0f, predictedReward);
+    }
+    
+    // Clamp reward values to reasonable range
+    const float MAX_REWARD = 100.0f;
+    const float MIN_REWARD = -100.0f;
+    
+    if (reward > MAX_REWARD) {
+        NLM_LOG_WARNING("AgentBrain::applyRewardModulation reward value too large: " + std::to_string(reward));
+        reward = MAX_REWARD;
+    } else if (reward < MIN_REWARD) {
+        NLM_LOG_WARNING("AgentBrain::applyRewardModulation reward value too small: " + std::to_string(reward));
+        reward = MIN_REWARD;
+    }
+    
+    if (predictedReward > MAX_REWARD) {
+        NLM_LOG_WARNING("AgentBrain::applyRewardModulation predictedReward value too large: " + std::to_string(predictedReward));
+        predictedReward = MAX_REWARD;
+    } else if (predictedReward < MIN_REWARD) {
+        NLM_LOG_WARNING("AgentBrain::applyRewardModulation predictedReward value too small: " + std::to_string(predictedReward));
+        predictedReward = MIN_REWARD;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -280,7 +392,34 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        NLM_LOG_ERROR("AgentBrain::updateDevelopment called with null brain pointer or development disabled");
+        return;
+    }
+    
+    // Validate timestep parameter
+    if (std::isnan(timestep) || std::isinf(timestep)) {
+        NLM_LOG_WARNING("AgentBrain::updateDevelopment called with invalid timestep: " + std::to_string(timestep));
+        timestep = 0.001;  // Default small timestep
+    }
+    
+    // Check timestep is within reasonable bounds
+    const double MAX_TIMESTEP = 1.0;  // 1 second maximum
+    const double MIN_TIMESTEP = 0.000001;  // 1 microsecond minimum
+    
+    if (timestep > MAX_TIMESTEP) {
+        NLM_LOG_WARNING("AgentBrain::updateDevelopment timestep too large: " + std::to_string(timestep));
+        timestep = MAX_TIMESTEP;
+    } else if (timestep < MIN_TIMESTEP) {
+        NLM_LOG_WARNING("AgentBrain::updateDevelopment timestep too small: " + std::to_string(timestep));
+        timestep = MIN_TIMESTEP;
+    }
+    
+    // Ensure timestep is positive
+    if (timestep <= 0.0) {
+        NLM_LOG_WARNING("AgentBrain::updateDevelopment timestep must be positive: " + std::to_string(timestep));
+        timestep = 0.001;  // Default timestep
+    }
     
     developmentalAge_ += timestep;
     
