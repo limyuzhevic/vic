@@ -422,4 +422,26 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
+// Include advanced bindings
+#include "advanced_bindings.cpp"
+
+// Include advanced bindings in the main module
+PYBIND11_MODULE(pynlm_advanced, m_advanced) {
+    m_advanced.doc() = R"pbdoc(
+        NLM Advanced Python Bindings
+        ----------------------------
+        Advanced Python bindings for NLM with enhanced features:
+        - Advanced configuration helpers
+        - Training session management
+        - Performance profiling
+        - Experiment runners
+        - Convenience functions for complex workflows
+    )pbdoc";
+    
+    // Add all the original bindings
+    // This creates a combined module with both basic and advanced features
+    addAdvancedBindings(m_advanced);
+}
+
 } // namespace nlm
+

@@ -42,33 +42,55 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Advanced Brain with Configuration
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create an advanced configuration
+config = pynlm.createAdvancedConfig()
+config.setBrainParameters(neuronCount=2000, regionCount=2)
+config.setPlasticityParameters(enableSTDP=True, enableHebbian=True)
+config.setDevelopmentParameters(enableDevelopment=True)
+config.setNeuromodulationParameters(enableCuriosity=True, enableNovelty=True)
+
+# Create brain with advanced configuration
+brain = pynlm.createBrain(config.getConfig())
 brain.initialize()
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
+# Run simulation
+for i in range(500):
+    brain.step(i)
 
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+print("Advanced simulation complete!")
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+### Example 3: Brain with Performance Monitoring
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+```python
+import pynlm
+import time
+
+# Create brain and profiler
+config = pynlm.createAdvancedConfig()
+brain = pynlm.createBrain(config.getConfig())
+brain.initialize()
+
+# Create performance profiler
+profiler = pynlm.createPerformanceProfiler(brain)
+profiler.start()
+
+# Run simulation with profiling
+for i in range(200):
+    brain.step(i)
+    profiler.recordStep()
+
+# Get performance metrics
+print("Simulation complete!")
+print(profiler.getMetricsSummary())
 ```
 
 ---
@@ -221,14 +243,19 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Advanced Features
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Setup with advanced configuration
+config = pynlm.createAdvancedConfig()
+config.setBrainParameters(neuronCount=1000, regionCount=2)
+config.setPlasticityParameters(enableSTDP=True, enableHebbian=True)
+config.setDevelopmentParameters(enableDevelopment=True)
+config.setNeuromodulationParameters(enableCuriosity=True, enableNovelty=True)
+
+brain = pynlm.createBrain(config.getConfig())
 brain.initialize()
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
@@ -236,22 +263,30 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable all learning features
 agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
+# Create profiler for monitoring
+profiler = pynlm.createPerformanceProfiler(brain)
+profiler.start()
+
 # Run agent
-for step in range(100):
+for step in range(200):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
+    profiler.recordStep()
     
-    if step % 20 == 0:
+    if step % 40 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
-print("Agent simulation complete!")
+print("Advanced agent simulation complete!")
+print(profiler.getMetricsSummary())
 ```
 
 ---
@@ -268,6 +303,8 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Create advanced config | `pynlm.createAdvancedConfig()` |
+| Monitor performance | `pynlm.createPerformanceProfiler(brain)` |
 
 ---
 
@@ -290,8 +327,9 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. Read `HOW_TO_USE.md` for more detailed documentation
+2. Explore the advanced features with `pynlm.createAdvancedConfig()`
+3. Use `pynlm.createPerformanceProfiler()` to monitor your simulations
+4. Experiment with different configurations and learning parameters!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM, including the advanced features.
