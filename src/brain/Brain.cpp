@@ -130,6 +130,9 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Now initialize these systems with brain reference
+        // (similar to how other systems are initialized)
+        
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
@@ -762,31 +765,94 @@ void Brain::reset() {
 }
 
 bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
-    try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
+    // Save memory systems
+        if (pImpl->workingMemory) {
+            if (!writer.writeWorkingMemory(*pImpl->workingMemory)) {
+                NLM_LOG_ERROR("Failed to save working memory");
+                return false;
+            }
         }
         
-        // Set metadata
-        writer.setMetadata(
-            getTotalNeuronCount(),
-            getTotalSynapseCount(),
-            getRegionCount(),
-            pImpl->currentStep,
-            pImpl->currentTime
-        );
+        if (pImpl->episodicMemory) {
+            if (!writer.writeEpisodicMemory(*pImpl->episodicMemory)) {
+                NLM_LOG_ERROR("Failed to save episodic memory");
+                return false;
+            }
+        }
         
-        // Write neurons
-        NeuronCheckpointData neuronData;
-        neuronData.membranePotential.reserve(getTotalNeuronCount());
-        neuronData.restingPotential.reserve(getTotalNeuronCount());
-        neuronData.threshold.reserve(getTotalNeuronCount());
-        neuronData.resetPotential.reserve(getTotalNeuronCount());
-        neuronData.leakConductance.reserve(getTotalNeuronCount());
+        if (pImpl->associativeMemory) {
+            if (!writer.writeAssociativeMemory(*pImpl->associativeMemory)) {
+                NLM_LOG_ERROR("Failed to save associative memory");
+                return false;
+            }
+        }
+        
+        // Save prediction system
+        if (pImpl->predictionSystem) {
+            if (!writer.writePredictionSystem(*pImpl->predictionSystem)) {
+                NLM_LOG_ERROR("Failed to save prediction system");
+                return false;
+            }
+        }
+        
+        // Save cognition systems
+        if (pImpl->planner) {
+            if (!writer.writePlanner(*pImpl->planner)) {
+                NLM_LOG_ERROR("Failed to save neural planner");
+                return false;
+            }
+        }
+        
+        if (pImpl->conceptFormation) {
+            if (!writer.writeConceptFormation(*pImpl->conceptFormation)) {
+                NLM_LOG_ERROR("Failed to save concept formation");
+                return false;
+            }
+        }
+        
+        if (pImpl->attention) {
+            if (!writer.writeAttention(*pImpl->attention)) {
+                NLM_LOG_ERROR("Failed to save attentional selection");
+                return false;
+            }
+        }
+        
+        // Save development system
+        if (pImpl->developmentSystem) {
+            if (!writer.writeDevelopmentSystem(*pImpl->developmentSystem)) {
+                NLM_LOG_ERROR("Failed to save development system");
+                return false;
+            }
+        }
+        
+        // Save neuromodulation systems
+        if (pImpl->dopamine) {
+            if (!writer.writeDopamine(*pImpl->dopamine)) {
+                NLM_LOG_ERROR("Failed to save dopamine system");
+                return false;
+            }
+        }
+        
+        if (pImpl->curiosity) {
+            if (!writer.writeCuriosity(*pImpl->curiosity)) {
+                NLM_LOG_ERROR("Failed to save curiosity system");
+                return false;
+            }
+        }
+        
+        if (pImpl->predictionError) {
+            if (!writer.writePredictionError(*pImpl->predictionError)) {
+                NLM_LOG_ERROR("Failed to save prediction error system");
+                return false;
+            }
+        }
+        
+        if (pImpl->novelty) {
+            if (!writer.writeNovelty(*pImpl->novelty)) {
+                NLM_LOG_ERROR("Failed to save novelty system");
+                return false;
+            }
+        }
         
         for (const auto& region : pImpl->regions) {
             for (const auto& pop : region->getPopulations()) {
@@ -898,6 +964,123 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // ========== LOAD MEMORY SYSTEMS ==========
+        
+        // Load working memory
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData workingMemoryData;
+            if (!reader.readWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to read working memory from checkpoint");
+                return false;
+            }
+            pImpl->workingMemory->loadFromCheckpoint(workingMemoryData);
+        }
+        
+        // Load episodic memory
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData episodicMemoryData;
+            if (!reader.readEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to read episodic memory from checkpoint");
+                return false;
+            }
+            pImpl->episodicMemory->loadFromCheckpoint(episodicMemoryData);
+        }
+        
+        // Load associative memory
+        if (pImpl->associativeMemory) {
+            AssociativeMemoryCheckpointData associativeMemoryData;
+            if (!reader.readAssociativeMemory(associativeMemoryData)) {
+                NLM_LOG_ERROR("Failed to read associative memory from checkpoint");
+                return false;
+            }
+            pImpl->associativeMemory->loadFromCheckpoint(associativeMemoryData);
+        }
+        
+        // Load prediction system
+        if (pImpl->predictionSystem) {
+            PredictionSystemCheckpointData predictionData;
+            if (!reader.readPredictionSystem(predictionData)) {
+                NLM_LOG_ERROR("Failed to read prediction system from checkpoint");
+                return false;
+            }
+            pImpl->predictionSystem->loadFromCheckpoint(predictionData);
+        }
+        
+        // Load cognition systems
+        if (pImpl->planner) {
+            PlannerCheckpointData plannerData;
+            if (!reader.readPlanner(plannerData)) {
+                NLM_LOG_ERROR("Failed to read neural planner from checkpoint");
+                return false;
+            }
+            pImpl->planner->loadFromCheckpoint(plannerData);
+        }
+        
+        if (pImpl->conceptFormation) {
+            ConceptFormationCheckpointData conceptData;
+            if (!reader.readConceptFormation(conceptData)) {
+                NLM_LOG_ERROR("Failed to read concept formation from checkpoint");
+                return false;
+            }
+            pImpl->conceptFormation->loadFromCheckpoint(conceptData);
+        }
+        
+        if (pImpl->attention) {
+            AttentionCheckpointData attentionData;
+            if (!reader.readAttention(attentionData)) {
+                NLM_LOG_ERROR("Failed to read attentional selection from checkpoint");
+                return false;
+            }
+            pImpl->attention->loadFromCheckpoint(attentionData);
+        }
+        
+        // Load development system
+        if (pImpl->developmentSystem) {
+            DevelopmentSystemCheckpointData developmentData;
+            if (!reader.readDevelopmentSystem(developmentData)) {
+                NLM_LOG_ERROR("Failed to read development system from checkpoint");
+                return false;
+            }
+            pImpl->developmentSystem->loadFromCheckpoint(developmentData);
+        }
+        
+        // Load neuromodulation systems
+        if (pImpl->dopamine) {
+            DopamineCheckpointData dopamineData;
+            if (!reader.readDopamine(dopamineData)) {
+                NLM_LOG_ERROR("Failed to read dopamine system from checkpoint");
+                return false;
+            }
+            pImpl->dopamine->loadFromCheckpoint(dopamineData);
+        }
+        
+        if (pImpl->curiosity) {
+            CuriosityCheckpointData curiosityData;
+            if (!reader.readCuriosity(curiosityData)) {
+                NLM_LOG_ERROR("Failed to read curiosity system from checkpoint");
+                return false;
+            }
+            pImpl->curiosity->loadFromCheckpoint(curiosityData);
+        }
+        
+        if (pImpl->predictionError) {
+            PredictionErrorCheckpointData predictionErrorData;
+            if (!reader.readPredictionError(predictionErrorData)) {
+                NLM_LOG_ERROR("Failed to read prediction error system from checkpoint");
+                return false;
+            }
+            pImpl->predictionError->loadFromCheckpoint(predictionErrorData);
+        }
+        
+        if (pImpl->novelty) {
+            NoveltyCheckpointData noveltyData;
+            if (!reader.readNovelty(noveltyData)) {
+                NLM_LOG_ERROR("Failed to read novelty system from checkpoint");
+                return false;
+            }
+            pImpl->novelty->loadFromCheckpoint(noveltyData);
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1017,35 +1200,24 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
-
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
-
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
-NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
-}
-
-ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
-}
-
-AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
-}
-
-// ========== DEVELOPMENT SYSTEM ==========
-
-DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
-}
-
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
+        // Write synapses
+        SynapseCheckpointData synapseData;
+        synapseData.weight.reserve(getTotalSynapseCount());
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                synapseData.weight.push_back(syn->getWeight());
+                synapseData.delay.push_back(syn->getDelay());
+                synapseData.is_excitatory.push_back(syn->isExcitatory());
+                synapseData.pre_neuron.push_back(syn->getPreNeuron());
+                synapseData.post_neuron.push_back(syn->getPostNeuron());
+            }
+        }
+        
+        if (!writer.writeSynapses(synapseData)) {
+            NLM_LOG_ERROR("Failed to save synapses");
+            return false;
+        }
 
 void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;

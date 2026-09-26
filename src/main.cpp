@@ -19,12 +19,7 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+void printHelp();
 
 using namespace nlm;
 
@@ -382,15 +377,114 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+    
+    // Set default values for Phase 2
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Advanced command line options
+    bool enableWorkingMemory = true;
+    bool enableEpisodicMemory = true;
+    bool enablePrediction = true;
+    bool enableCognition = true;
+    bool enableDevelopment = true;
+    bool enableNeuromodulation = true;
+    bool enableCheckpointing = false;
+    bool enableReplay = false;
+    bool enableCuriosity = true;
+    bool enableNovelty = true;
+    std::string checkpointPath = "./checkpoint.bin";
+    size_t replayInterval = 100;
+    size_t consolidationInterval = 1000;
+    size_t maxEpilogue = 1000;
+    
+    // Parse advanced command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--enable-working-memory") {
+            enableWorkingMemory = true;
+        } else if (arg == "--disable-working-memory") {
+            enableWorkingMemory = false;
+        } else if (arg == "--enable-episodic-memory") {
+            enableEpisodicMemory = true;
+        } else if (arg == "--disable-episodic-memory") {
+            enableEpisodicMemory = false;
+        } else if (arg == "--enable-prediction") {
+            enablePrediction = true;
+        } else if (arg == "--disable-prediction") {
+            enablePrediction = false;
+        } else if (arg == "--enable-cognition") {
+            enableCognition = true;
+        } else if (arg == "--disable-cognition") {
+            enableCognition = false;
+        } else if (arg == "--enable-development") {
+            enableDevelopment = true;
+        } else if (arg == "--disable-development") {
+            enableDevelopment = false;
+        } else if (arg == "--enable-neuromodulation") {
+            enableNeuromodulation = true;
+        } else if (arg == "--disable-neuromodulation") {
+            enableNeuromodulation = false;
+        } else if (arg == "--enable-curiosity") {
+            enableCuriosity = true;
+        } else if (arg == "--disable-curiosity") {
+            enableCuriosity = false;
+        } else if (arg == "--enable-novelty") {
+            enableNovelty = true;
+        } else if (arg == "--disable-novelty") {
+            enableNovelty = false;
+        } else if (arg == "--enable-checkpointing") {
+            enableCheckpointing = true;
+        } else if (arg == "--disable-checkpointing") {
+            enableCheckpointing = false;
+        } else if (arg == "--enable-replay") {
+            enableReplay = true;
+        } else if (arg == "--disable-replay") {
+            enableReplay = false;
+        } else if (arg == "--checkpoint-path" && i + 1 < argc) {
+            checkpointPath = argv[++i];
+        } else if (arg == "--replay-interval" && i + 1 < argc) {
+            replayInterval = static_cast<size_t>(std::stoul(argv[++i]));
+        } else if (arg == "--consolidation-interval" && i + 1 < argc) {
+            consolidationInterval = static_cast<size_t>(std::stoul(argv[++i]));
+        } else if (arg == "--max-episodes" && i + 1 < argc) {
+            maxEpilogue = static_cast<size_t>(std::stoul(argv[++i]));
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
+    
+    // Apply advanced options to config
+    config->set("enable_working_memory", enableWorkingMemory, ConfigSource::Default);
+    config->set("enable_episodic_memory", enableEpisodicMemory, ConfigSource::Default);
+    config->set("enable_prediction", enablePrediction, ConfigSource::Default);
+    config->set("enable_cognition", enableCognition, ConfigSource::Default);
+    config->set("enable_development", enableDevelopment, ConfigSource::Default);
+    config->set("enable_neuromodulation", enableNeuromodulation, ConfigSource::Default);
+    config->set("enable_curiosity", enableCuriosity, ConfigSource::Default);
+    config->set("enable_novelty", enableNovelty, ConfigSource::Default);
+    config->set("enable_checkpointing", enableCheckpointing, ConfigSource::Default);
+    config->set("enable_replay", enableReplay, ConfigSource::Default);
+    config->set("replay_interval", static_cast<int64_t>(replayInterval), ConfigSource::Default);
+    config->set("consolidation_interval", static_cast<int64_t>(consolidationInterval), ConfigSource::Default);
+    config->set("max_episodes", static_cast<int64_t>(maxEpilogue), ConfigSource::Default);
+    config->set("checkpoint_path", checkpointPath, ConfigSource::Default);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -429,21 +523,40 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+void printHelp() {
+    printBanner();
     
-    return 0;
+    std::cout << "\n=== NLM Command Line Options ===" << std::endl;
+    std::cout << "Basic Options:" << std::endl;
+    std::cout << "  --help, -h                  Show this help message" << std::endl;
+    std::cout << "  --config <file>             Load configuration from file" << std::endl;
+    std::cout << "\nAdvanced Options:" << std::endl;
+    std::cout << "  --enable-working-memory     Enable working memory integration (default: enabled)" << std::endl;
+    std::cout << "  --disable-working-memory    Disable working memory integration" << std::endl;
+    std::cout << "  --enable-episodic-memory    Enable episodic memory integration (default: enabled)" << std::endl;
+    std::cout << "  --disable-episodic-memory   Disable episodic memory integration" << std::endl;
+    std::cout << "  --enable-prediction        Enable prediction system integration (default: enabled)" << std::endl;
+    std::cout << "  --disable-prediction       Disable prediction system integration" << std::endl;
+    std::cout << "  --enable-cognition         Enable cognition systems (default: enabled)" << std::endl;
+    std::cout << "  --disable-cognition        Disable cognition systems" << std::endl;
+    std::cout << "  --enable-development       Enable developmental system (default: enabled)" << std::endl;
+    std::cout << "  --disable-development      Disable developmental system" << std::endl;
+    std::cout << "  --enable-neuromodulation    Enable neuromodulation (default: enabled)" << std::endl;
+    std::cout << "  --disable-neuromodulation   Disable neuromodulation" << std::endl;
+    std::cout << "  --enable-curiosity         Enable curiosity system (default: enabled)" << std::endl;
+    std::cout << "  --disable-curiosity        Disable curiosity system" << std::endl;
+    std::cout << "  --enable-novelty           Enable novelty detection (default: enabled)" << std::endl;
+    std::cout << "  --disable-novelty          Disable novelty detection" << std::endl;
+    std::cout << "  --enable-checkpointing     Enable checkpoint save/load (default: disabled)" << std::endl;
+    std::cout << "  --disable-checkpointing    Disable checkpoint save/load" << std::endl;
+    std::cout << "  --enable-replay            Enable memory replay (default: disabled)" << std::endl;
+    std::cout << "  --disable-replay           Disable memory replay" << std::endl;
+    std::cout << "\nAdvanced Configuration:" << std::endl;
+    std::cout << "  --checkpoint-path <file>    Path for checkpoint files (default: ./checkpoint.bin)" << std::endl;
+    std::cout << "  --replay-interval <n>       Steps between memory replay (default: 100)" << std::endl;
+    std::cout << "  --consolidation-interval <n> Steps between memory consolidation (default: 1000)" << std::endl;
+    std::cout << "  --max-episodes <n>          Maximum number of episodes to store (default: 1000)" << std::endl;
+    std::cout << "\nExample:" << std::endl;
+    std::cout << "./nlm --config configs/myconfig.cfg --enable-prediction --enable-replay" << std::endl;
+}
 }

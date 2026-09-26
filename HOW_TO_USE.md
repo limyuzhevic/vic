@@ -68,9 +68,168 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
 
+    pip install -e .
+```
+
+### Verifying Installation
+
+```python
+import pynlm
+
+# Check version
+print(pynlm.__version__)
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+```
+
 ---
 
-## Part 2: Installing the Python Library
+## Part 2: Using the C++ Command Line
+
+NLM provides a comprehensive command line interface for running advanced simulations with full control over brain system integration.
+
+### Basic Usage
+
+```bash
+# Run basic simulation with default configuration
+./nlm
+
+# Load specific configuration
+./nlm --config configs/myconfig.cfg
+
+# Show help information
+./nlm --help
+```
+
+### Advanced Options
+
+```bash
+# Control which systems are integrated
+./nlm \
+  --enable-prediction \
+  --enable-cognition \
+  --enable-development \
+  --enable-neuromodulation
+
+# Disable memory systems for performance
+./nlm --disable-working-memory --disable-episodic-memory
+
+# Enable checkpointing for long simulations
+./nlm --enable-checkpointing --checkpoint-path ./checkpoints/simulation_1.bin
+
+# Enable memory replay for memory consolidation
+./nlm --enable-replay --replay-interval 50
+
+# Run a simulation with curiosity and novelty detection
+./nlm --enable-curiosity --enable-novelty
+
+# Example: Advanced simulation command
+./nlm \
+  --enable-prediction \
+  --enable-cognition \
+  --enable-development \
+  --enable-neuromodulation \
+  --enable-curiosity \
+  --enable-novelty \
+  --enable-checkpointing \
+  --enable-replay \
+  --checkpoint-path ./simulation_checkpoint.bin \
+  --replay-interval 200 \
+  --consolidation-interval 1500 \
+  --max-episodes 5000
+```
+
+### Available Options
+
+- **`--help, -h`**: Show help message and list all options
+- **`--config <file>`**: Load configuration from file
+- **`--enable-* / --disable-*`**: Enable/disable specific brain systems
+- **`--checkpoint-path <file>`**: Set checkpoint file path
+- **`--replay-interval <n>`**: Steps between memory replay
+- **`--consolidation-interval <n>`**: Steps between memory consolidation
+- **`--max-episodes <n>`**: Maximum episodes to store
+
+### System Integration Controls
+
+NLM controls integration of several advanced brain systems:
+
+1. **Working Memory**: Persistent activity for temporary storage
+2. **Episodic Memory**: Experience encoding in neural patterns
+3. **Prediction System**: Temporal sequence prediction
+4. **Cognition Systems**: Neural planning, concept formation
+5. **Development System**: Age-based plasticity modifiers
+6. **Neuromodulation**: Dopamine, curiosity, novelty, prediction error
+7. **Checkpoint System**: Persistent state save/load
+8. **Replay System**: Memory consolidation through replay
+
+Each system can be independently enabled or disabled based on experimental requirements.
+
+#### Available Integration Options
+
+- **`--enable-working-memory / --disable-working-memory`**: Control working memory integration
+- **`--enable-episodic-memory / --disable-episodic-memory`**: Control episodic memory integration
+- **`--enable-prediction / --disable-prediction`**: Control prediction system
+- **`--enable-cognition / --disable-cognition`**: Control cognition systems
+- **`--enable-development / --disable-development`**: Control development system
+- **`--enable-neuromodulation / --disable-neuromodulation`**: Control neuromodulation
+- **`--enable-curiosity / --disable-curiosity`**: Control curiosity system
+- **`--enable-novelty / --disable-novelty`**: Control novelty detection
+- **`--enable-checkpointing / --disable-checkpointing`**: Control checkpointing
+- **`--enable-replay / --disable-replay`**: Control replay system
+
+#### Advanced Configuration Options
+
+```bash
+./nlm --replay-interval 100 --consolidation-interval 1000 --max-episodes 1000
+```
+
+- **`--replay-interval <n>`**: Steps between memory replay (default: 100)
+- **`--consolidation-interval <n>`**: Steps between memory consolidation (default: 1000)
+- **`--max-episodes <n>`**: Maximum number of episodes to store (default: 1000)
+- **`--checkpoint-path <file>`**: Path for checkpoint files (default: ./checkpoint.bin)
+
+### Example Usage
+
+#### Simple Simulation
+
+```bash
+./nlm
+```
+
+Runs a basic simulation with all default settings and integrated brain systems.
+
+#### Advanced Integrated Simulation
+
+```bash
+./nlm --enable-prediction --enable-cognition --enable-development --enable-neuromodulation --enable-curiosity --enable-novelty --enable-checkpointing --enable-replay
+```
+
+Runs a full Phase 6 integration simulation with all advanced systems enabled.
+
+#### Custom Configuration with Checkpointing
+
+```bash
+./nlm --config configs/experiment.cfg --enable-checkpointing --checkpoint-path ./my_simulation.bin
+```
+
+Loads custom configuration and saves checkpoint for later resumption.
+
+### Output and Logging
+
+The C++ executable provides extensive logging output:
+
+- **INFO level**: Normal operation messages, simulation statistics
+- **WARNING level**: Potential issues, configuration warnings
+- **ERROR level**: Critical failures, simulation errors
+
+You can control logging level through configuration file `log_level` parameter.
+
+---
+
+## Part 3: Using the Python Library
 
 ### From Source (Recommended for Development)
 
