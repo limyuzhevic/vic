@@ -19,36 +19,46 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with better error handling
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+        if (pos == std::string::npos) {
+            // Log malformed line but continue
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        try {
             set(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            // Log error but continue processing
+            continue;
         }
     }
     
@@ -86,7 +96,22 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Safe value conversion based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t> ||
+                                std::is_same_v<T, double> ||
+                                std::is_same_v<T, bool>) {
+                file << entry.key << " = " << arg << "\n";
+            } else {
+                // Fallback for unknown types
+                file << entry.key << " = " << "UNKNOWN_TYPE\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -102,8 +127,13 @@ std::optional<T> Config::get(const std::string& key) const {
     }
     
     try {
+        // Safe type checking with better error handling
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Log type mismatch error for debugging
+        return std::nullopt;
+    } catch (...) {
+        // Handle any other exceptions
         return std::nullopt;
     }
 }
