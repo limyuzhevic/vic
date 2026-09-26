@@ -199,7 +199,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }
-        return false;
+        return false;  // Exit immediately - neuron cannot fire during refractory period
     }
     
     // LIF dynamics: Leaky Integrate-and-Fire
@@ -294,9 +294,13 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
-    // Clear any residual state
-    pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    // Add convenience getter and setter methods for synaptic input
+void Neuron::setTotalSynapticInput(MembranePotential input) {
+    pImpl->synapticInput = input;
+}
+
+MembranePotential Neuron::getTotalSynapticInput() const {
+    return pImpl->synapticInput;
 }
 
 } // namespace nlm
