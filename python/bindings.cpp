@@ -400,21 +400,115 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Add convenience functions for easier Python usage
+    
+    // Quick brain creation
+    m.def("createQuickBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a quick brain with default settings");
+    
+    // Simple simulation run
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, int steps) {
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return brain->getTotalSpikeCount();
+    }, "Run a simple simulation for specified steps");
+    
+    // Export network to GraphViz format
+    m.def("exportNetworkGraphViz", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filename);
+        }
+        
+        file << "digraph NLM {
+    rankdir=LR;
+    node [shape=ellipse];\n";
+        
+        // Get all neurons
+        size_t neuronId = 0;
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                file << "    n" << syn->getSourceNeuron().index() 
+                     << " -> n" << syn->getDestinationNeuron().index() 
+                     << " [weight=" << syn->getWeight() << "]\n";
+            }
+        }
+        
+        file << "}\n";
+        file.close();
+        return true;
+    }, "Export neural network as GraphViz DOT file");
+    
+    // Get network statistics
+    m.def("getNetworkStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        return stats;
+    }, "Get comprehensive network statistics");
+    
+    // Create agent with world and brain
+    m.def("createAgentWithWorld", [](std::shared_ptr<Brain> brain) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create complete agent setup with brain and world");
+    
+    // Run complete agent simulation
+    m.def("runAgentSimulation", [](std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> setup, int steps) {
+        auto& [brain, world, agent] = setup;
+        
+        for (int i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, "Run complete agent simulation with brain-world interaction");
+    
+    // Save brain with statistics
+    m.def("saveBrainWithStats", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        if (!brain->save(filename)) {
+            throw std::runtime_error("Failed to save brain to: " + filename);
+        }
+        
+        // Get brain statistics
+        std::ofstream statsFile(filename + ".stats");
+        if (statsFile.is_open()) {
+            statsFile << "Neuron Count: " << brain->getTotalNeuronCount() << "\n";
+            statsFile << "Synapse Count: " << brain->getTotalSynapseCount() << "\n";
+            statsFile << "Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+            statsFile << "Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+            statsFile << "Average Firing Rate: " << brain->getAverageFiringRate() << "\n";
+            statsFile << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+            statsFile << "Save time: " << std::chrono::system_clock::now() << "\n";
+            statsFile.close();
+        }
+        
+        return true;
+    }, "Save brain state with accompanying statistics file");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

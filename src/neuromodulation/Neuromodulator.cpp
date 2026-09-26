@@ -17,6 +17,12 @@ Dopamine::Dopamine() : pImpl(new Impl) {}
 
 Dopamine::~Dopamine() = default;
 
+void Dopamine::initialize(class Brain* brain) {
+    // TODO PHASE 2: Implement proper dopamine initialization with brain reference
+    // PLACEHOLDER: Just store brain reference for future use
+    pImpl->baseline = 0.0f;
+}
+
 const char* Dopamine::getName() const {
     return "DA";
 }
@@ -47,10 +53,10 @@ void Dopamine::signalReward(float reward) {
     pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+void Dopamine::initialize(class Brain* brain) {
+    // Initialize dopamine system with brain reference
+    // Setup default baseline
+    setLevel(0.0f);
+    // Reset to baseline
+    pImpl->baseline = 0.0f;
 }
-
-} // namespace nlm

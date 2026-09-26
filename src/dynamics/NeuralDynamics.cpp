@@ -30,6 +30,16 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
+    // Check for invalid parameters
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane time constant: " + std::to_string(tau));
+        return;
+    }
+    if (R <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane resistance: " + std::to_string(R));
+        return;
+    }
+    
     // Simple Euler integration
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
     neuron->setMembranePotential(V + dV);
@@ -53,11 +63,30 @@ void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration 
     // TODO PHASE 2: Implement real synaptic dynamics
     // PLACEHOLDER: Synapse decay
     synapse->step(0.0);
+    
+    // Check for invalid synapse parameters
+    if (!synapse) {
+        NLM_LOG_ERROR("Null synapse pointer in updateSynapse");
+        return;
+    }
+    
+    // Check for invalid parameters
+    if (dt < 0.0) {
+        NLM_LOG_ERROR("Invalid timestep duration: " + std::to_string(dt));
+        return;
+    }
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
     // TODO PHASE 2: Implement real synaptic input
     // PLACEHOLDER: Simple additive input
+    
+    // Check for null pointers
+    if (!neuron || !synapse) {
+        NLM_LOG_ERROR("Null neuron or synapse pointer in applySpikeInput");
+        return;
+    }
+    
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);

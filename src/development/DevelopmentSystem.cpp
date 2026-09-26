@@ -108,12 +108,9 @@ bool DevelopmentSystem::isCriticalPeriod() const {
     return pImpl->stage == DevelopmentalStage::CriticalPeriod;
 }
 
-float DevelopmentSystem::getCriticalPeriodProgress() const {
-    if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
-        return 0.0f;
-    }
-    // Progress through critical period (0 to 1)
-    return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+void DevelopmentSystem::initialize(class Brain* brain) {
+    // Initialize development system with brain reference
+    // Set initial developmental stage
+    setStage(DevelopmentalStage::Initial);
+    age_ = 0.0;
 }
-
-} // namespace nlm

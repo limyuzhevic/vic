@@ -9,9 +9,14 @@ namespace nlm {
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
+class Brain;
+
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
+    
+    // Initialize neuromodulator with brain reference
+    virtual void initialize(class Brain* brain) = 0;
     
     // Get modulator name
     virtual const char* getName() const = 0;
@@ -37,6 +42,9 @@ class Dopamine : public Neuromodulator {
 public:
     Dopamine();
     ~Dopamine() override;
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
     
     const char* getName() const override;
     float getLevel() const override;

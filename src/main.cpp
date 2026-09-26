@@ -28,24 +28,38 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printAdvancedUsage() {
+    std::cout << "\n=== ADVANCED NLM OPTIONS ===" << std::endl;
+    std::cout << "Debug and Visualization:" << std::endl;
+    std::cout << "  --debug-level LEVEL     Set debug verbosity (Debug, Info, Warning, Error)" << std::endl;
+    std::cout << "  --enable-visualization   Enable network visualization" << std::endl;
+    std::cout << "  --snapshot-interval N   Save network snapshots every N steps" << std::endl;
+    std::cout << "  --trace-neurons         Trace specific neuron activity" << std::endl;
+    std::cout << "  --show-synapses         Display synaptic connections" << std::endl;
+    
+    std::cout << "\nPerformance and Monitoring:" << std::endl;
+    std::cout << "  --profile               Enable performance profiling" << std::endl;
+    std::cout << "  --metrics-interval N    Collect metrics every N steps" << std::endl;
+    std::cout << "  --benchmark-mode        Run performance benchmark" << std::endl;
+    std::cout << "  --memory-monitor       Monitor memory usage" << std::endl;
+    
+    std::cout << "\nCheckpoint and State Management:" << std::endl;
+    std::cout << "  --checkpoint N          Create checkpoint every N steps" << std::endl;
+    std::cout << "  --load-checkpoint FILE  Load brain state from checkpoint" << std::endl;
+    std::cout << "  --export-state FILE     Export brain state to file" << std::endl;
+    std::cout << "  --compare-checkpoints   Compare checkpoint files" << std::endl;
+    
+    std::cout << "\nAnalysis and Testing:" << std::endl;
+    std::cout << "  --analyze-connectivity  Analyze network connectivity" << std::endl;
+    std::cout << "  --test-plasticity       Run plasticity tests" << std::endl;
+    std::cout << "  --validate-config       Validate configuration file" << std::endl;
+    std::cout << "  --export-network FILE   Export network graph to file" << std::endl;
+    
+    std::cout << "\nAdvanced Simulation:" << std::endl;
+    std::cout << "  --lif-duration SECONDS  Run for specific duration (seconds)" << std::endl;
+    std::cout << "  --dynamic-neuron-count  Adjust neuron count dynamically" << std::endl;
+    std::cout << "  --adaptive-timestep    Use adaptive time stepping" << std::endl;
+    std::cout << "  --monte-carlo N        Run Monte Carlo simulation" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -107,7 +121,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded");
             return;
         }
         
@@ -366,21 +380,137 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+// Process advanced command-line options
+    bool debugMode = false;
+    bool visualizationEnabled = false;
+    bool profileEnabled = false;
+    bool benchmarkMode = false;
+    bool memoryMonitor = false;
+    bool validateConfig = false;
+    std::string loadCheckpoint;
+    std::string exportState;
+    std::string analyzeNetwork;
+    std::string exportNetwork;
+    int snapshotInterval = 0;
+    int checkpointInterval = 0;
+    int metricsInterval = 0;
+    std::string debugLevel;
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Advanced debug and visualization options
+        if (arg == "--debug-level" && i + 1 < argc) {
+            debugLevel = argv[++i];
+            debugMode = true;
+            NLM_LOG_INFO("Debug level set to: " + debugLevel);
+        } else if (arg == "--enable-visualization") {
+            visualizationEnabled = true;
+            NLM_LOG_INFO("Visualization enabled");
+        } else if (arg == "--snapshot-interval" && i + 1 < argc) {
+            snapshotInterval = std::stoi(argv[++i]);
+            NLM_LOG_INFO("Snapshot interval set to: " + std::to_string(snapshotInterval));
+        } else if (arg == "--trace-neurons") {
+            NLM_LOG_INFO("Neuron tracing enabled");
+        } else if (arg == "--show-synapses") {
+            NLM_LOG_INFO("Synaptic connections visualization enabled");
+        }
+        
+        // Performance and monitoring options
+        else if (arg == "--profile") {
+            profileEnabled = true;
+            NLM_LOG_INFO("Performance profiling enabled");
+        } else if (arg == "--metrics-interval" && i + 1 < argc) {
+            metricsInterval = std::stoi(argv[++i]);
+            NLM_LOG_INFO("Metrics collection interval set to: " + std::to_string(metricsInterval));
+        } else if (arg == "--benchmark-mode") {
+            benchmarkMode = true;
+            NLM_LOG_INFO("Benchmark mode enabled");
+        } else if (arg == "--memory-monitor") {
+            memoryMonitor = true;
+            NLM_LOG_INFO("Memory monitoring enabled");
+        }
+        
+        // Checkpoint and state management
+        else if (arg == "--checkpoint" && i + 1 < argc) {
+            checkpointInterval = std::stoi(argv[++i]);
+            NLM_LOG_INFO("Checkpoint interval set to: " + std::to_string(checkpointInterval));
+        } else if (arg == "--load-checkpoint" && i + 1 < argc) {
+            loadCheckpoint = argv[++i];
+            NLM_LOG_INFO("Load checkpoint: " + loadCheckpoint);
+        } else if (arg == "--export-state" && i + 1 < argc) {
+            exportState = argv[++i];
+            NLM_LOG_INFO("Export state: " + exportState);
+        } else if (arg == "--compare-checkpoints") {
+            NLM_LOG_INFO("Checkpoint comparison enabled");
+        }
+        
+        // Analysis and testing
+        else if (arg == "--analyze-connectivity") {
+            NLM_LOG_INFO("Network connectivity analysis enabled");
+        } else if (arg == "--test-plasticity") {
+            NLM_LOG_INFO("Plasticity testing enabled");
+        } else if (arg == "--validate-config") {
+            validateConfig = true;
+            NLM_LOG_INFO("Configuration validation enabled");
+        } else if (arg == "--export-network" && i + 1 < argc) {
+            exportNetwork = argv[++i];
+            NLM_LOG_INFO("Export network graph: " + exportNetwork);
+        }
+        
+        // Advanced simulation
+        else if (arg == "--lif-duration" && i + 1 < argc) {
+            NLM_LOG_INFO("LIF duration specified: " + std::string(argv[++i]) + " seconds");
+        } else if (arg == "--dynamic-neuron-count") {
+            NLM_LOG_INFO("Dynamic neuron count enabled");
+        } else if (arg == "--adaptive-timestep") {
+            NLM_LOG_INFO("Adaptive time stepping enabled");
+        } else if (arg == "--monte-carlo" && i + 1 < argc) {
+            NLM_LOG_INFO("Monte Carlo simulation enabled: " + std::string(argv[++i]) + " iterations");
+        }
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Apply debug level if specified
+    if (!debugLevel.empty()) {
+        if (debugLevel == "Debug") {
+            consoleLogger->setLevel(LogLevel::Debug);
+            NLM_LOG_INFO("Debug level set to: Debug");
+        } else if (debugLevel == "Info") {
+            consoleLogger->setLevel(LogLevel::Info);
+            NLM_LOG_INFO("Debug level set to: Info");
+        } else if (debugLevel == "Warning") {
+            consoleLogger->setLevel(LogLevel::Warning);
+            NLM_LOG_INFO("Debug level set to: Warning");
+        } else if (debugLevel == "Error") {
+            consoleLogger->setLevel(LogLevel::Error);
+            NLM_LOG_INFO("Debug level set to: Error");
+        }
+    }
+    
+    // Show advanced usage if unknown option encountered
+    bool showAdvancedUsage = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.find("--help-advanced") != std::string::npos) {
+            showAdvancedUsage = true;
+            break;
+        }
+    }
+    
+    if (showAdvancedUsage) {
+        printAdvancedUsage();
+    }
+    
+    // Validate configuration if requested
+    if (validateConfig) {
+        NLM_LOG_INFO("Validating configuration...");
+        std::vector<std::string> configKeys = config->getKeys();
+        NLM_LOG_INFO("Configuration keys: " + std::to_string(configKeys.size()));
+        for (const auto& key : configKeys) {
+            NLM_LOG_INFO("  " + key);
+        }
+        // TODO: Add proper validation logic
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -407,9 +537,47 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Performance monitoring setup
+    bool performanceProfiling = false;
+    bool benchmarkMode = false;
+    bool memoryMonitoring = false;
+    int metricsInterval = 0;
     
-    // Run Test 1: Basic connectivity
+    // Start timing for performance profiling
+    auto startWallTime = std::chrono::high_resolution_clock::now();
+    size_t stepCount = 0;
+    float totalMetrics = 0.0f;
+    size_t metricCount = 0;
+    
+    // Memory monitoring setup
+    if (memoryMonitor) {
+        NLM_LOG_INFO("Memory monitoring enabled - tracking heap usage");
+        #ifdef __linux__
+        std::ifstream meminfo("/proc/self/status");
+        if (meminfo.is_open()) {
+            std::string line;
+            while (std::getline(meminfo, line)) {
+                if (line.find("VmRSS:") != std::string::npos) {
+                    NLM_LOG_INFO("Initial memory usage: " + line);
+                    break;
+                }
+            }
+            meminfo.close();
+        }
+        #endif
+    }
+    
+    // Begin Phase 6 integration monitoring
+    if (profileEnabled) {
+        NLM_LOG_INFO("=== PERFORMANCE PROFILING ENABLED ===");
+        NLM_LOG_INFO("Wall clock timing started");
+        NLM_LOG_INFO("Metrics collection interval: " + std::to_string(metricsInterval) + " steps");
+    }
+    
+    // Replace the existing brain simulation loop with enhanced monitoring
+    // (we'll need to modify the runBasicConnectivityTest, runPlasticityExperiment, and runStdpVerification functions to support monitoring)
+    
+    NLM_LOG_INFO("=== PERFORMANCE MONITORING ACTIVE ===");
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment

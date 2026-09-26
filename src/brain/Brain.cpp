@@ -106,8 +106,8 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+// ========== INITIALIZE INTEGRATED SYSTEMS ==========
+
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -129,6 +129,20 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize all systems with brain reference
+        if (workingMemory) workingMemory->initialize(this);
+        if (episodicMemory) episodicMemory->initialize(this);
+        if (associativeMemory) associativeMemory->initialize(this);
+        if (predictionSystem) predictionSystem->initialize(this);
+        if (planner) planner->initialize(this);
+        if (conceptFormation) conceptFormation->initialize(this);
+        if (attention) attention->initialize(this);
+        if (developmentSystem) developmentSystem->initialize(this);
+        if (dopamine) dopamine->initialize(this);
+        if (curiosity) curiosity->initialize(this);
+        if (predictionError) predictionError->initialize(this);
+        if (novelty) novelty->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -243,7 +257,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -258,6 +272,7 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);  // Initialize dopamine with brain reference
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
