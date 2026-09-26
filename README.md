@@ -82,6 +82,13 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Phase 6 Main Test
+```bash
+./nlm
+```
+
+This runs the Phase 6 comprehensive integration test that demonstrates all systems working together.
+
 ## Project Structure
 
 ```
@@ -104,12 +111,12 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```

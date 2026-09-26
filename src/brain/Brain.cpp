@@ -80,9 +80,25 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
+        , rng(nullptr)  // Initialize as null, will be set in constructor body
+        , regions()
+        , interRegionConnections()
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
@@ -92,6 +108,11 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , sensoryNeurons()
+        , motorNeurons()
+        , developmentalStage(DevelopmentalStage::Initial)
+        , nextRegionId(1)
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
