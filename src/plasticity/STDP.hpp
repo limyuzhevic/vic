@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Enhanced with neuromodulation support
 
 class STDP : public PlasticityRule {
 public:
@@ -16,6 +16,12 @@ public:
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
                  TimestepDuration dt) override;
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt,
+                 float neuromodulationFactor,
+                 float baselineActivity) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
     
@@ -36,27 +42,63 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// Enhanced with neuromodulation support
 class RewardModulatedSTDP : public PlasticityRule {
 public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt,
+                 float neuromodulationFactor,
+                 float baselineActivity) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "R-STDP"; }
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
+// Enhanced with neuromodulation support
 class TripletSTDP : public PlasticityRule {
 public:
+    TripletSTDP();
+    ~TripletSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt,
+                 float neuromodulationFactor,
+                 float baselineActivity) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "TripletSTDP"; }
+    
+    // Parameters
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void setTripletScaling(float scaling);
+    float getTripletScaling() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

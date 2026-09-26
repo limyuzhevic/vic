@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NLM Visualization Dashboard</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/webgl-obj-loader/2.0.3/webgl-obj-loader.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>NLM Visualization Dashboard</h1>
+            <nav>
+                <button v-for="tab in tabs" :key="tab.id" :class="{active: activeTab === tab.id}" @click="setActiveTab(tab.id)">{{ tab.name }}</button>
+            </nav>
+        </header>
+        
+        <main>
+            <component :is="activeTab + '-component'"></component>
+        </main>
+        
+        <aside>
+            <div class="control-panel">
+                <h2>Controls</h2>
+                <div class="control-group">
+                    <h3>Visualization Settings</h3>
+                    <label for="visualization-mode">Visualization Mode:</label>
+                    <select id="visualization-mode" v-model="visualizationMode">
+                        <option value="3d">3D</option>
+                        <option value="2d">2D</option>
+                        <option value="topological">Topological</option>
+                        <option value="activity">Activity</option>
+                    </select>
+                    
+                    <label for="theme">Theme:</label>
+                    <select id="theme" v-model="theme">
+                        <option value="default">Default</option>
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                        <option value="high-contrast">High Contrast</option>
+                    </select>
+                    
+                    <label for="quality">Quality:</label>
+                    <select id="quality" v-model="quality">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="ultra">Ultra</option>
+                    </select>
+                    
+                    <label>
+                        <input type="checkbox" id="real-time-updates" v-model="realTimeUpdates">
+                        Real-time Updates
+                    </label>
+                    
+                    <label for="update-frequency">Update Frequency (Hz):</label>
+                    <input type="number" id="update-frequency" v-model="updateFrequency" min="1" max="120">
+                </div>
+                
+                <div class="control-group">
+                    <h3>Data Sources</h3>
+                    <button @click="addDataSource">Add Data Source</button>
+                    <ul>
+                        <li v-for="(source, index) in dataSources" :key="index">
+                            {{ source.name }} ({{ source.type }})
+                            <button @click="removeDataSource(index)">Remove</button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="control-group">
+                    <h3>Export/Import</h3>
+                    <button @click="exportData">Export Data</button>
+                    <button @click="importData">Import Data</button>
+                    <button @click="exportAnalysis">Export Analysis</button>
+                    <button @click="importAnalysis">Import Analysis</button>
+                </div>
+                
+                <div class="control-group">
+                    <h3>Templates</h3>
+                    <button @click="showTemplateManager">Manage Templates</button>
+                    <button @click="applyDefaultTemplate">Apply Default Template</button>
+                </div>
+            </div>
+            
+            <div class="performance-metrics">
+                <h2>Performance Metrics</h2>
+                <div class="metric">
+                    <label>FPS:</label>
+                    <span>{{ performanceMetrics.fps }}</span>
+                </div>
+                <div class="metric">
+                    <label>CPU:</label>
+                    <span>{{ performanceMetrics.cpuUsage }}%</span>
+                </div>
+                <div class="metric">
+                    <label>Memory:</label>
+                    <span>{{ performanceMetrics.memoryUsage }} MB</span>
+                </div>
+                <div class="metric">
+                    <label>Network:</label>
+                    <span>{{ performanceMetrics.networkUsage }} KB/s</span>
+                </div>
+                <div class="metric">
+                    <label>Rendering Time:</label>
+                    <span>{{ performanceMetrics.renderingTime }} ms</span>
+                </div>
+                <div class="metric">
+                    <label>Update Time:</label>
+                    <span>{{ performanceMetrics.updateTime }} ms</span>
+                </div>
+                <div class="metric">
+                    <label>Data Processing Time:</label>
+                    <span>{{ performanceMetrics.dataProcessingTime }} ms</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+    
+    <div id="template-manager" v-if="showTemplateManager" class="modal">
+        <div class="modal-content">
+            <h2>Template Manager</h2>
+            <button @click="hideTemplateManager">Close</button>
+            <div class="template-list">
+                <div v-for="template in templates" :key="template.name" class="template-item">
+                    <h3>{{ template.name }}</h3>
+                    <p>{{ template.description }}</p>
+                    <p>Category: {{ template.category }}</p>
+                    <button @click="applyTemplate(template.name)">Apply Template</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="components/dashboard.js"></script>
+    <script src="components/control-panel.js"></script>
+    <script src="components/data-source-manager.js"></script>
+    <script src="components/export-manager.js"></script>
+    <script src="components/template-manager.js"></script>
+    <script src="visualization/neural-network-visualization.js"></script>
+    <script src="visualization/memory-visualization.js"></script>
+    <script src="visualization/neuromodulation-visualization.js"></script>
+    <script src="visualization/plasticity-visualization.js"></script>
+    <script src="visualization/development-visualization.js"></script>
+    <script src="visualization/activity-monitor.js"></script>
+    <script src="visualization/network-topology.js"></script>
+    <script src="analysis/performance-analysis.js"></script>
+    <script src="analysis/learning-analysis.js"></script>
+    <script src="analysis/network-analysis.js"></script>
+    <script src="analysis/system-analysis.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/data-processor.js"></script>
+    <script src="scripts/chart-utils.js"></script>
+    <script>
+        // Main application
+        const app = Vue.createApp({
+            data() {
+                return {
+                    activeTab: 'dashboard',
+                    tabs: [
+                        { id: 'dashboard', name: 'Dashboard' },
+                        { id: 'neural-network', name: 'Neural Network' },
+                        { id: 'memory', name: 'Memory' },
+                        { id: 'neuromodulation', name: 'Neuromodulation' },
+                        { id: 'plasticity', name: 'Plasticity' },
+                        { id: 'development', name: 'Development' },
+                        { id: 'analysis', name: 'Analysis' }
+                    ],
+                    visualizationMode: '3d',
+                    theme: 'default',
+                    quality: 'high',
+                    realTimeUpdates: true,
+                    updateFrequency: 60,
+                    dataSources: [],
+                    performanceMetrics: {
+                        fps: 0,
+                        cpuUsage: 0,
+                        memoryUsage: 0,
+                        networkUsage: 0,
+                        renderingTime: 0,
+                        updateTime: 0,
+                        dataProcessingTime: 0
+                    },
+                    templates: [],
+                    showTemplateManager: false
+                }
+            },
+            methods: {
+                setActiveTab(tab) {
+                    this.activeTab = tab;
+                },
+                addDataSource() {
+                    const name = prompt('Enter data source name:');
+                    if (name) {
+                        this.dataSources.push({
+                            name: name,
+                            type: 'websocket',
+                            connected: false
+                        });
+                    }
+                },
+                removeDataSource(index) {
+                    this.dataSources.splice(index, 1);
+                },
+                exportData() {
+                    alert('Export data feature will be implemented!');
+                },
+                importData() {
+                    alert('Import data feature will be implemented!');
+                },
+                exportAnalysis() {
+                    alert('Export analysis feature will be implemented!');
+                },
+                importAnalysis() {
+                    alert('Import analysis feature will be implemented!');
+                },
+                showTemplateManager() {
+                    this.showTemplateManager = true;
+                    this.loadTemplates();
+                },
+                hideTemplateManager() {
+                    this.showTemplateManager = false;
+                },
+                loadTemplates() {
+                    // Load templates from server
+                    this.templates = [
+                        {
+                            name: 'Default Neural Network',
+                            description: 'Default neural network visualization template',
+                            category: 'neural',
+                            author: 'NLM Team'
+                        },
+                        {
+                            name: 'Working Memory',
+                            description: 'Working memory visualization template',
+                            category: 'memory',
+                            author: 'NLM Team'
+                        },
+                        {
+                            name: 'Dopamine Signal',
+                            description: 'Dopamine signal visualization template',
+                            category: 'neuromodulation',
+                            author: 'NLM Team'
+                        },
+                        {
+                            name: 'STDP Learning',
+                            description: 'STDP learning visualization template',
+                            category: 'plasticity',
+                            author: 'NLM Team'
+                        },
+                        {
+                            name: 'Developmental Stages',
+                            description: 'Developmental stages visualization template',
+                            category: 'development',
+                            author: 'NLM Team'
+                        }
+                    ];
+                },
+                applyTemplate(templateName) {
+                    alert(`Applying template: ${templateName}`);
+                    this.hideTemplateManager();
+                },
+                applyDefaultTemplate() {
+                    this.applyTemplate('Default Neural Network');
+                }
+            }
+        });
+        
+        app.mount('#app');
+    </script>
+</body>
+</html>

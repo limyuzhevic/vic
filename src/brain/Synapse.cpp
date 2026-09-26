@@ -64,14 +64,13 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;

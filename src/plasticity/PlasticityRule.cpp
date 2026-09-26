@@ -23,15 +23,15 @@ HebbianRule::~HebbianRule() = default;
 void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
-                          TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
+                          TimestepDuration dt,
+                          float neuromodulationFactor,
+                          float baselineActivity) {
+    // Enhanced Hebbian learning with neuromodulation support
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // Count coincident spikes (simplified correlation)
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
@@ -41,9 +41,16 @@ void HebbianRule::update(Synapse* synapse,
         }
     }
     
-    // Apply weight change proportional to coincidences
+    // Enhanced weight change with neuromodulation
+    float delta = pImpl->learningRate * static_cast<float>(coincidences);
+    
+    // Apply neuromodulation factor
+    delta *= (1.0f + neuromodulationFactor * 0.1f);
+    delta = std::clamp(delta, -0.1f, 0.1f);  // Stability bounds
+    
+    // Apply weight change with baseline activity modulation
     if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+        applyWeightChange(synapse, delta * (1.0f - baselineActivity * 0.5f));
     }
 }
 

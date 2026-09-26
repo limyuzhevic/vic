@@ -16,14 +16,13 @@ RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;

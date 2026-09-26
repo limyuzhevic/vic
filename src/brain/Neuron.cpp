@@ -37,14 +37,13 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
     other.pImpl = nullptr;
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
         other.pImpl = nullptr;
     }
     return *this;
