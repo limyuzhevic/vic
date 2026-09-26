@@ -128,10 +128,10 @@ public:
     // Get confidence in self-model for a given action
     float getSelfModelConfidence(ActionType action) const;
 
-    // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                       const std::vector<float>& afterState,
-                                       ActionType action) const;
+// Is this change likely caused by self (action) vs external?
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
+                                      const std::vector<float>& afterState,
+                                      ActionType action) const;
 
     // Get the body schema (preferred actions in different states)
     // Returns map of state -> preferred action
