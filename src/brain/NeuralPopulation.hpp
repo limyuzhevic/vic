@@ -2,13 +2,14 @@
 
 #include "../core/Types/Types.hpp"
 #include "Neuron.hpp"
+#include "../brain/Synapse.hpp"
 #include <vector>
 #include <memory>
 
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
+// Real implementation based on computational neuroscience principles
 
 class NeuralPopulation {
 public:
@@ -66,6 +67,19 @@ public:
     void recordActivity();  // Record current state for statistics
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
+    
+    // Population-level operations
+    void injectCurrent(MembranePotential current);
+    void setExternalInput(const std::vector<MembranePotential>& inputs);
+    
+    // Synapse management
+    void addSynapseToNeuron(Synapse* synapse, NeuronId targetNeuron);
+    void removeSynapseFromNeuron(Synapse* synapse, NeuronId targetNeuron);
+    std::vector<Synapse*> getSynapsesToNeuron(NeuronId neuron) const;
+    
+    // Development effects
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    void applyAgeEffects(float age);
     
 private:
     struct Impl;

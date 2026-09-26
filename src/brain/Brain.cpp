@@ -303,6 +303,10 @@ void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
+void Brain::step(SimulationStep currentStep) {
+    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+}
+
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
@@ -333,7 +337,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Optimize by batching operations and using local references
+    std::vector<NeuralRegion*> regions;
     for (auto& region : pImpl->regions) {
+        regions.push_back(region.get());
+    }
+    
+    for (auto& region : regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
@@ -342,7 +352,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
-    for (auto& region : pImpl->regions) {
+    for (auto& region : regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
@@ -568,6 +578,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
                 case DevelopmentalStage::Adult:
                     plasticityMod = 0.2f;  // Stable
+                    break;
+                case DevelopmentalStage::Aging:
+                    plasticityMod = 0.1f;  // Reduced plasticity
                     break;
             }
             

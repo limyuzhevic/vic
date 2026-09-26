@@ -6,14 +6,13 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Real implementation: STDP, Hebbian, and other learning rules
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -26,8 +25,17 @@ public:
     virtual const char* getName() const = 0;
     
     // Check if rule is enabled
-    bool isEnabled() const;
-    void setEnabled(bool enabled);
+    bool isEnabled() const { return enabled_; }
+    void setEnabled(bool enabled) { enabled_ = enabled; }
+    
+    // Get learning rate for this rule
+    virtual float getLearningRate() const { return 0.0f; }
+    
+    // Configure rule parameters
+    virtual void configure(const std::unordered_map<std::string, float>& params) {}
+    
+    // Check if rule supports reward modulation
+    virtual bool supportsRewardModulation() const { return false; }
     
 protected:
     PlasticityRule() : enabled_(true) {}

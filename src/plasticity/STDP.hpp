@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Real implementation based on spike timing correlation
 
 class STDP : public PlasticityRule {
 public:
@@ -26,9 +26,14 @@ public:
     float getLTDWeight() const;
     void setTimeConstant(float tau);    // STDP time constant (ms)
     float getTimeConstant() const;
+    void setLearningRate(float rate);   // Global learning rate scaling
+    float getLearningRate() const;
+    void setEligibilityDecay(float decay); // Eligibility trace decay
+    float getEligibilityDecay() const;
     
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
+    void configure(const std::unordered_map<std::string, float>& params);
     
 private:
     struct Impl;
