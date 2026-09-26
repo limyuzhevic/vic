@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+This is the original beginner-friendly guide. For advanced features, see `ADVANCED_PYTHON_GUIDE.md`.
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -69,6 +71,64 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Advanced Example: Using Statistics
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation and collect stats
+for step in range(100):
+    brain.step(step)
+    if step % 20 == 0:
+        # Get statistics
+        stats = pynlm.getBrainStats(brain)
+        print(f"Step {step}:")
+        print(f"  Neurons: {stats['total_neurons']}")
+        print(f"  Firing: {stats['firing_neurons']}")
+        print(f"  Spikes: {stats['spike_count']}")
+        print(f"  Avg Rate: {stats['average_firing_rate']:.2f}")
+```
+
+### Advanced Example: Agent Learning
+
+```python
+import pynlm
+
+# Setup configuration and components
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run learning simulation
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
 ```
 
 ---
@@ -290,8 +350,8 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
+1. Read `ADVANCED_PYTHON_GUIDE.md` for more details
+2. Read `HOW_TO_USE.md` to understand how it all works
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
