@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// ENHANCED - Phase 6: Full neuromodulation system
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -46,7 +46,28 @@ public:
     
     // Reward signaling
     void signalReward(float reward);
-    void signalRewardPredictionError(float error);
+    void signalPredictionError(float error);
+    
+    // Configuration
+    void setBaseline(float baseline);
+    void setTonicLevel(float tonic);
+    void setBurstDuration(float duration);
+    
+    // Integration modifiers
+    void setWorkingMemoryModulation(float modulation);
+    void setEpisodicMemoryModulation(float modulation);
+    void setConceptFormationModulation(float modulation);
+    void setAttentionModulation(float modulation);
+    
+    // Query methods
+    bool isBurstMode() const;
+    float getExcitabilityModulation() const;
+    float getWorkingMemoryModulation() const;
+    float getEpisodicMemoryModulation() const;
+    float getConceptFormationModulation() const;
+    float getAttentionModulation() const;
+    float getPredictionErrorResponse() const;
+    float getRewardResponse() const;
     
 private:
     struct Impl;
@@ -54,36 +75,114 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// ENHANCED - Phase 6: Full neuromodulation system
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signals
+    void signalAttention(float attention);
+    void signalMemory(float memory);
+    
+    // Configuration
+    void setBaseline(float baseline);
+    void setTonicLevel(float tonic);
+    
+    // Integration modifiers
+    void setAttentionWeight(float weight);
+    void setMemoryWeight(float weight);
+    
+    // Query methods
+    bool isBurstMode() const;
+    float getAttentionWeight() const;
+    float getMemoryWeight() const;
+    
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// ENHANCED - Phase 6: Full neuromodulation system
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signals
+    void signalArousal(float arousal);
+    void signalVigilance(float vigilance);
+    
+    // Configuration
+    void setBaseline(float baseline);
+    void setTonicLevel(float tonic);
+    
+    // Integration modifiers
+    void setArousalWeight(float weight);
+    void setVigilanceWeight(float weight);
+    
+    // Query methods
+    bool isBurstMode() const;
+    float getArousalWeight() const;
+    float getVigilanceWeight() const;
+    
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// ENHANCED - Phase 6: Full neuromodulation system
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signals
+    void signalMood(float mood);
+    void signalSocial(float social);
+    
+    // Configuration
+    void setBaseline(float baseline);
+    void setTonicLevel(float tonic);
+    
+    // Integration modifiers
+    void setMoodWeight(float weight);
+    void setImpulsivityWeight(float weight);
+    
+    // Query methods
+    bool isBurstMode() const;
+    float getMoodWeight() const;
+    float getImpulsivityWeight() const;
+    
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
