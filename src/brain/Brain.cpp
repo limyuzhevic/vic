@@ -174,16 +174,110 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
-bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+// Null pointer check for config
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration is null - cannot initialize brain");
+        return false;
+    }
     
-    // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Null pointer check for random generator
+    if (!pImpl->rng) {
+        NLM_LOG_ERROR("Random generator is null - cannot initialize brain");
+        return false;
+    }
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+    // Null pointer check for spike system
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Spike system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for STDP
+    if (!pImpl->stdp) {
+        NLM_LOG_ERROR("STDP system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for Hebbian plasticity
+    if (!pImpl->hebbian) {
+        NLM_LOG_ERROR("Hebbian plasticity system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for structural plasticity
+    if (!pImpl->structuralPlasticity) {
+        NLM_LOG_ERROR("Structural plasticity system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for working memory
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Working memory system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for episodic memory
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Episodic memory system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for associative memory
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Associative memory system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for prediction system
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_ERROR("Prediction system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for neural planner
+    if (!pImpl->planner) {
+        NLM_LOG_ERROR("Neural planner system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for concept formation
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_ERROR("Concept formation system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for attentional selection
+    if (!pImpl->attention) {
+        NLM_LOG_ERROR("Attentional selection system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for development system
+    if (!pImpl->developmentSystem) {
+        NLM_LOG_ERROR("Development system is null - cannot initialize brain");
+        return false;
+    }
+    
+    // Null pointer check for neuromodulation systems
+    if (!pImpl->dopamine) {
+        NLM_LOG_ERROR("Dopamine system is null - cannot initialize brain");
+        return false;
+    }
+    
+    if (!pImpl->curiosity) {
+        NLM_LOG_ERROR("Curiosity system is null - cannot initialize brain");
+        return false;
+    }
+    
+    if (!pImpl->predictionError) {
+        NLM_LOG_ERROR("Prediction error system is null - cannot initialize brain");
+        return false;
+    }
+    
+    if (!pImpl->novelty) {
+        NLM_LOG_ERROR("Novelty system is null - cannot initialize brain");
+        return false;
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
