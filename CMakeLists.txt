@@ -114,30 +114,66 @@ add_library(nlm_phase3 STATIC
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Performance monitoring
+add_library(nlm_performance STATIC
+    src/core/PerformanceMonitoring.cpp
+)
+target_include_directories(nlm_performance PUBLIC src/core)
+target_compile_features(nlm_performance PRIVATE cxx_std_20)
+
+# Performance monitoring
+add_library(nlm_performance STATIC
+    src/core/PerformanceMonitoring.cpp
+)
+target_include_directories(nlm_performance PUBLIC src/core)
+target_compile_features(nlm_performance PRIVATE cxx_std_20)
+
+# Enhanced logging
+add_library(nlm_logging STATIC
+    src/core/Logger/Logger.cpp
+    src/core/EnhancedLogger.cpp
+)
+target_include_directories(nlm_logging PUBLIC src/core)
+target_compile_features(nlm_logging PRIVATE cxx_std_20)
+target_link_libraries(nlm_logging PUBLIC nlm_performance)
+
+# Phase 3 experiments
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlm_logging)
+
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_logging)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_logging)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_logging)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_logging)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase4 nlm_logging)
 
 # Testing
 enable_testing()

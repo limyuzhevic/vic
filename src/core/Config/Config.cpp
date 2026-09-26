@@ -3,14 +3,26 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <limits>
+#include <unordered_map>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+#include <functional>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> validators;
+    bool validationEnabled;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->validationEnabled = true;
+    initializeDefaultValidators();
+}
 
 Config::~Config() = default;
 
@@ -18,17 +30,103 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+void Config::initializeDefaultValidators() {
+    // Register validators for key configuration parameters
+    pImpl->validators["neuron_count"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<int64_t>(&value)) {
+            return *val > 0 && *val <= 1000000;  // Reasonable upper limit
+        }
+        return false;
+    };
     
+    pImpl->validators["region_count"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<int64_t>(&value)) {
+            return *val > 0 && *val <= 1000;
+        }
+        return false;
+    };
+    
+    pImpl->validators["connection_probability"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<float>(&value)) {
+            return *val >= 0.0f && *val <= 1.0f;
+        }
+        return false;
+    };
+    
+    pImpl->validators["simulation_timestep"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<double>(&value)) {
+            return *val > 0.0 && *val <= 1.0;  // Max 1 second timestep
+        }
+        return false;
+    };
+    
+    pImpl->validators["random_seed"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<int64_t>(&value)) {
+            return *val >= 0;  // Non-negative seed
+        }
+        return false;
+    };
+    
+    pImpl->validators["stdp_ltp_weight"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<float>(&value)) {
+            return *val >= 0.0f && *val <= 10.0f;
+        }
+        return false;
+    };
+    
+    pImpl->validators["stdp_ltd_weight"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<float>(&value)) {
+            return *val >= 0.0f && *val <= 10.0f;
+        }
+        return false;
+    };
+    
+    pImpl->validators["stdp_tau"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<float>(&value)) {
+            return *val > 0.0f && *val <= 1000.0f;  // Up to 1000ms
+        }
+        return false;
+    };
+    
+    pImpl->validators["synaptogenesis_rate"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<float>(&value)) {
+            return *val >= 0.0f && *val <= 1.0f;
+        }
+        return false;
+    };
+    
+    pImpl->validators["pruning_rate"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<float>(&value)) {
+            return *val >= 0.0f && *val <= 1.0f;
+        }
+        return false;
+    };
+    
+    pImpl->validators["max_memory_episodes"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<int64_t>(&value)) {
+            return *val >= 0 && *val <= 1000000;
+        }
+        return false;
+    };
+    
+    pImpl->validators["working_memory_size"] = [this](const ConfigValue& value) {
+        if (auto val = std::get_if<int64_t>(&value)) {
+            return *val >= 0 && *val <= 100000;
+        }
+        return false;
+    };
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +146,24 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate and set
+            bool valid = true;
+            if (pImpl->validationEnabled) {
+                auto it = pImpl->validators.find(key);
+                if (it != pImpl->validators.end()) {
+                    valid = it->second(ConfigValue(value));
+                }
+            }
+            
+            if (valid) {
+                set(key, value, ConfigSource::File);
+            } else {
+                std::cerr << "Warning: Invalid value for key '" << key << "' in " << filepath 
+                         << ":" << lineNumber << ". Value: '" << value << "'" << std::endl;
+            }
+        } else {
+            std::cerr << "Warning: Invalid format in " << filepath 
+                     << ":" << lineNumber << ": " << line << std::endl;
         }
     }
     
@@ -84,9 +199,26 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM on " << getCurrentTimestamp() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# Source: " << static_cast<int>(entry.source) << "\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::string_view>) {
+                file << "\"" << std::string(arg) << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -115,12 +247,22 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+    // Validate if validation is enabled
+    if (pImpl->validationEnabled) {
+        auto it = pImpl->validators.find(key);
+        if (it != pImpl->validators.end() && !it->second(value)) {
+            std::cerr << "Validation error: Invalid value for key '" << key 
+                     << "'. Value: " << value << std::endl;
+            return;
+        }
+    }
+    
+    auto configIt = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    if (configIt != pImpl->entries.end()) {
+        configIt->value = value;
+        configIt->source = source;
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
@@ -168,9 +310,24 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
+void Config::setValidationEnabled(bool enabled) {
+    pImpl->validationEnabled = enabled;
+}
+
+bool Config::isValidationEnabled() const {
+    return pImpl->validationEnabled;
+}
+
+void Config::addCustomValidator(const std::string& key, 
+                               std::function<bool(const ConfigValue&)> validator) {
+    pImpl->validators[key] = validator;
+}
+
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Validation: " << (pImpl->validationEnabled ? "ENABLED" : "DISABLED") << "\n";
+    
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
@@ -181,9 +338,46 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (source: " << static_cast<int>(entry.source) << ")\n";
     }
+    
+    // Show validation status
+    oss << "\nValidation rules:" << std::endl;
+    for (const auto& pair : pImpl->validators) {
+        oss << "  - " << pair.first << std::endl;
+    }
+    
     return oss.str();
+}
+
+std::string Config::validateAll() const {
+    std::ostringstream oss;
+    bool hasErrors = false;
+    
+    for (const auto& entry : pImpl->entries) {
+        auto it = pImpl->validators.find(entry.key);
+        if (it != pImpl->validators.end()) {
+            if (!it->second(entry.value)) {
+                oss << "Error: Invalid value for key '" << entry.key 
+                    << "': " << entry.value << "\n";
+                hasErrors = true;
+            }
+        }
+    }
+    
+    if (!hasErrors) {
+        oss << "All configuration values are valid." << std::endl;
+    }
+    
+    return oss.str();
+}
+
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
 }
 
 std::string Config::trim(const std::string& str) {
