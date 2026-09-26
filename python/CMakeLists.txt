@@ -87,15 +87,27 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+pybind11_add_module(pynlm bindings_enhanced.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
+# Visualization bindings module
+pybind11_add_module(pynlm_viz pynlm_viz.cpp)
+target_link_libraries(pynlm_viz PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_viz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm_viz PRIVATE /permissive-)
 endif()
 
 install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
+
+install(TARGETS pynlm_viz
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm

@@ -287,11 +287,136 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Features
+
+NLM provides advanced features beyond basic simulation:
+
+### 1. Enhanced Configuration
+```python
+import pynlm
+
+# Create advanced configuration
+brain = pynlm.createAdvancedConfig()
+brain = pynlm.createBrain(brain)
+brain.initialize()
+
+# Configure for learning
+brain.enableWorkingMemory(True)
+brain.enableEpisodicMemory(True)
+brain.enableAssociativeMemory(True)
+
+# Enable neuromodulation
+brain.enableDopamine(True)
+brain.enableCuriosity(True)
+brain.enableNovelty(True)
+
+# Enable cognition
+brain.enablePlanner(True)
+brain.enableConceptFormation(True)
+brain.enableAttention(True)
+
+# Enable development
+brain.enableDevelopment(True)
+brain.enableStructuralPlasticity(True)
+```
+
+### 2. Multi-Agent Systems
+```python
+import pynlm
+
+# Create multiple collaborating agents
+agents = []
+for i in range(3):
+    brain = pynlm.createAdvancedConfig()
+    agent = pynlm.createAgentBrain(brain)
+    agent.enableCollaboration(True)  # Share information
+    agents.append(agent)
+
+# Run collaborative task
+results = create_multi_agent_collaboration(agents, world)
+```
+
+### 3. Advanced Learning Experiments
+```python
+import pynlm
+
+# Create learning environment
+brain = pynlm.createAdvancedConfig()
+brain.set("enable_structural_plasticity", True)
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning systems
+agent.enableAllLearningSystems(True)
+
+# Run learning experiment
+learning_results = run_learning_experiment(agent, world, "memory_learning")
+```
+
+### 4. Spatial Navigation Training
+```python
+import pynlm
+
+# Create navigation environment
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50)
+
+# Create navigation-trained agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Train navigation
+nav_results = run_navigation_training(agent, world)
+```
+
+---
+
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+When you're ready for more advanced usage:
 
-That's it! You're now ready to use NLM.
+1. **Explore advanced examples**: Run `advanced_agent_examples.py` for complex demonstrations
+2. **Learn about configuration**: Study the enhanced configuration system with schema validation
+3. **Understand memory systems**: Learn about working memory, episodic memory, and associative memory
+4. **Master neuromodulation**: Understand how dopamine, curiosity, and novelty drive behavior
+5. **Study cognition**: Explore neural planning, concept formation, and attention systems
+6. **Experiment with development**: Learn about developmental stages and structural plasticity
+
+For comprehensive documentation, check out:
+- `README.md` - Complete project documentation
+- `HOW_TO_USE.md` - Detailed usage instructions
+- `docs/ARCHITECTURE.md` - Technical architecture overview
+- `docs/PHASE6_FINAL_AUDIT.md` - Phase 6 integration audit
+
+---
+
+## Getting Help
+
+1. **Documentation**: Read the README and HOW_TO_USE guides for comprehensive information
+2. **Examples**: Run `advanced_agent_examples.py` for advanced demonstrations
+3. **Issues**: Report bugs or feature requests
+4. **Community**: Join discussions for collaborative development
+
+---
+
+## Quick Start Summary
+
+1. **Install**: `pip install pynlm` (after building C++ extensions)
+2. **Create**: `brain = pynlm.createBrain(config)`
+3. **Initialize**: `brain.initialize()`
+4. **Simulate**: `brain.step(step)` in a loop
+5. **Add advanced features**: Enable learning systems and configure parameters
+6. **Explore examples**: Try the advanced agent examples for complex scenarios
+
+That's all there is to getting started with NLM! You now have everything you need to create and simulate virtual brains with learning, memory, and development capabilities.
+
+Happy brain-building! 🧠
+
+*Note: For advanced features and complete documentation, also refer to `README.md`, `advanced_agent_examples.py`, and the `docs/` directory.*
+
+---
+
+*Created by NLM Research Team*
+*Version: 0.1.0 (Phase 6 Enhanced)*
+*Last Updated: $(date)*
