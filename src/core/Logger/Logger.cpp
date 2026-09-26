@@ -23,12 +23,14 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
+    // Check if this log level is enabled
     if (entry.level < pImpl->level) {
         return;
     }
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Format the log message with timestamp and level
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
@@ -40,14 +42,14 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with optional colors
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if set (for persistent logging)
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();

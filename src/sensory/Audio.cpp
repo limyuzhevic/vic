@@ -14,10 +14,22 @@ AudioProcessor::AudioProcessor() : pImpl(new Impl) {}
 AudioProcessor::~AudioProcessor() = default;
 
 void AudioProcessor::process(const Audio& input) {
-    // TODO PHASE 2: Implement real audio processing using NLM's neural machinery
-    // PLACEHOLDER: Just pass through raw data
+    // Phase 2 TODO: Implement real audio processing using NLM's neural machinery
+    // Current: Placeholder that passes through raw data
+    // For production use, implement:
+    // - Auditory preprocessing (spectrogram, MFCC, filter bank)
+    // - Neural processing using NLM's spiking neurons
+    // - Integration with cochlea-like processing
+    // - Sound localization and binaural processing
+    // - Temporal pattern detection for speech/music
+    // - Implementation using spiking neural network dynamics
+    
+    // Convert raw audio input to neural features
     pImpl->features = input.getData();
     pImpl->featureDimensions = input.getDimensions();
+    
+    // TODO: Add neural processing here
+    // For example: Process audio through neural layers using NLM neurons
 }
 
 const std::vector<float>& AudioProcessor::getFeatures() const {

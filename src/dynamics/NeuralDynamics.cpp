@@ -15,8 +15,14 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // Phase 2 TODO: Implement real integrate-and-fire dynamics
+    // Current implementation: Simple leaky integrator
+    // For production use, implement:
+    // - Realistic LIF neuron with conductance-based synapses
+    // - Adaptive threshold and refractory period
+    // - Spike-frequency adaptation mechanisms
+    // - Stochastic noise components
+    // - Ion channel dynamics (sodium, potassium, leak)
     
     const auto& state = neuron->getState();
     
@@ -34,13 +40,13 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
     neuron->setMembranePotential(V + dV);
     
-    // Check for firing
+    // Check for firing threshold crossing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(0.0);  // TODO: pass actual time when available
     }
     
-    // Refractory mechanism
+    // Refractory mechanism: clamp potential during refractory period
     if (neuron->isRefractory()) {
         neuron->setMembranePotential(state.resetPotential);
     }
@@ -50,14 +56,30 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
+    // Phase 2 TODO: Implement real synaptic dynamics
+    // Current: Placeholder implementation
+    // For production use, implement:
+    // - Realistic synaptic conductance dynamics
+    // - Neuromodulatory effects on synapses
+    // - Short-term plasticity (facilitation, depression)
+    // - Integration with synaptic plasticity rules
+    // - Implementation using differential equations
+    
+    // Placeholder: Synapse decay
     synapse->step(0.0);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    // Phase 2 TODO: Implement real synaptic input
+    // Current: Placeholder implementation
+    // For production use, implement:
+    // - Realistic synaptic transmission
+    // - Neuromodulatory effects on synaptic efficacy
+    // - Temporal dynamics of synaptic response
+    // - Spatial spread of synaptic input
+    // - Implementation using conductance-based models
+    
+    // Placeholder: Simple additive input
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);

@@ -19,16 +19,24 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 2 TODO: Implement proper JSON/YAML parser
+    // Currently uses a simple key=value format. For production use:
+    // - Use a proper JSON library (nlohmann/json, simdjson, etc.)
+    // - Support YAML format for human-readable configs
+    // - Validate configuration schema before loading
+    // - Merge with existing config (file > defaults > command line)
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Log error: Failed to open config file
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +57,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            // Optional: Log loaded configuration value
+        } else {
+            // Log warning: Malformed line in config file
         }
     }
     

@@ -35,6 +35,15 @@ void Novelty::setLevel(float level) {
 
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
+    // Phase 2 TODO: Implement real novelty detection
+    // Current: Placeholder implementation
+    // For production use, implement:
+    // - Neural novelty detection using NLM's processing
+    // - Integration with sensory processing systems
+    // - Implementation of statistical learning for novelty
+    // - Modulation of exploration behavior
+    // - Integration with curiosity mechanisms
+    
     // Extract features from observations and compare
     // Simple implementation: just set to a placeholder
     pImpl->level = 1.0f;

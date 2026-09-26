@@ -30,12 +30,28 @@ void Pruning::setPruningRate(float rate) {
 }
 
 void Pruning::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real pruning
-    // PLACEHOLDER: Weak synapses are removed probabilistically
+    // Phase 2 TODO: Implement real pruning
+    // Current: Placeholder implementation
+    // For production use, implement:
+    // - Biological pruning rules based on spike correlation
+    // - Activity-dependent synaptic elimination
+    // - Competition between synapses for resources
+    // - Integration with STDP for spike timing
+    // - Implementation using synaptic weight monitoring
+    
+    // Placeholder: Weak synapses are removed probabilistically
 }
 
 bool Pruning::pruneSynapse(Synapse* synapse) {
-    // TODO PHASE 2: Implement real synapse removal
+    // Phase 2 TODO: Implement real synapse removal
+    // Current: Placeholder - no synapses are pruned
+    // For production use, implement:
+    // - Activity-dependent synaptic removal
+    // - Spike-timing dependent pruning rules
+    // - Implementation using synaptic weight thresholds
+    // - Integration with plasticity mechanisms
+    // - Backpropagation of synaptic elimination signals
+    
     return false;
 }
 

@@ -17,6 +17,14 @@ WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
+    // Current: Simple storage without capacity management
+    // For production use, implement:
+    // - Bounded capacity with LRU eviction
+    // - Decay of memory traces over time
+    // - Integration with hippocampal mechanisms
+    // - Synaptic tagging for memory strength
+    // - Implementation using neural working memory systems
+    
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -109,6 +117,20 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // Current: Placeholder implementation
+    // For production use, implement:
+    // - Synaptic consolidation mechanisms
+    // - Systems consolidation over time
+    // - Integration with hippocampal-neocortical interactions
+    // - Memory strengthening based on relevance
+    // - Implementation using memory replay and reactivation
+    
+    // Placeholder implementation for memory consolidation
+    // Real implementation would involve:
+    // 1. Replaying important memories during sleep/rest
+    // 2. Strengthening synaptic connections
+    // 3. Transferring memories from hippocampus to cortex
+    // 4. Updating memory traces based on new experiences
 }
 
 // Semantic Memory Implementation

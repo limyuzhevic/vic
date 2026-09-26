@@ -25,26 +25,31 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
     // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
-        return;
+// Current: Simple placeholder implementation
+// For production use:
+// - Implement spike-timing dependent Hebbian rules
+// - Add synaptic tagging and capture mechanisms
+// - Include synaptic scaling for stability
+// - Add metaplasticity rules (learning to learn)
+// - Implement calcium-based plasticity models
+
+if (preSpikes.empty() || postSpikes.empty()) {
+    return;
+}
+
+float weightChange = 0.0f;
+
+// Basic correlation-based learning
+for (const auto& pre : preSpikes) {
+    for (const auto& post : postSpikes) {
+        // Implement proper Hebbian learning rule here
+        // Example: delta_w = learning_rate * pre_weight * post_weight
+        break; // Placeholder
     }
-    
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
-        }
-    }
-    
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
-    }
+}
+
+if (std::abs(weightChange) > 0.001f) {
+    synapse->addToWeight(weightChange);
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

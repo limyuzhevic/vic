@@ -30,8 +30,16 @@ void Synaptogenesis::setTargetDensity(float density) {
 }
 
 void Synaptogenesis::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real synaptogenesis
-    // PLACEHOLDER: New synapses form probabilistically
+    // Phase 2 TODO: Implement real synaptogenesis
+    // Current: Placeholder implementation
+    // For production use, implement:
+    // - Activity-dependent synaptogenesis based on correlated firing
+    // - Neuronal growth and guidance mechanisms
+    // - Implementation using axonal growth rules
+    // - Integration with neurotrophic factors
+    // - Structural plasticity for new connection formation
+    
+    // Placeholder: New synapses form probabilistically
 }
 
 } // namespace nlm

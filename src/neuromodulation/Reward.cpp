@@ -33,8 +33,16 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // Phase 2 TODO: Implement real reward computation from observation
+    // Current: Placeholder that returns 0
+    // For production use, implement:
+    // - Real reward calculation based on observation content
+    // - Reward function based on task objectives
+    // - Integration with agent goals and preferences
+    // - Reward shaping for exploration/exploitation
+    // - Implementation using NLM's reward systems
+    
+    // For now, return 0 as placeholder
     return 0.0f;
 }
 
