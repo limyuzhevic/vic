@@ -55,13 +55,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralAssociativeMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -130,6 +126,7 @@ target_link_libraries(nlm PUBLIC nlm_core)
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
+    src/experiments/DemoTests.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 

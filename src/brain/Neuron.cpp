@@ -154,6 +154,14 @@ void Neuron::recordSpike(Timestamp timestamp) {
     }
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
+}
+
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory;
+}
+
 void Neuron::clearSpikeHistory() {
     pImpl->spikeHistory.clear();
 }
