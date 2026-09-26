@@ -28,10 +28,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("stdp_ltp_weight", config.stdpLtpWeight);
+    cfg->set("stdp_ltd_weight", config.stdpLtdWeight);
+    cfg->set("stdp_tau", config.stdpTau);
+    cfg->set("synaptogenesis_rate", config.synaptogenesisRate);
+    cfg->set("pruning_rate", config.pruningRate);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -53,7 +54,33 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
     
-    NLM_LOG_INFO("Brain and agent initialized successfully");
+    // Configure agent based on config
+    if (config.environmentWidth > 0 && config.environmentHeight > 0) {
+        world.configure(config.environmentWidth, config.environmentHeight);
+    }
+    
+    if (config.worldTimeStep > 0) {
+        // Configure world timestep if needed
+        // This depends on the world's implementation
+    }
+    
+    if (config.neuralTimeStep > 0) {
+        cfg->set("simulation_timestep", config.neuralTimeStep);
+    }
+    
+    // Re-initialize brain with updated config
+    brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    // Re-initialize agent with new brain
+    agent = AgentBrain(brain);
+    agent.initialize(world);
+    agent.enableRewardModulation(true);
+    agent.enableStructuralPlasticity(config.enableDevelopment);
+    agent.enableDevelopment(config.enableDevelopment);
+    agent.enableCuriosity(true);
+    
+    NLM_LOG_INFO("Brain and agent re-initialized with updated configuration");
     
     // Run simulation
     float totalReward = 0.0f;
@@ -144,6 +171,42 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
+    }
+    
+    // Create new brain and load
+            auto brain2 = std::make_shared<Brain>(cfg);
+            brain2->initialize();
+            
+            if (brain2->load(config.checkpointPath)) {
+                NLM_LOG_INFO("Checkpoint loaded successfully");
+                result.checkpointingWorks = true;
+            } else {
+                NLM_LOG_ERROR("Failed to load checkpoint");
+            }
+        } else {
+            NLM_LOG_ERROR("Failed to save checkpoint");
+        }
+    }
+    
+    // Validate result before returning
+    if (!result.memoryWorkingMemoryIntegrated) {
+        NLM_LOG_WARNING("Working memory system is not integrated");
+    }
+    
+    if (!result.memoryEpisodicMemoryIntegrated) {
+        NLM_LOG_WARNING("Episodic memory system is not integrated");
+    }
+    
+    if (!result.neuromodulationIntegrated) {
+        NLM_LOG_WARNING("Neuromodulation system is not integrated");
+    }
+    
+    if (!result.predictionIntegrated) {
+        NLM_LOG_WARNING("Prediction system is not integrated");
+    }
+    
+    if (!result.developmentIntegrated) {
+        NLM_LOG_WARNING("Development system is not integrated");
     }
     
     result.endTime = time(nullptr);
@@ -240,6 +303,14 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         NLM_LOG_INFO("[PASS] Development system is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
+        success = false;
+    }
+    
+    // Test 6: Prediction system exists (additional check)
+    if (brain->getPredictionSystem() != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
         success = false;
     }
     

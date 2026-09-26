@@ -80,9 +80,21 @@ struct Phase6Config {
     size_t neuronCount;
     size_t regionCount;
     float connectionProbability;
+    float stdpLtpWeight;
+    float stdpLtdWeight;
+    float stdpTau;
+    float synaptogenesisRate;
+    float pruningRate;
     bool enableCheckpointing;
     bool enableReplay;
     bool enableDevelopment;
+    bool enableNeuromodulation;
+    float environmentWidth;
+    float environmentHeight;
+    float worldTimeStep;
+    float neuralTimeStep;
+    size_t visionWidth;
+    size_t visionHeight;
     std::string checkpointPath;
     
     Phase6Config()
@@ -90,9 +102,21 @@ struct Phase6Config {
         , neuronCount(1000)
         , regionCount(1)
         , connectionProbability(0.1f)
+        , stdpLtpWeight(0.01f)
+        , stdpLtdWeight(0.012f)
+        , stdpTau(20.0f)
+        , synaptogenesisRate(0.0001f)
+        , pruningRate(0.00001f)
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
+        , enableNeuromodulation(true)
+        , environmentWidth(20.0f)
+        , environmentHeight(20.0f)
+        , worldTimeStep(0.01f)
+        , neuralTimeStep(0.001f)
+        , visionWidth(16)
+        , visionHeight(16)
         , checkpointPath("./checkpoint_test.bin") {}
 };
 
