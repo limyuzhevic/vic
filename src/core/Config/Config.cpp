@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -28,7 +29,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,14 +44,48 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Handle quoted values
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Auto-detect value type
+            bool success = false;
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::File);
+                success = true;
+            } else {
+                // Try to parse as integer
+                try {
+                    size_t posEnd;
+                    int intValue = std::stoi(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intValue, ConfigSource::File);
+                        success = true;
+                    }
+                } catch (...) {}
+                
+                // Try to parse as double if not already an int
+                if (!success) {
+                    try {
+                        size_t posEnd;
+                        double doubleValue = std::stod(value, &posEnd);
+                        if (posEnd == value.size()) {
+                            set(key, doubleValue, ConfigSource::File);
+                            success = true;
+                        }
+                    } catch (...) {}
+                }
+            }
+            
+            if (!success) {
+                // If none of the above worked, store as string
+                set(key, value, ConfigSource::File);
+            }
+        } else {
+            // Handle malformed line silently for now
         }
     }
     
@@ -86,7 +123,48 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> ||
+                                std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format to avoid scientific notation
+                file << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
