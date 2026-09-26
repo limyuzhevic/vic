@@ -26,6 +26,13 @@ public:
         
         // Create configuration
         auto config = std::make_shared<Config>();
+        
+        // Validate config allocation
+        if (!config) {
+            std::cerr << "ERROR: Failed to create configuration object" << std::endl;
+            return;
+        }
+        
         configureEnvironment(config);
         configureBrain(config);
         
@@ -36,6 +43,13 @@ public:
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
+        
+        // Validate brain allocation
+        if (!brain) {
+            std::cerr << "ERROR: Failed to create brain object" << std::endl;
+            return;
+        }
+        
         brain->initialize();
         
         // Create agent brain interface

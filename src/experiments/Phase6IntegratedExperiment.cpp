@@ -25,6 +25,14 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
+    
+    // Validate config allocation
+    if (!cfg) {
+        NLM_LOG_ERROR("Failed to create configuration object");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
@@ -35,6 +43,14 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
+    
+    // Validate brain allocation
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
         result.endTime = time(nullptr);
@@ -164,10 +180,24 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     
     // Create minimal brain
     auto cfg = std::make_shared<Config>();
+    
+    // Validate config allocation
+    if (!cfg) {
+        NLM_LOG_ERROR("Failed to create configuration object");
+        return false;
+    }
+    
     cfg->set("neuron_count", 100);
     cfg->set("region_count", 1);
     
     auto brain = std::make_shared<Brain>(cfg);
+    
+    // Validate brain allocation
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object");
+        return false;
+    }
+    
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Brain initialization failed");
         return false;

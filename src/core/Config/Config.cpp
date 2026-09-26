@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -19,76 +21,260 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    NLM_LOG_DEBUG("Attempting to load config from: " + filepath);
+    
+    // Try JSON/YAML parser first (Phase 2), fallback to simple key=value format
+    bool loaded = false;
+    
+// Try YAML parser first
+    if (loadFromYAML(filepath)) {
+        loaded = true;
+        NLM_LOG_INFO("Successfully loaded config using YAML parser: " + filepath);
+    } else if (loadFromJSON(filepath)) {
+        loaded = true;
+        NLM_LOG_INFO("Successfully loaded config using JSON parser: " + filepath);
+    } else {
+        // Fallback to simple key=value format
+        NLM_LOG_DEBUG("Falling back to simple key=value format parser");
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open config file: " + filepath);
+            return false;
+        }
+        
+        // Clear existing entries before loading new ones
+        clear();
+        
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(file, line)) {
+            ++lineNum;
+            line = trim(line);
+            
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
+            }
+        }
+        
+        return true;
+    }
+    
+    if (!loaded) {
+        NLM_LOG_ERROR("Failed to load config file using any parser: " + filepath);
+        return false;
+    }
+}
+
+if (!loaded) {
+        NLM_LOG_ERROR("Failed to load config file using any parser: " + filepath);
+        return false;
+    }
+}
+
+// Load configuration from JSON file
+bool Config::loadFromJSON(const std::string& filepath) {
+    NLM_LOG_DEBUG("Attempting to load config from JSON file: " + filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        // Parse JSON
+        nlohmann::json j;
+        file >> j;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Clear existing entries before loading new ones
+        clear();
+        
+        // Convert JSON to Config entries
+        if (j.is_object()) {
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                std::string key = it.key();
+                
+                // Handle different JSON value types
+                const nlohmann::json& value = it.value();
+                if (value.is_string()) {
+                    set(key, value.get<std::string>(), ConfigSource::File);
+                } else if (value.is_number_integer()) {
+                    // Check if it fits in int64_t
+                    try {
+                        int64_t intVal = value.get<int64_t>();
+                        set(key, intVal, ConfigSource::File);
+                    } catch (...) {
+                        set(key, value.get<double>(), ConfigSource::File);
+                    }
+                } else if (value.is_number_float()) {
+                    set(key, value.get<double>(), ConfigSource::File);
+                } else if (value.is_boolean()) {
+                    set(key, value.get<bool>(), ConfigSource::File);
+                } else if (value.is_array()) {
+                    // Handle arrays
+                    std::vector<std::string> strArray;
+                    for (const auto& item : value) {
+                        strArray.push_back(item.get<std::string>());
+                    }
+                    set(key, strArray, ConfigSource::File);
+                } else if (value.is_object()) {
+                    // For nested objects, convert to string representation
+                    set(key, value.dump(), ConfigSource::File);
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            NLM_LOG_INFO("Successfully loaded JSON config from: " + filepath);
+            return true;
+        } else {
+            NLM_LOG_ERROR("Invalid JSON format: expected object at root");
+            return false;
         }
+    } catch (const nlohmann::json::parse_error& e) {
+        NLM_LOG_ERROR("JSON parse error in " + filepath + ": " + e.what());
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON file " + filepath + ": " + e.what());
+        return false;
     }
-    
-    return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+// Load configuration from YAML file
+bool Config::loadFromYAML(const std::string& filepath) {
+    NLM_LOG_DEBUG("Attempting to load config from YAML file: " + filepath);
+    
+    try {
+        // Parse YAML
+        YAML::Loader loader;
+        YAML::Node doc = loader.LoadFile(filepath);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        if (!doc.IsMap()) {
+            NLM_LOG_ERROR("Invalid YAML format: expected map at root");
+            return false;
+        }
+        
+        // Clear existing entries before loading new ones
+        clear();
+        
+        // Convert YAML to Config entries
+        for (auto it = doc.begin(); it != doc.end(); ++it) {
+            std::string key = it->first.as<std::string>();
+            
+            // Handle different YAML value types
+            const YAML::Node& value = it->second;
+            if (value.IsScalar()) {
+                // Check if scalar is boolean
+                if (value.IsBoolean()) {
+                    set(key, value.as<bool>(), ConfigSource::File);
+                } else if (value.IsInteger()) {
+                    set(key, value.as<int64_t>(), ConfigSource::File);
+                } else if (value.IsFloat()) {
+                    set(key, value.as<double>(), ConfigSource::File);
+                } else {
+                    // String scalar
+                    set(key, value.as<std::string>(), ConfigSource::File);
+                }
+            } else if (value.IsSequence()) {
+                // Handle sequences
+                std::vector<std::string> strArray;
+                for (const auto& item : value) {
+                    if (item.IsScalar()) {
+                        strArray.push_back(item.as<std::string>());
+                    }
+                }
+                set(key, strArray, ConfigSource::File);
+            } else if (value.IsMap()) {
+                // For nested objects, convert to string representation
+                std::stringstream ss;
+                ss << value;
+                set(key, ss.str(), ConfigSource::File);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        NLM_LOG_INFO("Successfully loaded YAML config from: " + filepath);
+        return true;
+    } catch (const YAML::Exception& e) {
+        NLM_LOG_ERROR("YAML parse error in " + filepath + ": " + std::string(e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML file " + filepath + ": " + e.what());
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    // Write header
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert config value to string
+        std::string valueStr;
+        std::visit([&valueStr](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                valueStr = "\"" + arg + "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                valueStr = arg ? "true" : "false";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                valueStr = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) valueStr += ", ";
+                    valueStr += std::to_string(arg[i]);
+                }
+                valueStr += "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                valueStr = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) valueStr += ", ";
+                    valueStr += std::to_string(arg[i]);
+                }
+                valueStr += "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                valueStr = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) valueStr += ", ";
+                    valueStr += "\"" + arg[i] + "\"";
+                }
+                valueStr += "]";
+            } else {
+                // For int, int64_t, double
+                std::ostringstream oss;
+                oss << arg;
+                valueStr = oss.str();
+            }
+        }, entry.value);
+        
+        file << entry.key << " = " << valueStr << "\n\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 

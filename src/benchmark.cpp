@@ -34,6 +34,13 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     // Create configuration
     auto config = std::make_shared<Config>();
+    
+    // Validate config allocation
+    if (!config) {
+        std::cerr << "ERROR: Failed to create configuration object" << std::endl;
+        return result;
+    }
+    
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.1f, ConfigSource::Default);
@@ -42,6 +49,13 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);
+    
+    // Validate brain allocation
+    if (!brain) {
+        std::cerr << "ERROR: Failed to create brain object" << std::endl;
+        return result;
+    }
+    
     brain->initialize();
     
     // Run simulation
@@ -113,6 +127,17 @@ int main() {
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
+    
+    // Validate smart pointer allocations
+    if (!logger) {
+        std::cerr << "ERROR: Failed to create logger object" << std::endl;
+        return 1;
+    }
+    if (!consoleLogger) {
+        std::cerr << "ERROR: Failed to create console logger object" << std::endl;
+        return 1;
+    }
+    
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     

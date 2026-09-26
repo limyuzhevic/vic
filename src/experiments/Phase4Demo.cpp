@@ -48,6 +48,13 @@ int main(int argc, char* argv[]) {
     
     // Create configuration
     auto config = std::make_shared<Config>();
+    
+    // Validate config allocation
+    if (!config) {
+        std::cerr << "ERROR: Failed to create configuration object" << std::endl;
+        return 1;
+    }
+    
     config->set("neuron_count", size_t(1000));
     config->set("region_count", size_t(2));
     config->set("connection_probability", 0.1f);
@@ -59,6 +66,13 @@ int main(int argc, char* argv[]) {
     // Create brain
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
+    
+    // Validate brain allocation
+    if (!brain) {
+        std::cerr << "ERROR: Failed to create brain object" << std::endl;
+        return 1;
+    }
+    
     if (!brain->initialize()) {
         std::cerr << "Failed to initialize brain!\n";
         return 1;
