@@ -7,15 +7,17 @@
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Uses NeuralPrediction to implement prediction through neural dynamics
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize prediction system with brain reference
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -33,6 +35,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Check if prediction system is initialized
+    bool isInitialized() const;
+    
+    // Get access to NeuralPrediction system
+    NeuralPrediction* getNeuralPrediction() const;
     
 private:
     struct Impl;

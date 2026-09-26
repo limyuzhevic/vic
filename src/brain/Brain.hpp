@@ -44,15 +44,37 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
-
+/**
+ * @class Brain
+ * @brief The central coordinator of the neural system
+ * 
+ * Implements real spiking neural computation with event-driven dynamics and
+ * integrates all brain systems including memory, prediction, cognition,
+ * neuromodulation, and development. This class serves as the main interface
+ * for controlling the artificial brain and accessing its various components.
+ * 
+ * The Brain class follows the Composite pattern for region management and
+ * provides access to all integrated systems as observers of neural activity.
+ * 
+ * @version Phase 6: Final Integration
+ * @author NLM Research Project
+ */
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Create brain with configuration
+     * 
+     * @param config Shared configuration for neural parameters
+     * @note Configuration should include neuron_count, region_count, 
+     *       connection_probability, and other simulation parameters
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destroy the Brain object
+     * 
+     * Cleans up all neural resources and integrated systems.
+     */
     ~Brain();
     
     // Disable copying, enable moving
@@ -61,13 +83,40 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    /**
+     * @brief Initialize brain with configuration
+     * 
+     * Creates neural regions, neurons, populations, and synaptic connections
+     * based on the configuration parameters. Also initializes all integrated
+     * systems (memory, prediction, cognition, neuromodulation, development).
+     * 
+     * @return true if initialization successful, false otherwise
+     * @note Must be called before any simulation steps
+     */
     bool initialize();
     
-    // Main simulation step
+    /**
+     * @brief Main simulation step
+     * 
+     * Performs one complete simulation step using the current simulation time
+     * from the simulation clock. This is the primary method for advancing
+     * the neural simulation.
+     * 
+     * @param currentStep Current simulation step number
+     * @note Automatically processes all neural dynamics, plasticity, memory,
+     *       prediction, and neuromodulation
+     */
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    /**
+     * @brief Simulation time step
+     * 
+     * Performs one complete simulation step with explicit time parameter.
+     * 
+     * @param currentStep Current simulation step number
+     * @param currentTime Current simulation time in seconds
+     * @note Provides more precise timing control than step(SimulationStep)
+     */
     void step(SimulationStep currentStep, Timestamp currentTime);
     
     // Receive sensory input from environment
