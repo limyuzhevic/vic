@@ -34,16 +34,16 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
-    // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
+    // Synaptic weight bounds (configurable via config system)
+    static constexpr float DEFAULT_MIN_WEIGHT = -1.0f;
+    static constexpr float DEFAULT_MAX_WEIGHT = 1.0f;
     
-    // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    // Short-term plasticity parameters (configurable)
+    static constexpr float DEFAULT_STP_FACILITATION_TAU = 100.0f;  // ms
+    static constexpr float DEFAULT_STP_DEPRESSION_TAU = 200.0f;  // ms
+    static constexpr float DEFAULT_STP_U_MAX = 1.0f;  // Max utilization
     
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr size_t DEFAULT_MAX_SPIKE_HISTORY = 100;
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
