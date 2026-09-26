@@ -80,6 +80,10 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
+    // Find neuron by ID (O(1) lookup)
+    Neuron* getNeuronById(NeuronId id);
+    const Neuron* getNeuronById(NeuronId id) const;
+    
     // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;

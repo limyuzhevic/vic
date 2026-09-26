@@ -234,7 +234,6 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike
@@ -250,6 +249,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is not firing, set to active state
         pImpl->state.firingState = FiringState::Active;
     }
     

@@ -34,6 +34,10 @@ public:
     Neuron* getNeuron(NeuronIndex index);
     const Neuron* getNeuron(NeuronIndex index) const;
     
+    // Find neuron by ID (O(1) lookup)
+    Neuron* getNeuronById(NeuronId id);
+    const Neuron* getNeuronById(NeuronId id) const;
+    
     // Add neuron to population
     void addNeuron(Neuron* neuron);
     

@@ -268,21 +268,19 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        // Find destination neuron and deliver synaptic input using efficient O(1) lookup
+        Neuron* targetNeuron = getNeuronById(event.destination_neuron);
+        if (targetNeuron) {
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                targetNeuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                targetNeuron->receiveInhibitoryInput(-synapticCurrent);
             }
+        } else {
+            NLM_LOG_WARNING("Delayed spike event: destination neuron not found (ID: " + 
+                           std::to_string(event.destination_neuron) + ")");
         }
     });
     
@@ -390,8 +388,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     
                     // Store to working memory - neurons that fire become part of working memory
                     if (pImpl->workingMemory) {
+                        float normalizationFactor = pImpl->config->getOr<float>("working_memory_normalization_factor", 10.0f);
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                            std::abs(state.membranePotential - state.restingPotential) / normalizationFactor);
                     }
                 }
             }
@@ -611,20 +610,17 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            float normalizationFactor = pImpl->config->getOr<float>("working_memory_normalization_factor", 10.0f);
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / normalizationFactor);
         }
     }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
+    // Use efficient O(1) lookup instead of linear search
+    Neuron* targetNeuron = getNeuronById(neuron);
+    if (targetNeuron) {
+        targetNeuron->injectCurrent(current);
     }
 }
 
@@ -652,8 +648,30 @@ STDP* Brain::getSTDP() {
     return pImpl->stdp.get();
 }
 
-Hebbian* Brain::getHebbian() {
-    return pImpl->hebbian.get();
+Neuron* Brain::getNeuronById(NeuronId id) {
+    for (auto& region : pImpl->regions) {
+        // Use population-level lookup for efficiency
+        for (auto& pop : region->getPopulations()) {
+            Neuron* neuron = pop->getNeuronById(id);
+            if (neuron) {
+                return neuron;
+            }
+        }
+    }
+    return nullptr;
+}
+
+const Neuron* Brain::getNeuronById(NeuronId id) const {
+    for (const auto& region : pImpl->regions) {
+        // Use population-level lookup for efficiency
+        for (const auto& pop : region->getPopulations()) {
+            const Neuron* neuron = pop->getNeuronById(id);
+            if (neuron) {
+                return neuron;
+            }
+        }
+    }
+    return nullptr;
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {

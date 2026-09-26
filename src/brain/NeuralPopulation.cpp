@@ -57,6 +57,19 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
     return pImpl->neurons[index];
 }
 
+// Find neuron by ID (O(1) lookup)
+Neuron* NeuralPopulation::getNeuronById(NeuronId id) {
+    auto it = std::find_if(pImpl->neurons.begin(), pImpl->neurons.end(),
+        [id](const Neuron* neuron) { return neuron->getId() == id; });
+    return (it != pImpl->neurons.end()) ? *it : nullptr;
+}
+
+const Neuron* NeuralPopulation::getNeuronById(NeuronId id) const {
+    auto it = std::find_if(pImpl->neurons.begin(), pImpl->neurons.end(),
+        [id](const Neuron* neuron) { return neuron->getId() == id; });
+    return (it != pImpl->neurons.end()) ? *it : nullptr;
+}
+
 void NeuralPopulation::addNeuron(Neuron* neuron) {
     pImpl->neurons.push_back(neuron);
     if (pImpl->size < pImpl->neurons.size()) {
