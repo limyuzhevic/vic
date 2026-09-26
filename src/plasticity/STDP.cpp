@@ -2,6 +2,7 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -11,19 +12,26 @@ struct STDP::Impl {
     float timeConstant;   // Tau for exponential window (ms)
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
+    bool softBounds;      // Enable soft bounds vs hard clamping
     
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f), softBounds(false) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP() : pImpl(new Impl) {
+    if (!pImpl) {
+        throw std::runtime_error("Failed to allocate STDP memory");
+    }
+}
 
-STDP::~STDP() = default;
+STDP::~STDP() {
+    delete pImpl;
+}
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                  const std::vector<Timestamp>& preSpikes,
+                  const std::vector<Timestamp>& postSpikes,
+                  TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -56,6 +64,11 @@ void STDP::update(Synapse* synapse,
         return;
     }
     
+    // Validate input parameters
+    if (dt <= 0.0f) {
+        throw std::invalid_argument("Timestep duration must be positive");
+    }
+    
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
@@ -85,7 +98,7 @@ void STDP::update(Synapse* synapse,
         totalDelta *= efficacy;
         
         // Apply weight change
-        synapse->addToWeight(totalDelta);
+        applyWeightChange(synapse, totalDelta);
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();
@@ -94,11 +107,25 @@ void STDP::update(Synapse* synapse,
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        throw std::invalid_argument("Cannot apply weight change to null synapse");
+    }
     
     // Clamp weight to bounds
     float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    
+    if (pImpl->softBounds) {
+        // Soft bounds: apply sigmoid-like transition near limits
+        if (newWeight > pImpl->maxWeight) {
+            newWeight = pImpl->maxWeight - std::exp(-(newWeight - pImpl->maxWeight)) * 0.1f;
+        } else if (newWeight < pImpl->minWeight) {
+            newWeight = pImpl->minWeight + std::exp((newWeight - pImpl->minWeight)) * 0.1f;
+        }
+    } else {
+        // Hard bounds: simple clamping
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    }
+    
     synapse->setWeight(newWeight);
 }
 
@@ -128,6 +155,14 @@ void STDP::setTimeConstant(float tau) {
 
 float STDP::getTimeConstant() const {
     return pImpl->timeConstant;
+}
+
+void STDP::setSoftBounds(bool enabled) {
+    pImpl->softBounds = enabled;
+}
+
+bool STDP::getSoftBounds() const {
+    return pImpl->softBounds;
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {

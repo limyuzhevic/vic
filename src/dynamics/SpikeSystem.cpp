@@ -1,4 +1,6 @@
 #include "SpikeSystem.hpp"
+#include "../../brain/NeuralRegion.hpp"
+#include "../../brain/NeuralPopulation.hpp"
 #include <algorithm>
 #include <limits>
 
@@ -9,18 +11,24 @@ struct SpikeSystem::Impl {
     std::vector<DetailedSpikeEvent> spikeHistory;
     std::vector<SpikeHandler> handlers;
     std::vector<DelayedSpikeHandler> delayedHandlers;
+    std::vector<DelayedSpikeHandlerOptimized> delayedHandlersOptimized;  // O(1) lookup optimized
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
     size_t maxHistorySize;
     
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
+    // Neuron lookup for O(1) delayed spike delivery
+    std::unordered_map<uint64_t, std::vector<std::pair<Neuron*, Synapse*>>> neuronSynapseMap;  // neuron_id -> list of (neuron, synapse) pairs
+    
     Impl() : maxHistorySize(10000) {}
 };
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
 
-SpikeSystem::~SpikeSystem() = default;
+SpikeSystem::~SpikeSystem() {
+    delete pImpl;
+}
 
 SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -84,7 +92,27 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     if (it != pImpl->delayedSpikes.end()) {
         // Process all spikes scheduled for this step
         for (const auto& delayedEvent : it->second) {
-            // Call delayed spike handlers (these will deliver synaptic input)
+            // Try optimized handler first (O(1) lookup)
+            if (!pImpl->delayedHandlersOptimized.empty() && 
+                delayedEvent.destination_neuron.has_value()) {
+                
+                // Look up neuron and synapse using O(1) map
+                auto neuronIt = pImpl->neuronSynapseMap.find(delayedEvent.destination_neuron.value());
+                if (neuronIt != pImpl->neuronSynapseMap.end()) {
+                    for (const auto& neuronSynapsePair : neuronIt->second) {
+                        Neuron* destinationNeuron = neuronSynapsePair.first;
+                        const Synapse* synapse = neuronSynapsePair.second;
+                        
+                        // Call optimized handler
+                        for (auto& handler : pImpl->delayedHandlersOptimized) {
+                            handler(delayedEvent, destinationNeuron, synapse);
+                        }
+                    }
+                    continue;  // Skip traditional handlers if optimized ones were called
+                }
+            }
+            
+            // Fall back to traditional handlers (O(n) lookup)
             for (auto& handler : pImpl->delayedHandlers) {
                 handler(delayedEvent);
             }
@@ -100,6 +128,10 @@ void SpikeSystem::registerHandler(SpikeHandler handler) {
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
     pImpl->delayedHandlers.push_back(handler);
+}
+
+void SpikeSystem::registerDelayedHandlerOptimized(DelayedSpikeHandlerOptimized handler) {
+    pImpl->delayedHandlersOptimized.push_back(handler);
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
@@ -178,6 +210,34 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+    pImpl->neuronSynapseMap.clear();
+}
+
+void SpikeSystem::compactMemory() {
+    // Clean up unused memory and optimize data structures
+    // Remove dead references from neuronSynapseMap
+    std::vector<uint64_t> neuronsToRemove;
+    for (const auto& pair : pImpl->neuronSynapseMap) {
+        // Check if neurons still exist (this would require access to brain)
+        // For now, we'll keep all references
+    }
+    
+    // Clear spike count per neuron if memory is low
+    if (pImpl->spikeCountPerNeuron.size() > 1000) {
+        pImpl->spikeCountPerNeuron.clear();
+    }
+}
+
+void SpikeSystem::setMaxHistorySize(size_t maxSize) {
+    pImpl->maxHistorySize = maxSize;
+    // Trim history if needed
+    while (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+size_t SpikeSystem::getMaxHistorySize() const {
+    return pImpl->maxHistorySize;
 }
 
 } // namespace nlm

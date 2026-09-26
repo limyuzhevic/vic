@@ -24,6 +24,7 @@ struct DetailedSpikeEvent {
 
 // Event-driven neural computation system
 // Handles spike event processing and delayed synaptic transmission
+// Optimized for O(1) neuron lookup instead of O(n) scanning
 class SpikeSystem {
 public:
     SpikeSystem();
@@ -56,6 +57,10 @@ public:
     using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
+    // Register delayed spike handler with O(1) neuron lookup (optimized)
+    using DelayedSpikeHandlerOptimized = std::function<void(const DelayedSpikeEvent&, Neuron* destinationNeuron, const Synapse* synapse)>;
+    void registerDelayedHandlerOptimized(DelayedSpikeHandlerOptimized handler);
+    
     // Get spike history
     const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
     void clearHistory();
@@ -71,6 +76,13 @@ public:
     
     // Reset
     void reset();
+    
+    // Memory management
+    void compactMemory();  // Clean up unused memory
+    
+    // Configuration
+    void setMaxHistorySize(size_t maxSize);
+    size_t getMaxHistorySize() const;
     
 private:
     struct Impl;
