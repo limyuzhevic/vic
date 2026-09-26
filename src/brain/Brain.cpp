@@ -125,7 +125,10 @@ struct Brain::Impl {
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
         // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
+        dopamine = std::make_unique<Dopamine>(config);
+        acetylcholine = std::make_unique<Acetylcholine>(config);
+        norepinephrine = std::make_unique<Norepinephrine>(config);
+        serotonin = std::make_unique<Serotonin>(config);
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
