@@ -398,15 +398,59 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced agent control
+        .def("setMaxExploration", &AgentBrain::setMaxExploration,
+             py::arg("max_exploration"),
+             "Set maximum exploration level (0.0 to 1.0)")
+        .def("getMaxExploration", &AgentBrain::getMaxExploration,
+             "Get current maximum exploration level")
+        .def("setTemperature", &AgentBrain::setTemperature,
+             py::arg("temperature"),
+             "Set exploration temperature for action selection (0.0 to 1.0)")
+        .def("getTemperature", &AgentBrain::getTemperature,
+             "Get current exploration temperature")
+        .def("setEpsilon", &AgentBrain::setEpsilon,
+             py::arg("epsilon"),
+             "Set epsilon-greedy exploration rate")
+        .def("getEpsilon", &AgentBrain::getEpsilon,
+             "Get current epsilon-greedy exploration rate")
+        
+        // State snapshot and comparison
+        .def("createSnapshot", &AgentBrain::createSnapshot,
+             "Create a snapshot of current brain state")
+        .def("compareSnapshots", &AgentBrain::compareSnapshots,
+             py::arg("snapshot1"), py::arg("snapshot2"),
+             "Compare two state snapshots")
+        .def("applySnapshot", &AgentBrain::applySnapshot,
+             py::arg("snapshot"),
+             "Apply a state snapshot to reset brain")
+        
+        // Advanced neuromodulation
+        .def("setDopamineLevel", &AgentBrain::setDopamineLevel,
+             py::arg("level"),
+             "Set dopamine level directly")
+        .def("getDopamineLevel", &AgentBrain::getDopamineLevel,
+             "Get current dopamine level")
+        .def("getCuriositySignal", &AgentBrain::getCuriositySignal,
+             "Get raw curiosity signal before thresholds")
+        .def("getNoveltySignal", &AgentBrain::getNoveltySignal,
+             "Get raw novelty signal before decay")
+        .def("getPredictionErrorSignal", &AgentBrain::getPredictionErrorSignal,
+             "Get raw prediction error signal")
+        
+        // Development control
+        .def("setDevelopmentRate", &AgentBrain::setDevelopmentRate,
+             py::arg("rate"),
+             "Set development rate modifier (0.0 to 2.0)")
+        .def("getDevelopmentRate", &AgentBrain::getDevelopmentRate,
+             "Get current development rate modifier")
+        .def("setCriticalPeriodEnd", &AgentBrain::setCriticalPeriodEnd,
+             py::arg("time"),
+             "Set end time of critical period")
+        .def("getCriticalPeriodEnd", &AgentBrain::getCriticalPeriodEnd,
+             "Get end time of critical period");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -416,10 +460,171 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("saveConfig", [](const Config& cfg, const std::string& filepath) {
+        cfg.saveToFile(filepath);
+    }, py::arg("cfg"), py::arg("filepath"), "Save configuration to file");
+
+    m.def("loadConfig", [](Config& cfg, const std::string& filepath) {
+        return cfg.loadFromFile(filepath);
+    }, py::arg("cfg"), py::arg("filepath"), "Load configuration from file");
+
+    m.def("getConfigSummary", [](const Config& cfg) {
+        return cfg.summary();
+    }, py::arg("cfg"), "Get configuration summary");
+
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                              std::shared_ptr<AgentBrain> agent, int steps, float timestep) {
+        for (int i = 0; i < steps; ++i) {
+            world->update(static_cast<double>(timestep));
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i, i * timestep);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, static_cast<double>(i * timestep));
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), py::arg("timestep"),
+       "Run complete simulation with brain-world interaction");
+
+    m.def("analyzeBrainConnectivity", [](std::shared_ptr<Brain> brain) {
+        std::ostringstream oss;
+        oss << "Brain Connectivity Analysis:\n";
+        oss << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+        oss << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        oss << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        oss << "  Pending spike events: " << brain->getPendingSpikeEventCount() << "\n";
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz\n";
+        oss << "  Excitation/Inhibition ratio: " << brain->getExcitationInhibitionRatio() << ":1\n";
+        return oss.str();
+    }, py::arg("brain"), "Analyze brain connectivity and statistics");
+
+    m.def("analyzeAgentPerformance", [](std::shared_ptr<AgentBrain> agent, 
+                                        std::shared_ptr<SimpleWorld> world, 
+                                        int steps) {
+        float totalReward = 0.0f;
+        float totalPredictionError = 0.0f;
+        float avgCuriosity = 0.0f;
+        float avgNovelty = 0.0f;
+        
+        for (int i = 0; i < steps; ++i) {
+            totalReward += agent->getNeuromodulationLevel();
+            totalPredictionError += std::abs(agent->getPredictionError());
+            avgCuriosity += agent->getCuriosityLevel();
+            avgNovelty += agent->getNoveltyLevel();
+        }
+        
+        int count = std::max(steps, 1);
+        avgCuriosity /= count;
+        avgNovelty /= count;
+        
+        std::ostringstream oss;
+        oss << "Agent Performance Analysis:\n";
+        oss << "  Average neuromodulation level: " << totalReward / count << "\n";
+        oss << "  Average prediction error: " << totalPredictionError / count << "\n";
+        oss << "  Average curiosity level: " << avgCuriosity << "\n";
+        oss << "  Average novelty level: " << avgNovelty << "\n";
+        oss << "  Developmental stage: " << static_cast<int>(agent->getDevelopmentalStage()) << "\n";
+        oss << "  Reward modulation: " << (agent->isRewardModulationEnabled() ? "enabled" : "disabled") << "\n";
+        oss << "  Structural plasticity: " << (agent->isStructuralPlasticityEnabled() ? "enabled" : "disabled") << "\n";
+        oss << "  Curiosity: " << (agent->isCuriosityEnabled() ? "enabled" : "disabled") << "\n";
+        return oss.str();
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"), 
+       "Analyze agent performance over simulation steps");
+
+    m.def("visualizeNetworkState", [](std::shared_ptr<Brain> brain) {
+        std::ostringstream oss;
+        oss << "=== Network State Visualization ===\n";
+        oss << "Brain Regions:\n";
+        
+        for (const auto& regionId : brain->getRegionIds()) {
+            auto* region = brain->getRegion(regionId);
+            if (region) {
+                oss << "  Region " << regionId.index() << " (" << region->getName() << "):\n";
+                oss << "    Neurons: " << region->getTotalNeuronCount() << "\n";
+                oss << "    Populations: " << region->getPopulationCount() << "\n";
+                oss << "    Synapses: " << region->getSynapseCount() << "\n";
+                oss << "    Avg weight: " << region->getAverageSynapticWeight() << "\n";
+            }
+        }
+        
+        oss << "\nGlobal Statistics:\n";
+        oss << "  Total neurons across all regions: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Total synapses across all regions: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Spike system pending: " << brain->getPendingSpikeEventCount() << "\n";
+        
+        return oss.str();
+    }, py::arg("brain"), "Generate ASCII visualization of network state");
+
+    m.def("exportBrainData", [](std::shared_ptr<Brain> brain, const std::string& prefix) {
+        std::ostringstream oss;
+        oss << "Brain Data Export\n";
+        oss << "==================\n";
+        oss << "Export prefix: " << prefix << "\n";
+        oss << "Timestamp: " << brain->getTotalSpikeCount() << " spikes\n";
+        oss << "\nRegion Summary:\n";
+        
+        for (const auto& regionId : brain->getRegionIds()) {
+            auto* region = brain->getRegion(regionId);
+            if (region) {
+                oss << "  Region " << regionId.index() << ": " << region->getName() << "\n";
+                oss << "    Neuron count: " << region->getTotalNeuronCount() << "\n";
+                oss << "    Synapse count: " << region->getSynapseCount() << "\n";
+                oss << "    Average synaptic weight: " << region->getAverageSynapticWeight() << "\n";
+            }
+        }
+        
+        oss << "\nGlobal Metrics:\n";
+        oss << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        oss << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+        oss << "  Active neurons: " << brain->getActiveNeuronCount() << "\n";
+        oss << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+        oss << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        oss << "  Pending spike events: " << brain->getPendingSpikeEventCount() << "\n";
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz\n";
+        oss << "  Excitation/Inhibition ratio: " << brain->getExcitationInhibitionRatio() << ":1\n";
+        
+        oss << "\nMemory Systems:\n";
+        auto* workingMem = brain->getWorkingMemory();
+        if (workingMem) {
+            oss << "  Working memory traces: " << workingMem->getActiveTraces() << "\n";
+        }
+        
+        auto* episodicMem = brain->getEpisodicMemory();
+        if (episodicMem) {
+            oss << "  Episodic memory episodes: " << episodicMem->getEpisodeCount() << "\n";
+        }
+        
+        oss << "\nNeuromodulation:\n";
+        auto* dopamine = brain->getDopamine();
+        if (dopamine) {
+            oss << "  Dopamine level: " << dopamine->getLevel() << "\n";
+            oss << "  Plasticity factor: " << dopamine->getPlasticityFactor() << "\n";
+        }
+        
+        auto* curiosity = brain->getCuriosity();
+        if (curiosity) {
+            oss << "  Curiosity level: " << curiosity->getLevel() << "\n";
+        }
+        
+        auto* novelty = brain->getNovelty();
+        if (novelty) {
+            oss << "  Novelty level: " << novelty->getLevel() << "\n";
+        }
+        
+        auto* predError = brain->getPredictionErrorSignal();
+        if (predError) {
+            oss << "  Prediction error: " << predError->getError() << "\n";
+        }
+        
+        oss << "\nDevelopment:\n";
+        oss << "  Current stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        
+        return oss.str();
+    }, py::arg("brain"), py::arg("prefix"), "Export comprehensive brain data as string");
 
 } // namespace nlm

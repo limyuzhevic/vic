@@ -69,6 +69,32 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced agent control
+    void setMaxExploration(float maxExploration) { maxExploration_ = maxExploration; }
+    float getMaxExploration() const { return maxExploration_; }
+    void setTemperature(float temperature) { temperature_ = temperature; }
+    float getTemperature() const { return temperature_; }
+    void setEpsilon(float epsilon) { epsilon_ = epsilon; }
+    float getEpsilon() const { return epsilon_; }
+    
+    // State snapshot and comparison
+    std::string createSnapshot() const;
+    float compareSnapshots(const std::string& snapshot1, const std::string& snapshot2) const;
+    void applySnapshot(const std::string& snapshot);
+    
+    // Advanced neuromodulation
+    void setDopamineLevel(float level) { dopamineLevel_ = level; }
+    float getDopamineLevel() const { return dopamineLevel_; }
+    float getCuriositySignal() const;
+    float getNoveltySignal() const;
+    float getPredictionErrorSignal() const;
+    
+    // Development control
+    void setDevelopmentRate(float rate) { developmentRate_ = rate; }
+    float getDevelopmentRate() const { return developmentRate_; }
+    void setCriticalPeriodEnd(double time) { criticalPeriodEnd_ = time; }
+    double getCriticalPeriodEnd() const { return criticalPeriodEnd_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +138,23 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced control parameters
+    float maxExploration_;
+    float temperature_;
+    float epsilon_;
+    float developmentRate_;
+    double criticalPeriodEnd_;
+    float curiositySignal_;
+    float noveltySignal_;
+    float predictionErrorSignal_;
+    size_t snapshotCounter_;
+
+    // Move operations
+    AgentBrain(AgentBrain&& other) noexcept;
+    AgentBrain& operator=(AgentBrain&& other) noexcept;
 };
+
+} // namespace nlm
 
 } // namespace nlm

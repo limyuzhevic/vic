@@ -256,42 +256,379 @@ print("Agent simulation complete!")
 
 ---
 
-## Quick Reference
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+print("Agent simulation complete!")
+```
+
+### Example 4: Advanced Agent with Learning and Exploration
+
+```python
+import pynlm
+
+# Setup a learning agent with advanced features
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced learning features
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)             # Explore new things
+agent.enableDevelopment(True)           # Brain matures over time
+agent.setMaxExploration(0.7)            # Maximum exploration level
+agent.setTemperature(0.6)               # Exploration temperature
+agent.setEpsilon(0.2)                   # Epsilon-greedy exploration
+
+# Run simulation with learning
+print("Running advanced agent simulation with learning...")
+for step in range(200):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Provide some reward signal
+    if step % 50 == 0:
+        reward = 1.0 if world.getAgentBody().health > 0.5 else 0.0
+        agent.applyRewardModulation(reward, 0.5)
+
+print("Advanced simulation complete!")
+print("Final stats:")
+print(f"  - Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"  - Total spikes: {brain.getTotalSpikeCount()}")
+print(f"  - Avg firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"  - Dopamine level: {agent.getNeuromodulationLevel():.3f}")
+print(f"  - Curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"  - Developmental stage: {agent.getDevelopmentalStage()}")
+print(f"  - Snapshots created: {len([s for s in dir(agent) if 'snapshot' in s])}")
+```
+
+### Example 5: Brain Analysis and Visualization
+
+```python
+import pynlm
+
+# Create a brain and analyze its properties
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run a few steps to let the brain settle
+for i in range(50):
+    brain.step(i)
+
+# Analyze brain connectivity
+print("=== Brain Connectivity Analysis ===")
+analysis = pynlm.analyzeBrainConnectivity(brain)
+print(analysis)
+
+# Visualize network state
+print("\n=== Network State Visualization ===")
+visualization = pynlm.visualizeNetworkState(brain)
+print(visualization)
+
+# Export brain data
+print("\n=== Brain Data Export ===")
+dataExport = pynlm.exportBrainData(brain, "brain_analysis")
+print(dataExport[:500] + "..." if len(dataExport) > 500 else dataExport)
+
+print("\nBrain analysis complete!")
+```
+
+### Example 6: State Management and Snapshot
+
+```python
+import pynlm
+
+# Create and simulate a brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for i in range(100):
+    brain.step(i)
+
+# Create snapshots at different stages
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Create snapshots
+early_snapshot = agent.createSnapshot()
+print(f"Early snapshot: {early_snapshot}")
+
+# Process some input and create another snapshot
+world.update(0.1)
+percept = world.getSensoryPercept()
+agent.processSensoryInput(percept)
+brain.step(50)
+late_snapshot = agent.createSnapshot()
+print(f"Late snapshot: {late_snapshot}")
+
+# Compare snapshots
+similarity = agent.compareSnapshots(early_snapshot, late_snapshot)
+print(f"Snapshot similarity (0.0 = identical, 1.0 = completely different): {similarity:.3f}")
+
+# Apply snapshot (reset brain to earlier state)
+agent.applySnapshot(early_snapshot)
+print("Brain reset to early snapshot state")
+print(f"Total spikes after reset: {brain.getTotalSpikeCount()}")
+```
+
+### Example 7: Simulation Control and Monitoring
+
+```python
+import pynlm
+
+# Create agent with monitoring
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run controlled simulation
+print("Starting controlled simulation...")
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+steps_completed = 0
+max_steps = 150
+timestep = 0.1
+
+for step in range(max_steps):
+    if steps_completed >= max_steps:
+        break
+        
+    world.update(timestep)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step, step * timestep)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, step * timestep)
+    
+    steps_completed += 1
+    
+    # Log progress every 25 steps
+    if step % 25 == 0:
+        print(f"Step {step}/{max_steps}: "
+              f"Firing: {brain.getFiringNeuronCount()}, "
+              f"Spikes: {brain.getTotalSpikeCount()}, "
+              f"Curiosity: {agent.getCuriosityLevel():.3f}, "
+              f"Dopamine: {agent.getNeuromodulationLevel():.3f}")
+
+print("Simulation complete!")
+print(f"\nFinal Performance Summary:")
+print(f"  - Steps completed: {steps_completed}")
+print(f"  - Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"  - Total spikes: {brain.getTotalSpikeCount()}")
+print(f"  - E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+
+# Performance analysis
+performance = pynlm.analyzeAgentPerformance(agent, world, steps_completed)
+print(f"\nAgent Performance Analysis:")
+print(performance)
+```
 
 ---
 
-## Troubleshooting
+## Advanced Features and Best Practices
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### 1. Learning and Adaptation
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+- **Reward Modulation**: Enable learning from environmental feedback
+- **Curiosity-Driven Exploration**: Balance exploitation with exploration
+- **Development System**: Simulate brain maturation and changing plasticity
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+### 2. State Management
+
+- **Snapshots**: Create and compare brain states for experimentation
+- **Save/Load**: Persist brain state for later use
+- **Reset**: Return to initial state for controlled experiments
+
+### 3. Advanced Configuration
+
+- **Exploration Parameters**: Control how the agent explores its environment
+- **Neuromodulation**: Direct control over dopamine, curiosity, novelty
+- **Development Control**: Fine-tune developmental stages and timing
+
+### 4. Performance Optimization
+
+- **Batch Processing**: Run multiple simulation steps efficiently
+- **Analysis Tools**: Built-in connectivity and performance analysis
+- **Visualization**: Generate ASCII visualizations of network states
+
+### 5. Best Practices
+
+#### For Beginners:
+```python
+# Start simple and build up
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+for i in range(100):
+    brain.step(i)
+```
+
+#### For Researchers:
+```python
+# Use snapshots for experimental control
+brain1 = create_brain()
+snapshot1 = agent.createSnapshot()
+# Run experiment...
+brain2 = create_brain()
+snapshot2 = agent.createSnapshot()
+# Compare results
+```
+
+#### For Production:
+```python
+# Monitor and log performance
+for step in range(10000):
+    # Run simulation
+    # Log metrics periodically
+    # Analyze performance
+```
+
+---
+
+## Quick Reference
+
+### Core Operations
+
+| Operation | Function | Description |
+|-----------|----------|-------------|
+| **Create Brain** | `pynlm.createBrain(config)` | Creates a new neural brain |
+| **Initialize** | `brain.initialize()` | Sets up initial brain state |
+| **Step Forward** | `brain.step(step)` | Advances simulation by one time step |
+| **Create World** | `pynlm.createSimpleWorld()` | Creates simulation environment |
+| **Create Agent** | `pynlm.createAgentBrain(brain)` | Creates agent-brain interface |
+| **Sensory Input** | `agent.processSensoryInput(percept)` | Injects environmental data |
+| **Motor Output** | `agent.decodeMotorCommand()` | Generates actions from neural activity |
+
+### Advanced Operations
+
+| Feature | Function | Description |
+|---------|----------|-------------|
+| **Enable Learning** | `agent.enableRewardModulation(True)` | Turns on reward-based learning |
+| **Set Exploration** | `agent.setTemperature(0.5)` | Controls exploration-exploitation balance |
+| **Create Snapshot** | `agent.createSnapshot()` | Captures current brain state |
+| **Compare States** | `agent.compareSnapshots(snap1, snap2)` | Measures state similarity |
+| **Analyze Network** | `pynlm.analyzeBrainConnectivity(brain)` | Analyzes connectivity patterns |
+| **Visualize State** | `pynlm.visualizeNetworkState(brain)` | Generates network visualization |
+
+### Configuration Management
+
+| Operation | Function | Description |
+|-----------|----------|-------------|
+| **Create Config** | `pynlm.createDefaultConfig()` | Creates default configuration |
+| **Save Config** | `pynlm.saveConfig(cfg, "file.cfg")` | Saves to file |
+| **Load Config** | `pynlm.loadConfig(cfg, "file.cfg")` | Loads from file |
+| **Get Summary** | `pynlm.getConfigSummary(cfg)` | Gets config description |
+
+### State Management
+
+| Function | Description |
+|----------|-------------|
+| `brain.getTotalNeuronCount()` | Number of neurons in brain |
+| `brain.getTotalSynapseCount()` | Number of connections |
+| `brain.getAverageFiringRate()` | Average firing frequency |
+| `agent.getNeuromodulationLevel()` | Current neuromodulation level |
+| `agent.getCuriosityLevel()` | Current curiosity level |
+| `agent.getDevelopmentalStage()` | Current developmental stage |
+
+---
+
+## Troubleshooting and Common Issues
+
+### Performance Issues
+
+**Problem**: Simulation is too slow
+
+**Solution**:
+- Reduce number of neurons (`config.set("neuron_count", 100)`)
+- Decrease simulation steps
+- Use more efficient algorithms
+
+**Problem**: Memory usage is high
+
+**Solution**:
+- Monitor with `agent.getTotalNeuronCount()` and `brain.getTotalSynapseCount()`
+- Use snapshots to manage memory efficiently
+- Clear history with `agent.reset()`
+
+### Learning Issues
+
+**Problem**: Agent isn't learning
+
+**Solution**:
+- Verify `agent.enableRewardModulation(True)` is called
+- Check that rewards are being applied: `agent.applyRewardModulation(reward, predicted)`
+- Monitor neuromodulation levels: `agent.getNeuromodulationLevel()`
+
+**Problem**: Agent gets stuck in local optima
+
+**Solution**:
+- Increase exploration: `agent.setTemperature(0.8)`
+- Enable curiosity: `agent.enableCuriosity(True)`
+- Use snapshot comparison for diversity
+
+### Configuration Issues
+
+**Problem**: Configuration not loading
+
+**Solution**:
+- Verify file path is correct
+- Use `pynlm.getConfigSummary(cfg)` to check loaded values
+- Try default config: `config = pynlm.createDefaultConfig()`
+
+**Problem**: Unexpected behavior
+
+**Solution**:
+- Use analysis tools to debug
+- Create snapshots before/after problematic operations
+- Check agent state with `agent.getDevelopmentalStage()`
 
 ---
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+When you're comfortable with the basics:
 
-That's it! You're now ready to use NLM.
+### 1. Deepen Your Understanding
+- Read `HOW_TO_USE.md` for technical details
+- Study `docs/ARCHITECTURE.md` for implementation details
+- Explore the source code for advanced features
+
+### 2. Research Applications
+- Implement custom learning algorithms
+- Create specialized environments
+- Design novel neural architectures
+
+### 3. Production Deployment
+- Batch process large simulations
+- Implement monitoring and logging
+- Optimize performance for scale
+
+### 4. Contribution
+- Add new Python bindings
+- Improve documentation
+- Report issues and suggest features
+
+
+That's it! You're now fully equipped to use NLM with both basic and advanced features. The Python API provides powerful tools for neural simulation, learning, and experimentation.
+
+Happy brain hacking! 🧠✨
+
