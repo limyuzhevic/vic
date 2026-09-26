@@ -2,6 +2,9 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "MotorDecoder.hpp"
+#include "SensoryProcessor.hpp"
+#include "Neuromodulator.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -9,109 +12,204 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+/**
+ * @class AgentBrain
+ * @brief Connects NLM brain to the world using component-based architecture
+ * 
+ * This class serves as the main interface between the neural system and the environment.
+ * It has been refactored to use composition with focused, single-responsibility
+ * components for improved maintainability, testability, and modularity.
+ * 
+ * The AgentBrain now delegates its responsibilities to:
+ * - MotorDecoder: Handles motor neuron decoding and curiosity-based exploration
+ * - SensoryProcessor: Handles sensory input processing and distribution
+ * - Neuromodulator: Handles neuromodulation, development, and reward processing
+ * 
+ * This component-based design provides:
+ * - Clean separation of concerns
+ * - Easier unit testing
+ * - Better maintainability
+ * - Enhanced modularity
+ * - Backward compatibility through unchanged public API
+ */
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    /**
+     * @brief Constructor for AgentBrain
+     * 
+     * @param brain Pointer to the brain for neural access
+     * @param world Pointer to the world for environmental context
+     * @throw std::invalid_argument if brain pointer is null
+     */
+    AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world);
+    
+    /**
+     * @brief Destructor
+     */
     ~AgentBrain();
     
-    // Initialize with world
+    /**
+     * @brief Initialize agent with world context
+     * 
+     * @param world The world to initialize with
+     * @pre world pointer must not be null
+     */
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
+    /**
+     * @brief Get sensory input size expected by brain
+     * 
+     * @return size_t Expected sensory input size
+     */
     size_t getSensoryInputSize() const;
     
-    // Get motor output size expected
+    /**
+     * @brief Get motor output size expected
+     * 
+     * @return size_t Expected motor output size
+     */
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
+    /**
+     * @brief Process sensory percept and inject into brain
+     * 
+     * @param percept The sensory percept to process
+     * @pre percept must contain valid sensory data
+     */
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    /**
+     * @brief Decode brain motor activity into motor command
+     * 
+     * @return MotorCommand The decoded motor command
+     */
     MotorCommand decodeMotorCommand();
     
-    // Apply neuromodulation based on reward
+    /**
+     * @brief Apply neuromodulation based on reward
+     * 
+     * @param reward Current reward signal
+     * @param predictedReward Predicted reward based on expectations
+     */
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
+    /**
+     * @brief Update development system
+     * 
+     * @param timestep Time since last update
+     */
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
+    /**
+     * @brief Get current developmental stage
+     * 
+     * @return DevelopmentalStage Current developmental stage
+     */
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
+    /**
+     * @brief Get neuromodulation level (dopamine)
+     * 
+     * @return float Neuromodulation level (-1.0 to 1.0)
+     */
     float getNeuromodulationLevel() const;
     
-    // Get curiosity level
+    /**
+     * @brief Get curiosity level
+     * 
+     * @return float Current curiosity level (0.0-1.0)
+     */
     float getCuriosityLevel() const;
     
-    // Get novelty level
+    /**
+     * @brief Get novelty level
+     * 
+     * @return float Current novelty level (0.0-1.0)
+     */
     float getNoveltyLevel() const;
     
-    // Get prediction error
+    /**
+     * @brief Get prediction error
+     * 
+     * @return float Current prediction error
+     */
     float getPredictionError() const;
     
-    // Reset agent for new episode
+    /**
+     * @brief Reset agent for new episode
+     */
     void reset();
     
-    // Get brain pointer
+    /**
+     * @brief Get brain pointer
+     * 
+     * @return Brain* Pointer to the brain, or nullptr if brain_ is null
+     */
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    /**
+     * @brief Enable or disable reward modulation
+     * 
+     * @param enable True to enable reward modulation, false to disable
+     */
+    void enableRewardModulation(bool enable) { neuromodulator_->enableRewardModulation(enable); }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    /**
+     * @brief Enable or disable structural plasticity
+     * 
+     * @param enable True to enable structural plasticity, false to disable
+     */
+    void enableStructuralPlasticity(bool enable) { neuromodulator_->enableStructuralPlasticity(enable); }
     
+    /**
+     * @brief Enable or disable development
+     * 
+     * @param enable True to enable development, false to disable
+     */
+    void enableDevelopment(bool enable) { neuromodulator_->enableDevelopment(enable); }
+    
+    /**
+     * @brief Enable or disable curiosity
+     * 
+     * @param enable True to enable curiosity, false to disable
+     */
+    void enableCuriosity(bool enable) { motorDecoder_->enableCuriosity(enable); }
+    
+    /**
+     * @brief Check if reward modulation is enabled
+     * 
+     * @return bool True if reward modulation is enabled
+     */
+    bool isRewardModulationEnabled() const { return neuromodulator_->isRewardModulationEnabled(); }
+    
+    /**
+     * @brief Check if structural plasticity is enabled
+     * 
+     * @return bool True if structural plasticity is enabled
+     */
+    bool isStructuralPlasticityEnabled() const { return neuromodulator_->isStructuralPlasticityEnabled(); }
+    
+    /**
+     * @brief Check if development is enabled
+     * 
+     * @return bool True if development is enabled
+     */
+    bool isDevelopmentEnabled() const { return neuromodulator_->isDevelopmentEnabled(); }
+    
+    /**
+     * @brief Check if curiosity is enabled
+     * 
+     * @return bool True if curiosity is enabled
+     */
+    bool isCuriosityEnabled() const { return motorDecoder_->isCuriosityEnabled(); }
+
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Core components
+    std::shared_ptr<Brain> brain_;            ///< Brain for neural computation
+    std::shared_ptr<SimpleWorld> world_;       ///< World for environmental context
+    std::unique_ptr<MotorDecoder> motorDecoder_; ///< Motor decoding and curiosity
+    std::unique_ptr<SensoryProcessor> sensoryProcessor_; ///< Sensory input processing
+    std::unique_ptr<Neuromodulator> neuromodulator_; ///< Neuromodulation and development
 };
 
 } // namespace nlm

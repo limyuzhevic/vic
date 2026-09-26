@@ -172,42 +172,136 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
              "Set the timestamp");
 
+    // Enhanced Vision class with Pythonic factory methods
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        // Simplified constructors with default parameters
+        .def(py::init<>(), "Create empty vision input")
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+             "Create vision input with specified dimensions")
+        
+        // Pythonic factory methods
+        .def_static("from_image", [](size_t width, size_t height, size_t channels = 3) {
+            return Vision(width, height, channels);
+        }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+            "Create vision input from image dimensions (Pythonic factory)")
+        .def_static("from_data", [](const std::vector<float>& data, size_t width, size_t height, size_t channels = 3) {
+            Vision vision(width, height, channels);
+            vision.setData(data);
+            return vision;
+        }, py::arg("data"), py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+            "Create vision input from image data (Pythonic factory)")
+        .def_static("grayscale", [](size_t width, size_t height) {
+            return Vision(width, height, 1);
+        }, py::arg("width"), py::arg("height"), "Create grayscale vision input")
+        .def_static("rgb", [](size_t width, size_t height) {
+            return Vision(width, height, 3);
+        }, py::arg("width"), py::arg("height"), "Create RGB vision input")
+        .def_static("rgba", [](size_t width, size_t height) {
+            return Vision(width, height, 4);
+        }, py::arg("width"), py::arg("height"), "Create RGBA vision input")
+        
+        // Enhanced property access with validation
+        .def("get_width", &Vision::getWidth, "Get image width")
+        .def("get_height", &Vision::getHeight, "Get image height")
+        .def("get_channels", &Vision::getChannels, "Get number of color channels")
+        .def("is_grayscale", [](const Vision& self) {
+            return self.getChannels() == 1;
+        }, "Check if image is grayscale")
+        .def("is_rgb", [](const Vision& self) {
+            return self.getChannels() == 3;
+        }, "Check if image is RGB")
+        .def("is_rgba", [](const Vision& self) {
+            return self.getChannels() == 4;
+        }, "Check if image is RGBA")
+        
+        // Data management with validation
+        .def("set_data", &Vision::setData, py::arg("data"),
+             "Set image data with validation")
+        .def("set_data_bytes", [](Vision& self, const py::bytes& data, size_t width, size_t height, size_t channels) {
+            auto buffer = py::buffer(data);
+            auto ptr = buffer.request();
+            if (ptr.size != width * height * channels * sizeof(float)) {
+                throw py::value_error("Data size mismatch for specified dimensions");
+            }
+            std::vector<float> vec(static_cast<const float*>(ptr.ptr), 
+                                 static_cast<const float*>(ptr.ptr) + ptr.size / sizeof(float));
+            self.setData(vec);
+        }, py::arg("data"), py::arg("width"), py::arg("height"), py::arg("channels"),
+           "Set image data from bytes with validation")
+        .def("get_data", &Vision::getData, "Get image data as vector")
+        .def("clone", &Vision::clone, "Clone the vision input");
 
+    // Enhanced Audio class with Pythonic factory methods
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        // Simplified constructors with default parameters
+        .def(py::init<>(), "Create empty audio input")
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"),
+             "Create audio input with specified sample rate and duration")
+        
+        // Pythonic factory methods
+        .def_static("from_samples", [](size_t sampleRate, size_t numSamples) {
+            return Audio(sampleRate, numSamples);
+        }, py::arg("sampleRate"), py::arg("numSamples"),
+            "Create audio input from sample rate and number of samples (Pythonic factory)")
+        .def_static("from_samples_with_data", [](size_t sampleRate, size_t numSamples, const std::vector<float>& data) {
+            Audio audio(sampleRate, numSamples);
+            if (data.size() != numSamples) {
+                throw py::value_error("Data size mismatch for specified number of samples");
+            }
+            audio.setData(data);
+            return audio;
+        }, py::arg("sampleRate"), py::arg("numSamples"), py::arg("data"),
+            "Create audio input from sample rate, duration, and audio data (Pythonic factory)")
+        .def_static("create_default_audio", [](double duration, double sampleRate = 44100.0) {
+            size_t numSamples = static_cast<size_t>(duration * sampleRate);
+            return Audio(static_cast<size_t>(sampleRate), numSamples);
+        }, py::arg("duration"), py::arg("sampleRate") = 44100.0,
+            "Create audio input with default sample rate for given duration")
+        
+        // Enhanced property access
+        .def("get_sample_rate", &Audio::getSampleRate, "Get audio sample rate")
+        .def("get_num_samples", &Audio::getNumSamples, "Get number of audio samples")
+        .def("get_duration", [](const Audio& self) {
+            return self.getNumSamples() / static_cast<double>(self.getSampleRate());
+        }, "Get audio duration in seconds")
+        .def("set_sample_rate", &Audio::setSampleRate, py::arg("sampleRate"),
+             "Set audio sample rate")
+        .def("get_data", &Audio::getData, "Get audio data as vector")
+        .def("set_data", &Audio::setData, py::arg("data"),
+             "Set audio data with validation")
+        .def("clone", &Audio::clone, "Clone the audio input");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
-        .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        // Builder pattern fluent interface with validation
+        .def("set_type", &Action::setType, py::arg("type"), "Set action type")
+        .def("set_parameters", &Action::setParameters, py::arg("params"), "Set action parameters")
+        .def("with_parameters", [](Action& self, const std::vector<float>& params) {
+            self.setParameters(params);
+            return self;
+        }, py::arg("params"), "Set parameters and return self for chaining")
+        .def("move_forward", []() {
+            Action action;
+            action.setType(ActionType::MoveForward);
+            return action;
+        }, "Create move forward action (alternative)")
+        .def("turn_left", []() {
+            Action action;
+            action.setType(ActionType::TurnLeft);
+            return action;
+        }, "Create turn left action (alternative)")
+        
+        // Properties with validation
+        .def("get_type", &Action::getType, "Get action type")
+        .def("get_parameters", &Action::getParameters, "Get action parameters")
+        .def("get_name", &Action::getName, "Get action name")
+        .def("clone", &Action::clone, "Clone the action")
+        .def("__repr__", [](const Action& a) {
+            return "<Action type: " + a.getName() + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -318,16 +412,18 @@ PYBIND11_MODULE(pynlm, m) {
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
+        .def("getRegion", [](const Brain& self, const RegionId& id) {
+            auto region = self.getRegion(id);
+            return region;
+        }, py::arg("id"),
+             "Get a region by ID (returns smart pointer)")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
-             "Get all regions")
+             "Get all regions (returns shared_ptr)")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
@@ -384,9 +480,10 @@ PYBIND11_MODULE(pynlm, m) {
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+        .def("getBrain", [](const AgentBrain& self) {
+            return self.getBrain();
+        }, py::return_value_policy::reference_internal,
+             "Get the underlying brain (returns smart pointer)")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -402,24 +499,172 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration")
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Enhanced factory methods with validation and error handling
+    m.def("createBrainFromConfig", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("Configuration cannot be null");
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create a new brain from configuration object")
+
+    m.def("createBrainFromFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to create brain from file: " + filepath + " - file not found or invalid format");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from a configuration file")
+
+    m.def("createBrainFromArgs", [](int argc, char** argv) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromArgs(argc, argv)) {
+            throw std::runtime_error("Failed to create brain from arguments: invalid configuration");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("argc"), py::arg("argv"), "Create a brain from command line arguments")
+
+    m.def("createAgentBrainFromConfig", [](std::shared_ptr<Config> config) -> std::shared_ptr<AgentBrain> {
+        if (!config) {
+            throw std::invalid_argument("Configuration cannot be null for agent brain creation");
+        }
+        auto brain = std::make_shared<Brain>(config);
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("config"), "Create an agent brain from configuration (Pythonic factory)")
+
+    m.def("createAgentBrainFromBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null for agent brain creation");
+        }
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create an agent brain from brain object (Pythonic factory)")
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a new simple world")
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createSimpleWorldWithSize", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+        "Create a simple world with specified dimensions and vision configuration")
+
+    m.def("createSimpleWorldWithVision", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        return createSimpleWorldWithSize(width, height, visionWidth, visionHeight);
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+        "Create a simple world with vision configuration (Pythonic factory)")
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
-} // namespace nlm
+    // Context managers for resource cleanup
+    py::class_<py::module_::None> mNone(m, "None");
+    
+    // Enhanced Brain context manager
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "BrainContext", R"pbdoc(Context manager for Brain resources)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("__enter__", [](Brain& self) {
+            return &self;
+        }, "Enter the context")
+        .def("__exit__", [](Brain& self, py::args) {
+            self.reset();
+        }, "Exit the context and clean up resources")
+        .def("step", &Brain::step, py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", [](Brain& self, SimulationStep step, Timestamp time) {
+            self.step(step, time);
+        }, py::arg("currentStep"), py::arg("currentTime"),
+           "Perform a simulation step with timestamp")
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file");
+
+    // Enhanced World context manager
+    py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "WorldContext", R"pbdoc(Context manager for World resources)pbdoc")
+        .def(py::init<>())
+        .def("__enter__", [](SimpleWorld& self) {
+            return &self;
+        }, "Enter the context")
+        .def("__exit__", [](SimpleWorld& self, py::args) {
+            self.reset();
+        }, "Exit the context and clean up resources")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world simulation")
+        .def("reset", &SimpleWorld::reset,
+             "Reset world state")
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal,
+             "Get sensory percept");
+
+    // Type conversion utilities
+    m.def("to_string", [](const Action& action) {
+        return action.getName();
+    }, "Convert Action to string representation");
+    
+    m.def("to_vector", [](const Vision& vision) {
+        return vision.getData();
+    }, "Convert Vision to data vector");
+    
+    m.def("to_vector", [](const Audio& audio) {
+        return audio.getData();
+    }, "Convert Audio to data vector");
+
+    // Serialization support
+    m.def("serialize_brain", [](const Brain& brain, const std::string& filepath) {
+        brain.save(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+        "Serialize brain to file");
+
+    m.def("deserialize_brain", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath + ".config");
+        auto brain = std::make_shared<Brain>(config);
+        brain->load(filepath);
+        return brain;
+    }, py::arg("filepath"),
+        "Deserialize brain from file");
+
+    // Utility functions
+    m.def("compare_actions", [](const Action& a1, const Action& a2) {
+        return a1.getType() == a2.getType() && a1.getParameters() == a2.getParameters();
+    }, py::arg("action1"), py::arg("action2"),
+        "Compare two actions for equality");
+
+    m.def("get_action_type_names", []() {
+        std::vector<std::string> names;
+        for (int i = 0; i < static_cast<int>(ActionType::Custom); ++i) {
+            names.push_back(ActionType(i));
+        }
+        return names;
+    }, "Get all action type names");
+
+    m.def("calculate_brain_stats", [](const Brain& brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain.getTotalNeuronCount();
+        stats["total_synapses"] = brain.getTotalSynapseCount();
+        stats["active_neurons"] = brain.getActiveNeuronCount();
+        stats["firing_neurons"] = brain.getFiringNeuronCount();
+        stats["average_firing_rate"] = brain.getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain.getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain.getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"),
+        "Calculate comprehensive brain statistics");
+
+    // Enhanced error reporting
+    m.def("get_last_error", []() {
+        return std::string("No error available - implement error tracking system");
+    }, "Get last error message");
+
+    m.def("has_error", []() {
+        return false;
+    }, "Check if there was an error");
+}
