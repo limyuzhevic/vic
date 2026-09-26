@@ -1,0 +1,519 @@
+# NLM - Easy Usage Guide for Beginners
+
+## What is NLM?
+
+NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+
+Think of it like this:
+- **Neurons** = Brain cells that send signals to each other
+- **Synapses** = Connections between brain cells
+- **Learning** = When connections get stronger or weaker based on what happens
+- **Memory** = The brain remembering patterns
+
+That's it! NLM simulates all of this.
+
+---
+
+## New Pythonic Convenience Methods
+
+NLM's Python bindings now include **factory methods** and **convenience functions** to make Python development more intuitive:
+
+```python
+import pynlm as nlm
+
+# Factory methods for common actions
+action = nlm.ActionType.MoveForward.create_action()
+action = nlm.ActionType.TurnLeft.create_action(45.0)  # With parameters
+
+# Config convenience methods
+config = nlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
+
+# Sensory data from arrays
+vision = nlm.Vision.from_array(vision_array, width, height, channels)
+audio = nlm.Audio.from_array(audio_samples, sample_rate)
+internal = nlm.InternalSignals.from_dict({"reward": 0.5, "curiosity": 0.3})
+
+# Percept helpers
+percept = nlm.SensoryPercept.from_dict(data_dict)
+percept.set_all_like(other_percept)
+percept.has_vision()
+percept.has_audio()
+percept.has_internal()
+
+# World creation helpers
+world = nlm.createSimpleWorld()
+world.add_resource(5.0, 3.0, value=2.0, radius=1.0)
+world.add_hazard(8.0, 7.0, value=1.5, radius=0.8)
+world.add_wall(10.0, 10.0, radius=0.5)
+world.add_marker(15.0, 15.0, value=100.0)
+agent = world.create_agent(10.0, 10.0, orientation=45.0)
+
+# Agent brain convenience
+brain = nlm.createBrain(config)
+agent_brain = nlm.createAgentBrain(brain)
+agent_brain.step_percept(percept)      # Single sensory step
+agent_brain.step_and_decode(percept)   # Process + decode
+agent_brain.get_system_state()         # Get agent status
+agent_brain.enable_all()               # Enable all subsystems
+agent_brain.disable_all()              # Disable all subsystems
+```
+
+## The 3 Things You Need to Know
+
+1. **Brain** - The virtual brain that thinks
+2. **World** - The environment the brain lives in
+3. **Agent** - The bridge connecting brain to world
+
+---
+
+## SimpleWorld Improvements
+
+The `SimpleWorld` class now provides **convenience methods for common operations**, **world configuration helpers**, and **agent management**:
+
+### create_agent()
+
+```python
+import pynlm as nlm
+
+# Create agent at specific position
+world = nlm.createSimpleWorld()
+
+# Basic agent creation
+agent = world.create_agent(5.0, 3.0)  # At coordinates (5.0, 3.0)
+agent = world.create_agent(10.0, 10.0, orientation=45.0)  # With rotation
+agent = world.create_agent(0.0, 0.0, orientation=90.0)     # At origin with heading
+
+# Agent with custom properties
+agent = world.create_agent(
+    x=5.0, 
+    y=5.0, 
+    orientation=0.0,
+    brain=brain,
+    max_energy=100.0,
+    max_curiosity=0.8
+)
+```
+
+### add_resource() and add_hazard()
+
+```python
+# Add different types of world objects
+world.add_resource(1.0, 1.0, value=5.0, radius=0.5)    # High-value resource
+world.add_resource(3.0, 3.0, value=0.5, radius=1.0)    # Low-value, large resource
+world.add_hazard(2.0, 2.0, value=2.0, radius=0.8)       # Moderate hazard
+world.add_hazard(5.0, 5.0, value=1.5, radius=1.2)       # Wide-area hazard
+world.add_wall(4.0, 4.0, radius=0.5)                     # Small wall
+world.add_marker(8.0, 8.0, value=100.0, radius=1.0)     # Important marker
+
+# Find nearest resource
+def find_nearest_resource(world, x, y):
+    objects = world.get_objects()
+    nearest = None
+    min_dist = float('inf')
+    
+    for obj in objects:
+        if obj.type == nlm.WorldObjectType.Resource:
+            dist = ((obj.x - x) ** 2 + (obj.y - y) ** 2) ** 0.5
+            if dist < min_dist:
+                min_dist = dist
+                nearest = obj
+    
+    return nearest
+
+nearest = find_nearest_resource(world, 5.0, 5.0)
+if nearest:
+    print(f"Nearest resource at ({nearest.x}, {nearest.y}) with value {nearest.value}")
+```
+
+### add_wall() and add_marker()
+
+```python
+# Add walls and markers for environment shaping
+world.add_wall(1.0, 1.0, radius=0.5)        # Small wall
+world.add_wall(5.0, 5.0, radius=1.0)        # Large wall
+world.add_marker(2.0, 2.0, value=10.0)      # Goal location
+world.add_marker(8.0, 8.0, value=50.0)      # Important point
+world.add_marker(12.0, 12.0, value=100.0)   # High-value marker
+
+# Create structured environments
+def create_environment(world, layout_type="random"):
+    if layout_type == "open":
+        # Open field with scattered resources
+        world.add_resource(2.0, 2.0, value=2.0)
+        world.add_resource(8.0, 8.0, value=3.0)
+        world.add_resource(5.0, 9.0, value=1.0)
+        world.add_marker(9.5, 9.5, value=50.0)
+        
+    elif layout_type == "maze":
+        # Create maze-like structure
+        # Vertical walls
+        for y in [2.0, 4.0, 6.0, 8.0]:
+            world.add_wall(3.0, y, radius=0.3)
+            world.add_wall(7.0, y, radius=0.3)
+        
+        # Horizontal walls
+        for x in [2.0, 4.0, 6.0, 8.0]:
+            world.add_wall(x, 3.0, radius=0.3)
+            world.add_wall(x, 7.0, radius=0.3)
+        
+        # Entrance and exit
+        world.add_marker(1.0, 5.0, value=20.0)
+        world.add_marker(9.0, 5.0, value=100.0)
+        
+    elif layout_type == "resource_farm":
+        # Farm layout with resources and hazards
+        for x in [1.0, 3.0, 5.0, 7.0]:
+            for y in [1.0, 3.0, 5.0, 7.0]:
+                if (x + y) % 2 == 0:
+                    world.add_resource(x, y, value=1.0, radius=0.4)
+                else:
+                    world.add_hazard(x, y, value=0.5, radius=0.4)
+
+# Create different environments
+create_environment(world, "open")
+create_environment(world, "maze")
+create_environment(world, "resource_farm")
+```
+
+### World Configuration Helpers
+
+```python
+# Advanced world configuration
+world = nlm.createSimpleWorld()
+
+# Configure with multiple parameters at once
+world.configure(
+    width=30,
+    height=30,
+    visionWidth=16,
+    visionHeight=16,
+    maxEnergy=200.0,
+    timestep=0.05,
+    gravity=9.8,
+    friction=0.1
+)
+
+# Quick setup for common scenarios
+def setup_research_environment(world):
+    world.configure(
+        width=50, height=50, visionWidth=20, visionHeight=20,
+        maxEnergy=150.0, timestep=0.1
+    )
+    world.reset()
+    
+    # Add research station
+    world.add_marker(25.0, 25.0, value=200.0, radius=2.0)
+    
+    # Add resources and hazards
+    for i in range(5):
+        x = 10 + i * 8
+        y = 10 + i * 6
+        world.add_resource(x, y, value=5.0 + i * 2, radius=0.6)
+        world.add_hazard(x + 4, y + 4, value=1.0 + i, radius=0.8)
+    
+    return world
+
+research_world = setup_research_environment(world)
+```
+
+### Agent Management
+
+```python
+# Create multiple agents for testing
+agents = []
+for i in range(3):
+    agent = world.create_agent(
+        x=5.0 + i * 10,
+        y=5.0 + i * 10,
+        orientation=i * 90.0
+    )
+    agents.append(agent)
+
+# Batch agent operations
+def initialize_all_agents(world, agents):
+    for agent in agents:
+        agent.initialize(world)
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+
+initialize_all_agents(world, agents)
+
+# Agent world pair creation (convenience function)
+brain = nlm.createBrain(nlm.createDefaultConfig())
+brain.initialize()
+
+agent_brain = nlm.createAgentBrain(brain)
+agent_brain.initialize(world)
+
+# Or create complete agent-world pairs
+agent_world_pair = nlm.create_agent_world_pair({
+    'brain_config': nlm.createDefaultConfig(),
+    'world_config': {
+        'width': 20,
+        'height': 20,
+        'visionWidth': 8,
+        'visionHeight': 8
+    }
+})
+```
+
+### World State Management
+
+```python
+# World state operations
+world.reset()  # Reset to initial state
+world.update(0.1)  # Advance simulation
+world.setRandomSeed(42)  # Reproducible simulations
+
+# Save and load world state
+world.save("world_checkpoint.json")
+loaded_world = nlm.createSimpleWorld()
+loaded_world.load("world_checkpoint.json")
+
+# World analysis
+def analyze_world(world):
+    objects = world.get_objects()
+    resources = [obj for obj in objects if obj.type == nlm.WorldObjectType.Resource]
+    hazards = [obj for obj in objects if obj.type == nlm.WorldObjectType.Hazard]
+    walls = [obj for obj in objects if obj.type == nlm.WorldObjectType.Wall]
+    markers = [obj for obj in objects if obj.type == nlm.WorldObjectType.Marker]
+    
+    return {
+        'total_objects': len(objects),
+        'resources': len(resources),
+        'hazards': len(hazards),
+        'walls': len(walls),
+        'markers': len(markers),
+        'density': len(objects) / (world.getWidth() * world.getHeight())
+    }
+
+world_analysis = analyze_world(world)
+print(f"World analysis: {world_analysis}")
+```
+
+---
+
+## Simple Analogy
+
+| Real World | NLM Code |
+|------------|----------|
+| You see something | `percept = world.getSensoryPercept()` |
+| Your brain processes it | `agent.processSensoryInput(percept)` |
+| You decide to act | `action = agent.decodeMotorCommand()` |
+| You do the action | `world.applyMotorCommand(action, time)` |
+| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+
+---
+
+## The Simplest Possible Example
+
+```python
+import pynlm
+
+# One line to create a virtual brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize it
+brain.initialize()
+
+# Make it active
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
+---
+
+## Common Patterns
+
+### Pattern 1: Run a Simulation
+
+```python
+def run_simulation(brain, world, agent, num_steps):
+    for step in range(num_steps):
+        # 1. Update world
+        world.update(0.1)
+        
+        # 2. Get what the agent sees
+        percept = world.getSensoryPercept()
+        
+        # 3. Tell the brain
+        agent.processSensoryInput(percept)
+        
+        # 4. Brain thinks
+        brain.step(step)
+        
+        # 5. Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # 6. Do action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+
+# Use it like this:
+run_simulation(brain, world, agent, 1000)
+```
+
+### Pattern 2: Get Brain Stats
+
+```python
+# Just add these inside your loop:
+print("Neurons firing:", brain.getFiringNeuronCount())
+print("Total spikes:", brain.getTotalSpikeCount())
+print("Avg firing rate:", brain.getAverageFiringRate())
+print("Development stage:", brain.getDevelopmentalStage())
+```
+
+### Pattern 3: Enable Brain Features
+
+```python
+# These are all optional:
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableCuriosity(True)             # Explore new things
+```
+
+---
+
+## What Each Part Does
+
+### `pynlm.createBrain(config)`
+Creates a virtual brain with neurons and synapses.
+- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+
+### `brain.initialize()`
+Starts up the brain. Always call this before using the brain!
+
+### `brain.step(step_number)`
+Makes the brain process one moment in time. The brain:
+- Checks each neuron
+- Sends signals between connected neurons
+- Updates connections based on learning rules
+
+### `world.update(time)`
+Updates the virtual world by `time` seconds.
+
+### `agent.processSensoryInput(percept)`
+Gives sensory information (vision, touch, etc.) to the brain.
+
+### `agent.decodeMotorCommand()`
+Reads the brain's motor neurons to decide what action to take.
+
+---
+
+## Mini Projects
+
+### Project 1: Silent Brain (Just Neurons)
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for i in range(10):
+    brain.step(i)
+
+print("Silent brain test done!")
+```
+
+### Project 2: Brain Watching a World
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Watch the world for 30 steps
+for i in range(30):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.getAverageFiringRate())
+```
+
+### Project 3: Complete Agent
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+```
+
+---
+
+## Quick Reference
+
+| What you want | Code |
+|--------------|------|
+| Create brain | `pynlm.createBrain(config)` |
+| Start brain | `brain.initialize()` |
+| Make brain think | `brain.step(step)` |
+| Create world | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
+
+---
+
+## Troubleshooting
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+---
+
+## Next Steps
+
+When you're comfortable:
+1. Read `HOW_TO_USE.md` for more details
+2. Read `docs/ARCHITECTURE.md` to understand how it all works
+3. Experiment with different configurations!
+
+That's it! You're now ready to use NLM.

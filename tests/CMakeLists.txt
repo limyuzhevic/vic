@@ -14,9 +14,15 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_action.cpp
+    test_sensory.cpp
+    test_sensorypercept.cpp
+    test_simpleworld.cpp
+    test_agentbrain.cpp
+    test_advanced.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
+target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent nlm_world)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing

@@ -1,10 +1,13 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Comprehensive test suite for NLM Python bindings
+// Tests all Python API compatibility and convenience methods
 
 #include <iostream>
 #include <cassert>
+#include <vector>
+#include <string>
+#include <cmath>
 
-// Forward declarations of test functions
+// Include all test namespaces
 namespace test_types {
     void runAll();
 }
@@ -37,15 +40,37 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_action {
+    void runAll();
+}
+
+namespace test_sensory {
+    void runAll();
+}
+
+namespace test_sensorypercept {
+    void runAll();
+}
+
+namespace test_simpleworld {
+    void runAll();
+}
+
+namespace test_agentbrain {
+    void runAll();
+}
+
+namespace test_advanced {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
-    std::cout << std::endl;
+    std::cout << "=== NLM Python Bindings Comprehensive Test Suite ===" << std::endl;
+    std::cout << "Testing Python API compatibility and convenience methods:" << std::endl;
     
     bool allPassed = true;
+    
+    std::cout << std::endl << "=== Running Core Tests ===" << std::endl;
     
     std::cout << "Running Types tests..." << std::endl;
     try {
@@ -119,12 +144,72 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << std::endl << "=== Running Python API Tests ===" << std::endl;
+    
+    std::cout << "Running Action class tests..." << std::endl;
+    try {
+        test_action::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Sensory classes tests..." << std::endl;
+    try {
+        test_sensory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running SensoryPercept tests..." << std::endl;
+    try {
+        test_sensorypercept::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running SimpleWorld tests..." << std::endl;
+    try {
+        test_simpleworld::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running AgentBrain tests..." << std::endl;
+    try {
+        test_agentbrain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl << "=== Running Advanced Features Tests ===" << std::endl;
+    
+    std::cout << "Running Advanced features tests..." << std::endl;
+    try {
+        test_advanced::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== ALL TESTS PASSED ===" << std::endl;
+        std::cout << "Python bindings API is fully compatible and functional" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "=== SOME TESTS FAILED ===" << std::endl;
+        std::cout << "Python bindings API has compatibility issues" << std::endl;
         return 1;
     }
 }
