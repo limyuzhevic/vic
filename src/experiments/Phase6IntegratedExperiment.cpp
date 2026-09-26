@@ -193,6 +193,14 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     // Test 2: Neuromodulation systems exist
     if (brain->getDopamine() != nullptr) {
         NLM_LOG_INFO("[PASS] Dopamine system is integrated");
+        // Validate that dopamine system is actually functional
+        float dopamineLevel = brain->getDopamine()->getLevel();
+        if (dopamineLevel >= 0.0f && dopamineLevel <= 1.0f) {
+            NLM_LOG_INFO("[PASS] Dopamine level is valid: " + std::to_string(dopamineLevel));
+        } else {
+            NLM_LOG_ERROR("[FAIL] Dopamine level is invalid: " + std::to_string(dopamineLevel));
+            success = false;
+        }
     } else {
         NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
         success = false;
@@ -200,8 +208,31 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     
     if (brain->getCuriosity() != nullptr) {
         NLM_LOG_INFO("[PASS] Curiosity system is integrated");
+        // Validate that curiosity system is actually functional
+        float curiosityLevel = brain->getCuriosity()->getLevel();
+        if (curiosityLevel >= 0.0f && curiosityLevel <= 1.0f) {
+            NLM_LOG_INFO("[PASS] Curiosity level is valid: " + std::to_string(curiosityLevel));
+        } else {
+            NLM_LOG_ERROR("[FAIL] Curiosity level is invalid: " + std::to_string(curiosityLevel));
+            success = false;
+        }
     } else {
         NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getNovelty() != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty system is integrated");
+        // Validate that novelty system is actually functional
+        float noveltyLevel = brain->getNovelty()->getLevel();
+        if (noveltyLevel >= 0.0f && noveltyLevel <= 1.0f) {
+            NLM_LOG_INFO("[PASS] Novelty level is valid: " + std::to_string(noveltyLevel));
+        } else {
+            NLM_LOG_ERROR("[FAIL] Novelty level is invalid: " + std::to_string(noveltyLevel));
+            success = false;
+        }
+    } else {
+        NLM_LOG_ERROR("[FAIL] Novelty system is NOT integrated");
         success = false;
     }
     

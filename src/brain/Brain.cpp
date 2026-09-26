@@ -159,7 +159,9 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -1006,41 +1008,41 @@ float Brain::getAverageFiringRate() const {
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return pImpl && pImpl->workingMemory ? pImpl->workingMemory.get() : nullptr;
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return pImpl && pImpl->episodicMemory ? pImpl->episodicMemory.get() : nullptr;
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return pImpl && pImpl->associativeMemory ? pImpl->associativeMemory.get() : nullptr;
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    return pImpl && pImpl->predictionSystem ? pImpl->predictionSystem.get() : nullptr;
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    return pImpl && pImpl->planner ? pImpl->planner.get() : nullptr;
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    return pImpl && pImpl->conceptFormation ? pImpl->conceptFormation.get() : nullptr;
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    return pImpl && pImpl->attention ? pImpl->attention.get() : nullptr;
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    return pImpl && pImpl->developmentSystem ? pImpl->developmentSystem.get() : nullptr;
 }
 
 DevelopmentalStage Brain::getDevelopmentalStage() const {
@@ -1054,19 +1056,19 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    return pImpl && pImpl->dopamine ? pImpl->dopamine.get() : nullptr;
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return pImpl && pImpl->curiosity ? pImpl->curiosity.get() : nullptr;
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    return pImpl && pImpl->novelty ? pImpl->novelty.get() : nullptr;
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    return pImpl && pImpl->predictionError ? pImpl->predictionError.get() : nullptr;
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {

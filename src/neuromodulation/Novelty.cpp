@@ -3,10 +3,15 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Novelty.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
+
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
+    Brain* brain;
     float level;
     float decayRate;
     std::vector<float> history;

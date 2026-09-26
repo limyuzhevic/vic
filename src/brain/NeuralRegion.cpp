@@ -1,6 +1,8 @@
 #include "NeuralRegion.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <stdexcept>
+#include <cmath>
 
 namespace nlm {
 
@@ -90,7 +92,8 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
 
 SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
                                    SynapticWeight weight, Delay delay) {
-    SynapseId synId(pImpl->nextSynapseId++);
+    SynapseId synId = pImpl->nextSynapseId;
+    pImpl->nextSynapseId = SynapseId(pImpl->nextSynapseId.value + 1);
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);

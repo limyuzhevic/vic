@@ -61,6 +61,8 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
+    // Ensure pImpl is properly managed in destructor
+    
     // Initialize brain with configuration
     bool initialize();
     

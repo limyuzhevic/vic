@@ -2,8 +2,13 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
+#include <functional>
 
 namespace nlm {
+    using std::exp;
+    using std::max;
+    using std::clamp;
 
 struct Synapse::Impl {
     SynapseId id;
@@ -248,7 +253,7 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
-    pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    pImpl->delay = static_cast<Delay>(rng.uniformInt(static_cast<uint64_t>(1), static_cast<uint64_t>(5)));
     
     // Initialize short-term plasticity state
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
