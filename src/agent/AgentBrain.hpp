@@ -1,11 +1,8 @@
 #pragma once
 
-#include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
+#include "../memory/Memory.hpp"
+#include "../motor/Action.hpp"
 
 namespace nlm {
 
@@ -75,6 +72,11 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Store experience in episodic memory
+    void storeExperience(const SensoryPercept& sensoryPercept,
+                        const MotorCommand& action,
+                        float reward);
     
     std::shared_ptr<Brain> brain_;
     

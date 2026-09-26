@@ -74,6 +74,154 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
         advanceStage();
     }
+    
+    // Apply development effects on neural properties
+    if (brain) {
+        // 1. Effects on neural excitability
+        // Higher development stages reduce baseline excitability
+        float excitabilityModifier = 1.0f;
+        switch (pImpl->stage) {
+            case DevelopmentalStage::Initial: excitabilityModifier = 1.0f; break;
+            case DevelopmentalStage::CriticalPeriod: excitabilityModifier = 0.9f; break;
+            case DevelopmentalStage::Maturation: excitabilityModifier = 0.8f; break;
+            case DevelopmentalStage::Adult: excitabilityModifier = 0.7f; break;
+            case DevelopmentalStage::Aging: excitabilityModifier = 0.6f; break;
+        }
+        
+        // Apply to all neurons - in a full implementation this would be more targeted
+        for (const auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Development reduces resting membrane potential over time
+                    // This makes neurons less excitable in later stages
+                    float currentResting = neuron->getState().restingPotential;
+                    neuron->setRestingPotential(currentResting * excitabilityModifier);
+                }
+            }
+        }
+        
+        // 2. Effects on plasticity rules
+        // Development modifies plasticity parameters based on stage
+        auto* stdp = brain->getSTDP();
+        auto* hebbian = brain->getHebbian();
+        auto* structuralPlasticity = brain->getStructuralPlasticity();
+        
+        if (stdp) {
+            float stdpModifier = 1.0f;
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: stdpModifier = 1.0f; break;
+                case DevelopmentalStage::CriticalPeriod: stdpModifier = 0.9f; break;
+                case DevelopmentalStage::Maturation: stdpModifier = 0.7f; break;
+                case DevelopmentalStage::Adult: stdpModifier = 0.5f; break;
+                case DevelopmentalStage::Aging: stdpModifier = 0.3f; break;
+            }
+            // Apply to STDP parameters
+            float ltpWeight = stdp->getLTPWeight() * stdpModifier;
+            float ltdWeight = stdp->getLTDWeight() * stdpModifier;
+            stdp->configure(ltpWeight, ltdWeight, stdp->getTau());
+        }
+        
+        if (hebbian) {
+            float hebbianModifier = 1.0f;
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: hebbianModifier = 1.0f; break;
+                case DevelopmentalStage::CriticalPeriod: hebbianModifier = 0.9f; break;
+                case DevelopmentalStage::Maturation: hebbianModifier = 0.7f; break;
+                case DevelopmentalStage::Adult: hebbianModifier = 0.5f; break;
+                case DevelopmentalStage::Aging: hebbianModifier = 0.3f; break;
+            }
+            // Apply to Hebbian parameters (conceptually)
+            // In a full implementation, there would be Hebbian-specific parameters
+        }
+        
+        if (structuralPlasticity) {
+            // Structural plasticity is already modulated in Brain.cpp
+            // But we can also adjust the rates based on development
+            float synRate = 0.0001f;
+            float pruneRate = 0.00001f;
+            
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: 
+                    synRate = 0.0002f; 
+                    pruneRate = 0.000005f; 
+                    break;
+                case DevelopmentalStage::CriticalPeriod: 
+                    synRate = 0.00015f; 
+                    pruneRate = 0.000008f; 
+                    break;
+                case DevelopmentalStage::Maturation: 
+                    synRate = 0.0001f; 
+                    pruneRate = 0.00001f; 
+                    break;
+                case DevelopmentalStage::Adult: 
+                    synRate = 0.00005f; 
+                    pruneRate = 0.000015f; 
+                    break;
+                case DevelopmentalStage::Aging: 
+                    synRate = 0.00002f; 
+                    pruneRate = 0.00002f; 
+                    break;
+            }
+            
+            structuralPlasticity->setSynaptogenesisRate(synRate);
+            structuralPlasticity->setPruningRate(pruneRate);
+        }
+        
+        // 3. Effects on attention
+        // Development affects attention parameters
+        auto* attention = brain->getAttention();
+        if (attention) {
+            float attentionInhibition = 0.5f;
+            float attentionExcitation = 1.5f;
+            
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: 
+                    attentionInhibition = 0.7f; 
+                    attentionExcitation = 1.8f; 
+                    break;
+                case DevelopmentalStage::CriticalPeriod: 
+                    attentionInhibition = 0.6f; 
+                    attentionExcitation = 1.7f; 
+                    break;
+                case DevelopmentalStage::Maturation: 
+                    attentionInhibition = 0.5f; 
+                    attentionExcitation = 1.6f; 
+                    break;
+                case DevelopmentalStage::Adult: 
+                    attentionInhibition = 0.4f; 
+                    attentionExcitation = 1.5f; 
+                    break;
+                case DevelopmentalStage::Aging: 
+                    attentionInhibition = 0.3f; 
+                    attentionExcitation = 1.4f; 
+                    break;
+            }
+            
+            attention->setInhibitionStrength(attentionInhibition);
+            attention->setExcitationStrength(attentionExcitation);
+        }
+        
+        // 4. Effects on memory consolidation
+        // Development affects memory consolidation parameters
+        // In a full implementation, this would affect working memory decay rates,
+        // episodic memory consolidation intervals, etc.
+        
+        // 5. Effects on neuromodulation
+        // Development affects neuromodulator levels and effects
+        auto* dopamine = brain->getDopamine();
+        if (dopamine) {
+            float dopamineBaseline = 0.1f;
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: dopamineBaseline = 0.1f; break;
+                case DevelopmentalStage::CriticalPeriod: dopamineBaseline = 0.08f; break;
+                case DevelopmentalStage::Maturation: dopamineBaseline = 0.06f; break;
+                case DevelopmentalStage::Adult: dopamineBaseline = 0.05f; break;
+                case DevelopmentalStage::Aging: dopamineBaseline = 0.04f; break;
+            }
+            dopamine->setLevel(dopamineBaseline);
+        }
+    }
+}
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
@@ -89,6 +237,153 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
         advanceStage();
     } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
         advanceStage();
+    }
+    
+    // Apply development effects on neural properties
+    if (brain) {
+        // 1. Effects on neural excitability
+        // Higher development stages reduce baseline excitability
+        float excitabilityModifier = 1.0f;
+        switch (pImpl->stage) {
+            case DevelopmentalStage::Initial: excitabilityModifier = 1.0f; break;
+            case DevelopmentalStage::CriticalPeriod: excitabilityModifier = 0.9f; break;
+            case DevelopmentalStage::Maturation: excitabilityModifier = 0.8f; break;
+            case DevelopmentalStage::Adult: excitabilityModifier = 0.7f; break;
+            case DevelopmentalStage::Aging: excitabilityModifier = 0.6f; break;
+        }
+        
+        // Apply to all neurons - in a full implementation this would be more targeted
+        for (const auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Development reduces resting membrane potential over time
+                    // This makes neurons less excitable in later stages
+                    float currentResting = neuron->getState().restingPotential;
+                    neuron->setRestingPotential(currentResting * excitabilityModifier);
+                }
+            }
+        }
+        
+        // 2. Effects on plasticity rules
+        // Development modifies plasticity parameters based on stage
+        auto* stdp = brain->getSTDP();
+        auto* hebbian = brain->getHebbian();
+        auto* structuralPlasticity = brain->getStructuralPlasticity();
+        
+        if (stdp) {
+            float stdpModifier = 1.0f;
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: stdpModifier = 1.0f; break;
+                case DevelopmentalStage::CriticalPeriod: stdpModifier = 0.9f; break;
+                case DevelopmentalStage::Maturation: stdpModifier = 0.7f; break;
+                case DevelopmentalStage::Adult: stdpModifier = 0.5f; break;
+                case DevelopmentalStage::Aging: stdpModifier = 0.3f; break;
+            }
+            // Apply to STDP parameters
+            float ltpWeight = stdp->getLTPWeight() * stdpModifier;
+            float ltdWeight = stdp->getLTDWeight() * stdpModifier;
+            stdp->configure(ltpWeight, ltdWeight, stdp->getTau());
+        }
+        
+        if (hebbian) {
+            float hebbianModifier = 1.0f;
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: hebbianModifier = 1.0f; break;
+                case DevelopmentalStage::CriticalPeriod: hebbianModifier = 0.9f; break;
+                case DevelopmentalStage::Maturation: hebbianModifier = 0.7f; break;
+                case DevelopmentalStage::Adult: hebbianModifier = 0.5f; break;
+                case DevelopmentalStage::Aging: hebbianModifier = 0.3f; break;
+            }
+            // Apply to Hebbian parameters (conceptually)
+            // In a full implementation, there would be Hebbian-specific parameters
+        }
+        
+        if (structuralPlasticity) {
+            // Structural plasticity is already modulated in Brain.cpp
+            // But we can also adjust the rates based on development
+            float synRate = 0.0001f;
+            float pruneRate = 0.00001f;
+            
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: 
+                    synRate = 0.0002f; 
+                    pruneRate = 0.000005f; 
+                    break;
+                case DevelopmentalStage::CriticalPeriod: 
+                    synRate = 0.00015f; 
+                    pruneRate = 0.000008f; 
+                    break;
+                case DevelopmentalStage::Maturation: 
+                    synRate = 0.0001f; 
+                    pruneRate = 0.00001f; 
+                    break;
+                case DevelopmentalStage::Adult: 
+                    synRate = 0.00005f; 
+                    pruneRate = 0.000015f; 
+                    break;
+                case DevelopmentalStage::Aging: 
+                    synRate = 0.00002f; 
+                    pruneRate = 0.00002f; 
+                    break;
+            }
+            
+            structuralPlasticity->setSynaptogenesisRate(synRate);
+            structuralPlasticity->setPruningRate(pruneRate);
+        }
+        
+        // 3. Effects on attention
+        // Development affects attention parameters
+        auto* attention = brain->getAttention();
+        if (attention) {
+            float attentionInhibition = 0.5f;
+            float attentionExcitation = 1.5f;
+            
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: 
+                    attentionInhibition = 0.7f; 
+                    attentionExcitation = 1.8f; 
+                    break;
+                case DevelopmentalStage::CriticalPeriod: 
+                    attentionInhibition = 0.6f; 
+                    attentionExcitation = 1.7f; 
+                    break;
+                case DevelopmentalStage::Maturation: 
+                    attentionInhibition = 0.5f; 
+                    attentionExcitation = 1.6f; 
+                    break;
+                case DevelopmentalStage::Adult: 
+                    attentionInhibition = 0.4f; 
+                    attentionExcitation = 1.5f; 
+                    break;
+                case DevelopmentalStage::Aging: 
+                    attentionInhibition = 0.3f; 
+                    attentionExcitation = 1.4f; 
+                    break;
+            }
+            
+            attention->setInhibitionStrength(attentionInhibition);
+            attention->setExcitationStrength(attentionExcitation);
+        }
+        
+        // 4. Effects on memory consolidation
+        // Development affects memory consolidation parameters
+        // In a full implementation, this would affect working memory decay rates,
+        // episodic memory consolidation intervals, etc.
+        
+        // 5. Effects on neuromodulation
+        // Development affects neuromodulator levels and effects
+        auto* dopamine = brain->getDopamine();
+        if (dopamine) {
+            float dopamineBaseline = 0.1f;
+            switch (pImpl->stage) {
+                case DevelopmentalStage::Initial: dopamineBaseline = 0.1f; break;
+                case DevelopmentalStage::CriticalPeriod: dopamineBaseline = 0.08f; break;
+                case DevelopmentalStage::Maturation: dopamineBaseline = 0.06f; break;
+                case DevelopmentalStage::Adult: dopamineBaseline = 0.05f; break;
+                case DevelopmentalStage::Aging: dopamineBaseline = 0.04f; break;
+            }
+            dopamine->setLevel(dopamineBaseline);
+        }
     }
 }
 

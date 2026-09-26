@@ -6,9 +6,9 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -46,6 +46,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +129,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        serotonin = std::make_unique<Serotonin>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -232,8 +238,10 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
@@ -526,10 +534,78 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+    // ========== STEP 10: Update cognitive systems ==========
+    
+    // Neural Planner for action planning
+    if (pImpl->planner) {
+        // Get current state from brain for planning
+        std::vector<float> currentState;
+        // Extract neural activity patterns as state representation
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        float activation = std::abs(neuron->getState().membranePotential - 
+                                                 neuron->getState().restingPotential) / 100.0f;
+                        currentState.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Get target reward from dopamine level
+            float targetReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+            
+            // Plan action based on current state
+            ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+            
+            // In a full implementation, this would update the agent's action selection
+            // For now, just log the planned action
+            if (plannedAction != ActionType::Wait) {
+                NLM_LOG_DEBUG("NeuralPlanner planned action: " + std::to_string(static_cast<int>(plannedAction)));
+            }
+        }
+    }
+    
+    // Concept Formation for learning and abstraction
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current neural activity patterns for concept formation
+        std::vector<float> conceptFeatures;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                float popActivity = 0.0f;
+                size_t activeNeurons = 0;
+                
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        popActivity += std::abs(neuron->getState().membranePotential - 
+                                              neuron->getState().restingPotential) / 100.0f;
+                        activeNeurons++;
+                    }
+                }
+                
+                if (activeNeurons > 0) {
+                    conceptFeatures.push_back(popActivity / activeNeurons);
+                } else {
+                    conceptFeatures.push_back(0.0f);
+                }
+            }
+        }
+        
+        if (!conceptFeatures.empty()) {
+            // Present current neural patterns as experience
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                conceptFeatures, conceptFeatures, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f,
+                pImpl->currentTime
+            );
+            
+            if (conceptId > 0) {
+                NLM_LOG_DEBUG("ConceptFormation identified concept " + std::to_string(conceptId) + 
+                             " with " + std::to_string(conceptFeatures.size()) + " features");
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1051,10 +1127,20 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
     pImpl->developmentalStage = stage;
 }
 
-// ========== NEUROMODULATION SYSTEMS ==========
-
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
 Curiosity* Brain::getCuriosity() {

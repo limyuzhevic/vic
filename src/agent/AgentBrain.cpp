@@ -84,69 +84,60 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+void AgentBrain::storeExperience(const SensoryPercept& sensoryPercept,
+                               const MotorCommand& action,
+                               float reward) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    // Get episodic memory
+    auto* episodicMemory = brain_->getEpisodicMemory();
+    if (!episodicMemory) return;
+    
+    // Create episodic memory item
+    EpisodicMemoryItem episode;
+    
+    // Capture current step as timestamp
+    episode.timestamp = brain_->getCurrentStep();
+    
+    // Capture active neurons in the brain
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (Neuron* neuron : pop->getNeurons()) {
+                // Only include neurons that are firing or have high activation
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - 
+                           neuron->getState().restingPotential) > 10.0f) {
+                    episode.neurons.push_back(neuron->getId());
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential) / 100.0f;
+                    episode.values.push_back(activation);
+                }
+            }
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
+    // Store action in metadata
+    episode.metadata = "Action: " + std::to_string(static_cast<int>(action)) + ", Reward: " + std::to_string(reward);
+    
+    // Store episode in episodic memory
+    episodicMemory->storeEpisode(episode);
+    
+    NLM_LOG_INFO("Stored experience in episodic memory (step " + 
+                 std::to_string(episode.timestamp) + ") with " +
+                 std::to_string(episode.neurons.size()) + " active neurons");
+}
+    
+    MotorCommand AgentBrain::decodeMotorCommand() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // Apply curiosity-based exploration
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        decoded = selectWithCuriosity(decoded);
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
-    
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    return decoded;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
