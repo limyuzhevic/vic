@@ -49,6 +49,7 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Reward> reward;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +130,7 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        reward = std::make_unique<Reward>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -511,8 +513,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state
+        std::vector<float> sensoryPattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+            sensoryPattern.push_back(activation);
+        }
+        
+        // Create sensory input for prediction
+        // Note: Using a simplified approach since we need to create actual SensoryInput objects
+        // For now, we'll use the neural patterns directly
+        
+        // Make prediction for next state based on current state
+        // This is a simplified prediction - in reality this would use learned predictive models
+        pImpl->predictionSystem->train(SensoryInput(sensoryPattern));
+        
+        // Get prediction error and use it for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to neuromodulators
+        if (pImpl->predictionError) {
+            pImpl->predictionError->computeError(0.0f, predictionError);
+        }
+        
+        if (pImpl->curiosity) {
+            pImpl->curiosity->signalPredictionError(predictionError);
+        }
+        
+        if (pImpl->novelty) {
+            pImpl->novelty->signalPredictionError(predictionError);
+        }
+        
+        if (pImpl->dopamine) {
+            // Dopamine encodes reward prediction error
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,11 +563,69 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Create neural pattern from current brain state for concept formation
+        std::vector<float> neuralPattern;
+        
+        // Sample neural activity across regions
+        for (auto& region : pImpl->regions) {
+            // Get average activation of internal neurons in this region
+            float regionTotal = 0.0f;
+            size_t regionCount = 0;
+            
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Internal) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        regionTotal += activation;
+                        regionCount++;
+                    }
+                }
+            }
+            
+            if (regionCount > 0) {
+                neuralPattern.push_back(regionTotal / regionCount);
+            } else {
+                neuralPattern.push_back(0.0f);
+            }
+        }
+        
+        // Create features vector (simplified: use reward and prediction error)
+        std::vector<float> features;
+        
+        // Add neuromodulator levels as features
+        if (pImpl->dopamine) {
+            features.push_back(pImpl->dopamine->getLevel());  // Reward signal
+        }
+        if (pImpl->curiosity) {
+            features.push_back(pImpl->curiosity->getLevel());  // Exploration drive
+        }
+        if (pImpl->novelty) {
+            features.push_back(pImpl->novelty->getLevel());  // Novelty detection
+        }
+        if (pImpl->predictionError) {
+            features.push_back(pImpl->predictionError->getMagnitude());  // Learning signal
+        }
+        
+        // Get current reward
+        float currentReward = pImpl->reward ? pImpl->reward->getValue() : 0.0f;
+        
+        // Present the pattern to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            neuralPattern, features, currentReward, pImpl->currentStep);
+        
+        // Enhance associative memory with new concept
+        if (pImpl->associativeMemory && conceptId > 0 && !neuralPattern.empty()) {
+            // Store the neural pattern associated with this concept
+            // This creates bidirectional associations between neural patterns and concepts
+            
+            // Get concept prototype
+            auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+            if (concept) {
+                // Associate neural pattern with concept prototype
+                pImpl->associativeMemory->associate(neuralPattern, concept->prototype, 0.5f);
+            }
+        }
     }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
@@ -1069,49 +1162,302 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+bool Brain::initializeWithValidation() {
+    NLM_LOG_INFO("Initializing NLM Brain with comprehensive validation (Phase 6: Integrated)");
+    
+    // Validate configuration before initialization
+    ValidationResult configValidation = getConfigurationValidation();
+    if (!configValidation.isValid) {
+        NLM_LOG_ERROR("Configuration validation failed during initialization:");
+        for (const auto& error : configValidation.errors) {
+            NLM_LOG_ERROR("  " + error.key + ": " + error.errorMessage);
+        }
+        return false;
+    }
+    
+    // If configuration is unhealthy but repairable, attempt repair
+    if (isConfigurationHealthy()) {
+        NLM_LOG_INFO("Configuration is healthy - proceeding with initialization");
+    } else {
+        NLM_LOG_WARNING("Configuration has issues - attempting repair");
+        if (repairConfiguration()) {
+            NLM_LOG_INFO("Configuration repaired successfully");
+            // Re-validate after repair
+            configValidation = getConfigurationValidation();
+            if (!configValidation.isValid) {
+                NLM_LOG_ERROR("Configuration repair failed - validation still failing");
+                return false;
+            }
+        } else {
+            NLM_LOG_ERROR("Configuration repair failed - cannot proceed with initialization");
+            return false;
+        }
+    }
+    
+    // Validate integration before proceeding
+    ValidationResult integrationValidation = validateIntegration();
+    if (!integrationValidation.isValid) {
+        NLM_LOG_ERROR("Integration validation failed during initialization:");
+        for (const auto& error : integrationValidation.errors) {
+            NLM_LOG_ERROR("  " + error.errorMessage);
+        }
+        return false;
+    }
+    
+    // Log validation summary
+    NLM_LOG_INFO("Validation passed - configuration is ready for brain initialization");
+    
+    // Proceed with standard initialization
+    return initialize();
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+bool Brain::validateConfiguration() const {
+    ValidationResult validationResult = getConfigurationValidation();
+    return validationResult.isValid;
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+ValidationResult Brain::getConfigurationValidation() const {
+    ValidationResult result;
+    auto startTime = std::chrono::high_resolution_clock::now();
     
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    // Check if config object exists
+    if (!pImpl->config) {
+        result.addError("config", "Configuration object is null");
+        return result;
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    // Use config's validation methods
+    auto configErrors = pImpl->config->getValidationErrors();
+    for (const auto& error : configErrors) {
+        result.addError(error.key, error.errorMessage, error.source);
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    // Cross-validate configuration sections
+    ValidationResult crossValidation = crossValidateConfiguration();
+    if (!crossValidation.isValid) {
+        for (const auto& error : crossValidation.errors) {
+            result.addError(error.key, error.errorMessage, error.source);
+        }
+    }
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    // Check configuration completeness
+    std::set<std::string> essentialKeys = {"neuron_count", "region_count", "simulation_timestep"};
+    for (const auto& key : essentialKeys) {
+        if (!pImpl->config->has(key)) {
+            result.addError(key, "Essential configuration key is missing: " + key, ConfigSource::Default);
+        }
+    }
+    
+    // Validate range-specific values
+    if (auto neuronCount = pImpl->config->get<size_t>("neuron_count")) {
+        if (*neuronCount < 1 || *neuronCount > 1000000) {
+            result.addError("neuron_count", "Neuron count must be between 1 and 1,000,000", ConfigSource::Runtime);
+        }
+    }
+    
+    if (auto regionCount = pImpl->config->get<size_t>("region_count")) {
+        if (*regionCount < 1 || *regionCount > 100) {
+            result.addError("region_count", "Region count must be between 1 and 100", ConfigSource::Runtime);
+        }
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    result.validationTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    // Record performance metric
+    pImpl->config->recordValidationPerformance("brain_validation", result.validationTime.count());
+    
+    return result;
+}
+
+bool Brain::isConfigurationHealthy() const {
+    ValidationResult healthResult = getConfigurationHealth();
+    return healthResult.isValid;
+}
+
+ValidationResult Brain::getConfigurationHealth() const {
+    ValidationResult result;
+    
+    // Get configuration validation
+    ValidationResult configValidation = getConfigurationValidation();
+    if (!configValidation.isValid) {
+        for (const auto& error : configValidation.errors) {
+            result.addError(error.key, error.errorMessage, error.source);
+        }
+    }
+    
+    // Get health status from config's health monitor if available
+    if (pImpl->config) {
+        ValidationResult healthCheck = pImpl->config->validateHealth();
+        if (!healthCheck.isValid) {
+            for (const auto& error : healthCheck.errors) {
+                result.addError(error.key, error.errorMessage, error.source);
+            }
+        }
+        for (const auto& warning : healthCheck.warnings) {
+            result.addWarning(warning);
+        }
+    }
+    
+    // Check system resource requirements
+    size_t totalNeurons = getTotalNeuronCount();
+    if (totalNeurons < 100) {
+        result.addWarning("Low neuron count may limit system capabilities");
+    }
+    
+    return result;
+}
+
+bool Brain::repairConfiguration() {
+    if (!pImpl->config) {
+        return false;
+    }
+    
+    bool repaired = false;
+    
+    // Use config's automatic repair functionality
+    if (pImpl->config->fixCommonIssues()) {
+        repaired = true;
+        NLM_LOG_INFO("Configuration repaired common issues");
+    }
+    
+    // Inject default values if schema exists
+    ValidationResult schemaValidation = pImpl->config->validateAgainstSchema(ConfigSchema::getDefaultSchema());
+    if (!schemaValidation.isValid) {
+        ConfigSchema::getDefaultSchema().injectDefaults(*pImpl->config);
+        repaired = true;
+        NLM_LOG_INFO("Default configuration values injected");
+    }
+    
+    return repaired;
+}
+
+ValidationResult Brain::validateIntegration() const {
+    ValidationResult result;
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Check if all required brain systems are initialized
+    if (!pImpl->workingMemory) {
+        result.addError("working_memory", "Working memory system not initialized");
+    }
+    
+    if (!pImpl->episodicMemory) {
+        result.addError("episodic_memory", "Episodic memory system not initialized");
+    }
+    
+    if (!pImpl->associativeMemory) {
+        result.addError("associative_memory", "Associative memory system not initialized");
+    }
+    
+    if (!pImpl->predictionSystem) {
+        result.addError("prediction_system", "Prediction system not initialized");
+    }
+    
+    // Check system compatibility
+    if (pImpl->workingMemory && pImpl->episodicMemory) {
+        // Check if memory systems can work together
+        if (pImpl->workingMemory->getCapacity() < 1 && pImpl->episodicMemory->getMaxEpisodes() > 0) {
+            result.addWarning("Working memory capacity may be insufficient for episodic memory load");
+        }
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    result.validationTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    // Record performance metric
+    if (pImpl->config) {
+        pImpl->config->recordValidationPerformance("integration_validation", result.validationTime.count());
+    }
+    
+    return result;
+}
+
+ValidationResult Brain::crossValidateConfiguration() const {
+    ValidationResult result;
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Cross-validate memory and neural system parameters
+    if (auto neuronCount = getConfig()->get<size_t>("neuron_count")) {
+        if (pImpl->workingMemory && neuronCount > 0) {
+            size_t workingMemoryCapacity = pImpl->workingMemory->getCapacity();
+            if (workingMemoryCapacity > 0) {
+                float memoryLoadRatio = static_cast<float>(workingMemoryCapacity) / static_cast<float>(*neuronCount);
+                if (memoryLoadRatio > 0.1f) {
+                    result.addWarning("Working memory load ratio is high: " + std::to_string(memoryLoadRatio));
+                }
+            }
+        }
+        
+        if (pImpl->episodicMemory) {
+            size_t maxEpisodes = pImpl->episodicMemory->getMaxEpisodes();
+            if (maxEpisodes > 0) {
+                float episodeMemoryRatio = static_cast<float>(maxEpisodes) / static_cast<float>(*neuronCount);
+                if (episodeMemoryRatio > 0.05f) {
+                    result.addWarning("Episodic memory capacity ratio is high: " + std::to_string(episodeMemoryRatio));
+                }
+            }
+        }
+    }
+    
+    // Check neurotransmitter system compatibility
+    if (pImpl->dopamine && pImpl->curiosity) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        
+        if (dopamineLevel > 1.0f && curiosityLevel > 1.0f) {
+            result.addWarning("High levels of both dopamine and curiosity may cause over-excitability");
+        }
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    result.validationTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    // Record performance metric
+    if (pImpl->config) {
+        pImpl->config->recordValidationPerformance("cross_validation", result.validationTime.count());
+    }
+    
+    return result;
+}
+
+std::map<std::string, double> Brain::getValidationStatistics() const {
+    if (!pImpl->config) {
+        return std::map<std::string, double>();
+    }
+    
+    return pImpl->config->getValidationStatistics();
+}
+
+std::map<std::string, std::chrono::milliseconds> Brain::getValidationPerformanceMetrics() const {
+    std::map<std::string, std::chrono::milliseconds> metrics;
+    
+    if (pImpl->config) {
+        // Extract performance metrics from config
+        auto stats = pImpl->config->getStatistics();
+        for (const auto& pair : stats) {
+            metrics[pair.first] = std::chrono::milliseconds(pair.second);
+        }
+    }
+    
+    return metrics;
+}
+
+void Brain::enableHealthMonitoring(bool enable) {
+    if (enable) {
+        if (pImpl->config) {
+            // Configure health monitoring with brain-specific checks
+            pImpl->config->enableHealthMonitoring();
+        }
+    } else {
+        if (pImpl->config) {
+            pImpl->config->disableHealthMonitoring();
+        }
     }
 }
 
-} // namespace nlm
+bool Brain::isHealthMonitoringEnabled() const {
+    if (pImpl->config) {
+        return pImpl->config->isHealthMonitoringEnabled();
+    }
+    return false;
+}

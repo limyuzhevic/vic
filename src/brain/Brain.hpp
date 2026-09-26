@@ -6,6 +6,8 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Reward.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <string>
 
@@ -28,6 +30,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Reward;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,61 +141,43 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ============= VALIDATION SUPPORT ==========
+
+    // Initialize brain with configuration and validate it
+    bool initializeWithValidation();
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Check configuration validity
+    bool validateConfiguration() const;
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // Get configuration validation results
+    ValidationResult getConfigurationValidation() const;
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Check if configuration is healthy
+    bool isConfigurationHealthy() const;
     
-    // ========== PREDICTION SYSTEM ==========
+    // Get configuration health status
+    ValidationResult getConfigurationHealth() const;
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Fix configuration issues if possible
+    bool repairConfiguration();
     
-    // ========== COGNITION SYSTEMS ==========
+    // Validate integration with brain systems
+    ValidationResult validateIntegration() const;
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Cross-validate configuration sections
+    ValidationResult crossValidateConfiguration() const;
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Get validation statistics
+    std::map<std::string, double> getValidationStatistics() const;
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Get validation performance metrics
+    std::map<std::string, std::chrono::milliseconds> getValidationPerformanceMetrics() const;
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Configure health monitoring
+    void enableHealthMonitoring(bool enable = true);
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Check if health monitoring is enabled
+    bool isHealthMonitoringEnabled() const;
     
 private:
     struct Impl;
