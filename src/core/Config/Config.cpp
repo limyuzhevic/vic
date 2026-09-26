@@ -22,24 +22,64 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_WARNING("Config: Cannot load from empty filepath");
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_WARNING("Config: File not found: " + filepath);
+        return false;
+    }
+    
+    if (!std::filesystem::is_regular_file(filepath)) {
+        NLM_LOG_WARNING("Config: Path is not a regular file: " + filepath);
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config: Cannot open file for reading: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool hasValidEntries = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        // Validate line format
+        if (line.find('=') == std::string::npos) {
+            NLM_LOG_WARNING("Config: Invalid format on line " + std::to_string(lineNumber) + ": " + line);
+            continue; // Skip malformed lines
+        }
+        
+        try {
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Config: Empty key on line " + std::to_string(lineNumber));
+                continue;
+            }
+            
+            // Validate value
+            if (value.empty()) {
+                NLM_LOG_WARNING("Config: Empty value for key '" + key + "' on line " + std::to_string(lineNumber));
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -49,7 +89,16 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            hasValidEntries = true;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Config: Error parsing line " + std::to_string(lineNumber) + ": " + e.what());
+            continue; // Skip lines that cause exceptions
         }
+    }
+    
+    if (!hasValidEntries) {
+        NLM_LOG_WARNING("Config: No valid configuration entries found in file: " + filepath);
     }
     
     return true;
@@ -79,14 +128,66 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_WARNING("Config: Cannot save to empty filepath");
         return false;
     }
     
+    // Check if path is writable
+    std::filesystem::path filePath(filepath);
+    std::filesystem::path parentDir = filePath.parent_path();
+    
+    if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+        NLM_LOG_WARNING("Config: Parent directory does not exist: " + parentDir.string());
+        return false;
+    }
+    
+    // Try to create/open the file for writing
+    std::ofstream file(filepath, std::ios::out | std::ios::trunc);
+    if (!file.is_open()) {
+        NLM_LOG_WARNING("Config: Cannot open file for writing: " + filepath);
+        return false;
+    }
+    
+    // Check if we can write to the file
+    file << "# Test write\n";
+    if (!file.good()) {
+        NLM_LOG_WARNING("Config: Cannot write to file: " + filepath);
+        return false;
+    }
+    file.clear();
+    
+    // Write configuration entries
+    size_t entryCount = 0;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        try {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            // Handle different value types
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            
+            file << "\n\n";
+            ++entryCount;
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Config: Error writing entry " + entry.key + ": " + e.what());
+            continue; // Skip problematic entries
+        }
+    }
+    
+    if (entryCount == 0) {
+        NLM_LOG_WARNING("Config: No configuration entries to save to file: " + filepath);
     }
     
     return true;

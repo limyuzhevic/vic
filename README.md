@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -76,11 +75,217 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2 Demo (Real Neural Computation)
+
+```bash
+./nlm
+```
+
+This runs the Phase 2 demonstration showing real neural computation with:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+
+### Running Tests
+
+```bash
+cd build
+ctest --output-on-failure
+```
+
+## Configuration
+
+### Configuration Files
+
+NLM supports configuration files in a simple key=value format. Common files include:
+
+- `configs/default.cfg` - Default configuration
+- Custom configuration files can be specified via command line
+
+### Command Line Arguments
+
+```bash
+# Specify custom config file
+./nlm --config=my_config.cfg
+
+# Override specific parameters
+./nlm --neuron_count=2000 --simulation_timestep=0.0001
+
+# Multiple parameters
+./nlm --random_seed=123 --region_count=2 --connection_probability=0.2
+```
+
+## Python Usage
+
+### Installation
+
+```bash
+# Install from source
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
+### Basic Usage
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Optionally configure specific parameters
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
+
+### Complete Agent Example
+
+```python
+import pynlm
+
+def run_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with brain and world."""
+    
+    # 1. Create configuration
+    config = pynlm.createDefaultConfig()
+    
+    # 2. Create brain and initialize
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 3. Create agent brain interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    world.setAgentStart(10.0, 10.0)
+    
+    # 5. Initialize agent with world
+    agent.initialize(world)
+    
+    # 6. Enable subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # 7. Run simulation loop
+    for step in range(num_steps):
+        # Update world
+        world.update(timestep=0.1)
+        
+        # Get sensory input from world
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input in brain
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step)
+        
+        # Decode motor command from brain activity
+        motor_cmd = agent.decodeMotorCommand()
+        
+        # Apply motor command to world
+        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Print progress
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+# Run the simulation
+run_agent_simulation(1000)
+```
+
+## Error Handling and Troubleshooting
+
+### Common Issues and Solutions
+
+**Issue: "My brain isn't doing anything"**
+- **Solution**: Did you call `brain.initialize()`? Always call this before using the brain!
+- Try increasing the number of steps
+
+**Issue: "The agent isn't moving"**
+- **Solution**: Did you call `world.applyMotorCommand()`?
+- Ensure that `world.update()` is being called
+
+**Issue: "Everything is 0"**
+- **Solution**: Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+**Issue: "ImportError: No module named 'pynlm'"**
+- **Solution**: ```bash
+pip install --force-reinstall .
+```
+
+**Issue: "Segmentation faults"**
+- **Solution**: 
+  - Check that `initialize()` is called before `step()`
+  - Ensure `reset()` is called before re-running simulation
+  - Verify configuration parameters are valid
+
+## New Features
+
+The improvements in this version include:
+
+1. **Enhanced Python Bindings**: Reduced boilerplate and more Pythonic API
+2. **Comprehensive Error Handling**: Better validation and detailed error messages
+3. **Modular Code Structure**: Easier to maintain and test
+4. **Improved Documentation**: More examples and clearer explanations
+
+## Performance Notes
+
+- Phase 2 simulation uses approximately 500 neurons by default
+- Configuration files can be used to adjust neuron count and other parameters
+- The Python bindings provide a convenient interface for research and experimentation
+- All simulation steps are deterministic with a fixed random seed
+
+## Getting Help
+
+For more information:
+
+1. **Documentation**: Check the `docs/` directory for detailed technical documentation
+2. **Examples**: Refer to the `HOW_TO_USE.md` and `easy_usage.md` files
+3. **Issues**: Report bugs and feature requests at the NLM GitHub repository
+4. **Community**: Join the NLM research community for discussions and support
+
+## License
+
+MIT License - See `LICENSE` file for details.
+
+## Authors
+
+Research project — See `docs/` for scientific background and references.
 
 ## Project Structure
 
