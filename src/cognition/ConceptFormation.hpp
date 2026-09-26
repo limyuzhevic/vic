@@ -134,6 +134,17 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
+    // Update concept based on prediction error
+    void updateConceptFromError(size_t conceptId, const std::vector<float>& prediction,
+                              const std::vector<float>& actual, float error);
+
+    // Update concept with prediction target
+    void updateConceptWithTarget(size_t conceptId, const std::vector<float>& target,
+                               float confidence = 1.0f);
+
+    // Get concept influence on predictions
+    std::vector<float> getConceptInfluence(size_t conceptId) const;
+
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }

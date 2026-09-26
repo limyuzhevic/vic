@@ -296,6 +296,83 @@ void ConceptFormation::clear() {
     nextConceptId_ = 1;
 }
 
+void ConceptFormation::updateConceptFromError(size_t conceptId, const std::vector<float>& prediction,
+                                            const std::vector<float>& actual, float error) {
+    DiscoveredConcept* concept = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            concept = &c;
+            break;
+        }
+    }
+    
+    if (!concept) return;
+    
+    // Update prototype based on prediction error
+    if (!prediction.empty() && !actual.empty() && prediction.size() == actual.size()) {
+        float alpha = error * 0.1f;  // Error-dependent learning rate
+        alpha = std::min(alpha, 0.3f);  // Cap learning rate
+        
+        for (size_t i = 0; i < concept->prototype.size() && i < prediction.size() && i < actual.size(); ++i) {
+            // Move prototype toward actual based on error
+            float correction = (actual[i] - concept->prototype[i]) * alpha;
+            concept->prototype[i] += correction;
+            
+            // Clamp to reasonable range
+            concept->prototype[i] = std::max(0.0f, std::min(1.0f, concept->prototype[i]));
+        }
+        
+        // Also adjust instances based on error
+        for (auto& instance : concept->instances) {
+            if (!instance.pattern.empty() && instance.pattern.size() == prediction.size()) {
+                for (size_t i = 0; i < instance.pattern.size() && i < prediction.size(); ++i) {
+                    float correction = (actual[i] - instance.pattern[i]) * alpha * 0.5f;
+                    instance.pattern[i] += correction;
+                    instance.pattern[i] = std::max(0.0f, std::min(1.0f, instance.pattern[i]));
+                }
+            }
+        }
+    }
+    
+    // Update stability based on error magnitude (high error means concept is becoming more variable)
+    float stabilityAdjustment = std::max(0.0f, 1.0f - error);
+    concept->avgStability = concept->avgStability * 0.9f + stabilityAdjustment * 0.1f;
+}
+
+void ConceptFormation::updateConceptWithTarget(size_t conceptId, const std::vector<float>& target,
+                                            float confidence) {
+    DiscoveredConcept* concept = nullptr;
+    for (auto& c : concepts_) {
+        if (c.id == conceptId) {
+            concept = &c;
+            break;
+        }
+    }
+    
+    if (!concept) return;
+    
+    // Use target as new instance to update concept
+    std::vector<float> features(target.size(), 0.5f);  // Placeholder features
+    float reward = confidence * 0.5f;  // Normalize to [0, 0.5]
+    
+    updateConcept(conceptId, target, features, reward);
+}
+
+std::vector<float> ConceptFormation::getConceptInfluence(size_t conceptId) const {
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return {};
+    
+    // Concept influence is its prototype weighted by stability
+    std::vector<float> influence = concept->prototype;
+    float stabilityFactor = concept->avgStability;
+    
+    for (float& value : influence) {
+        value *= stabilityFactor;
+    }
+    
+    return influence;
+}
+
 // SpatialRepresentation Implementation
 struct SpatialRepresentation::Impl {
     Brain* brain;
