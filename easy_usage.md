@@ -104,33 +104,102 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## Advanced Patterns
 
-### Pattern 1: Run a Simulation
+### Pattern 2: Advanced Agent with Learning
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
+def run_learning_simulation(brain, world, agent, num_steps):
+    # Enable learning features
+    agent.enableRewardModulation(True)    # Learn from rewards
+    agent.enableCuriosity(True)           # Explore new things
+    agent.enableDevelopment(True)         # Brain matures over time
+    
     for step in range(num_steps):
-        # 1. Update world
+        # Update world
         world.update(0.1)
         
-        # 2. Get what the agent sees
+        # Get sensor data
         percept = world.getSensoryPercept()
         
-        # 3. Tell the brain
+        # Process sensory input
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # Brain computes action
         brain.step(step)
         
-        # 5. Get action from brain
+        # Get motor command from brain
         action = agent.decodeMotorCommand()
         
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+        # Apply action and get result
+        result = world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation if enabled
+        if agent.isRewardModulationEnabled():
+            reward = result.reward
+            predicted = agent.getPredictionError()
+            agent.applyRewardModulation(reward, predicted)
+        
+        # Update development system
+        if agent.isDevelopmentEnabled():
+            agent.updateDevelopment(0.1)
+        
+        # Optional: Print debug info periodically
+        if step % 100 == 0:
+            print(f"Step {step}: "
+                  f"Action: {action}, "
+                  f"Reward: {result.reward:.3f}, "
+                  f"Neurons firing: {brain.getFiringNeuronCount()}, "
+                  f"Spikes: {brain.getTotalSpikeCount()}")
 
 # Use it like this:
-run_simulation(brain, world, agent, 1000)
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+run_learning_simulation(brain, world, agent, 1000)
+```
+
+### Pattern 3: Brain State Management
+
+```python
+import pynlm
+import os
+
+def save_brain_state(brain, filepath):
+    """Save brain state to a file for later use"""
+    brain.save(filepath)
+    print(f"Brain state saved to {filepath}")
+
+def load_brain_state(filepath, config=None):
+    """Load brain state from a file"""
+    if config is None:
+        config = pynlm.createDefaultConfig()
+    
+    brain = pynlm.createBrain(config)
+    brain.load(filepath)
+    print(f"Brain state loaded from {filepath}")
+    return brain
+
+# Example usage:
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Simulate for a while
+for step in range(100):
+    brain.step(step)
+
+# Save the brain state
+save_brain_state(brain, "my_brain_state.bin")
+
+# Later, load it back
+brain2 = load_brain_state("my_brain_state.bin", config)
+brain2.initialize()
 ```
 
 ### Pattern 2: Get Brain Stats

@@ -69,9 +69,10 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     plasticityModifier_ = 1.0f;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
+                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
+                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons, " +
+                  std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -253,6 +254,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;  // Skip null synapses
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
