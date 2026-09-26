@@ -194,11 +194,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
+        // During refractory period, don't reset synapticInput - we want to preserve
+        // the effect of the incoming signal that triggered the spike
+        // Synaptic input will be consumed through spike generation anyway
+        // pImpl->synapticInput = 0.0f;  // REMOVED: preserves signal effect
         return false;
     }
     
@@ -250,6 +249,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is firing due to exceeding threshold
         pImpl->state.firingState = FiringState::Active;
     }
     
