@@ -454,80 +454,466 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 5: Example Scripts
+## Part 5: Advanced CLI and Configuration Management
 
-### Minimal Example
+### Advanced CLI Overview
+
+The NLM Advanced CLI provides comprehensive command-line interfaces for power users working with the NLM brain simulation system. It includes:
+
+- **Advanced Configuration Management**: Import/export configurations in multiple formats
+- **Enhanced Simulation Control**: Custom simulation parameters and real-time monitoring
+- **Power User Features**: Advanced debugging and performance profiling
+- **Brain State Management**: Direct manipulation and analysis
+
+#### Basic CLI Commands
+
+```bash
+# Show help information
+nlm-cli --help
+
+# Show version information
+nlm-cli --version
+
+# Enable verbose output
+nlm-cli --verbose
+
+# Suppress output
+nlm-cli --quiet
+```
+
+#### Configuration Management
+
+```bash
+# Export configuration to file
+nlm-cli config export --file config.json --format json
+nlm-cli config export --file config.yaml --format yaml
+nlm-cli config export --file config.txt --format table
+
+# Import configuration from file
+nlm-cli config import --file config.json --format json
+nlm-cli config import --file config.yaml --format yaml
+
+# Validate configuration schema
+nlm-cli config validate
+
+# Compare configuration versions
+nlm-cli config diff --source current --target default
+
+# List all configuration keys
+nlm-cli config list
+```
+
+#### Simulation Control
+
+```bash
+# Run custom simulation
+nlm-cli simulate custom --timestep 0.001 --neurons 1000 --regions 2 --plasticity
+
+# Run in real-time with monitoring
+nlm-cli simulate realtime --speed 2.0 --monitoring --checkpoint-interval 100
+
+# Start simulation monitoring
+nlm-cli simulate monitor --log-level INFO --metrics --performance
+
+# Create checkpoint
+nlm-cli simulate checkpoint --directory checkpoints --compress --keep 5
+
+# Restart from checkpoint
+nlm-cli simulate restart --checkpoint checkpoints/brain_checkpoint_20250101_120000.bin
+
+# Configure learning rate schedule
+nlm-cli simulate schedule --type exponential_decay --initial 0.01 --decay 0.001 --steps 1000
+```
+
+#### Power User Features
+
+```bash
+# Advanced debugging
+nlm-cli debug advanced --neuron-debug --synapse-monitor --memory-leak
+
+# Performance profiling
+nlm-cli profiler start --output profile.json --duration 60 --detailed
+nlm-cli profiler report --input profile.json --format html
+
+# Neuron-by-neuron debugging
+nlm-cli neuron debug --id 1 --show-potential --show-spikes --show-synapses
+nlm-cli neuron debug --population sensory --show-activations --history-size 100
+
+# Synapse-level monitoring
+nlm-cli synapse monitor --show-weights --plasticity-events --delays
+nlm-cli synapse monitor --filter type excitatory --history 50
+
+# Network-wide statistics
+nlm-cli network stats --summary --detailed --performance
+```
+
+#### Brain State Management
+
+```bash
+# Manual brain state manipulation
+nlm-cli state manual --command inject --neuron-id 1 --current 50.0
+nlm-cli state manual --command set-weight --source 1 --dest 2 --weight 0.5
+nlm-cli state manual --command set-development-stage --stage maturation
+
+# Pattern injection for testing
+nlm-cli state pattern --type pre-post --pre-neuron 1 --post-neuron 2 --repetitions 10
+nlm-cli state pattern --type random --neurons 20 --current-range 10-50 --steps 100
+
+# Network topology exploration
+nlm-cli state topology --measure clustering --measure shortest-path
+nlm-cli state topology --identify hubs --threshold 0.8
+
+# Weight visualization
+nlm-cli state visualize --type network --output network_graph.png
+nlm-cli state visualize --type distribution --output weight_histogram.png
+
+# Brain state analysis
+nlm-cli state analysis --complexity --information-bottleneck --generalization
+```
+
+### Configuration File Formats
+
+#### JSON Format (`config.json`)
+
+```json
+{
+  "neuron_count": 1000,
+  "region_count": 1,
+  "simulation_timestep": 0.001,
+  "random_seed": 42,
+  "stdp_ltp_weight": 0.02,
+  "stdp_ltd_weight": 0.015,
+  "stdp_tau": 20.0,
+  "synaptogenesis_rate": 0.0001,
+  "pruning_rate": 0.00001,
+  "connection_probability": 0.15,
+  "replay_interval": 100,
+  "consolidation_interval": 1000
+}
+```
+
+#### YAML Format (`config.yaml`)
+
+```yaml
+# NLM Configuration
+neuron_count: 1000
+region_count: 1
+simulation_timestep: 0.001
+random_seed: 42
+
+# Plasticity Parameters
+stdp_ltp_weight: 0.02
+stdp_ltd_weight: 0.015
+stdp_tau: 20.0
+synaptogenesis_rate: 0.0001
+pruning_rate: 0.00001
+
+# Network Properties
+connection_probability: 0.15
+replay_interval: 100
+consolidation_interval: 1000
+```
+
+#### Table Format (`config.txt`)
+
+```text
+# Configuration File
+# Format: key = value
+neuron_count = 1000
+region_count = 1
+simulation_timestep = 0.001
+random_seed = 42
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+connection_probability = 0.15
+replay_interval = 100
+consolidation_interval = 1000
+```
+
+### Advanced Configuration Options
+
+#### Brain Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `brain.neuron_count` | int | 1000 | Total number of neurons |
+| `brain.region_count` | int | 1 | Number of neural regions |
+| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
+| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
+| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
+| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
+
+#### Plasticity Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `plasticity.stdp.enable` | bool | true | Enable STDP |
+| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
+| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
+| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
+| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
+| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
+
+#### Neuromodulation Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
+| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
+| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+
+### Performance Optimization
+
+#### Large-Scale Simulation Tips
+
+1. **Use checkpointing for long runs**:
+   ```bash
+   # Create periodic checkpoints
+   nlm-cli simulate checkpoint --directory checkpoints --compress --keep 10
+   
+   # Use checkpoint for restart
+   nlm-cli simulate restart --checkpoint checkpoints/brain_checkpoint.bin
+   ```
+
+2. **Monitor performance during simulation**:
+   ```bash
+   # Start monitoring with performance metrics
+   nlm-cli simulate monitor --performance --metrics --log-level INFO
+   ```
+
+3. **Use parallel processing**:
+   ```bash
+   # Run simulation with multiple threads
+   nlm-cli simulate custom --parallel --num-threads 8 --neurons 5000
+   ```
+
+4. **Optimize memory usage**:
+   ```bash
+   # Clean up old checkpoints
+   nlm-cli simulate checkpoint --directory checkpoints --keep 5
+   ```
+
+### Advanced Usage Examples
+
+#### Example 1: Complete Development Workflow
+
+```bash
+#!/bin/bash
+# Complete workflow for NLM experiment with monitoring
+
+set -e
+
+EXPERIMENT_NAME="nlm_experiment_$(date +%Y%m%d_%H%M%S)"
+CHECKPOINT_DIR="checkpoints/${EXPERIMENT_NAME}"
+PROFILE_DIR="profiles/${EXPERIMENT_NAME}"
+
+# 1. Initialize with configuration
+nlm-cli config import --file config.yaml --format yaml
+nlm-cli config validate
+
+# 2. Run experiment with monitoring
+mkdir -p "${CHECKPOINT_DIR}"
+mkdir -p "${PROFILE_DIR}"
+
+echo "Starting experiment with monitoring..."
+nlm-cli simulate realtime --speed 1.0 --monitoring --checkpoint-interval 1000
+
+# 3. Analyze results
+echo "Analyzing experiment results..."
+nlm-cli profiler start --output "${PROFILE_DIR}/profile.json" --duration 60 --detailed
+nlm-cli network stats --detailed
+nlm-cli state analysis --complexity --generalization
+
+# 4. Export final configuration
+nlm-cli config export --file "${EXPERIMENT_NAME}_final_config.json" --format json
+
+echo "Experiment completed successfully! Results in: ${EXPERIMENT_NAME}"
+```
+
+#### Example 2: Production Environment Setup
+
+```bash
+#!/bin/bash
+# Production workflow for NLM simulation
+
+set -e
+
+# 1. Run simulation with production settings
+nlm-cli simulate custom --timestep 0.0005 --neurons 5000 --regions 3
+
+# 2. Enable comprehensive monitoring
+nlm-cli simulate monitor --log-level INFO --metrics --performance
+
+# 3. Create periodic checkpoints
+nlm-cli simulate checkpoint --directory prod_checkpoints --compress --keep 10
+
+# 4. Analyze production results
+nlm-cli network stats --summary --detailed
+nlm-cli state analysis --complexity --generalization
+
+# 5. Validate results
+nlm-cli config validate
+
+# 6. Export production configuration
+nlm-cli config export --file production_config.json --format json
+```
+
+### Integration with External Tools
+
+#### Python Integration
 
 ```python
-import pynlm
+#!/usr/bin/env python3
+# Python script to integrate with NLM Advanced CLI
 
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+import subprocess
+import json
+import time
 
-# Simulate
-for i in range(100):
-    brain.step(i)
+def run_nlm_cli_command(command):
+    """Run NLM CLI command and return output"""
+    try:
+        result = subprocess.run(
+            command.split(),
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout, result.stderr, result.returncode
+    except subprocess.CalledProcessError as e:
+        return e.stdout, e.stderr, e.returncode
 
-print("Simulation complete!")
+def run_complete_experiment(config_file):
+    """Run complete NLM experiment with monitoring"""
+    
+    # 1. Import configuration
+    stdout, stderr, code = run_nlm_cli_command(
+        f"nlm-cli config import --file {config_file} --format yaml"
+    )
+    if code != 0:
+        print(f"Configuration import failed: {stderr}")
+        return False
+    
+    # 2. Validate configuration
+    stdout, stderr, code = run_nlm_cli_command("nlm-cli config validate")
+    if code != 0:
+        print(f"Configuration validation failed: {stderr}")
+        return False
+    
+    # 3. Run simulation with profiling
+    print("Starting simulation with profiling...")
+    profile_proc = subprocess.Popen(
+        "nlm-cli profiler start --output experiment_profile.json --duration 300 --detailed",
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    
+    # 4. Monitor simulation
+    monitor_proc = subprocess.Popen(
+        "nlm-cli simulate monitor --performance --metrics",
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    
+    # 5. Wait for completion
+    profile_proc.wait()
+    monitor_proc.terminate()
+    
+    # 6. Analyze results
+    stdout, stderr, code = run_nlm_cli_command(
+        "nlm-cli network stats --detailed"
+    )
+    if code == 0:
+        print("Network statistics:")
+        print(stdout)
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    success = run_complete_experiment("config.yaml")
+    if success:
+        print("Experiment completed successfully!")
+    else:
+        print("Experiment failed!")
 ```
 
-### Environment Interaction
+### Error Handling
 
-```python
-import pynlm
+#### Common Errors and Solutions
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
+**Configuration Errors:**
+- **Symptom**: Configuration validation fails
+- **Solution**: Check required keys and value types in configuration
+- **Command**: `nlm-cli config validate --fix`
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
-```
+**Brain Initialization Errors:**
+- **Symptom**: "Failed to initialize brain"
+- **Solution**: Check system resources and configuration compatibility
+- **Command**: `nlm-cli brain info` to check system status
 
----
+**Memory Issues:**
+- **Symptom**: Simulation crashes with memory error
+- **Solution**: Reduce neuron count, increase checkpoint frequency
+- **Command**: `nlm-cli simulate checkpoint --keep 3`
 
-## Troubleshooting
+**Performance Issues:**
+- **Symptom**: Slow simulation performance
+- **Solution**: Use checkpointing, increase threads, optimize configuration
+- **Command**: `nlm-cli profiler start --output perf.json --duration 30`
 
-### Build Issues
+#### Error Codes
 
-**CMake cannot find Python:**
+The CLI uses the following error codes:
+- `0`: Success
+- `1`: General error
+- `2`: Configuration error
+- `3`: Brain initialization error
+- `4`: Simulation error
+- `5`: Debug error
+- `6`: Profiling error
+- `7`: State management error
+- `8`: I/O error
+
+### Environment Configuration
+
+Set environment variables for advanced CLI usage:
+
 ```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+# Set configuration file location
+export NLM_CONFIG_FILE=config.yaml
+
+# Set log level
+export NLM_LOG_LEVEL=DEBUG
+
+# Set log file
+export NLM_LOG_FILE=/var/log/nlm.log
+
+# Set profiling output directory
+export NLM_PROFILE_DIR=/opt/nlm/profiles
+
+# Set checkpoint directory
+export NLM_CHECKPOINT_DIR=/opt/nlm/checkpoints
 ```
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+### Configuration File Locations
 
-### Runtime Issues
+The Advanced CLI looks for configuration files in the following order:
 
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
-
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
-
----
+1. Current directory (`./config.json`, `./config.yaml`, `./config.txt`)
+2. Home directory (`~/.config/nlm/config.json`)
+3. Environment variable (`$NLM_CONFIG_FILE`)
+4. Compiled-in defaults
 
 ## Further Reading
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [AdvancedCLI.md](AdvancedCLI.md) - Advanced CLI documentation and examples
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Phase 6 integration audit
+- [docs/SCIENCE.md](docs/SCIENCE.md) - Scientific background
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions

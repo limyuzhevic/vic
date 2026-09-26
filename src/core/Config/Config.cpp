@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,9 +20,136 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension for format detection
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    if (ext == ".json") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries before loading new ones
+        clear();
+        
+        // Process JSON object
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            std::string valueStr;
+            ConfigSource source = ConfigSource::File;
+            std::string description = "Loaded from JSON";
+            
+            // Convert JSON value to string representation
+            if (it->is_string()) {
+                valueStr = it->get<std::string>();
+            } else if (it->is_number_integer()) {
+                valueStr = std::to_string(it->get<int64_t>());
+            } else if (it->is_number_float()) {
+                valueStr = std::to_string(it->get<double>());
+            } else if (it->is_boolean()) {
+                valueStr = it->get<bool>() ? "true" : "false";
+            } else if (it->is_array()) {
+                // Handle arrays - convert to comma-separated string
+                std::ostringstream oss;
+                oss << "[";
+                for (size_t i = 0; i < it->size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    if ((*it)[i].is_string()) {
+                        oss << "\"" << (*it)[i].get<std::string>() << "\"";
+                    } else {
+                        oss << (*it)[i].dump();
+                    }
+                }
+                oss << "]";
+                valueStr = oss.str();
+            } else {
+                valueStr = it->dump();
+            }
+            
+            set(key, valueStr, source);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "[WARNING] Failed to parse JSON file \"" << filepath << "\": " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    int lineNumber = 0;
+    
+    // Clear existing entries before loading new ones
+    clear();
+    
+    while (std::getline(file, line)) {
+        ++lineNumber;
+        line = trim(line);
+        
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#' || line[0] == '%') {
+            continue;
+        }
+        
+        // Try to parse as key: value (YAML-like syntax)
+        size_t pos = line.find(':');
+        if (pos != std::string::npos && pos > 0) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+            continue;
+        }
+        
+        // Try to parse as key = value (alternative syntax)
+        pos = line.find('=');
+        if (pos != std::string::npos && pos > 0) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +214,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save in key=value format for backward compatibility
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
@@ -119,6 +280,8 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Warning for duplicate entries
+        std::cerr << "[WARNING] Config key \"" << key << "\" already exists. Previous value will be overwritten." << std::endl;
         it->value = value;
         it->source = source;
     } else {

@@ -451,4 +451,161 @@ inline uint64_t ChecksumCalculator::combine(uint64_t a, uint64_t b) {
     return a ^ (b + 0x9e3779b97f4a7c15ULL + (a << 6) + (a >> 2));
 }
 
+/**
+ * Checkpoint serializer for complete brain state serialization
+ */
+class CheckpointSerializer {
+public:
+    CheckpointSerializer();
+    ~CheckpointSerializer() = default;
+    
+    /**
+     * Get current compression level
+     */
+    CompressionLevel getCompressionLevel() const;
+    
+    /**
+     * Set compression level
+     */
+    void setCompressionLevel(CompressionLevel level);
+    
+    /**
+     * Get whether checksums are validated
+     */
+    bool getValidateChecksums() const;
+    
+    /**
+     * Set whether checksums are validated
+     */
+    void setValidateChecksums(bool validate);
+    
+    /**
+     * Serialize neuron data from brain neurons
+     */
+    bool serializeNeuronData(const std::vector<Neuron*>& neurons, NeuronCheckpointData& data);
+    
+    /**
+     * Serialize synapse data from brain synapses
+     */
+    bool serializeSynapseData(const std::vector<Synapse*>& synapses, SynapseCheckpointData& data);
+    
+    /**
+     * Serialize complete brain state including neurons, synapses, plasticity, etc.
+     */
+    bool serializeBrainState(const Brain& brain, CheckpointHeader& header);
+    
+    /**
+     * Serialize memory components (working, episodic, associative)
+     */
+    bool serializeMemoryState(const Brain& brain, CheckpointHeader& header);
+    
+    /**
+     * Serialize configuration parameters
+     */
+    bool serializeConfigState(const Config& config, CheckpointHeader& header);
+    
+    /**
+     * Serialize neuromodulation state (dopamine, curiosity, prediction error)
+     */
+    bool serializeNeuromodulationState(const Brain& brain, CheckpointHeader& header);
+    
+    /**
+     * Serialize performance metrics (spike count, firing rate, etc.)
+     */
+    bool serializePerformanceMetrics(const Brain& brain, CheckpointHeader& header);
+    
+    /**
+     * Serialize simulation state (step, time, running status)
+     */
+    bool serializeSimulationState(const Brain& brain, CheckpointHeader& header);
+    
+    /**
+     * Deserialize brain state from checkpoint file
+     */
+    bool deserializeBrainState(const std::string& filepath, Brain& brain);
+    
+    /**
+     * Restore brain from checkpoint file
+     */
+    bool restoreFromCheckpoint(const std::string& filepath, Brain& brain);
+    
+    /**
+     * Save checkpoint to directory with automatic name generation
+     */
+    bool saveCheckpoint(const std::string& directory, const std::string& name, const Brain& brain);
+    
+    /**
+     * Load checkpoint from directory and restore to brain
+     */
+    bool loadCheckpoint(const std::string& directory, const std::string& name, Brain& brain);
+    
+    /**
+     * Generate checkpoint name based on step and simulation time
+     */
+    std::string generateCheckpointName(uint64_t step, double simulationTime) const;
+    
+    /**
+     * List available checkpoints in directory
+     */
+    std::vector<std::string> listAvailableCheckpoints(const std::string& directory) const;
+    
+    /**
+     * Validate checkpoint file integrity
+     */
+    bool validateCheckpoint(const std::string& filepath) const;
+    
+    /**
+     * Prune old checkpoints, keeping only the most recent N
+     */
+    bool pruneOldCheckpoints(const std::string& directory, size_t keepCount);
+
+private:
+    CompressionLevel compressionLevel_;
+    bool validateChecksums_;
+};
+
+// Checksum implementation
+
+inline uint64_t ChecksumCalculator::crc64(const void* data, size_t size) {
+    // Simple CRC-64 implementation
+    static const uint64_t table[256] = { /* precomputed */ };
+    uint64_t crc = 0xFFFFFFFFFFFFFFFF;
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    
+    for (size_t i = 0; i < size; ++i) {
+        uint8_t idx = (crc ^ bytes[i]) & 0xFF;
+        crc = table[idx] ^ (crc >> 8);
+    }
+    
+    return crc ^ 0xFFFFFFFFFFFFFFFF;
+}
+
+inline uint32_t ChecksumCalculator::crc32(const void* data, size_t size) {
+    uint32_t crc = 0xFFFFFFFF;
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    
+    for (size_t i = 0; i < size; ++i) {
+        crc ^= bytes[i];
+        for (int j = 0; j < 8; ++j) {
+            crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+        }
+    }
+    
+    return ~crc;
+}
+
+inline uint64_t ChecksumCalculator::fletcher64(const uint64_t* data, size_t count) {
+    uint64_t sum1 = 0, sum2 = 0;
+    for (size_t i = 0; i < count; ++i) {
+        sum1 = (sum1 + data[i]) % 0xFFFFFFFFFFFFFFFF;
+        sum2 = (sum2 + sum1) % 0xFFFFFFFFFFFFFFFF;
+    }
+    return (sum2 << 32) | sum1;
+}
+
+inline uint64_t ChecksumCalculator::combine(uint64_t a, uint64_t b) {
+    // XOR combine for incremental checksums
+    return a ^ (b + 0x9e3779b97f4a7c15ULL + (a << 6) + (a >> 2));
+}
+
 } // namespace nlm

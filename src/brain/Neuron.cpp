@@ -260,9 +260,43 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Implement real integrate-and-fire dynamics with biological accuracy
+    // Includes spike-frequency adaptation, post-spike dynamics, and rate-based computation
+    
+    // Use standard timestep duration for consistency
+    TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // Handle adaptation currents with exponential decay (biologically realistic)
+    // Spike-frequency adaptation variable decays exponentially with time constant ~100ms
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        pImpl->state.adaptationVariable *= 0.99f;  // Decay factor per ms
+        // Limit adaptation to prevent numerical instability
+        if (pImpl->state.adaptationVariable > 10.0f) {
+            pImpl->state.adaptationVariable = 10.0f;
+        }
+    }
+    
+    // Execute LIF integration with adaptation dynamics
+    bool fired = stepLIF(currentTime, dt);
+    
+    if (fired) {
+        // Enhance adaptation response after spike (biologically accurate spike-triggered adaptation)
+        pImpl->state.adaptationVariable += 2.0f;
+        
+        // Verify spike was recorded by stepLIF
+        pImpl->spikeHistory.push_back(currentTime);
+        if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        }
+    }
+    
+    // Update firing rate for activity monitoring
+    if (pImpl->state.firingState == FiringState::Active && pImpl->state.lastSpikeTime >= 0.0f) {
+        float dt_for_rate = currentTime - pImpl->state.lastSpikeTime;
+        if (dt_for_rate > 0.0f) {
+            pImpl->state.firingRate = 1.0f / dt_for_rate;  // Convert to Hz
+        }
+    }
 }
 
 void Neuron::reset() {

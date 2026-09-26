@@ -72,15 +72,62 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Advanced Usage
+
+For advanced usage, including comprehensive documentation, API references, and CLI examples, visit:
+
+- **NLM Advanced User Guide**: `AdvancedCLI.md` (current file)
+- **NLM API Documentation**: `docs/API_DOCUMENTATION.md` (if available)
+- **NLM Configuration Examples**: `configs/` directory
+- **NLM Python Examples**: `examples/` directory (if available)
+
+### Advanced Documentation Access
+
+The NLM system provides comprehensive documentation for different user levels:
+
+#### For Beginners
+- **Easy Usage Guide**: `easy_usage.md` - Step-by-step tutorials for getting started
+- **Quick Reference**: Summary of essential commands and patterns
+
+#### For Intermediate Users
+- **HOW_TO_USE.md**: Complete technical documentation including:
+  - Building from source
+  - Python library installation and usage
+  - Complete API documentation
+  - Configuration options
+  - Example scripts
+
+#### For Advanced Users
+- **AdvancedCLI.md**: Comprehensive command-line interface documentation
+- **Phase 6 Integration**: Integration testing and advanced features
+- **Performance Optimization**: Tips for large-scale simulations
+- **Configuration Management**: Advanced configuration options and management
+
+### Quick Start for All Users
+
+```bash
+# Basic setup
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Quick test of basic functionality
+./nlm_phase3_demo  # Basic demo
+./nlm_phase4_demo  # Advanced demo  
+```
+
+For complete documentation and advanced features, refer to the specific documentation files in this repository.
 
 ## Project Structure
 
