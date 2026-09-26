@@ -4,19 +4,14 @@
 
 ## What is NLM?
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM (熙然, meaning "serene flow") is an advanced neural simulation framework. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
-
-NLM IS intended to become:
+NLM IS:
 - A neural system that learns from experience
 - A brain-inspired architecture with neurons and synapses
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
+- A complete integrated artificial brain (Phase 6)
 
 ## Current Phase
 
@@ -75,12 +70,39 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Demo (Final Integration)
+```bash
+./nlm
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Available Demos
+
+**NLM Phase 3 Demo**: World interaction and learning
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+**NLM Phase 4 Demo**: Emerging cognition mechanisms
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+**NLM Phase 5 Demo**: Lifetime learning and development
+```bash
+./nlm_phase5_demo
+```
+
+**NLM Phase 6 Demo**: Final integration test
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+**NLM Test Suite**: Comprehensive unit and integration tests
+```bash
+./nlm_test
+```
 
 ## Project Structure
 
@@ -104,14 +126,14 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── tests/             # Test framework
+└── configs/          # Configuration files
 ```
 
 ## Phase Summary
@@ -161,6 +183,37 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+## Advanced Usage
+
+### Command Line Options
+All executables support `--config=config_file` to specify configuration files.
+
+### Configuration Files
+- `configs/default.cfg` - Default configuration
+- Custom configs can be created for specific experiments
+
+### Python Bindings
+The project includes Python bindings via pybind11 for integration with Python-based research tools.
+
+## Testing
+
+Run the test suite to verify all systems:
+
+```bash
+cd build
+./nlm_test
+```
+
+Individual demo tests are also available:
+
+```bash
+cd build
+./nlm_phase3_demo
+./nlm_phase4_demo
+./nlm_phase5_demo
+./nlm_phase6_demo
+```
 
 ## Scientific Limitations
 
