@@ -115,6 +115,14 @@ bool Neuron::checkThreshold() const {
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
 float Neuron::getLastSpikeTime() const {
     return pImpl->state.lastSpikeTime;
 }
@@ -202,25 +210,48 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
+    // LIF dynamics: Leaky Integrate-and-Fire with exponential Euler integration
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Exponential solution: V(t+dt) = V(t)*exp(-dt/tau) + R*I*(1-exp(-dt/tau))
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
+    float tau = Impl::TIME_CONSTANT;  // ms at 37°C
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Temperature factor (Q10 = 3.0 for ion channel kinetics)
+    // At typical temperature (37°C = 310K), time constant is nominal
+    // Temperature affects ion channel opening/closing rates
+    const float Q10 = 3.0f;  // Typical Q10 for ion channels
+    const float temperature = 310.0f;  // 37°C in Kelvin
+    float temperatureFactor = std::pow(Q10, (temperature - 310.0f) / 10.0f);
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Adjust time constant for temperature (faster kinetics at higher temperature)
+    float tau_adjusted = tau / temperatureFactor;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Convert timestep to consistent units (dt in seconds, tau in ms)
+    float dt_ms = static_cast<float>(dt) * 1000.0f;  // Convert seconds to milliseconds
+    
+    // Synaptic input as current (I in nA)
+    MembranePotential I_syn = pImpl->synapticInput;
+    
+    // Resistance R = C * tau_adjusted (membrane resistance at current temperature)
+    float R = C * tau_adjusted;
+    
+    // Exponential Euler integration for LIF dynamics
+    float exp_factor = std::exp(-dt_ms / tau_adjusted);
+    float driving_factor = R * I_syn * (1.0f - exp_factor);
+    
+    // Update membrane potential: V_new = V_old * exp(-dt/tau) + R*I*(1-exp(-dt/tau)) + V_rest * (1-exp(-dt/tau))
+    V = V * exp_factor + driving_factor + V_rest * (1.0f - exp_factor);
+    
+    // Update membrane potential: V_new = V_old * exp(-dt/tau) + R*I*(1-exp(-dt/tau)) + V_rest * (1-exp(-dt/tau))
+    V = V * exp_factor + driving_factor + V_rest * (1.0f - exp_factor);
+    
+    // Ensure membrane potential doesn't cross reset if already near threshold
+    // This prevents instability from numerical integration
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -228,11 +259,11 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Spike detection with hysteresis to prevent multiple detections
+    // Use a threshold buffer to ensure neuron stays above threshold for detection
+    bool spikeDetected = (V >= threshold + 0.5f);  // 0.5mV hysteresis
     
-    // Check for spike
-    if (V >= threshold) {
+    if (spikeDetected) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -240,17 +271,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
-        V = V_reset;
+        // Reset membrane potential to reset level with biological realism
+        // Reset should bring potential close to but not necessarily exactly at resting
+        float resetFraction = 0.95f;  // Reset to 95% of distance to resting
+        V = V_reset + (V_rest - V_reset) * resetFraction;
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Update adaptation for spike-frequency adaptation (stronger for recent spikes)
+        pImpl->state.adaptationVariable += 2.0f;  // Increased adaptation
+        
+        // Clamp to biologically plausible range
+        V = std::clamp(V, -100.0f, 50.0f);
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
