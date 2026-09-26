@@ -4,6 +4,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Observation;
+
 // Reward signal for reinforcement learning
 // PLACEHOLDER - Phase 2 will implement real reward computation
 
@@ -24,7 +27,7 @@ public:
     
     // Compute reward from environment state
     // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
+    float computeReward(const Observation& observation) const;
     
     // Reward history
     const std::vector<float>& getHistory() const;

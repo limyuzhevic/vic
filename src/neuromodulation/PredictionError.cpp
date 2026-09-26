@@ -1,5 +1,6 @@
 #include "PredictionError.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../environment/Observation.hpp"
 #include <cmath>
 
 namespace nlm {

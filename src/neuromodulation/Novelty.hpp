@@ -4,6 +4,10 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+class Observation;
+
 // Novelty detection signal
 // Computes novelty from comparison with previous observations
 
@@ -13,15 +17,15 @@ public:
     ~Novelty();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
     // Get novelty level
     float getLevel() const;
     void setLevel(float level);
     
     // Detect novelty from observation
-    void detectNovelty(const class Observation& observation, 
-                       const class Observation& previousObservation);
+    void detectNovelty(const Observation& observation, 
+                       const Observation& previousObservation);
     
     // Detect novelty from sensory input pattern
     void detectNovelty(const std::vector<float>& currentPattern,

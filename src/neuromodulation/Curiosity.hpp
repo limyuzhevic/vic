@@ -4,6 +4,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
 
@@ -13,7 +16,7 @@ public:
     ~Curiosity();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
     // Get curiosity level
     float getLevel() const;

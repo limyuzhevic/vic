@@ -1,4 +1,5 @@
 #include "Reward.hpp"
+#include "../environment/Observation.hpp"
 
 namespace nlm {
 

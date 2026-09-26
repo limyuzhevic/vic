@@ -4,6 +4,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+
 // Prediction error signal for curiosity and learning
 // Computes difference between predicted and actual values
 
@@ -13,7 +16,7 @@ public:
     ~PredictionError();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain);
     
     // Get error value
     float getError() const;

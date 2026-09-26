@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <limits>
+#include <cstdint>
 
 namespace nlm {
 
@@ -19,40 +22,138 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Parse JSON file using nlohmann::json
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Clear existing entries
+        clear();
+        
+        // Process JSON object
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            std::string key = it.key();
+            const auto& value = it.value();
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Convert JSON value to ConfigValue based on type
+            ConfigValue configValue;
+            
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else         if (value.is_number_integer()) {
+                // Check if it fits into int64_t (handles large numbers)
+                if (value.get<int64_t>() <= std::numeric_limits<int>::max()) {
+                    configValue = value.get<int>();
+                } else {
+                    configValue = value.get<int64_t>();
+                }
+            } else if (value.is_number_unsigned()) {
+                // Handle unsigned numbers - convert to int64_t
+                uint64_t unsignedVal = value.get<uint64_t>();
+                if (unsignedVal <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+                    configValue = static_cast<int64_t>(unsignedVal);
+                } else {
+                    // If too large for int64_t, use string representation
+                    configValue = std::to_string(unsignedVal);
+                }
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Handle arrays
+                if (value.empty()) {
+                    configValue = std::vector<int>{};
+                } else {
+                    // Check array element type
+                    bool allInts = true;
+                    bool allDoubles = true;
+                    bool allStrings = true;
+                    
+                    for (const auto& item : value) {
+                        if (!item.is_number_integer()) allInts = false;
+                        if (!item.is_number_float()) allDoubles = false;
+                        if (!item.is_string()) allStrings = false;
+                    }
+                    
+                    if (allInts) {
+                        std::vector<int> intArray;
+                        intArray.reserve(value.size());
+                        for (const auto& item : value) {
+                            intArray.push_back(item.get<int>());
+                        }
+                        configValue = intArray;
+                    } else if (allDoubles) {
+                        std::vector<double> doubleArray;
+                        doubleArray.reserve(value.size());
+                        for (const auto& item : value) {
+                            doubleArray.push_back(item.get<double>());
+                        }
+                        configValue = doubleArray;
+                    } else if (allStrings) {
+                        std::vector<std::string> stringArray;
+                        stringArray.reserve(value.size());
+                        for (const auto& item : value) {
+                            stringArray.push_back(item.get<std::string>());
+                        }
+                        configValue = stringArray;
+                    } else {
+                        // Mixed types - convert to vector of doubles
+                        std::vector<double> mixedArray;
+                        mixedArray.reserve(value.size());
+                        for (const auto& item : value) {
+                            if (item.is_number()) {
+                                mixedArray.push_back(item.get<double>());
+                            } else {
+                                mixedArray.push_back(0.0); // Default for non-numeric
+                            }
+                        }
+                        configValue = mixedArray;
+                    }
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, configValue, ConfigSource::File);
         }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to simple key=value format for backward compatibility
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string valueStr = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (valueStr.size() >= 2 && 
+                    ((valueStr.front() == '"' && valueStr.back() == '"') ||
+                     (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                    valueStr = valueStr.substr(1, valueStr.size() - 2);
+                }
+                
+                set(key, valueStr, ConfigSource::File);
+            }
+        }
+        
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +185,36 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON object
+    nlohmann::json jsonConfig;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to appropriate JSON type
+        std::visit([&](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, int>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, double>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                jsonConfig[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                jsonConfig[entry.key] = value;
+            }
+        }, entry.value);
     }
+    
+    // Write JSON to file with indentation
+    file << jsonConfig.dump(4);
     
     return true;
 }
@@ -177,6 +304,30 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "["; bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "["; bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << item;
+                    first = false;
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "["; bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) oss << ", ";
+                    oss << "\"" << item << "\"";
+                    first = false;
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }
@@ -205,11 +356,17 @@ template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
 
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
 
 } // namespace nlm
