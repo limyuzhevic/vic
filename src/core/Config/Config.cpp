@@ -21,6 +21,26 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // 
+    // Current implementation supports:
+    // - Simple key=value pairs
+    // - Quoted values with spaces
+    // - Comments with # or //
+    // - Optional description comments
+    // 
+    // Future implementation will incorporate:
+    // - Full JSON (with jsoncpp/nlohmann/json) or YAML (with yaml-cpp) support
+    // - Nested configuration objects
+    // - Arrays and structured data
+    // - Schema validation
+    // - Cross-platform configuration format support
+    // 
+    // Benefits of proper JSON/YAML:
+    // - Standard configuration format widely used in other projects
+    // - Better integration with DevOps tools (Kubernetes, Docker, etc.)
+    // - Richer data types and structures
+    // - Better tooling and IDE support
+    // - Version control compatibility
     
     std::ifstream file(filepath);
     if (!file.is_open()) {

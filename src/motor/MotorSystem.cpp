@@ -34,22 +34,21 @@ std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegio
     return std::make_unique<Action>(ActionType::Wait);
 }
 
-const std::vector<ActionType>& MotorSystem::getAvailableActions() const {
-    return pImpl->availableActions;
+void MotorSystem::recordAction(std::unique_ptr<Action> action) {
+    if (action) {
+        pImpl->actionHistory.push_back(std::move(action));
+    }
 }
 
 void MotorSystem::setActionPreference(ActionType action, float preference) {
     // TODO PHASE 2: Implement action preferences
 }
 
-const std::vector<const Action*>& MotorSystem::getActionHistory() const {
+const std::vector<std::unique_ptr<Action>>& MotorSystem::getActionHistory() const {
     return pImpl->actionHistory;
 }
 
 void MotorSystem::clearHistory() {
-    for (auto* action : pImpl->actionHistory) {
-        delete action;
-    }
     pImpl->actionHistory.clear();
 }
 

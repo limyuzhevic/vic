@@ -21,11 +21,25 @@ HebbianRule::HebbianRule() : pImpl(new Impl) {}
 HebbianRule::~HebbianRule() = default;
 
 void HebbianRule::update(Synapse* synapse,
-                          const std::vector<Timestamp>& preSpikes,
-                          const std::vector<Timestamp>& postSpikes,
-                          TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
+                           const std::vector<Timestamp>& preSpikes,
+                           const std::vector<Timestamp>& postSpikes,
+                           TimestepDuration dt) {
+    // TODO PHASE 2: Implement real Hebbian learning with biological accuracy
     // PLACEHOLDER: Simple correlated firing increases weight
+    // 
+    // Biological basis:
+    // - Co-activity drives synaptic strengthening (Hebb's rule)
+    // - NMDA receptor-dependent calcium influx
+    // - AMPA receptor trafficking and insertion
+    // - Astrocyte-mediated signaling
+    // 
+    // Implementation will incorporate:
+    // - Real spike timing-dependent components
+    // - Calcium dynamics and signaling cascades
+    // - Vesicle trafficking and membrane insertion
+    // - Neuromodulator interactions (dopamine, acetylcholine)
+    // - Competition and saturation effects
+    // - Metaplasticity and synaptic tags
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
