@@ -1,4 +1,5 @@
 #include "NeuralPlanner.hpp"
+#include "../motor/Action.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -28,8 +29,10 @@ void NeuralPlanner::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
-ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+std::unique_ptr<class Action> NeuralPlanner::planAction(
+    const std::vector<float>& currentState,
+    const std::vector<RegionId>& attendedRegions,
+    SimulationStep currentStep) {
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
@@ -39,6 +42,20 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
     // Evaluate each sequence
     for (const auto& sequence : sequences) {
         PlanningCandidate candidate = evaluateSequence(sequence, currentState);
+        
+        // Apply attention weighting based on attended regions
+        if (!attendedRegions.empty()) {
+            // Increase reward if actions align with attended regions
+            float attentionBonus = 0.0f;
+            for (size_t i = 0; i < sequence.size() && i < attendedRegions.size(); ++i) {
+                // Simple heuristic: action type related to attended region gets bonus
+                ActionType action = sequence[i];
+                // In a full implementation, we'd map actions to regions
+                // For now, just apply a small bonus for attention focus
+                attentionBonus += 0.1f;
+            }
+            candidate.expectedReward += attentionBonus;
+        }
         
         if (candidate.expectedReward > best.expectedReward) {
             best = candidate;
@@ -50,19 +67,19 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
         planningConfidence_ = best.confidence;
     }
     
-    // Return first action of best sequence
+    // Return action as unique_ptr
     if (!best.actions.empty()) {
-        // Record success/failure based on whether we achieved target
-        recentPlanSuccess_.push_back(best.expectedReward >= targetReward);
+        // Record success/failure
+        recentPlanSuccess_.push_back(best.expectedReward >= 0.5f);
         if (recentPlanSuccess_.size() > 10) {
             recentPlanSuccess_.pop_front();
         }
         
-        return best.actions[0];
+        return std::make_unique<Action>(best.actions[0]);
     }
     
     // Default: wait if no good option
-    return ActionType::Wait;
+    return std::make_unique<Action>(ActionType::Wait);
 }
 
 PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,

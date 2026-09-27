@@ -37,7 +37,13 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Plan next action given current state and goal
+    // Plan next action given current state and attention focus
+    // Returns the best action to take now, considering which brain regions are being attended
+    std::unique_ptr<class Action> planAction(const std::vector<float>& currentState,
+                                          const std::vector<RegionId>& attendedRegions,
+                                          SimulationStep currentStep = 0);
+
+    // Plan next action given current state and target reward (legacy method)
     // Returns the best action to take now
     ActionType planAction(const std::vector<float>& currentState,
                          float targetReward = 0.5f);
