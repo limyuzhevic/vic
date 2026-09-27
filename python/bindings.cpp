@@ -416,6 +416,121 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Additional utility functions for advanced users
+    m.def("createDefaultConfigWithOverrides", [](const std::vector<std::string>& overrides) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (const auto& overridePair : overrides) {
+            size_t pos = overridePair.find('=');
+            if (pos != std::string::npos) {
+                std::string key = overridePair.substr(0, pos);
+                std::string value = overridePair.substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        return config;
+    }, py::arg("overrides"), "Create a default configuration with key=value overrides");
+
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+
+    m.def("importBrainState", [](const std::string& filepath, std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->load(filepath)) {
+            return brain;
+        } else {
+            throw std::runtime_error("Failed to load brain state from: " + filepath);
+        }
+    }, py::arg("filepath"), py::arg("config"), "Load brain state from file");
+
+    m.def("runExperiment", [](std::shared_ptr<Brain> brain, const std::string& experimentName, 
+                             SimulationStep maxSteps, double timestep) {
+        // Create a simple experiment runner (simplified for Python)
+        auto runner = std::make_shared<ExperimentRunner>();
+        auto exp = runner->createExperiment(experimentName);
+        
+        // For simplicity, create a dummy environment
+        auto env = std::make_shared<SimpleWorld>();
+        env->configure(10, 10, 8, 8);
+        env->reset();
+        
+        return runner->runExperiment(exp, brain, env, maxSteps);
+    }, py::arg("brain"), py::arg("experimentName"), 
+        py::arg("maxSteps"), py::arg("timestep"), "Run an experiment");
+
+    m.def("analyzeBrainState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> metrics;
+        
+        metrics["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        metrics["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        metrics["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+        metrics["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        return metrics;
+    }, py::arg("brain"), "Analyze brain state and return metrics");
+
+    m.def("normalizeBrainState", [](std::shared_ptr<Brain> brain, double targetFiringRate) {
+        // Adjust synaptic weights to normalize firing rate
+        auto* stdp = brain->getSTDP();
+        if (stdp) {
+            double currentRate = brain->getAverageFiringRate();
+            if (currentRate > 0.0) {
+                double scaleFactor = targetFiringRate / currentRate;
+                // Adjust STDP weights
+                float ltpWeight = static_cast<float>(0.01 * scaleFactor);
+                float ltdWeight = static_cast<float>(0.012 * scaleFactor);
+                stdp->setLTPWeight(ltpWeight);
+                stdp->setLTDWeight(ltdWeight);
+                return true;
+            }
+        }
+        return false;
+    }, py::arg("brain"), py::arg("targetFiringRate"), "Normalize brain state to target firing rate");
+
+    m.def("getBrainSummary", [](std::shared_ptr<Brain> brain) {
+        std::stringstream summary;
+        summary << "Brain Summary:" << std::endl;
+        summary << "  Total Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        summary << "  Total Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        summary << "  Firing Neurons: " << brain->getFiringNeuronCount() << std::endl;
+        summary << "  Total Spikes: " << brain->getTotalSpikeCount() << std::endl;
+        summary << "  Average Firing Rate: " << brain->getAverageFiringRate() << std::endl;
+        summary << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        summary << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        return summary.str();
+    }, py::arg("brain"), "Get a text summary of brain state");
+
+    m.def("createAdvancedConfig", [](int neuronCount, int regionCount, float connectionProb, 
+                                     double timestep, uint64_t seed) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("connection_probability", connectionProb, ConfigSource::Default);
+        config->set("simulation_timestep", timestep, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::Default);
+        
+        // Set advanced plasticity parameters
+        config->set("plasticity_stdp_enable", true, ConfigSource::Default);
+        config->set("plasticity_stdp_learning_rate", 0.001, ConfigSource::Default);
+        config->set("plasticity_stdp_tau_plus", 20.0, ConfigSource::Default);
+        config->set("plasticity_stdp_tau_minus", 20.0, ConfigSource::Default);
+        
+        config->set("plasticity_hebbian_enable", true, ConfigSource::Default);
+        config->set("plasticity_structural_enable", true, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001, ConfigSource::Default);
+        
+        return config;
+    }, py::arg("neuronCount"), py::arg("regionCount"), py::arg("connectionProb"), 
+        py::arg("timestep"), py::arg("seed"), "Create an advanced configuration");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

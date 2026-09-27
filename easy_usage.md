@@ -71,6 +71,109 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Configuration
+
+```python
+import pynlm
+
+# Create advanced configuration
+config = pynlm.createAdvancedConfig(
+    neuronCount=2000,
+    regionCount=3,
+    connectionProb=0.1,
+    timestep=0.001,
+    seed=42
+)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
+
+### Example 4: Brain Analysis and Export
+
+```python
+import pynlm
+
+# Create and run brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for i in range(100):
+    brain.step(i)
+
+# Analyze brain state
+metrics = pynlm.analyzeBrainState(brain)
+print("Brain Metrics:")
+for key, value in metrics.items():
+    print(f"  {key}: {value}")
+
+# Export brain state
+pynlm.exportBrainState(brain, "my_brain.bin")
+print("Brain state saved to 'my_brain.bin'")
+
+# Import brain state
+config2 = pynlm.createDefaultConfig()
+importedBrain = pynlm.importBrainState("my_brain.bin", config2)
+print(f"Imported brain has {importedBrain.getTotalNeuronCount()} neurons")
+```
+
+### Example 5: Advanced Agent with Learning
+
+```python
+import pynlm
+
+# Setup with advanced configuration
+config = pynlm.createAdvancedConfig(
+    neuronCount=1000,
+    regionCount=2,
+    connectionProb=0.05,
+    timestep=0.001,
+    seed=123
+)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+world.setAgentStart(7.5, 7.5)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run simulation with learning
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Get reward and apply learning
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+    
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Advanced agent simulation complete!")
+print("Final brain summary:")
+print(pynlm.getBrainSummary(brain))
+```
+
 ---
 
 ## Simple Analogy
@@ -179,6 +282,21 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
+### `pynlm.createAdvancedConfig(neuronCount, regionCount, connectionProb, timestep, seed)`
+Creates an advanced configuration with custom parameters.
+
+### `pynlm.analyzeBrainState(brain)`
+Analyzes brain state and returns metrics as a dictionary.
+
+### `pynlm.exportBrainState(brain, filepath)`
+Saves brain state to a file.
+
+### `pynlm.importBrainState(filepath, config)`
+Loads brain state from a file.
+
+### `pynlm.getBrainSummary(brain)`
+Returns a text summary of brain state.
+
 ---
 
 ## Mini Projects
@@ -268,6 +386,11 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Advanced config | `pynlm.createAdvancedConfig(neuronCount, regionCount, connectionProb, timestep, seed)` |
+| Analyze brain | `pynlm.analyzeBrainState(brain)` |
+| Export brain | `pynlm.exportBrainState(brain, filepath)` |
+| Import brain | `pynlm.importBrainState(filepath, config)` |
+| Get summary | `pynlm.getBrainSummary(brain)` |
 
 ---
 
@@ -294,4 +417,16 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## New Advanced Features
+
+With recent improvements, you can now:
+
+- **Create advanced configurations** with `pynlm.createAdvancedConfig()`
+- **Analyze brain state** with `pynlm.analyzeBrainState()`
+- **Export/import brain states** with `pynlm.exportBrainState()` and `pynlm.importBrainState()`
+- **Get detailed brain summaries** with `pynlm.getBrainSummary()`
+- **Run experiments programmatically** with `pynlm.runExperiment()`
+- **Normalize brain states** with `pynlm.normalizeBrainState()`
+- **Create configurations with overrides** using `pynlm.createDefaultConfigWithOverrides()`
+
+These new features make it much easier to work with complex neural simulations and integrate them into your applications.

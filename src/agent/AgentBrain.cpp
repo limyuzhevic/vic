@@ -85,15 +85,36 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Validate input
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: No brain available for sensory processing");
+        return;
+    }
+    
+    if (!brain_->getSpikeSystem()) {
+        NLM_LOG_WARNING("AgentBrain: Brain has no spike system");
+        return;
+    }
+    
+    // Validate percept data
+    if (percept.getVision().empty() && 
+        percept.getTouch().empty() && 
+        percept.getInternal().empty() && 
+        percept.getProprioception().empty()) {
+        NLM_LOG_DEBUG("AgentBrain: Empty percept data, skipping processing");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
+            // Inject current proportional to vision intensity with bounds checking
             float current = vision[i] * 5.0f;  // Scale factor
+            current = std::clamp(current, 0.0f, 100.0f);  // Safety clamp
             sensoryVision_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null vision neuron at index " + std::to_string(i));
         }
     }
     
@@ -102,7 +123,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            current = std::clamp(current, 0.0f, 100.0f);  // Safety clamp
             sensoryTouch_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null touch neuron at index " + std::to_string(i));
         }
     }
     
@@ -111,7 +135,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            current = std::clamp(current, -10.0f, 10.0f);  // Allow negative for inhibition
             sensoryInternal_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null internal neuron at index " + std::to_string(i));
         }
     }
     
@@ -120,7 +147,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            current = std::clamp(current, -5.0f, 5.0f);  // Allow negative for inhibition
             sensoryProprioception_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("AgentBrain: Null proprioception neuron at index " + std::to_string(i));
         }
     }
     
@@ -134,6 +164,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         
         // Normalize
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        
+        // Clamp novelty to reasonable range
+        noveltyLevel_ = std::clamp(noveltyLevel_, 0.0f, 1.0f);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -163,15 +196,28 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
+    // Validate brain pointer
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: No brain available for motor decoding");
+        return MotorCommand::Wait;
+    }
+    
+    // Calculate average activity in each motor group with null checking
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
+        size_t validNeurons = 0;
         for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (n) {  // Check for null pointer
+                // Use membrane potential deviation from rest as activity measure
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+                validNeurons++;
+            } else {
+                NLM_LOG_DEBUG("AgentBrain: Null neuron pointer in activity calculation");
+            }
         }
-        return sum / neurons.size();
+        // Avoid division by zero if all neurons were null
+        return validNeurons > 0 ? (sum / validNeurons) : 0.0f;
     };
     
     float forwardAct = calcActivity(motorForward_);
@@ -181,7 +227,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
+    // Find maximum activity with bounds checking
     struct { MotorCommand cmd; float activity; } commands[] = {
         {MotorCommand::MoveForward, forwardAct},
         {MotorCommand::MoveBackward, backwardAct},
@@ -195,30 +241,52 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float bestActivity = waitAct;  // Default to wait if nothing stronger
     
     for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
+        if (c.activity > bestActivity + 0.001f) {  // Add small epsilon to avoid floating point issues
             bestActivity = c.activity;
             best = c.cmd;
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Only act if there's meaningful activity with reasonable threshold
+    if (bestActivity < 0.01f) {  // Reduced threshold to be more responsive
+        NLM_LOG_DEBUG("AgentBrain: Low motor activity (%.4f), defaulting to Wait", bestActivity);
         return MotorCommand::Wait;
+    }
+    
+    // Log the selected action for debugging
+    if (verboseMode) {
+        NLM_LOG_DEBUG("AgentBrain: Selected action: %d with activity %.4f", 
+                     static_cast<int>(best), bestActivity);
     }
     
     return best;
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    // Validate input
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: No brain available for curiosity-based selection");
+        return defaultCmd;
+    }
+    
+    if (!brain_->getRandomGenerator()) {
+        NLM_LOG_WARNING("AgentBrain: Brain has no random generator for curiosity");
+        return defaultCmd;
+    }
+    
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
+        // Clamp exploreChance to valid range
+        exploreChance = std::clamp(exploreChance, 0.0f, 1.0f);
+        
+        // Generate random number
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command with extended options
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 9);  // Extended to 10 options
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,6 +295,8 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
+                case 7: return MotorCommand::MoveForward;  // Repeat for better distribution
+                case 8: return MotorCommand::Wait;
                 default: return MotorCommand::Wait;
             }
         }
