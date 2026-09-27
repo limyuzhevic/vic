@@ -1,7 +1,11 @@
 #pragma once
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
+#include "AgentConfig.hpp"
+#include "../agent/MotorDecoder.hpp"
+#include "../agent/SensoryProcessor.hpp"
+#include "../agent/NeuromodulationManager.hpp"
+#include "../agent/DevelopmentManager.hpp"
+#include "../agent/CuriosityManager.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -9,11 +13,11 @@
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Refactored AgentBrain: Orchestrates multiple specialized components
+// Each component handles a specific aspect of agent behavior
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, const AgentConfig& config = AgentConfig());
     ~AgentBrain();
     
     // Initialize with world
@@ -69,28 +73,41 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Update component configurations
+    void updateComponentConfigs() {
+        motorDecoder_.setConfig(config_);
+        sensoryProcessor_.setConfig(config_);
+        neuromodulationManager_.setConfig(config_);
+        developmentManager_.setConfig(config_);
+        curiosityManager_.setConfig(config_);
+    }
+    
+    // Set global agent configuration
+    void setConfig(const AgentConfig& config) {
+        config_ = config;
+        updateComponentConfigs();
+    }
+    
+    const AgentConfig& getConfig() const { return config_; }
+    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Component managers
+    MotorDecoder motorDecoder_;
+    SensoryProcessor sensoryProcessor_;
+    NeuromodulationManager neuromodulationManager_;
+    DevelopmentManager developmentManager_;
+    CuriosityManager curiosityManager_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Agent configuration
+    AgentConfig config_;
+    
+    // Configuration flags
+    bool rewardModulationEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool developmentEnabled_;
+    bool curiosityEnabled_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -103,15 +120,27 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    
+    // Neuron groups (organized by type)
+    std::vector<Neuron*> motorForward_;
+    std::vector<Neuron*> motorBackward_;
+    std::vector<Neuron*> motorTurnLeft_;
+    std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorWait_;
+    
+    std::vector<Neuron*> sensoryVision_;
+    std::vector<Neuron*> sensoryTouch_;
+    std::vector<Neuron*> sensoryInternal_;
+    std::vector<Neuron*> sensoryProprioception_;
+    
+    // Helper methods
+    void initializeNeuronGroups();
+    void organizeNeuronsByType(const Brain* brain);
+    void organizeMotorNeurons(const Brain* brain);
+    void organizeSensoryNeurons(const Brain* brain);
 };
 
 } // namespace nlm
