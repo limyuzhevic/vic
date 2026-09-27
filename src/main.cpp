@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "core/CLI/CLI.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,10 +26,122 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <functional>
+#include <map>
+
+using namespace nlm;
+using namespace nlm::cli;
+using namespace nlm::cli::utils;
+#include <chrono>
 
 using namespace nlm;
 
-void printBanner() {
+// Enhanced CLI argument structure
+struct MainProgramArgs {
+    std::string configFile = "configs/default.cfg";
+    bool help = false;
+    bool version = false;
+    bool verbose = false;
+    bool benchmark = false;
+    uint64_t neuronCount = 0; // 0 means use default
+    double timestep = 0.0; // 0.0 means use default
+    uint64_t randomSeed = 0; // 0 means use default
+    std::string outputFile;
+    bool saveConfig = false;
+    std::string logLevel = "INFO";
+    bool enableProfiling = false;
+};
+
+// Function to parse command line arguments using the new CLI system
+MainProgramArgs parseArgs(int argc, char** argv) {
+    MainProgramArgs args;
+    
+    nlm::cli::CLIParser parser("nlm", "NLM - Neural Learning Machine (熙然)\n" \
+                               "Phase 2: Real Neural Computation\n\n" \
+                               "An experimental artificial developmental brain implementing:\n" \
+                               "  - Leaky Integrate-and-Fire (LIF) neuron dynamics\n" \
+                               "  - Event-driven spike propagation with delays\n" \
+                               "  - STDP and Hebbian plasticity rules\n" \
+                               "  - Structural plasticity (synaptogenesis/pruning)\n\n" \
+                               "For more information, use --help-full.\n");
+    
+    // Add standard arguments
+    parser.addArgument(nlm::cli::CLIParser::Argument("help", 'h', "help",
+        "Show help information and exit", false));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("version", 'v', "version",
+        "Show version information and exit", false));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("config", 'c', "config",
+        "Load configuration from file", false, "configs/default.cfg"));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("neuron-count", 'n', "neuron-count",
+        "Override neuron count", false, "0"));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("timestep", 't', "timestep",
+        "Override simulation timestep (seconds)", false, "0.0"));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("seed", 's', "seed",
+        "Set random seed for reproducible results", false, "0"));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("verbose", 'V', "verbose",
+        "Enable verbose output", false));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("benchmark", 'b', "benchmark",
+        "Run performance benchmark and exit", false));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("output", 'o', "output",
+        "Save output to file", false));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("save-config", 0, "save-config",
+        "Save configuration to file after execution", false));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("log-level", 0, "log-level",
+        "Set logging level (OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE)", false, "INFO"));
+    
+    parser.addArgument(nlm::cli::CLIParser::Argument("profile", 0, "profile",
+        "Enable profiling during execution", false));
+    
+    // Parse arguments
+    if (!parser.parse(argc, argv)) {
+        return args; // Help/version was displayed
+    }
+    
+    // Extract parsed values
+    args.help = parser.hasValue("help");
+    args.version = parser.hasValue("version");
+    args.configFile = parser.getValue("config");
+    
+    std::string neuronCountStr = parser.getValue("neuron-count");
+    if (!neuronCountStr.empty() && neuronCountStr != "0") {
+        args.neuronCount = std::stoull(neuronCountStr);
+    }
+    
+    std::string timestepStr = parser.getValue("timestep");
+    if (!timestepStr.empty() && timestepStr != "0.0") {
+        args.timestep = std::stod(timestepStr);
+    }
+    
+    std::string seedStr = parser.getValue("seed");
+    if (!seedStr.empty() && seedStr != "0") {
+        args.randomSeed = std::stoull(seedStr);
+    }
+    
+    args.verbose = parser.hasValue("verbose");
+    args.benchmark = parser.hasValue("benchmark");
+    args.outputFile = parser.getValue("output");
+    args.saveConfig = parser.hasValue("save-config");
+    args.logLevel = parser.getValue("log-level");
+    args.enableProfiling = parser.hasValue("profile");
+    
+    return args;
+}
+
+void printEnhancedBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -46,6 +159,10 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    
+    std::cout << "NLM (熙然) - Neural Learning Machine - Version 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: " << utils::getBuildInfo() << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
