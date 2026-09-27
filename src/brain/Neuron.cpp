@@ -143,7 +143,8 @@ void Neuron::injectCurrent(MembranePotential current) {
     pImpl->synapticInput += current;
 }
 
-void Neuron::clearTotalCurrent() {
+void Neuron::clearSynapticInput() {
+    // Clear all synaptic input for next integration step
     pImpl->synapticInput = 0.0f;
 }
 

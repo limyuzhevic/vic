@@ -71,12 +71,28 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Type-specific convenience methods
+    std::optional<int> getInt(const std::string& key) const {
+        return get<int>(key);
+    }
+    
+    std::optional<double> getDouble(const std::string& key) const {
+        return get<double>(key);
+    }
+    
+    std::optional<bool> getBool(const std::string& key) const {
+        return get<bool>(key);
+    }
+    
+    std::optional<std::string> getString(const std::string& key) const {
+        return get<std::string>(key);
+    }
+    
+    // Set values with type validation
+    void setInt(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setDouble(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setBool(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;

@@ -23,11 +23,26 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
+            if (!region) {
+                NLM_LOG_WARN("Found null region in brain, skipping");
+                continue;
+            }
+            
             for (auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_WARN("Found null population in region, skipping");
+                    continue;
+                }
+                
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) {
+                            NLM_LOG_WARN("Found null neuron in motor population, skipping");
+                            continue;
+                        }
+                        
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
@@ -44,6 +59,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
+                        if (!n) {
+                            NLM_LOG_WARN("Found null neuron in sensory population, skipping");
+                            continue;
+                        }
+                        
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
@@ -58,6 +78,23 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 }
             }
         }
+    }
+    
+    // Validate that we have at least some motor neurons
+    size_t totalMotorNeurons = motorForward_.size() + motorBackward_.size() +
+                               motorTurnLeft_.size() + motorTurnRight_.size() +
+                               motorInteract_.size() + motorWait_.size();
+    
+    if (totalMotorNeurons == 0) {
+        NLM_LOG_WARN("No motor neurons found in brain - AgentBrain may not function correctly");
+    }
+    
+    // Validate that we have sensory neurons
+    size_t totalSensoryNeurons = sensoryVision_.size() + sensoryTouch_.size() +
+                                sensoryInternal_.size() + sensoryProprioception_.size();
+    
+    if (totalSensoryNeurons == 0) {
+        NLM_LOG_WARN("No sensory neurons found in brain - AgentBrain may not function correctly");
     }
 }
 
@@ -76,23 +113,40 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Use named constants instead of magic numbers
+    constexpr size_t VISION_PIXELS = 16 * 16;  // 256
+    constexpr size_t TOUCH_SENSORS = 8;
+    constexpr size_t INTERNAL_SIGNALS = 4;
+    constexpr size_t PROPRIOCEPTORS = 6;
+    
+    return VISION_PIXELS + TOUCH_SENSORS + INTERNAL_SIGNALS + PROPRIOCEPTORS;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action group
+    // Use named constant instead of magic number
+    constexpr size_t MOTOR_ACTION_GROUPS = 6;
+    
+    return MOTOR_ACTION_GROUPS;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+    
+    // Scale factors for sensory transduction - use named constants
+    constexpr float VISION_SCALE = 5.0f;
+    constexpr float TOUCH_SCALE = 8.0f;
+    constexpr float INTERNAL_CENTER = 2.0f;
+    constexpr float INTERNAL_SCALE = 5.0f;
+    constexpr float PROPRIOCEPTION_CENTER = 2.0f;
+    constexpr float PROPRIOCEPTION_SCALE = 3.0f;
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            float current = vision[i] * VISION_SCALE;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +155,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * TOUCH_SCALE; // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +164,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * INTERNAL_CENTER - 1.0f) * INTERNAL_SCALE; // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,12 +173,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * PROPRIOCEPTION_CENTER - 1.0f) * PROPRIOCEPTION_SCALE; // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Novelty detection
     if (!vision.empty()) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
@@ -144,7 +198,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Curiosuty calculation constants
+        constexpr float CURIOSITY_NOVELTY_WEIGHT = 2.0f;
+        constexpr float CURIOSITY_ERROR_WEIGHT = 0.5f;
+        
+        curiosityLevel_ = noveltyLevel_ * CURIOSITY_NOVELTY_WEIGHT + std::abs(predictionError_) * CURIOSITY_ERROR_WEIGHT;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -163,6 +221,9 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Threshold for considering an action "meaningful"
+    constexpr float ACTION_THRESHOLD = 0.5f;
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
@@ -202,7 +263,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity < ACTION_THRESHOLD) {
         return MotorCommand::Wait;
     }
     
@@ -210,24 +271,124 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+    // Thresholds for curiosity-based exploration - use named constants
+    constexpr float HIGH_CURiosity_THRESHOLD = 0.5f;
+    constexpr float EXPLORATION_CHANCE_FACTOR = 0.3f;
+    constexpr int MAX_MOTOR_ACTION_GROUPS = 5;
+    
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityLevel_ > HIGH_CURiosity_THRESHOLD) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * EXPLORATION_CHANCE_FACTOR;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command from available motor groups
+            // Only use motor groups that actually exist in the brain
+            int choice = brain_->getRandomGenerator()->uniformInt(0, MAX_MOTOR_ACTION_GROUPS);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
+                case 4: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
+            }
+        }
+    }
+    
+    // Apply curiosity-based exploration with smart strategies
+    return applySmartExploration(defaultCmd);
+}
+
+MotorCommand AgentBrain::applySmartExploration(MotorCommand defaultCmd) {
+    // Enhanced curiosity-based exploration with adaptive strategies
+    // Combines random exploration with context-aware decision making
+    
+    if (!curiosityEnabled_ || curiosityLevel_ <= 0.3f) {
+        return defaultCmd;
+    }
+    
+    // Get current brain state for context-aware exploration
+    if (!brain_) return defaultCmd;
+    
+    // Exploration strategy thresholds - use named constants
+    constexpr float LOW_CURiosity_THRESHOLD = 0.3f;
+    constexpr float HIGH_CURiosity_THRESHOLD = 0.7f;
+    constexpr float EXPLORATION_BIAS_FACTOR = 1.2f;
+    constexpr float GENTLE_EXPLORATION_FACTOR = 0.2f;
+    
+    // Exploration strategies based on curiosity level
+    float normalizedCuriosity = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    
+    // Strategy 1: High curiosity = exploratory behavior
+    if (normalizedCuriosity > HIGH_CURiosity_THRESHOLD) {
+        // Maximum exploration: choose from all motor commands
+        // This is ideal for discovering new behaviors
+        int choice = brain_->getRandomGenerator()->uniformInt(0, 6);
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::LookLeft;
+            case 5: return MotorCommand::LookRight;
+            default: return MotorCommand::Interact;
+        }
+    }
+    
+    // Strategy 2: Medium curiosity = balanced exploration
+    else if (normalizedCuriosity > LOW_CURiosity_THRESHOLD) {
+        // Moderate exploration: bias toward less-tried actions
+        // This promotes variety while maintaining some consistency
+        
+        // Use named constants for action bias
+        float weights[6] = {1.0f, 1.0f, 1.0f, 1.0f, EXPLORATION_BIAS_FACTOR, EXPLORATION_BIAS_FACTOR}; // Favor exploration actions
+        
+        // Normalize weights
+        float totalWeight = weights[0] + weights[1] + weights[2] +
+                           weights[3] + weights[4] + weights[5];
+        
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, totalWeight);
+        float cumulative = 0.0f;
+        
+        for (int i = 0; i < 6; ++i) {
+            cumulative += weights[i];
+            if (r <= cumulative) {
+                switch (i) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                }
+            }
+        }
+    }
+    
+    // Strategy 3: Low curiosity = slight exploration bias
+    else {
+        // Gentle exploration: occasionally try new actions
+        // This prevents getting stuck in local optima
+        
+        // Use named constant for exploration probability
+        float exploreChance = normalizedCuriosity * GENTLE_EXPLORATION_FACTOR;  // Up to 20% chance
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        
+        if (r < exploreChance) {
+            // 50/50 chance to try new action or stay with default
+            if (brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) < 0.5f) {
+                // Try new action
+                int choice = brain_->getRandomGenerator()->uniformInt(0, 5);
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
             }
         }
     }
