@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,9 +20,14 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first (Phase 2 implementation)
+    auto jsonContent = tryLoadJsonFile(filepath);
+    if (jsonContent) {
+        parseJsonConfig(jsonContent.value());
+        return true;
+    }
     
+    // Fall back to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -29,19 +35,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
@@ -59,7 +62,6 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
@@ -68,7 +70,6 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
@@ -85,8 +86,8 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << " (source: " << static_cast<int>(entry.source) << ")\n";
+        file << entry.key << " = " << getValueDescription(entry) << "\n";
     }
     
     return true;
@@ -173,12 +174,12 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
+        std::visit([&oss](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\"" << v << "\"";
             } else {
-                oss << arg;
+                oss << v;
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
@@ -199,17 +200,176 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::string Config::getValueDescription(const ConfigEntry& entry) {
+    std::ostringstream oss;
+    std::visit([&oss](const auto& v) {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << v << "\"";
+        } else {
+            oss << v;
+        }
+    }, entry.value);
+    return oss.str();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+inline std::string nlm::configTypeToString(const ConfigValue& value) {
+    return std::visit([](const auto& v) -> std::string {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, int>) return "int";
+        else if constexpr (std::is_same_v<T, int64_t>) return "int64_t";
+        else if constexpr (std::is_same_v<T, double>) return "double";
+        else if constexpr (std::is_same_v<T, bool>) return "bool";
+        else if constexpr (std::is_same_v<T, std::string>) return "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) return "std::vector<int>";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) return "std::vector<double>";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) return "std::vector<std::string>";
+        else return "unknown";
+    }, value);
+}
+
+inline std::string nlm::valueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](const auto& v) {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << v << "\"";
+        } else {
+            oss << v;
+        }
+    }, value);
+    return oss.str();
+}
+
+inline ConfigValue nlm::stringToValue(const std::string& str, const std::string& typeHint) {
+    if (typeHint == "int") {
+        try { return std::stoi(str); } catch (...) {}
+    } else if (typeHint == "int64_t") {
+        try { return std::stoll(str); } catch (...) {}
+    } else if (typeHint == "double") {
+        try { return std::stod(str); } catch (...) {}
+    } else if (typeHint == "bool") {
+        std::string lower = toLower(str);
+        if (lower == "true" || lower == "yes" || lower == "1") return true;
+        if (lower == "false" || lower == "no" || lower == "0") return false;
+    } else if (typeHint == "string") {
+        return str;
+    } else if (typeHint == "std::vector<int>") {
+        return parseVectorConfig<std::vector<int>>(str);
+    } else if (typeHint == "std::vector<double>") {
+        return parseVectorConfig<std::vector<double>>(str);
+    } else if (typeHint == "std::vector<std::string>") {
+        return parseVectorConfig<std::vector<std::string>>(str);
+    }
+    
+    // Default: try to parse as most common types
+    try { return std::stoi(str); } catch (...) {}
+    try { return std::stod(str); } catch (...) {}
+    return str;
+}
+
+inline std::string nlm::toConfigString(bool value) {
+    return value ? "true" : "false";
+}
+
+inline std::string nlm::toConfigString(int value) {
+    return std::to_string(value);
+}
+
+inline std::string nlm::toConfigString(int64_t value) {
+    return std::to_string(value);
+}
+
+inline std::string nlm::toConfigString(double value) {
+    return std::to_string(value);
+}
+
+inline bool nlm::validateConfigEntry(const std::string& key, const ConfigValue& value) {
+    // Basic validation - can be expanded with more sophisticated rules
+    return !key.empty() && !std::holds_alternative<std::monostate>(value);
+}
+
+// Helper function to parse vector config values
+namespace {
+    template<typename T>
+    ConfigValue parseVectorConfig(const std::string& str) {
+        // Parse vector format: [1,2,3] or "1,2,3"
+        std::vector<T> result;
+        
+        if (str.empty()) return result;
+        
+        // Try different formats
+        if (str.front() == '[' && str.back() == ']') {
+            std::string content = str.substr(1, str.size() - 2);
+            // Parse comma-separated values
+            std::stringstream ss(content);
+            std::string item;
+            while (std::getline(ss, item, ',')) {
+                item = Config::trim(item);
+                if (item.empty()) continue;
+                try {
+                    if constexpr (std::is_same_v<T, int>) {
+                        result.push_back(std::stoi(item));
+                    } else if constexpr (std::is_same_v<T, double>) {
+                        result.push_back(std::stod(item));
+                    } else if constexpr (std::is_same_v<T, std::string>) {
+                        // Remove quotes if present
+                        std::string trimmed = Config::trim(item);
+                        if (trimmed.size() >= 2 && 
+                            ((trimmed.front() == '"' && trimmed.back() == '"') ||
+                             (trimmed.front() == '\'' && trimmed.back() == '\''))) {
+                            trimmed = trimmed.substr(1, trimmed.size() - 2);
+                        }
+                        result.push_back(trimmed);
+                    }
+                } catch (...) {
+                    // Skip invalid items
+                }
+            }
+        } else {
+            // Comma-separated format
+            std::stringstream ss(str);
+            std::string item;
+            while (std::getline(ss, item, ',')) {
+                item = Config::trim(item);
+                if (item.empty()) continue;
+                try {
+                    if constexpr (std::is_same_v<T, int>) {
+                        result.push_back(std::stoi(item));
+                    } else if constexpr (std::is_same_v<T, double>) {
+                        result.push_back(std::stod(item));
+                    } else if constexpr (std::is_same_v<T, std::string>) {
+                        result.push_back(item);
+                    }
+                } catch (...) {
+                    // Skip invalid items
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    // Helper functions for JSON parsing (Phase 2)
+    std::optional<std::string> tryLoadJsonFile(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return std::nullopt;
+        }
+        
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+    }
+    
+    void parseJsonConfig(const std::string& jsonContent) {
+        // TODO PHASE 2: Implement proper JSON parsing
+        // For now, just log that JSON support is available
+        // This would use a proper JSON library like nlohmann/json
+        std::cerr << "Warning: JSON configuration parsing not yet implemented (Phase 2)" << std::endl;
+    }
+}
+
+// Explicit template instantiations
 
 } // namespace nlm

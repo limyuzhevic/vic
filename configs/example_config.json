@@ -1,0 +1,96 @@
+{
+    "brain": {
+        "neuron_count": 500,
+        "region_count": 2,
+        "synapse_density": 0.08,
+        "connection_probability": 0.12,
+        "initial_weight_mean": 0.6,
+        "initial_weight_std": 0.15,
+        "v_thresh": -45.0,
+        "v_rest": -65.0,
+        "v_reset": -70.0,
+        "tau_mem": 25.0,
+        "tau_ref": 3.0
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.002,
+            "tau_plus": 25.0,
+            "tau_minus": 25.0
+        },
+        "hebbian": {
+            "enable": true
+        },
+        "structural": {
+            "enable": true,
+            "synaptogenesis_rate": 0.00015,
+            "pruning_rate": 0.00002
+        }
+    },
+    "neuromodulation": {
+        "dopamine": {
+            "scale": 1.2,
+            "enable": true
+        },
+        "acetylcholine": {
+            "enable": true
+        },
+        "norepinephrine": {
+            "enable": true
+        },
+        "serotonin": {
+            "enable": true
+        },
+        "curiosity": {
+            "enable": true,
+            "strength": 0.8
+        },
+        "novelty": {
+            "enable": true,
+            "threshold": 0.3
+        }
+    },
+    "memory": {
+        "working_memory": {
+            "capacity": 150,
+            "enable": true
+        },
+        "episodic_memory": {
+            "max_episodes": 2000,
+            "enable": true
+        },
+        "associative_memory": {
+            "enable": true
+        }
+    },
+    "cognition": {
+        "neural_planner": {
+            "enable": true,
+            "planning_depth": 4
+        },
+        "concept_formation": {
+            "enable": true
+        },
+        "attentional_selection": {
+            "enable": true,
+            "inhibition_strength": 0.6,
+            "excitation_strength": 1.8
+        }
+    },
+    "development": {
+        "plasticity_decay_rate": 0.002,
+        "critical_period_length": 120.0,
+        "enable": true
+    },
+    "simulation": {
+        "timestep": 0.005,
+        "random_seed": 42,
+        "max_steps": 5000
+    },
+    "output": {
+        "log_level": "Info",
+        "checkpoint_interval": 500,
+        "enable_progress": true
+    }
+}
