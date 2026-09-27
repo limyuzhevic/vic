@@ -138,21 +138,55 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Extract sensory features from brain for concept formation
+    std::vector<float> extractSensoryFeatures(Brain* brain);
+    
+    // Extract reward/prediction features from brain for concept formation
+    std::vector<float> extractRewardFeatures(Brain* brain);
+    
+    // Process current brain state as an experience
+    // Combines sensory input, reward, and temporal context
+    size_t processCurrentExperience(float reward, SimulationStep currentTime);
+    
+    // Get current concept activations
+    std::vector<float> getCurrentConceptActivations() const;
+    
+    // Get current prototype patterns
+    std::vector<std::vector<float>> getCurrentPrototypes() const;
+    
+    // Get current concept stability levels
+    std::vector<float> getCurrentConceptStabilities() const;
+    
+    // Integrate concept formation with prediction system
+    void integrateWithPrediction(const std::vector<float>& predictedPattern);
+    
+    // Integrate concept formation with attention system
+    void integrateWithAttention(float attentionLevel);
+    
+    // Get concept associations for generalization
+    std::vector<size_t> getConceptAssociations(size_t conceptId) const;
+    
+    // Set formation parameters
+    void setAttentionThreshold(float threshold) { attentionThreshold_ = threshold; }
+    void setMemoryConsolidation(bool enable) { memoryConsolidation_ = enable; }
+    
 private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
-
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
-
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
-
+    // Create new concept from pattern and associated features
+    size_t createConceptFromPattern(const std::vector<float>& pattern,
+                                   const std::vector<float>& features,
+                                   const std::vector<float>& rewardFeatures,
+                                   float reward);
+    
+    // Update concept with Hebbian-like consolidation
+    void consolidateConcept(size_t conceptId, const std::vector<float>& newPattern,
+                           const std::vector<float>& features, float reward);
+    
+    // Check if pattern is attention-worthy for concept formation
+    bool isAttentionWorthy(const std::vector<float>& pattern, float attentionLevel) const;
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
@@ -161,7 +195,16 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
-};
+    
+    // Integration parameters
+    float attentionThreshold_;   // Minimum attention level for concept formation
+    bool memoryConsolidation_;  // Enable memory consolidation
+    float rewardPredictionError_; // Track prediction error for learning
+    
+    // Attention and prediction integration
+    std::vector<float> attentionLog_;  // Recent attention levels
+    std::vector<float> predictionLog_; // Recent prediction errors
+}
 
 // SpatialRepresentation: Learns spatial relationships from experience
 // NOT a map with coordinates - encodes spatial relationships in neural patterns

@@ -528,8 +528,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current sensory pattern from sensory neurons
+        std::vector<float> currentSensoryPattern;
+        
+        // Extract features from sensory processing
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                const auto& state = neuron->getState();
+                float potential = state.membranePotential;
+                float baseline = state.restingPotential;
+                
+                if (potential > baseline + 0.5f) {  // Thresholded activity
+                    currentSensoryPattern.push_back((potential - baseline) * 2.0f);  // Scale to [0,2]
+                }
+            }
+        }
+        
+        // Extract reward prediction error for learning
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->getPredictionError();
+        }
+        
+        // Process current brain state as an experience
+        pImpl->conceptFormation->processCurrentExperience(
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+            currentStep
+        );
+        
+        // Integrate concept formation with prediction system
+        if (!currentSensoryPattern.empty()) {
+            pImpl->conceptFormation->integrateWithPrediction(currentSensoryPattern);
+        }
+        
+        // Integrate concept formation with attention
+        if (pImpl->attention) {
+            float attentionLevel = 0.5f;  // Default attention level
+            // Get attention from winners if available
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                attentionLevel = pImpl->attention->getInhibitionFor(pImpl->workingMemory->getMemoryNeurons()[0]);
+            }
+            
+            pImpl->conceptFormation->integrateWithAttention(attentionLevel);
+        }
+        
+        // Log concept formation activity
+        if (pImpl->conceptFormation->getConceptCount() > 0) {
+            NLM_LOG_DEBUG("ConceptFormation: " + std::to_string(pImpl->conceptFormation->getConceptCount()) +
+                         " concepts discovered, stability: " +
+                         std::to_string(pImpl->conceptFormation->getConceptStability(1)));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

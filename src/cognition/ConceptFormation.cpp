@@ -24,10 +24,88 @@ ConceptFormation::ConceptFormation()
 
 ConceptFormation::~ConceptFormation() = default;
 
-void ConceptFormation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("ConceptFormation initialized");
+// Extract sensory pattern from brain for concept formation
+std::vector<float> ConceptFormation::extractSensoryFeatures(Brain* brain) {
+    if (!brain) return {};
+    
+    std::vector<float> features;
+    
+    // Extract working memory activity patterns
+    if (brain->getWorkingMemory()) {
+        auto memoryNeurons = brain->getWorkingMemory()->getMemoryNeurons();
+        for (NeuronId neuronId : memoryNeurons) {
+            if (brain->getWorkingMemory()->contains(neuronId)) {
+                float activation = brain->getWorkingMemory()->getNeuronActivation(neuronId);
+                features.push_back(activation);
+            }
+        }
+    }
+    
+    // Extract sensory neuron activity
+    auto regions = brain->getRegions();
+    for (const auto& region : regions) {
+        for (const auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == NeuronType::Sensory) {
+                for (Neuron* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float potential = state.membranePotential;
+                    float baseline = state.restingPotential;
+                    
+                    if (potential > baseline + 1.0f) {  // Thresholded activity
+                        features.push_back((potential - baseline) / 10.0f);  // Normalize to [0,1]
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add memory-based features if available
+    if (brain->getEpisodicMemory()) {
+        auto episodes = brain->getEpisodicMemory()->getRecentEpisodes(5);
+        for (const auto* episode : episodes) {
+            // Add reward-related features
+            features.push_back(episode->reward);
+            features.push_back(episode->novelty);
+        }
+    }
+    
+    return features;
+}
+
+// Extract reward prediction error features
+std::vector<float> ConceptFormation::extractRewardFeatures(Brain* brain) {
+    std::vector<float> features;
+    
+    if (!brain) return features;
+    
+    // Get current neuromodulation levels
+    if (brain->getDopamine()) {
+        float dopamine = brain->getDopamine()->getLevel();
+        features.push_back(dopamine);  // Reward prediction error signal
+    }
+    
+    if (brain->getCuriosity()) {
+        float curiosity = brain->getCuriosity()->getLevel();
+        features.push_back(curiosity);  // Exploration drive
+    }
+    
+    // Get recent rewards from episodic memory
+    if (brain->getEpisodicMemory()) {
+        auto episodes = brain->getEpisodicMemory()->getRecentEpisodes(10);
+        float totalReward = 0.0f;
+        size_t count = 0;
+        
+        for (const auto* episode : episodes) {
+            totalReward += episode->reward;
+            count++;
+        }
+        
+        if (count > 0) {
+            features.push_back(totalReward / count);  // Average recent reward
+        }
+    }
+    
+    return features;
 }
 
 size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,

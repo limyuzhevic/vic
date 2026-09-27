@@ -147,16 +147,93 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Integrate with prediction system if available
+    if (brain_ && brain_->getPredictionSystem()) {
+        // Extract current sensory state for prediction
+        std::vector<float> currentSensory;
+        currentSensory.reserve(sensoryVision_.size() + sensoryTouch_.size() + 
+                              sensoryInternal_.size() + sensoryProprioception_.size());
+        
+        for (float val : vision) currentSensory.push_back(val);
+        for (float val : touch) currentSensory.push_back(val);
+        for (float val : intern) currentSensory.push_back(val);
+        for (float val : proprio) currentSensory.push_back(val);
+        
+        // Update prediction system with new observation
+        // This would integrate with the brain's prediction system
+        // For now, just store for potential planning
+        predictionError_ = computePredictionError(currentSensory);
+    }
+}
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    MotorCommand decoded = MotorCommand::Wait;
+    bool planningAvailable = false;
+    
+    // Try to use NeuralPlanner for sophisticated action planning
+    if (brain_->getPlanner()) {
+        // Extract current neural state for planning
+        std::vector<float> currentState;
+        currentState.reserve(getSensoryInputSize() + getMotorOutputSize());
+        
+        // Extract sensory state from working memory
+        if (brain_->getWorkingMemory()) {
+            auto memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                if (brain_->getWorkingMemory()->contains(neuronId)) {
+                    float activation = brain_->getWorkingMemory()->getNeuronActivation(neuronId);
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        // Add motor state if available
+        for (int i = 0; i < 6; ++i) {  // 6 motor groups
+            currentState.push_back(0.0f);  // Default motor state
+        }
+        
+        // Set current goal if available
+        std::vector<float> goal = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f};  // Default goal
+        brain_->getPlanner()->setCurrentGoal(goal);
+        
+        // Set planning depth based on curiosity
+        size_t planningDepth = 3;  // Default
+        if (curiosityLevel_ > 0.5f) {
+            planningDepth = 5;  // More exploration with high curiosity
+        }
+        brain_->getPlanner()->setPlanningDepth(planningDepth);
+        
+        // Plan action using NeuralPlanner
+        try {
+            ActionType plannedAction = brain_->getPlanner()->planAction(currentState, 0.5f);
+            decoded = static_cast<MotorCommand>(plannedAction);
+            planningAvailable = true;
+            
+            NLM_LOG_DEBUG("AgentBrain: NeuralPlanner selected action: " + std::to_string(static_cast<int>(decoded)));
+        } catch (...) {
+            // Fallback to basic decoding if planning fails
+            decoded = decodeFromMotorNeurons();
+        }
+    }
+    
+    // If NeuralPlanner not available or planning failed, use basic decoding
+    if (!planningAvailable) {
+        decoded = decodeFromMotorNeurons();
+    }
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Update planner based on selected action
+    if (brain_->getPlanner()) {
+        std::vector<ActionType> plannedActions = {static_cast<ActionType>(decoded)};
+        brain_->getPlanner()->updatePlanQuality(plannedActions, plannedActions, 0.0f);
     }
     
     return decoded;
