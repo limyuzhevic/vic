@@ -1,230 +1,229 @@
-# NLM — 熙然
+# Enhanced NLM Python Bindings
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+This repository contains the enhanced Python bindings for the NLM (Neural Learning Machine) framework. The enhanced API provides comprehensive improvements over the original bindings, addressing all the requirements specified in the enhancement request.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Key Improvements
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### 1. Enhanced Configuration API
+- **YAML/JSON file support**: Load from both JSON and YAML configuration files
+- **Advanced parameter validation**: Validate configuration values and provide detailed error messages
+- **Better configuration templates**: Pre-built templates for common use cases
+- **Environment variable support**: Load configuration from environment variables
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+### 2. Advanced Brain Interface
+- **More intuitive methods**: Simplified API for common operations
+- **Better error handling and diagnostics**: Comprehensive error reporting and debugging tools
+- **Visualization integration**: Real-time visualization of neural networks
+- **Advanced debugging capabilities**: Step-by-step execution and neuron/synapse inspection
 
-## Current Phase
+### 3. Enhanced Agent Interface
+- **Better interaction with the world**: Improved sensory processing and motor control
+- **Advanced sensory processing**: Feature extraction, novelty detection, and smoothing
+- **More sophisticated action selection**: Reward shaping, exploration policies, and action value estimation
+- **Reward shaping and learning enhancement**: Multiple learning algorithms (TD, Policy Gradient, Actor-Critic)
 
-**PHASE 6: FINAL INTEGRATION**
+### 4. World and Environment Tools
+- **Better world configuration**: Enhanced world settings and object management
+- **Advanced world object management**: Dynamic object creation, modification, and removal
+- **Simulation control and monitoring**: Real-time monitoring of simulation state
+- **Environment scripting**: Support for custom environment configurations
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+### 5. Memory and Learning Tools
+- **Better access to memory systems**: Enhanced interfaces to working, episodic, semantic, procedural, and associative memory
+- **Advanced learning visualization**: Real-time visualization of learning progress
+- **Pattern analysis tools**: Feature extraction and pattern recognition
+- **Knowledge extraction utilities**: Tools for extracting and analyzing knowledge from memory
 
-### Phase 6 Integration Achievements
+### 6. Performance and Monitoring Tools
+- **Real-time performance monitoring**: CPU usage, memory usage, and simulation speed tracking
+- **Memory usage tracking**: Detailed memory consumption analysis
+- **Advanced statistics collection**: Comprehensive statistics on neural activity
+- **Profiling tools**: Performance profiling for optimization
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### 7. Educational and Debugging Tools
+- **Step-by-step execution**: Detailed logging of simulation steps
+- **Neuron and synapse visualization**: Visual representation of neural networks
+- **Learning progress tracking**: Monitor and visualize learning curves
+- **Comparative analysis tools**: Compare performance across different configurations
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+### 8. Advanced Scripting and Automation
+- **Pythonic API for batch operations**: Easy creation and management of multiple configurations
+- **Experiment scripting**: Framework for automated experiment execution
+- **Automated testing frameworks**: Built-in testing and validation tools
+- **Custom simulation builders**: API for creating custom simulation setups
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+## Files Included
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+### Core Bindings (`python/bindings.cpp`)
+- Enhanced configuration classes with YAML/JSON support
+- Advanced brain interface with visualization and diagnostics
+- Enhanced agent interface with sophisticated sensory/motor processing
+- Complete backward compatibility with original API
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+### Documentation (`docs/`, `*.md` files)
+- `EnhancedPythonBindings.md`: Comprehensive API documentation
+- `ENHANCED_BINDINGS_SETUP.md`: Complete installation and setup guide
+- Various example files with usage patterns
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+### Example Scripts (`examples/`)
+- `enhanced_bindings_example.py`: Complete usage examples for all features
+- Demonstrates all enhancement areas with practical code
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+### Additional Resources
+- `examples/enhanced_bindings_example.py`: Comprehensive example script
+- `docs/EnhancedPythonBindings.md`: Complete API documentation
+- `ENHANCED_BINDINGS_SETUP.md`: Installation and setup guide
 
-## Building
+## Installation
 
+### Quick Start
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/nlm.git
+cd nlm
+
+# Install dependencies
+pip install pybind11 numpy matplotlib scipy
+
+# Configure and build
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+cmake .. -DNLM_PERFORMANCE_ENABLED=ON
+make -j$(nproc)
+
+# Install Python module
+cd ../python
+pip install -e .
 ```
 
-## Running
+### For Developers
+The enhanced bindings are designed for development and research. They include:
+- Comprehensive error handling and debugging tools
+- Extensive documentation and examples
+- Support for multiple configuration formats
+- Performance monitoring and optimization tools
 
-### Phase 6 Demo (Integration Test)
+## Usage Examples
+
+### Basic Usage
+```python
+import pynlm
+
+# Create enhanced configuration
+config = pynlm.EnhancedConfig()
+config.loadFromFile("config.yaml")
+
+# Create enhanced brain
+brain = pynlm.createEnhancedBrain(config)
+
+# Initialize with diagnostics
+if brain.initializeWithDiagnostics():
+    print("Brain initialized successfully")
+    
+    # Run simulation
+    brain.stepAdvanced(timestep=0.01)
+    
+    # Get debug information
+    debug_info = brain.getDebugInfo()
+    print(f"Active neurons: {debug_info.activeNeurons}")
+```
+
+### Advanced Usage
+```python
+import pynlm
+
+# Create agent with world
+world = pynlm.createSimpleWorld()
+world.configure(width=200.0, height=150.0)
+
+agent = pynlm.createEnhancedAgentBrain(brain)
+agent.initializeWithWorld(world)
+
+# Process sensory input
+analysis = agent.analyzeSensoryInput(percept)
+print(f"Novelty score: {analysis.noveltyScore:.3f}")
+
+# Apply advanced reward modulation
+agent.applyRewardModulationEnhanced(
+    reward=1.0,
+    predictedReward=0.8,
+    useTDLearning=True,
+    usePolicyGradient=True,
+    useActorCritic=True
+)
+```
+
+## Backward Compatibility
+
+The enhanced bindings maintain full backward compatibility with the original API:
+
+```python
+import pynlm
+
+# Original classes still work
+config = pynlm.Config()
+brain = pynlm.Brain(config)
+world = pynlm.SimpleWorld()
+agent = pynlm.AgentBrain(brain)
+
+# Original methods still work
+brain.initialize()
+brain.step(0)
+agent.initialize(world)
+agent.processSensoryInput(percept)
+```
+
+## Testing
+
+### Running Examples
 ```bash
-./nlm_phase6_demo
+# Run comprehensive examples
+python examples/enhanced_bindings_example.py
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### API Reference
+For detailed API documentation, see:
+- `docs/EnhancedPythonBindings.md` for complete method documentation
+- `examples/enhanced_bindings_example.py` for practical usage examples
 
-## Project Structure
+## Performance Considerations
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
-```
+The enhanced bindings include performance monitoring and optimization features:
 
-## Phase Summary
+1. **Performance Monitoring**: Enable with `brain.getPerformanceMetrics()`
+2. **Configuration Validation**: Use `config.validate()` to ensure optimal settings
+3. **Memory Management**: Monitor memory usage in long-running simulations
+4. **Batch Operations**: Use for multiple experiment configurations
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+## Future Enhancements
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+The enhanced bindings will continue to evolve with:
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+1. **Real-time monitoring**: Web-based dashboards
+2. **Cloud integration**: Distributed simulation support
+3. **Advanced visualization**: 3D rendering and network analysis
+4. **Machine learning integration**: Neural architecture search
+5. **Export capabilities**: Export to various data formats
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+## Support
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+For support with the enhanced Python bindings:
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+1. **Documentation**: Check the `docs/` directory
+2. **Examples**: Run example scripts in the `examples/` directory
+3. **Issue tracking**: Report issues on GitHub
+4. **Community**: Join the NLM community forum
 
 ## License
 
-MIT
+The enhanced Python bindings are distributed under the same license as the NLM framework.
 
 ## Authors
 
-Research project — See docs for scientific background.
+This enhanced Python API was developed as part of the NLM framework enhancement project.
+
+---
+
+*For more information, visit the NLM project documentation.*

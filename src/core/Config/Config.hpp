@@ -64,9 +64,79 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Sleep/rest cycle configuration
+    bool getEnableSleepRestCycle() const;
+    void setEnableSleepRestCycle(bool enable);
+    
+    size_t getSleepStageDuration() const;
+    void setSleepStageDuration(size_t duration);
+    
+    size_t getSleepCycleLength() const;
+    void setSleepCycleLength(size_t length);
+    
+    float getNREMToREMRatio() const;
+    void setNREMToREMRatio(float ratio);
+    
+    size_t getMemoryConsolidationInterval() const;
+    void setMemoryConsolidationInterval(size_t interval);
+    
+    float getMemoryConsolidationStrength() const;
+    void setMemoryConsolidationStrength(float strength);
+    
+    bool getEnableReplayDuringSleep() const;
+    void setEnableReplayDuringSleep(bool enable);
+    
+    size_t getReplayIntervalDuringSleep() const;
+    void setReplayIntervalDuringSleep(size_t interval);
+    
+    size_t getReplayBatchSize() const;
+    void setReplayBatchSize(size_t size);
+    
+    float getNeuromodulationSleepLow() const;
+    void setNeuromodulationSleepLow(float low);
+    
+    float getNeuromodulationSleepHigh() const;
+    void setNeuromodulationSleepHigh(float high);
+    
+    float getAttentionSleepSuppression() const;
+    void setAttentionSleepSuppression(float suppression);
+    
+    bool getEnableDevelopmentDuringSleep() const;
+    void setEnableDevelopmentDuringSleep(bool enable);
+    
+    float getDevelopmentRateSleep() const;
+    void setDevelopmentRateSleep(float rate);
+    
+    bool getEnablePredictionUpdateSleep() const;
+    void setEnablePredictionUpdateSleep(bool enable);
+    
+float getPredictionUpdateStrength() const;
+    void setPredictionUpdateStrength(float strength);
+
+    // Neuromodulator (ACh, NE, 5-HT) configuration
+    float getNeuromodulationAChBaseline() const;
+    void setNeuromodulationAChBaseline(float baseline);
+    
+    float getNeuromodulationAChPeak() const;
+    void setNeuromodulationAChPeak(float peak);
+    
+    float getNeuromodulationAChDecayRate() const;
+    void setNeuromodulationAChDecayRate(float decayRate);
+    
+    float getNeuromodulationNEActivationThreshold() const;
+    void setNeuromodulationNEActivationThreshold(float threshold);
+    
+    float getNeuromodulationNESleepLow() const;
+    void setNeuromodulationNESleepLow(float low);
+    
+    float getNeuromodulationNESleepHigh() const;
+    void setNeuromodulationNESleepHigh(float high);
+    
+    float getNeuromodulation5HTBaseline() const;
+    void setNeuromodulation5HTBaseline(float baseline);
+    
+    float getNeuromodulation5HTReleaseRate() const;
+    void setNeuromodulation5HTReleaseRate(float releaseRate);
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
