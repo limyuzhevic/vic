@@ -392,6 +392,96 @@ void SimpleWorld::generateVision() {
     sensory_.setAudio({});
 }
 
+// Compute reward based on agent state and environmental interactions
+float SimpleWorld::computeReward(const NeuralRegion* brainRegion) const {
+    if (!brainRegion) {
+        return 0.0f;
+    }
+    
+    float reward = 0.0f;
+    
+    // Get statistics from the brain region
+    float avgFiringRate = brainRegion->getAverageFiringRate();
+    size_t firingCount = brainRegion->getFiringNeuronCount();
+    size_t totalNeurons = brainRegion->getTotalNeuronCount();
+    
+    // Activity-based rewards
+    if (avgFiringRate > 0.0f) {
+        // Positive reward for neural activity (engagement/learning)
+        reward += avgFiringRate * 0.5f;
+        
+        // Bonus for high firing activity
+        if (firingCount > totalNeurons * 0.3f) {
+            reward += 1.0f;
+        }
+        
+        // Bonus for moderate firing (avoid too much or too little)
+        if (avgFiringRate > 0.1f && avgFiringRate < 0.5f) {
+            reward += 0.3f;
+        }
+    }
+    
+    // Stability rewards (encourage stable activity patterns)
+    if (avgFiringRate < 0.05f) {
+        reward -= 0.5f;  // Low activity penalty
+    }
+    
+    // Object interaction rewards
+    // Check for resources and hazards near agent
+    const float interactRange = 1.0f;
+    
+    for (const auto& obj : objects_) {
+        if (!obj.active) continue;
+        
+        float dx = obj.x - agent_.x;
+        float dy = obj.y - agent_.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        
+        if (dist < interactRange + obj.radius) {
+            // Proximity bonus
+            float proximityBonus = std::max(0.0f, 1.0f - dist / (interactRange + obj.radius));
+            
+            if (obj.type == WorldObjectType::Resource) {
+                // Resource proximity (should lead to positive reward when consumed)
+                reward += proximityBonus * 0.3f;
+            } else if (obj.type == WorldObjectType::Hazard) {
+                // Hazard proximity (negative reward)
+                reward -= proximityBonus * 1.0f;
+            }
+        }
+    }
+    
+    // Efficiency rewards (encourage energy conservation)
+    if (agent_.energy > 0.0f) {
+        float energyEfficiency = agent_.energy / maxEnergy_;
+        reward += energyEfficiency * 0.2f;
+    }
+    
+    // Health maintenance rewards
+    reward += agent_.health * 0.1f;
+    
+    // Exploration rewards (encourage movement and discovery)
+    if (agent_.isMoving || agent_.isTurning) {
+        reward += 0.05f;  // Small movement bonus
+    }
+    
+    // Action success based on movement efficiency
+    // This would normally come from action results, but we can estimate
+    if (agent_.velocityX != 0.0f || agent_.velocityY != 0.0f) {
+        // Normalize movement speed
+        float speed = std::sqrt(agent_.velocityX * agent_.velocityX + 
+                               agent_.velocityY * agent_.velocityY);
+        if (speed > 0.0f && speed < 5.0f) {
+            reward += 0.1f;  // Efficient movement bonus
+        }
+    }
+    
+    // Clamp reward to reasonable bounds
+    reward = std::max(-10.0f, std::min(10.0f, reward));
+    
+    return reward;
+}
+
 void SimpleWorld::checkCollisions() {
     // Passive collision check (for damage when moving into objects)
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);

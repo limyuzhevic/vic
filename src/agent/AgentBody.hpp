@@ -67,11 +67,21 @@ enum class MotorCommand {
 
 // Action result from the world's perspective
 struct ActionResult {
-    float reward;
-    bool success;
-    std::string message;
+    float reward;                    ///< Reward value resulting from the action
+    bool success;                    ///< Whether the action was successful
+    std::string message;             ///< Descriptive message about action outcome
     
+    /**
+     * @brief Default constructor
+     */
     ActionResult() : reward(0.0f), success(false), message("") {}
+    
+    /**
+     * @brief Constructor with parameters
+     * @param r Reward value
+     * @param s Success flag
+     * @param m Descriptive message
+     */
     ActionResult(float r, bool s, const std::string& m = "") 
         : reward(r), success(s), message(m) {}
 };

@@ -79,9 +79,8 @@ public:
     // Time
     double getSimulationTime() const { return simTime_; }
     
-    // Seed for reproducibility
-    void setRandomSeed(uint64_t seed);
-    uint64_t getRandomSeed() const { return rngSeed_; }
+    // Compute reward based on brain region activity and environmental interactions
+    float computeReward(const NeuralRegion* brainRegion) const;
     
 private:
     // Generate vision from current view
