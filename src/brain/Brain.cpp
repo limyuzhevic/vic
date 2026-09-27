@@ -56,6 +56,10 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Development state (Phase 5)
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
