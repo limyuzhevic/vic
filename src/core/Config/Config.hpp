@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
@@ -93,6 +96,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON conversion methods
+    nlohmann::json toJson() const;
+    static std::shared_ptr<Config> fromJson(const nlohmann::json& json);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +107,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::vector<std::string> split(const std::string& str, char delimiter);
+    static ConfigValue parseValue(const std::string& valueStr);
 };
 
 } // namespace nlm
