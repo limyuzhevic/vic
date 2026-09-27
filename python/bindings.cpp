@@ -401,12 +401,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        auto config = std::make_shared<Config>();
+        // Load default configuration from file
+        config->loadFromFile("configs/default.cfg");
+        return config;
+    }, "Create a default configuration with values from configs/default.cfg");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Load default configuration from file
+        config->loadFromFile("configs/default.cfg");
+        // Apply Phase 2 specific defaults for easier use
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration and Phase 2 defaults");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();

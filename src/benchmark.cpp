@@ -70,9 +70,6 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
     
     std::cout << " Done!" << std::endl;
-    std::cout << "    Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
-    std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;
-    std::cout << "    Spikes/step: " << std::fixed << std::setprecision(2) << result.spikesPerStep << std::endl;
     
     return result;
 }

@@ -24,7 +24,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <future>
+#include <condition_variable>
 #include <functional>
 #include <algorithm>
 #include <numeric>
@@ -34,12 +34,12 @@
 
 namespace nlm {
 
-// Number of threads (can be configured)
-#ifndef NLM_NUM_THREADS
+// Number of threads (can be configured via compile definition NLM_NUM_THREADS)
+#ifdef NLM_NUM_THREADS
+    static constexpr size_t DEFAULT_NUM_THREADS = NLM_NUM_THREADS;
+#else
     #include <thread>
     static constexpr size_t DEFAULT_NUM_THREADS = std::thread::hardware_concurrency();
-#else
-    static constexpr size_t DEFAULT_NUM_THREADS = NLM_NUM_THREADS;
 #endif
 
 /**
@@ -140,7 +140,7 @@ public:
      */
     template<typename T>
     static void inclusiveScan(std::vector<T>& data, std::function<T(const T&, const T&)> op);
-    
+
     template<typename T>
     static void exclusiveScan(std::vector<T>& data, T identity, std::function<T(const T&, const T&)> op);
 
@@ -198,7 +198,7 @@ public:
      * Get thread pool
      */
     ThreadPool& getThreadPool() { return threadPool_; }
-    
+
 private:
     size_t numThreads_;
     ThreadPool threadPool_;
