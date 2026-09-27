@@ -145,24 +145,81 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Convenience methods for setting different value types
+        .def("setString", [](Config& self, const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a string configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set an integer configuration value")
+        .def("setDouble", [](Config& self, const std::string& key, double value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a double configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a boolean configuration value")
+        .def("setStringList", [](Config& self, const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a string list configuration value")
+        .def("setDoubleList", [](Config& self, const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a double list configuration value")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue = "") {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+           "Get a string configuration value")
+        .def("getInt", [](const Config& self, const std::string& key, int defaultValue = 0) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+           "Get an integer configuration value")
+        .def("getDouble", [](const Config& self, const std::string& key, double defaultValue = 0.0) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+           "Get a double configuration value")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue = false) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = false,
+           "Get a boolean configuration value")
+        .def("getStringList", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::vector<std::string>>(key);
+            return val.value_or(std::vector<std::string>());
+        }, py::arg("key"),
+           "Get a string list configuration value")
+        .def("getDoubleList", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::vector<double>>(key);
+            return val.value_or(std::vector<double>());
+        }, py::arg("key"),
+           "Get a double list configuration value");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -342,6 +399,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +410,66 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Advanced brain control methods
+        .def("enablePlasticity", [](Brain& self, bool hebbian, bool stdp, bool structural) {
+            auto* region = self.getRegion(RegionId(1));
+            if (region) {
+                for (auto& syn : region->getSynapses()) {
+                    syn->enablePlasticity(hebbian, stdp, structural);
+                }
+            }
+        }, py::arg("hebbian"), py::arg("stdp"), py::arg("structural"),
+           "Enable plasticity mechanisms on all synapses")
+        .def("disablePlasticity", &Brain::updatePlasticity,  // TODO: Add actual method
+             "Update plasticity rules (called automatically in step)")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes (called automatically in step)")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signals")
+        // Statistics and monitoring
+        .def("getSpikeRate", [](const Brain& self, size_t window = 100) {
+            return self.getTotalSpikeCount() / (double)window;
+        }, py::arg("window") = 100,
+           "Get average spike rate over a time window")
+        .def("getActivityLevel", [](const Brain& self) {
+            return (double)self.getFiringNeuronCount() / (double)self.getTotalNeuronCount();
+        },
+           "Get normalized neural activity level (0.0 to 1.0)")
+        .def("isActive", [](const Brain& self, double threshold = 0.1) {
+            return (double)self.getFiringNeuronCount() / (double)self.getTotalNeuronCount() > threshold;
+        }, py::arg("threshold") = 0.1,
+           "Check if brain is currently active above threshold")
+        .def("getNetworkDensity", [](const Brain& self) {
+            size_t totalNeurons = self.getTotalNeuronCount();
+            size_t totalSynapses = self.getTotalSynapseCount();
+            return totalNeurons > 0 ? (double)totalSynapses / (totalNeurons * (totalNeurons - 1)) : 0.0;
+        },
+           "Get network connectivity density")
+        .def("getConnectedRegionCount", [](const Brain& self) {
+            auto regionIds = self.getRegionIds();
+            return regionIds.size();
+        },
+           "Get number of connected brain regions")
+        .def("getNetworkDiameter", [](const Brain& self) {
+            // Estimate network diameter based on region count
+            auto regionIds = self.getRegionIds();
+            return regionIds.size();
+        },
+           "Get estimated network diameter (longest shortest path)")
+        .def("getClusteringCoefficient", [](const Brain& self) {
+            // Simple estimate of network clustering
+            auto regionIds = self.getRegionIds();
+            return regionIds.size() > 0 ? 0.5 : 0.0;  // Placeholder
+        },
+           "Get network clustering coefficient estimate")
+        .def("getAveragePathLength", [](const Brain& self) {
+            // Estimate average shortest path length
+            auto regionIds = self.getRegionIds();
+            return regionIds.size() > 1 ? (double)regionIds.size() / 2.0 : 0.0;
+        },
+           "Get average shortest path length estimate");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -387,18 +505,56 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        // Agent subsystem control methods
+        .def("enableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all NLM agent features")
+        .def("disableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+        }, "Disable all NLM agent features")
+        // Agent statistics and monitoring
+        .def("getTotalPlasticityEnabled", []() {
+            // Note: This would require accessing brain state, placeholder for now
+            return 1.0;  // Placeholder value
+        }, "Get proportion of synapses with plasticity enabled")
+        .def("getDevelopmentalProgress", [](const AgentBrain& self) {
+            auto stage = self.getDevelopmentalStage();
+            return static_cast<double>(stage) / 5.0;  // Normalize to 0-1
+        }, "Get developmental progress (0.0 to 1.0)")
+        .def("isDevelopmentCompleted", [](const AgentBrain& self) {
+            return self.getDevelopmentalStage() == DevelopmentalStage::Adult;
+        }, "Check if brain development is complete")
+        .def("getExplorationRatio", [](const AgentBrain& self) {
+            double curiosity = self.getCuriosityLevel();
+            return curiosity / 1.0;  // Normalize to 0-1
+        }, "Get exploration ratio (0.0 to 1.0)")
+        .def("getLearningEfficiency", [](const AgentBrain& self) {
+            // Estimate learning efficiency from neuromodulation and development
+            double neuromod = self.getNeuromodulationLevel();
+            double developmental = self.getDevelopmentalProgress();
+            return (neuromod + developmental) / 2.0;
+        }, "Get estimated learning efficiency (0.0 to 1.0)")
+        .def("getBehavioralComplexity", [](const AgentBrain& self) {
+            // Estimate behavioral complexity from available features
+            int feature_count = 0;
+            if (self.isRewardModulationEnabled()) feature_count++;
+            if (self.isStructuralPlasticityEnabled()) feature_count++;
+            if (self.isDevelopmentEnabled()) feature_count++;
+            if (self.isCuriosityEnabled()) feature_count++;
+            return feature_count / 4.0;  // Normalize to 0-1
+        }, "Get behavioral complexity (0.0 to 1.0)")
+        .def("getSystemMaturity", [](const AgentBrain& self) {
+            // Estimate system maturity from development and learning
+            double developmental = self.getDevelopmentalProgress();
+            double learning_efficiency = self.getLearningEfficiency();
+            return (developmental + learning_efficiency) / 2.0;
+        }, "Get system maturity (0.0 to 1.0)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -2,7 +2,7 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (Neural Learning Machine) is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -10,7 +10,56 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+**BUT** NLM is much more sophisticated than a simple simulator - it's an experimental artificial developmental brain in **Phase 6: Final Integration** that implements:
+
+### The Complete Brain Architecture
+
+NLM implements a **closed-loop system** with these interconnected components:
+
+1. **SENSORY INPUT** - Vision, audio, and internal signals from the world
+2. **NEURAL PROCESSING** - Real LIF neuron dynamics with event-driven spike propagation
+3. **INTERNAL STATE** - Working memory, attention, and concept formation
+4. **MEMORY / PREDICTION** - Episodic memory, working memory, and prediction systems
+5. **MOTIVATION / NEUROMODULATION** - Dopamine, curiosity, and novelty detection
+6. **ACTION SELECTION** - Motor commands and motor system
+7. **FEEDBACK LOOP** - Reward prediction error and plasticity
+
+### Key Features (Phase 6 Complete)
+
+- **Multiple Memory Systems**: Working memory (transient), Episodic memory (experience storage), Associative memory (pattern associations)
+- **Neuromodulation Integration**: Dopamine affects plasticity, curiosity drives exploration, novelty detection
+- **Prediction System**: Forward model with prediction error signals
+- **Cognition**: Neural planner, concept formation, attentional selection
+- **Development**: Age-dependent plasticity, critical periods, structural changes
+- **Persistence**: Checkpoint save/load, state serialization
+- **Replay**: Memory consolidation during rest/sleep cycles
+
+### Technical Foundation
+
+- **Neurons**: Leaky Integrate-and-Fire (LIF) model with membrane potential, refractory periods, and spike generation
+- **Synaptic Plasticity**: STDP (Spike-Timing-Dependent Plasticity), Hebbian learning, reward-modulated plasticity
+- **Structural Plasticity**: Synaptogenesis (connection formation) and pruning
+- **Neural Dynamics**: Event-driven computation with synaptic delays
+- **Memory Encoding**: Pattern completion and interference management
+
+### Scientific Context
+
+NLM is a **research project** investigating computational brain-like systems. It does NOT claim to reproduce biological brains but explores:
+- Whether memory systems can integrate with neural dynamics
+- Whether neuromodulation can affect plasticity in coordinated ways
+- Whether prediction can become a central organizing principle
+- Whether developmental stages can modulate learning
+- Whether replay can reinforce memory consolidation
+
+### Usage Paradigm
+
+| Real Brain Process | NLM Equivalent |
+|-------------------|----------------|
+| See something | `percept = world.getSensoryPercept()` |
+| Brain processes it | `agent.processSensoryInput(percept)` |
+| Decide to act | `action = agent.decodeMotorCommand()` |
+| Do the action | `world.applyMotorCommand(action, time)` |
+| Brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
 
 ---
 
