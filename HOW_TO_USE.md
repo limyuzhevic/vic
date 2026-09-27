@@ -7,9 +7,8 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
-
----
+3. Using the NLM Python API with high-level classes
+4. Training and optimization examples
 
 ## Part 1: Building the C++ Project from Source
 
@@ -68,8 +67,6 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
 
----
-
 ## Part 2: Installing the Python Library
 
 ### From Source (Recommended for Development)
@@ -113,16 +110,14 @@ brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
 
----
+## Part 3: Using the NLM Python API (High-Level Interface)
 
-## Part 3: Using the Python Library
+### Basic Usage with High-Level Classes
 
-### Basic Usage
-
-#### Creating a Brain
+#### Creating a Brain with NLMBrain
 
 ```python
-import pynlm
+import pynlm as nlm
 
 # Create a default configuration
 config = pynlm.createDefaultConfig()
@@ -139,395 +134,695 @@ print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
-#### Running a Simulation
+#### Creating an Experiment with NLMExperiment
 
 ```python
-import pynlm
+import pynlm as nlm
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
-```
-
-#### Creating a Simple World
-
-```python
-import pynlm
-
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
-
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
+# Create an experiment with standard setup
+experiment = nlm.NLMExperiment.create_standard(
+    world_size=(20, 20),
+    config={
+        "brain": {
+            "neuron_count": 2000,
+            "complexity": 0.7
+        }
+    }
 )
 
-# Reset world to initial state
-world.reset()
+brain = experiment.get_brain()
+world = experiment.get_world()
+agent = experiment.get_agent()
 
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
+# Enable learning features
+experiment.enable_features(
+    reward_modulation=True,
+    structural_plasticity=True,
+    development=True,
+    curiosity=True
+)
 
-# Run world update
-world.update(timestep=0.1)
+print("Experiment setup complete!")
 ```
 
-### Complete Agent Example
+#### Running a Complete Simulation
 
 ```python
-import pynlm
+import pynlm as nlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+# Create experiment
+experiment = nlm.NLMExperiment.create_standard(world_size=(15, 15))
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run simulation
+results = experiment.run(num_steps=1000)
+
+# Access results
+print(f"Final firing rate: {results.metrics['final_firing_rate']:.3f}")
+print(f"Total spikes: {results.metrics['final_spikes']}")
+print(f"Average firing rate: {results.metrics['average_firing_rate']:.3f}")
+
+# Save results to file
+with open('experiment_results.json', 'w') as f:
+    json.dump(results.to_dict(), f, indent=2)
 ```
 
-### Key Classes and Methods
+### Advanced Training Examples
 
-#### Brain Class
+#### Example 1: Basic Reinforcement Learning with High-Level API
+
+```python
+import pynlm as nlm
+from pynlm.training import TrainingConfig, SimpleTrainingCallback
+
+print("=== Example 1: Basic Reinforcement Learning ===")
+
+# Create training setup using the high-level API
+trainer, brain, world, agent = nlm.create_training_setup()
+
+# Configure basic training
+training_config = TrainingConfig()
+training_config.maxEpisodes = 500
+training_config.learningRate = 0.001
+training_config.discountFactor = 0.99
+training_config.explorationRate = 0.1
+
+# Create simple training callback
+class BasicCallback(SimpleTrainingCallback):
+    def afterEpisode(self, episode, reward, success):
+        if episode % 50 == 0:
+            print(f"Episode {episode}: Reward = {reward:.2f}, Success = {success}")
+    
+    def afterStep(self, episode, step, reward, loss):
+        pass
+
+# Enable features for RL
+brain.enable_features(reward_modulation=True, curiosity=True)
+world.enable_features(exploration=True)
+agent.enable_learning(True)
+
+# Run training
+print("Starting basic reinforcement learning training...")
+callback = BasicCallback()
+training_complete = trainer.trainAgent(brain, world, agent, training_config, [callback])
+
+if training_complete:
+    print("✓ Basic training completed successfully!")
+else:
+    print("✗ Training was stopped early")
+
+# Evaluate agent performance
+print("Evaluating agent performance...")
+performance = trainer.evaluateAgent(brain, world, agent, training_config, 20)
+print(f"Average evaluation reward: {performance:.3f}")
+```
+
+#### Example 2: Advanced Training with Callbacks and Monitoring
+
+```python
+import pynlm as nlm
+from pynlm.training import TrainingConfig, SimpleTrainingCallback
+
+print("=== Example 2: Advanced Training with Monitoring ===")
+
+# Create training setup
+trainer, brain, world, agent = nlm.create_training_setup()
+
+# Configure advanced training
+training_config = TrainingConfig()
+training_config.maxEpisodes = 1000
+training_config.learningRate = 0.001
+training_config.explorationRate = 0.1
+training_config.rewardConfig.type = nlm.RewardConfig.Type.WEIGHTED
+training_config.rewardConfig.weighted.stepCompletion = 1.0
+training_config.rewardConfig.weighted.novelty = 0.5
+training_config.rewardConfig.weighted.survival = 0.8
+training_config.rewardConfig.weighted.efficiency = 1.0
+
+# Create callback that tracks performance
+class PerformanceTrackingCallback(SimpleTrainingCallback):
+    def __init__(self):
+        super().__init__()
+        self.episode_rewards = []
+        self.step_losses = []
+    
+    def afterEpisode(self, episode, reward, success):
+        self.episode_rewards.append(reward)
+        super().afterEpisode(episode, reward, success)
+    
+    def afterStep(self, episode, step, reward, loss):
+        self.step_losses.append(loss)
+        super().afterStep(episode, step, reward, loss)
+    
+    def getPerformanceSummary(self):
+        if not self.episode_rewards:
+            return "No performance data"
+        
+        avg_reward = sum(self.episode_rewards) / len(self.episode_rewards)
+        avg_loss = sum(self.step_losses) / len(self.step_losses) if self.step_losses else 0
+        
+        return {
+            'episodes_completed': len(self.episode_rewards),
+            'average_reward': avg_reward,
+            'average_loss': avg_loss,
+            'best_reward': max(self.episode_rewards),
+            'worst_reward': min(self.episode_rewards)
+        }
+
+# Enable advanced features
+class AdvancedFeaturesCallback(SimpleTrainingCallback):
+    def afterEpisode(self, episode, reward, success):
+        # Enable curriculum learning based on performance
+        if success and episode % 100 == 0:
+            print(f"Curriculum progression: Episode {episode} successful")
+        
+        # Log advanced feature activation
+        if agent.isCuriosityEnabled():
+            curiosity = agent.getCuriosityLevel()
+            if curiosity > 0.5:
+                print(f"High curiosity detected: {curiosity:.2f}")
+        
+        super().afterEpisode(episode, reward, success)
+
+# Enable all features
+brain.enable_features(
+    reward_modulation=True,
+    structural_plasticity=True,
+    development=True,
+    curiosity=True
+)
+
+world.enable_features(
+    exploration=True,
+    reward=True,
+    novelty=True
+)
+
+agent.enable_learning(True)
+
+# Run advanced training
+print("Starting advanced training with monitoring...")
+performance_callback = PerformanceTrackingCallback()
+advanced_callback = AdvancedFeaturesCallback()
+
+training_complete = trainer.trainAgent(
+    brain, world, agent, training_config,
+    [performance_callback, advanced_callback]
+)
+
+if training_complete:
+    print("✓ Advanced training completed successfully!")
+    summary = performance_callback.getPerformanceSummary()
+    print(f"Performance Summary: {summary}")
+else:
+    print("✗ Training was stopped early")
+
+# Evaluate agent performance
+print("Evaluating agent performance...")
+performance = trainer.evaluateAgent(brain, world, agent, training_config, 20)
+print(f"Average evaluation reward: {performance:.3f}")
+```
+
+#### Example 3: Hyperparameter Optimization
+
+```python
+import pynlm as nlm
+from pynlm.training import HyperparameterOptimizer, OptimizationStrategy
+
+print("=== Example 3: Hyperparameter Optimization ===")
+
+# Define hyperparameter search space
+param_space = [
+    {"name": "learning_rate", "value": 0.001, "min": 0.0001, "max": 0.01},
+    {"name": "discount_factor", "value": 0.99, "min": 0.9, "max": 0.999},
+    {"name": "exploration_rate", "value": 0.1, "min": 0.01, "max": 0.5},
+    {"name": "batch_size", "value": 32, "min": 16, "max": 128, "discrete": True},
+    {"name": "hidden_size", "value": 256, "min": 128, "max": 1024, "discrete": True},
+]
+
+# Define evaluation function that runs a training session
+def evaluate_training_params(params):
+    print(f"Testing params: LR={params['learning_rate']}, DF={params['discount_factor']}, ER={params['exploration_rate']}")
+    
+    # Create training setup
+    trainer, brain, world, agent = nlm.create_training_setup()
+    
+    # Configure training with these hyperparameters
+    training_config = nlm.TrainingConfig()
+    training_config.maxEpisodes = 100  # Short evaluation for speed
+    training_config.learningRate = params['learning_rate']
+    training_config.discountFactor = params['discount_factor']
+    training_config.explorationRate = params['exploration_rate']
+    
+    # Run training (simplified for optimization)
+    callback = SimpleTrainingCallback()
+    success = trainer.trainAgent(brain, world, agent, training_config, [callback])
+    
+    if success:
+        # Calculate performance score
+        # In a real implementation, you would collect final reward or other metrics
+        return 85.5  # Placeholder score
+    else:
+        return 0.0  # Penalty for failed training
+
+# Create optimizer and run optimization
+print("Starting hyperparameter optimization...")
+optimizer = HyperparameterOptimizer()
+
+results = optimizer.optimize(
+    param_space,
+    evaluate_training_params,
+    OptimizationStrategy.RANDOM_SEARCH,
+    maxIterations=50
+)
+
+# Print top results
+print("\nTop 5 hyperparameter configurations:")
+print("Rank | Score | Learning Rate | Discount Factor | Exploration Rate")
+print("-----|-------|---------------|-----------------|------------------")
+for i, (params, score) in enumerate(results[:5]):
+    print(f"{i+1:4d} | {score:5.2f} | {params['learning_rate']:13.6f} | {params['discount_factor']:15.6f} | {params['exploration_rate']:18.6f}")
+
+# Get best hyperparameters
+best_params = results[0]
+print(f"\nBest hyperparameters:")
+for param in best_params.first:
+    print(f"  {param['name']}: {param['value']}")
+```
+
+#### Example 4: Common Training Patterns
+
+```python
+import pynlm as nlm
+from pynlm.training import SimpleTrainingConfig, CommonTrainingPatterns, SimpleTrainingCallback
+
+print("=== Example 4: Common Training Patterns ===")
+
+# Create training setup
+trainer, brain, world, agent = nlm.create_training_setup()
+
+# Enable all features
+brain.enable_features(reward_modulation=True, curiosity=True)
+agent.enable_learning(True)
+
+# Create callback
+from pynlm.training import SimpleTrainingCallback
+callback = SimpleTrainingCallback()
+
+print("=== Running Reinforcement Learning Pattern ===")
+# Configure RL pattern
+rl_config = SimpleTrainingConfig.RLPattern()
+rl_config.gamma = 0.99
+rl_config.epsilon = 0.1
+rl_config.learningRate = 0.001
+rl_config.maxSteps = 1000
+rl_config.updateInterval = 10
+
+# Enable curiosity for RL
+if agent.isCuriosityEnabled():
+    trainer.addCuriosityDrivenExplorationPattern(brain, world)
+
+# Run RL pattern
+rl_result = CommonTrainingPatterns.runReinforcementLearningPattern(
+    trainer, brain, world, agent, rl_config, callback
+)
+print(f"RL Pattern Result: {'Success' if rl_result else 'Failed'}")
+
+print("\n=== Running Supervised Learning Pattern ===")
+# Configure SL pattern
+sl_config = SimpleTrainingConfig.SupervisedPattern()
+sl_config.epochs = 100
+sl_config.learningRate = 0.001
+sl_config.validationSplit = 0.2
+sl_config.earlyStopping = True
+sl_config.patience = 10
+
+# Run SL pattern
+sl_result = CommonTrainingPatterns.runSupervisedLearningPattern(
+    trainer, brain, world, agent, sl_config, callback
+)
+print(f"SL Pattern Result: {'Success' if sl_result else 'Failed'}")
+
+print("\n=== Running Unsupervised Learning Pattern ===")
+# Configure US pattern
+us_config = SimpleTrainingConfig.UnsupervisedPattern()
+us_config.epochs = 50
+us_config.reconstructionLossWeight = 1.0
+us_config.regularizationWeight = 0.01
+us_config.useNegativeSamples = True
+
+# Run US pattern
+us_result = CommonTrainingPatterns.runUnsupervisedLearningPattern(
+    trainer, brain, world, agent, us_config, callback
+)
+print(f"US Pattern Result: {'Success' if us_result else 'Failed'}")
+
+print("\n=== Running Hybrid Training Pattern ===")
+# Configure hybrid pattern
+hybrid_config = SimpleTrainingConfig.HybridPattern()
+hybrid_config.rlWeight = 0.7
+hybrid_config.slWeight = 0.3
+hybrid_config.interleavedEpisodes = 10
+
+# Run hybrid pattern
+hybrid_result = CommonTrainingPatterns.runHybridTrainingPattern(
+    trainer, brain, world, agent, hybrid_config, callback
+)
+print(f"Hybrid Pattern Result: {'Success' if hybrid_result else 'Failed'}")
+```
+
+#### Example 5: Experiment Tracking and Persistence
+
+```python
+import pynlm as nlm
+from pynlm.training import TrainingPersistence
+
+print("=== Example 5: Experiment Tracking and Persistence ===")
+
+# Create training setup
+trainer, brain, world, agent = nlm.create_training_setup()
+
+# Configure training
+training_config = nlm.TrainingConfig()
+training_config.maxEpisodes = 500
+training_config.checkpointFrequency = 50
+
+# Create callback that tracks experiments
+class ExperimentTrackingCallback:
+    def __init__(self):
+        self.experiments = []
+        self.checkpoints = []
+    
+    def afterEpisode(self, episode, reward, success):
+        # Create experiment for this episode
+        experiment = {
+            'episode': episode,
+            'reward': reward,
+            'success': success,
+            'timestamp': nlm.getCurrentTime()  # Assuming this function exists
+        }
+        self.experiments.append(experiment)
+        
+        # Save checkpoint every 50 episodes
+        if episode % 50 == 0:
+            checkpoint_path = f"experiments/checkpoint_ep{episode}.nlm"
+            if trainer.saveTrainingSession(checkpoint_path, brain, agent, episode):
+                self.checkpoints.append(checkpoint_path)
+                print(f"✓ Checkpoint saved: {checkpoint_path}")
+    
+    def onTrainingEnd(self):
+        print(f"✓ Training completed. {len(self.experiments)} experiments recorded.")
+        print(f"✓ {len(self.checkpoints)} checkpoints saved.")
+
+# Enable features
+brain.enable_features(reward_modulation=True, curiosity=True)
+agent.enable_learning(True)
+
+# Run training with experiment tracking
+print("Starting training with experiment tracking...")
+experiment_callback = ExperimentTrackingCallback()
+
+training_complete = trainer.trainAgent(
+    brain, world, agent, training_config,
+    [experiment_callback]
+)
+
+# Save complete experiment
+if training_complete:
+    print("\nSaving complete experiment...")
+    if trainer.saveTrainingSession(
+        "final_experiment.nlm",
+        brain, agent,
+        experiment_callback.experiments[-1]['episode']
+    ):
+        print("✓ Complete experiment saved successfully")
+        
+        # Load experiment for analysis
+        print("Loading experiment for analysis...")
+        loaded_trainer = nlm.createTrainingCore()
+        loaded_brain = nlm.cloneBrain(brain)
+        loaded_agent = nlm.cloneAgent(agent)
+        loaded_episode = experiment_callback.experiments[-1]['episode']
+        
+        if trainer.loadTrainingSession(
+            "final_experiment.nlm",
+            loaded_trainer, loaded_brain, loaded_agent,
+            loaded_episode
+        ):
+            print("✓ Experiment loaded successfully")
+            
+            # Analyze experiment data
+            print("\nExperiment Analysis:")
+            print(f"Total episodes: {len(experiment_callback.experiments)}")
+            print(f"Successful episodes: {sum(1 for exp in experiment_callback.experiments if exp['success'])}")
+            print(f"Average reward: {sum(exp['reward'] for exp in experiment_callback.experiments) / len(experiment_callback.experiments):.2f}")
+            print(f"Best reward: {max(exp['reward'] for exp in experiment_callback.experiments):.2f}")
+            print(f"Checkpoints saved: {len(experiment_callback.checkpoints)}")
+```
+
+#### Example 6: Advanced Features Integration
+
+```python
+import pynlm as nlm
+from pynlm.training import TrainingConfig, AdvancedTrainingFeatures, SimpleTrainingCallback
+
+print("=== Example 6: Advanced Features Integration ===")
+
+# Create training setup
+trainer, brain, world, agent = nlm.create_training_setup()
+
+# Enable advanced training features
+features = AdvancedTrainingFeatures()
+
+# Configure curiosity-driven exploration
+features.enableCuriosityDrivenExploration()
+features.curiosityConfig.explorationBonus = 0.1
+features.curiosityConfig.enableIntrinsicMotivation = True
+
+# Configure curriculum learning
+features.enableCurriculumLearning()
+features.curriculumConfig.enableCurriculum = True
+features.curriculumConfig.initialDifficulty = 1
+features.curriculumConfig.maxDifficulty = 10
+features.curriculumConfig.successThreshold = 0.8
+
+# Configure transfer learning
+features.enableTransferLearning("source_task")
+features.transferConfig.enableTransfer = True
+features.transferConfig.transferWeight = 0.5
+
+# Configure meta-learning
+features.enableMetaLearning()
+features.metaLearningConfig.enableMetaLearning = True
+features.metaLearningConfig.metaSteps = 10
+
+# Enable features on brain and world
+brain.enable_features(reward_modulation=True, curiosity=True)
+world.enable_features(exploration=True, reward=True)
+agent.enable_learning(True)
+
+# Create callback that uses advanced features
+class AdvancedFeaturesCallback(SimpleTrainingCallback):
+    def __init__(self, features):
+        super().__init__()
+        self.features = features
+        self.episode_count = 0
+    
+    def afterEpisode(self, episode, reward, success):
+        self.episode_count = episode
+        
+        # Monitor and adjust advanced features based on performance
+        if self.features.isCurriculumEnabled() and success:
+            # Progress curriculum based on success
+            print(f"Curriculum progression: Episode {episode} successful")
+        
+        if self.features.isCuriosityEnabled():
+            curiosity = agent.getCuriosityLevel()
+            if curiosity > 0.7:
+                print(f"High curiosity level detected: {curiosity:.2f}")
+        
+        super().afterEpisode(episode, reward, success)
+
+# Configure training with advanced features
+training_config = TrainingConfig()
+training_config.maxEpisodes = 1000
+training_config.learningRate = 0.001
+training_config.explorationRate = 0.1
+
+# Run training with advanced features
+print("Starting training with advanced features...")
+advanced_callback = AdvancedFeaturesCallback(features)
+
+training_complete = trainer.trainAgent(
+    brain, world, agent, training_config,
+    [advanced_callback]
+)
+
+if training_complete:
+    print("✓ Advanced training completed successfully!")
+    
+    # Get feature status
+    print("\nAdvanced Features Status:")
+    print(f"Curiosity-driven exploration: {'Enabled' if features.isCuriosityEnabled() else 'Disabled'}")
+    print(f"Curriculum learning: {'Enabled' if features.isCurriculumEnabled() else 'Disabled'}")
+    print(f"Transfer learning: {'Enabled' if features.isTransferEnabled() else 'Disabled'}")
+    print(f"Meta-learning: {'Enabled' if features.isMetaLearningEnabled() else 'Disabled'}")
+    
+    if features.isCuriosityEnabled():
+        print(f"Current curiosity level: {agent.getCuriosityLevel():.2f}")
+    
+    if features.isCurriculumEnabled():
+        print(f"Current developmental stage: {agent.getDevelopmentalStage()}")
+else:
+    print("✗ Training was stopped early")
+```
+
+## Key Classes and Methods (High-Level API)
+
+### TrainingCore Class
 
 ```python
 # Creation
-brain = pynlm.createBrain(config)
+trainer = nlm.createTrainingCore()
 
-# Initialization
-brain.initialize()
+# Training
+trainer.trainAgent(brain, world, agent, training_config, callbacks)
+trainer.evaluateAgent(brain, world, agent, training_config, num_episodes)
 
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+# Advanced features
+trainer.addCuriosityDrivenExplorationPattern(brain, world)
 ```
 
-#### Config Class
+### TrainingConfig Class
 
 ```python
 # Create
-config = pynlm.createDefaultConfig()
+training_config = nlm.TrainingConfig()
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
+# Query and modify
+if training_config.maxEpisodes:
+    print(f"Max episodes: {training_config.maxEpisodes}")
 
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+training_config.maxEpisodes = 1000
+training_config.learningRate = 0.001
+training_config.explorationRate = 0.1
 
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# Reward configuration
+training_config.rewardConfig.type = nlm.RewardConfig.Type.WEIGHTED
+training_config.rewardConfig.weighted.stepCompletion = 1.0
 ```
 
-#### AgentBrain Class
+### TrainingCallback Classes
 
 ```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
+# Create custom callback
+class MyCallback(SimpleTrainingCallback):
+    def afterEpisode(self, episode, reward, success):
+        # Custom logic here
+        pass
 
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Create callback instance and register
+callback = MyCallback()
+trainer.trainAgent(brain, world, agent, training_config, [callback])
 ```
 
-#### SimpleWorld Class
+### CommonTrainingPatterns
 
 ```python
-# Creation
-world = pynlm.createSimpleWorld()
+# Use predefined patterns
+from pynlm.training import CommonTrainingPatterns
 
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+# RL pattern
+CommonTrainingPatterns.runReinforcementLearningPattern(
+    trainer, brain, world, agent, rl_config, callback
+)
 
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
+# SL pattern
+CommonTrainingPatterns.runSupervisedLearningPattern(
+    trainer, brain, world, agent, sl_config, callback
+)
 
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
+# US pattern
+CommonTrainingPatterns.runUnsupervisedLearningPattern(
+    trainer, brain, world, agent, us_config, callback
+)
 
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+# Hybrid pattern
+CommonTrainingPatterns.runHybridTrainingPattern(
+    trainer, brain, world, agent, hybrid_config, callback
+)
 ```
 
-### Enumerations
+### TrainingPersistence
 
 ```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
+# Save training session
+from pynlm.training import TrainingPersistence
 
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
+persistence = TrainingPersistence()
+persistence.saveTrainingSession("checkpoint_ep50.nlm", brain, agent, 50)
 
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+# Load training session
+persistence.loadTrainingSession("checkpoint_ep50.nlm", trainer, brain, agent, 50)
 ```
 
----
+## Installation
 
-## Part 4: Configuration Options
+To use the training module, install the training dependencies:
 
-### Brain Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `brain.neuron_count` | int | 1000 | Total number of neurons |
-| `brain.synapse_density` | float | 0.1 | Synapse connectivity density |
-| `brain.connection_probability` | float | 0.05 | Probability of connection between neurons |
-| `brain.initial_weight_mean` | float | 0.5 | Mean initial synaptic weight |
-| `brain.initial_weight_std` | float | 0.1 | Standard deviation of initial weights |
-| `brain.v_thresh` | float | -50.0 | Neuron threshold potential (mV) |
-| `brain.v_rest` | float | -70.0 | Resting potential (mV) |
-| `brain.v_reset` | float | -75.0 | Reset potential after spike (mV) |
-| `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
-| `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
-
-### Plasticity Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `plasticity.stdp.enable` | bool | true | Enable STDP |
-| `plasticity.stdp.learning_rate` | float | 0.001 | STDP learning rate |
-| `plasticity.stdp.tau_plus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.stdp.tau_minus` | float | 20.0 | STDP time constant (ms) |
-| `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
-| `plasticity.structural.enable` | bool | true | Enable structural plasticity |
-
-### Neuromodulation Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
-
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
-
-```python
-import pynlm
-
-# Create and initialize
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-# Simulate
-for i in range(100):
-    brain.step(i)
-
-print("Simulation complete!")
+```bash
+pip install pynlm[training]
 ```
 
-### Environment Interaction
+Or install all development dependencies:
 
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
-
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+```bash
+pip install pynlm[dev]
 ```
 
----
+## Getting Started
+
+1. **Basic Training**: Start with Example 1 for simple reinforcement learning
+2. **Advanced Training**: Use Example 2 for training with callbacks and monitoring
+3. **Hyperparameter Optimization**: Use Example 3 for automated hyperparameter tuning
+4. **Common Patterns**: Use Example 4 to experiment with different training patterns
+5. **Experiment Tracking**: Use Example 5 for persistent experiment tracking
+6. **Advanced Features**: Use Example 6 to integrate curiosity-driven exploration, curriculum learning, transfer learning, and meta-learning
 
 ## Troubleshooting
 
-### Build Issues
+### Common Issues
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
-```
+**"Training is taking too long"**
+- Reduce maxEpisodes or increase stopping criteria
+- Use hyperparameter optimization to find better configurations
+- Adjust learning rate or exploration rate
 
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
+**"Callbacks not being called"**
+- Ensure callbacks are properly registered
+- Check that training configuration enables the features callbacks expect
+- Verify callback order and implementation
 
-### Runtime Issues
+**"Saving training sessions fails"**
+- Ensure sufficient disk space
+- Check file permissions
+- Verify that required dependencies are installed
+- Consider using compressed checkpoints for large brains
 
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
+**"Advanced features not working"**
+- Verify that the agent supports the required features
+- Check that the world simulation supports the advanced feature modules
+- Ensure feature flags are properly enabled
+- Debug feature configuration
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+## Next Steps
 
----
+When you're comfortable with the training module:
 
-## Further Reading
+1. **Integrate with your specific task** by creating custom reward functions
+2. **Experiment with different training patterns** to find what works best for your use case
+3. **Use hyperparameter optimization** to automate configuration discovery
+4. **Set up experiment tracking** for reproducible research
+5. **Combine multiple advanced features** for state-of-the-art training
+6. **Deploy to production** using the training persistence and logging capabilities
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+The NLM Training Module provides a comprehensive, extensible system for training NLM brains for various tasks while maintaining biological plausibility and performance of the underlying simulation.

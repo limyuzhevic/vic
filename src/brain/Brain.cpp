@@ -22,11 +22,429 @@
 
 namespace nlm {
 
+// Thread-safe access to BrainImpl data members
+#define THREAD_SAFE_ACCESS
+
+// Add thread safety for BrainImpl operations
+namespace nlm {
+
+class BrainImplThreadSafety {
+public:
+    explicit BrainImplThreadSafety(std::mutex* mutex) : mutex_(mutex) {}
+    
+    // Thread-safe access to regions vector
+    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return regions_;
+    }
+    
+    // Thread-safe modification of regions vector
+    void setRegions(std::vector<std::unique_ptr<NeuralRegion>> newRegions) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        regions_ = std::move(newRegions);
+    }
+    
+    // Thread-safe access to sensory neurons
+    const std::vector<Neuron*>& getSensoryNeurons() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return sensoryNeurons_;
+    }
+    
+    // Thread-safe modification of sensory neurons
+    void addSensoryNeuron(Neuron* neuron) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        sensoryNeurons_.push_back(neuron);
+    }
+    
+    // Thread-safe access to motor neurons
+    const std::vector<Neuron*>& getMotorNeurons() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return motorNeurons_;
+    }
+    
+    // Thread-safe modification of motor neurons
+    void addMotorNeuron(Neuron* neuron) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        motorNeurons_.push_back(neuron);
+    }
+    
+    // Thread-safe access to spike statistics
+    size_t getTotalSpikesThisStep() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return totalSpikesThisStep_;
+    }
+    
+    size_t getTotalSpikesTotal() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return totalSpikesTotal_;
+    }
+    
+    // Thread-safe modification of spike statistics
+    void incrementSpikesThisStep() {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        ++totalSpikesThisStep_;
+    }
+    
+    void incrementTotalSpikes() {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        ++totalSpikesTotal_;
+    }
+    
+    // Thread-safe reset of spike statistics
+    void resetSpikesThisStep() {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        totalSpikesThisStep_ = 0;
+    }
+    
+    // Thread-safe access to configuration
+    const Config& getConfig() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return config_;
+    }
+    
+    // Thread-safe modification of configuration
+    void setConfig(const Config& cfg) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        config_ = cfg;
+    }
+    
+    // Thread-safe access to timestep
+    double getTimestep() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return timestep_;
+    }
+    
+    // Thread-safe modification of timestep
+    void setTimestep(double ts) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        timestep_ = ts;
+    }
+    
+    // Thread-safe access to current step
+    SimulationStep getCurrentStep() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return currentStep_;
+    }
+    
+    // Thread-safe modification of current step
+    void setCurrentStep(SimulationStep step) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        currentStep_ = step;
+    }
+    
+    // Thread-safe access to current time
+    Timestamp getCurrentTime() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return currentTime_;
+    }
+    
+    // Thread-safe modification of current time
+    void setCurrentTime(Timestamp time) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        currentTime_ = time;
+    }
+    
+    // Thread-safe access to integration state
+    bool getIsResting() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return isResting_;
+    }
+    
+    // Thread-safe modification of integration state
+    void setIsResting(bool resting) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        isResting_ = resting;
+    }
+    
+    // Thread-safe access to steps since last episode
+    size_t getStepsSinceLastEpisode() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return stepsSinceLastEpisode_;
+    }
+    
+    // Thread-safe modification of steps since last episode
+    void incrementStepsSinceLastEpisode() {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        ++stepsSinceLastEpisode_;
+    }
+    
+    // Thread-safe reset of steps since last episode
+    void resetStepsSinceLastEpisode() {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        stepsSinceLastEpisode_ = 0;
+    }
+    
+    // Thread-safe access to developmental stage
+    DevelopmentalStage getDevelopmentalStage() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return developmentalStage_;
+    }
+    
+    // Thread-safe modification of developmental stage
+    void setDevelopmentalStage(DevelopmentalStage stage) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        developmentalStage_ = stage;
+    }
+    
+    // Thread-safe access to next region ID
+    RegionId getNextRegionId() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return nextRegionId_;
+    }
+    
+    // Thread-safe modification of next region ID
+    void incrementNextRegionId() {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        ++nextRegionId_;
+    }
+    
+    // Thread-safe access to random generator
+    const RandomGenerator& getRandomGenerator() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return *rng_;
+    }
+    
+    // Thread-safe modification of random generator
+    void setRandomGenerator(std::unique_ptr<RandomGenerator> rng) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        rng_ = std::move(rng);
+    }
+    
+    // Thread-safe access to working memory
+    NeuralWorkingMemory* getWorkingMemory() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return workingMemory_.get();
+    }
+    
+    // Thread-safe modification of working memory
+    void setWorkingMemory(std::unique_ptr<NeuralWorkingMemory> memory) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        workingMemory_ = std::move(memory);
+    }
+    
+    // Thread-safe access to episodic memory
+    NeuralEpisodicMemory* getEpisodicMemory() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return episodicMemory_.get();
+    }
+    
+    // Thread-safe modification of episodic memory
+    void setEpisodicMemory(std::unique_ptr<NeuralEpisodicMemory> memory) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        episodicMemory_ = std::move(memory);
+    }
+    
+    // Thread-safe access to associative memory
+    NeuralAssociativeMemory* getAssociativeMemory() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return associativeMemory_.get();
+    }
+    
+    // Thread-safe modification of associative memory
+    void setAssociativeMemory(std::unique_ptr<NeuralAssociativeMemory> memory) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        associativeMemory_ = std::move(memory);
+    }
+    
+    // Thread-safe access to prediction system
+    PredictionSystem* getPredictionSystem() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return predictionSystem_.get();
+    }
+    
+    // Thread-safe modification of prediction system
+    void setPredictionSystem(std::unique_ptr<PredictionSystem> system) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        predictionSystem_ = std::move(system);
+    }
+    
+    // Thread-safe access to planner
+    NeuralPlanner* getPlanner() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return planner_.get();
+    }
+    
+    // Thread-safe modification of planner
+    void setPlanner(std::unique_ptr<NeuralPlanner> planner) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        planner_ = std::move(planner);
+    }
+    
+    // Thread-safe access to concept formation
+    ConceptFormation* getConceptFormation() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return conceptFormation_.get();
+    }
+    
+    // Thread-safe modification of concept formation
+    void setConceptFormation(std::unique_ptr<ConceptFormation> formation) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        conceptFormation_ = std::move(formation);
+    }
+    
+    // Thread-safe access to attention system
+    AttentionalSelection* getAttention() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return attention_.get();
+    }
+    
+    // Thread-safe modification of attention system
+    void setAttention(std::unique_ptr<AttentionalSelection> attention) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        attention_ = std::move(attention);
+    }
+    
+    // Thread-safe access to development system
+    DevelopmentSystem* getDevelopmentSystem() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return developmentSystem_.get();
+    }
+    
+    // Thread-safe modification of development system
+    void setDevelopmentSystem(std::unique_ptr<DevelopmentSystem> system) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        developmentSystem_ = std::move(system);
+    }
+    
+    // Thread-safe access to neuromodulation systems
+    Dopamine* getDopamine() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return dopamine_.get();
+    }
+    
+    void setDopamine(std::unique_ptr<Dopamine> dopamine) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        dopamine_ = std::move(dopamine);
+    }
+    
+    Curiosity* getCuriosity() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return curiosity_.get();
+    }
+    
+    void setCuriosity(std::unique_ptr<Curiosity> curiosity) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        curiosity_ = std::move(curiosity);
+    }
+    
+    PredictionError* getPredictionError() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return predictionError_.get();
+    }
+    
+    void setPredictionError(std::unique_ptr<PredictionError> error) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        predictionError_ = std::move(error);
+    }
+    
+    Novelty* getNovelty() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return novelty_.get();
+    }
+    
+    void setNovelty(std::unique_ptr<Novelty> novelty) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        novelty_ = std::move(novelty);
+    }
+    
+    // Thread-safe access to spike systems
+    SpikeSystem* getSpikeSystem() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return spikeSystem_.get();
+    }
+    
+    void setSpikeSystem(std::unique_ptr<SpikeSystem> system) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        spikeSystem_ = std::move(system);
+    }
+    
+    STDP* getSTDP() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return stdp_.get();
+    }
+    
+    void setSTDP(std::unique_ptr<STDP> stdp) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        stdp_ = std::move(stdp);
+    }
+    
+    Hebbian* getHebbian() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return hebbian_.get();
+    }
+    
+    void setHebbian(std::unique_ptr<Hebbian> hebbian) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        hebbian_ = std::move(hebbian);
+    }
+    
+    StructuralPlasticity* getStructuralPlasticity() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return structuralPlasticity_.get();
+    }
+    
+    void setStructuralPlasticity(std::unique_ptr<StructuralPlasticity> plasticity) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        structuralPlasticity_ = std::move(plasticity);
+    }
+    
+    // Thread-safe access to checkpoint manager
+    CheckpointManager* getCheckpointManager() const {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return checkpointManager_.get();
+    }
+    
+    void setCheckpointManager(std::unique_ptr<CheckpointManager> manager) {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        checkpointManager_ = std::move(manager);
+    }
+    
+private:
+    std::mutex* mutex_;
+    std::vector<std::unique_ptr<NeuralRegion>> regions_;
+    std::vector<Neuron*> sensoryNeurons_;
+    std::vector<Neuron*> motorNeurons_;
+    size_t totalSpikesThisStep_ = 0;
+    size_t totalSpikesTotal_ = 0;
+    Config config_;
+    double timestep_ = 0.001;
+    SimulationStep currentStep_ = 0;
+    Timestamp currentTime_ = 0.0;
+    bool isResting_ = false;
+    size_t stepsSinceLastEpisode_ = 0;
+    DevelopmentalStage developmentalStage_ = DevelopmentalStage::Initial;
+    RegionId nextRegionId_ = 1;
+    std::unique_ptr<RandomGenerator> rng_;
+    std::unique_ptr<NeuralWorkingMemory> workingMemory_;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory_;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory_;
+    std::unique_ptr<PredictionSystem> predictionSystem_;
+    std::unique_ptr<NeuralPlanner> planner_;
+    std::unique_ptr<ConceptFormation> conceptFormation_;
+    std::unique_ptr<AttentionalSelection> attention_;
+    std::unique_ptr<DevelopmentSystem> developmentSystem_;
+    std::unique_ptr<Dopamine> dopamine_;
+    std::unique_ptr<Curiosity> curiosity_;
+    std::unique_ptr<PredictionError> predictionError_;
+    std::unique_ptr<Novelty> novelty_;
+    std::unique_ptr<SpikeSystem> spikeSystem_;
+    std::unique_ptr<STDP> stdp_;
+    std::unique_ptr<Hebbian> hebbian_;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity_;
+    std::unique_ptr<CheckpointManager> checkpointManager_;
+};
+
+} // namespace nlm
+
+// Update BrainImpl definition to use thread safety
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Thread-safe wrapper for data members
+    nlm::BrainImplThreadSafety threadSafety;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -81,6 +499,7 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , threadSafety(&mutex_)  // Initialize thread safety with mutex
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -91,7 +510,7 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps) {}
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed

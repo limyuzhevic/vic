@@ -78,12 +78,126 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Test with valid values
+    config.set("neuron_count", 1000, nlm::ConfigSource::Runtime);
+    assert(config.validateValue("neuron_count", 1000));
+    
+    config.set("connection_probability", 0.5, nlm::ConfigSource::Runtime);
+    assert(config.validateValue("connection_probability", 0.5));
+    
+    config.set("log_level", std::string("INFO"), nlm::ConfigSource::Runtime);
+    assert(config.validateValue("log_level", std::string("INFO")));
+    
+    // Test with invalid values
+    assert(!config.validateValue("neuron_count", 0)); // Below minimum
+    assert(!config.validateValue("neuron_count", 2000000)); // Above maximum
+    assert(!config.validateValue("connection_probability", 1.5)); // Above maximum
+    assert(!config.validateValue("log_level", std::string("INVALID"))); // Not in allowed values
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
+void testConfigValidationResult() {
+    nlm::Config config;
+    
+    // Set both valid and invalid values
+    config.set("neuron_count", 2000, nlm::ConfigSource::Runtime); // Valid
+    config.set("connection_probability", 1.5, nlm::ConfigSource::Runtime); // Invalid
+    config.set("log_level", std::string("DEBUG"), nlm::ConfigSource::Runtime); // Valid
+    
+    nlm::ValidationResult result = config.validate();
+    assert(!result.valid);
+    assert(result.errors.size() > 0);
+    assert(result.getErrors().find("connection_probability") != std::string::npos);
+    
+    // Check that valid values are not in errors
+    assert(result.getErrors().find("neuron_count") == std::string::npos);
+    assert(result.getErrors().find("log_level") == std::string::npos);
+    
+    std::cout << "    testConfigValidationResult passed" << std::endl;
+}
+
+void testConfigSchema() {
+    nlm::Config config;
+    
+    // Test that schema is properly registered
+    auto schema = nlm::Config::getDefaultSchema();
+    assert(schema.find("neuron_count") != schema.end());
+    assert(schema.find("connection_probability") != schema.end());
+    assert(schema.find("log_level") != schema.end());
+    
+    // Test that all schema entries are valid
+    for (const auto& pair : schema) {
+        const auto& entry = pair.second;
+        assert(config.validateKey(entry.key));
+        assert(config.validateValue(entry.key, entry.value));
+    }
+    
+    std::cout << "    testConfigSchema passed" << std::endl;
+}
+
+void testConfigLoadFromDefaults() {
+    nlm::Config config;
+    
+    // Load default schema values
+    config.loadFromDefaults();
+    
+    // Check that all default keys are present
+    auto schema = nlm::Config::getDefaultSchema();
+    for (const auto& pair : schema) {
+        assert(config.has(pair.first));
+    }
+    
+    // Check a few specific values
+    assert(config.get<int>("neuron_count").has_value());
+    assert(config.get<int>("neuron_count").value() == 1000);
+    assert(config.get<double>("simulation_timestep").has_value());
+    assert(config.get<double>("simulation_timestep").value() == 0.001);
+    
+    std::cout << "    testConfigLoadFromDefaults passed" << std::endl;
+}
+
+void testConfigSaveToFile() {
+    nlm::Config config;
+    
+    // Set some values
+    config.set("test_int", 42, nlm::ConfigSource::Runtime);
+    config.set("test_string", std::string("hello"), nlm::ConfigSource::Runtime);
+    config.set("test_double", 3.14, nlm::ConfigSource::Runtime);
+    
+    // Save to file
+    assert(config.saveToFile("test_config.cfg"));
+    
+    // Load it back
+    nlm::Config config2;
+    assert(config2.loadFromFile("test_config.cfg"));
+    
+    // Check values
+    assert(config2.get<int>("test_int").has_value());
+    assert(config2.get<int>("test_int").value() == 42);
+    assert(config2.get<std::string>("test_string").has_value());
+    assert(config2.get<std::string>("test_string").value() == "hello");
+    
+    // Clean up
+    std::remove("test_config.cfg");
+    
+    std::cout << "    testConfigSaveToFile passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigValidationResult();
+    testConfigSchema();
+    testConfigLoadFromDefaults();
+    testConfigSaveToFile();
 }
 
 } // namespace test_config

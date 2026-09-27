@@ -87,17 +87,45 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
+# Training module
+add_library(nlm_training STATIC
+    src/training/TrainingCore.cpp
+    src/training/TrainingComponents.cpp
+    src/training/TrainingModule.cpp
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+target_include_directories(nlm_training PUBLIC src)
+target_link_libraries(nlm_training nlm_core nlm_agent)
+
+# Python bindings
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+# For now, just compile the training library
+# In a full implementation, you would also create Python bindings
+# and add those to a separate target or to the main nlm library
+
+# Installation
+install(TARGETS nlm_core nlm_agent nlm_training
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
+
+install(DIRECTORY src/ DESTINATION include/nlm
+        FILES_MATCHING PATTERN "*.hpp")
+
+# Create a simple test target for the training module
+add_executable(training_test
+    tests/test_training.cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
+
+target_link_libraries(training_test nlm_training)
+
+# Python package configuration (simplified)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml"
+    @ONLY
+)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
 # World system (environment, objects, simple world)

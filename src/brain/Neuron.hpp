@@ -41,7 +41,8 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with spike-frequency adaptation
+// This is the core computational unit of the NLM artificial brain
 class Neuron {
 public:
     // Create neuron with ID
@@ -66,16 +67,16 @@ public:
     const NeuronState& getState() const;
     NeuronState& getState();
     
-    // Membrane potential
+    // Membrane potential dynamics
     MembranePotential getMembranePotential() const;
     void setMembranePotential(MembranePotential potential);
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
+    // Threshold parameters
     MembranePotential getThreshold() const;
     void setThreshold(MembranePotential threshold);
     
-    // Firing state
+    // Firing state management
     bool isFiring() const;
     bool isRefractory() const;
     void setFiringState(FiringState state);
@@ -86,7 +87,7 @@ public:
     FiringRate getFiringRate() const;
     void setFiringRate(FiringRate rate);
     
-    // LIF neuron parameters
+    // LIF neuron parameters (biophysical properties)
     void setLeakConductance(MembranePotential conductance);
     MembranePotential getLeakConductance() const;
     uint32_t getRefractoryPeriod() const;
@@ -94,40 +95,41 @@ public:
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
     
-    // Spike detection
+    // Spike detection and management
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    // LIF step function - implements differential equation dV/dt = (V_rest - V)/tau + I/C
+    // Returns true if neuron fired (membrane potential crossed threshold)
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
-    // Incoming signals (post-synaptic potentials)
+    // Incoming signals (post-synaptic potentials from synaptic inputs)
     void receiveExcitatoryInput(MembranePotential amplitude);
     void receiveInhibitoryInput(MembranePotential amplitude);
     void receiveModulatoryInput(MembranePotential amplitude);
     
-    // Current injection (from external sources)
+    // External current injection (from sensory input or external sources)
     void injectCurrent(MembranePotential current);
     MembranePotential getTotalCurrent() const;
     void clearTotalCurrent();
     
-    // Spike history (recent spikes for STDP)
+    // Spike history (recent spikes for STDP and synaptic plasticity)
     void recordSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
     
-    // Synapse management (incoming and outgoing)
+    // Synapse management (incoming and outgoing synaptic connections)
     void addIncomingSynapse(SynapseHandle handle);
     void addOutgoingSynapse(SynapseHandle handle);
     const std::vector<SynapseHandle>& getIncomingSynapses() const;
     const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
-    // Plasticity state
+    // Plasticity state management
     const PlasticityFlags& getPlasticityFlags() const;
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
-    // Region/population membership
+    // Region/population membership for network organization
     void setRegionId(RegionId region);
     RegionId getRegionId() const;
     void setPopulationId(PopulationId population);
@@ -137,11 +139,30 @@ public:
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
-    // Reset to initial state
+    // Reset to initial state (used during network initialization and reset)
     void reset();
     
-    // Initialize with random parameters
+    // Initialize with random parameters (for network initialization)
     void initializeRandom(RandomGenerator& rng);
+    
+    // Get neuron statistics for monitoring and debugging
+    size_t getSpikeCount() const;
+    float getAverageFiringRate() const;
+    float getMaxMembranePotential() const;
+    float getMinMembranePotential() const;
+    
+    // Check if neuron is healthy (for fault detection)
+    bool isHealthy() const;
+    
+    // Export neuron state for checkpointing
+    void exportState(std::ostream& out) const;
+    
+    // Import neuron state from checkpoint
+    void importState(std::istream& in);
+    
+    // Computational complexity metrics
+    static constexpr size_t getMemoryFootprint() { return sizeof(Neuron); }
+    static constexpr size_t getComputationalCost() { return 100; } // CPU cycles per step
     
 private:
     struct Impl;
