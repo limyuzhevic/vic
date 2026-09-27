@@ -133,15 +133,27 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
+// Update neuron for one simulation step
+    // Uses LIF dynamics with configurable timestep
+    void step(Timestamp currentTime, TimestepDuration dt = TimestepDuration(0.001f));
+
     // Reset to initial state
     void reset();
-    
+
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+
+    // Set neuron parameters
+    void configure(MembranePotential restingPotential = -70.0f,
+                   MembranePotential threshold = -55.0f,
+                   MembranePotential resetPotential = -70.0f,
+                   uint32_t refractoryPeriod = 5);
+
+    // Get neuron configuration
+    MembranePotential getRestingPotential() const;
+    MembranePotential getThreshold() const;
+    MembranePotential getResetPotential() const;
+    uint32_t getRefractoryPeriod() const;
     
 private:
     struct Impl;

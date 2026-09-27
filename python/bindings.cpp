@@ -19,13 +19,53 @@
 namespace py = pybind11;
 namespace nlm {
 
+// =============================================================================
+// NLM Python Bindings
+// =============================================================================
+// This module provides Python bindings for the NLM (Neural Learning Machine) C++ framework.
+// NLM is an experimental artificial developmental brain project that simulates
+// spiking neural networks using Leaky Integrate-and-Fire (LIF) neurons with real
+// neural dynamics, plasticity, and learning mechanisms.
+//
+// The bindings provide access to:
+// - Brain simulation with LIF neurons and spike-based computation
+// - Agent-environment interaction for embodied intelligence
+// - Neuromodulation-based learning (dopamine, curiosity, novelty)
+// - Developmental stages and structural plasticity
+// - Multiple plasticity mechanisms (STDP, Hebbian, reward-modulated)
+// - Memory systems and prediction mechanisms
+//
+// Usage example:
+// ```python
+// import pynlm
+//
+// # Create brain configuration
+// config = pynlm.createDefaultConfig()
+// config.set("brain.neuron_count", 1000)
+//
+// # Create and initialize brain
+// brain = pynlm.createBrain(config)
+// brain.initialize()
+//
+// # Create agent and world
+// agent = pynlm.createAgentBrain(brain)
+// world = pynlm.createSimpleWorld()
+// world.configure(width=20, height=20)
+//
+// # Enable learning subsystems
+// agent.enableRewardModulation(True)
+// agent.enableCuriosity(True)
+// agent.enableDevelopment(True)
+//
+// # Run simulation
+// for step in range(1000):
+//     world.update(0.1)
+//     agent.processSensoryInput(world.getSensoryPercept())
+//     brain.step(step)
+//     action = agent.decodeMotorCommand()
+// ```
+
 PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 

@@ -28,25 +28,19 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Command line argument helpers
+bool hasArg(int argc, char** argv, const std::string& arg) {
+    for (int i = 1; i < argc; ++i) {
+        std::string argStr(argv[i]);
+        if (argStr == arg) return true;
+    }
+    return false;
 }
+
+void printHelp();
+void printAdvancedHelp();
+
+void printBanner();
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -322,6 +316,25 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version options
+    if (hasArg(argc, argv, "--help")) {
+        printHelp();
+        return 0;
+    }
+    
+    if (hasArg(argc, argv, "--version")) {
+        std::cout << "NLM (熙然) Neural Learning Machine v0.1.0\n";
+        std::cout << "Phase 2: Real Neural Computation\n";
+        return 0;
+    }
+    
+    if (hasArg(argc, argv, "--advanced-help")) {
+        printHelp();
+        std::cout << "\n";
+        printAdvancedHelp();
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

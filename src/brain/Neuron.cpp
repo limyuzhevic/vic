@@ -261,7 +261,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    TimestepDuration dt = TimestepDuration(0.001f);  // 1ms default
+    stepLIF(currentTime, dt);
+}
+
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    // LIF step with configurable timestep
+    // dt: Timestep duration in milliseconds
+    stepLIF(currentTime, dt);
+}
+
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    // LIF step with configurable timestep
     stepLIF(currentTime, dt);
 }
 
@@ -273,30 +284,90 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
+    // Neuron parameters are initialized with realistic biological ranges
+    // Membrane potential starts near resting potential with small perturbation
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
+    // Threshold is typically -55mV with small biological variation
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Resting potential typically -70mV
+    // Resting potential typically -70mV (standard for cortical neurons)
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
+    // Reset potential is usually close to resting potential (typically 1-8mV higher)
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
+    // Refractory period: 2-10ms typical for cortical neurons
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
-    // Initial state
+    // Initial neuron state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.adaptationVariable = 0.0f;  // For spike-frequency adaptation
+    pImpl->state.lastSpikeTime = -1.0f;    // No spikes recorded yet
     
-    // Clear any residual state
+    // Clear any residual synaptic state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+void Neuron::configure(MembranePotential restingPotential,
+                       MembranePotential threshold,
+                       MembranePotential resetPotential,
+                       uint32_t refractoryPeriod) {
+    // Configure neuron parameters with validation
+    // This method allows programmatic setting of neuron parameters
+    pImpl->state.restingPotential = restingPotential;
+    pImpl->state.threshold = threshold;
+    pImpl->state.resetPotential = resetPotential;
+    pImpl->state.refractoryPeriod = refractoryPeriod;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    // Return the current resting potential of the neuron
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    // Return the firing threshold of the neuron
+    return pImpl->state.threshold;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    // Return the reset potential after a spike
+    return pImpl->state.resetPotential;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    // Return the refractory period in milliseconds
+    return pImpl->state.refractoryPeriod;
+}
+
+void Neuron::configure(MembranePotential restingPotential,
+                       MembranePotential threshold,
+                       MembranePotential resetPotential,
+                       uint32_t refractoryPeriod) {
+    // Configure neuron parameters with validation
+    pImpl->state.restingPotential = restingPotential;
+    pImpl->state.threshold = threshold;
+    pImpl->state.resetPotential = resetPotential;
+    pImpl->state.refractoryPeriod = refractoryPeriod;
+}
+
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
+uint32_t Neuron::getRefractoryPeriod() const {
+    return pImpl->state.refractoryPeriod;
 }
 
 } // namespace nlm

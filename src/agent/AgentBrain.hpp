@@ -11,6 +11,9 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Implements the agent interface for closed-loop interaction with environment
+// Manages neuromodulation, development, and curiosity-driven exploration
+
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -58,7 +61,7 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
+    // Configuration and subsystem management
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -78,7 +81,7 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups for different action types
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,24 +89,24 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups for different input types
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Neuromodulation state and learning signals
+    float dopamineLevel_;          // Dopamine (reward prediction error) signal
+    float noveltyLevel_;           // Novelty detection signal
+    float curiosityLevel_;         // Curiosity-driven exploration signal
+    float predictionError_;        // Prediction error signal
+    float expectedReward_;         // Expected reward estimate (for curiosity)
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    // Development state and plasticity modifiers
+    double developmentalAge_;       // Age of the agent in simulation time
+    float plasticityModifier_;      // Modulates plasticity based on development
     
-    // Configuration flags
+    // Configuration flags for learning subsystems
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
@@ -111,7 +114,7 @@ private:
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    float sensoryNoveltyDecay_;     // Decay rate for novelty signal
 };
 
 } // namespace nlm
