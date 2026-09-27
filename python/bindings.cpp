@@ -416,6 +416,133 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Convenience function for creating a complete agent setup
+    m.def("createCompleteAgent", [](std::shared_ptr<Config> config, 
+                                  size_t width = 20, size_t height = 20) 
+          -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("config"), py::arg("width") = 20, py::arg("height") = 20,
+       "Create a complete agent setup with brain, world, and agent (convenience function)");
+
+    // Convenience function for running a complete simulation
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, 
+                             std::shared_ptr<SimpleWorld> world,
+                             std::shared_ptr<AgentBrain> agent,
+                             size_t numSteps) {
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete simulation for the specified number of steps (convenience function)");
+
+    // Phase 6 integration convenience functions
+    m.def("createPhase6Config", []() -> Phase6Config {
+        Phase6Config config;
+        config.neuronCount = 1000;
+        config.maxSteps = 10000;
+        config.regionCount = 1;
+        config.connectionProbability = 0.1f;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        config.checkpointPath = "checkpoint_test.bin";
+        return config;
+    }, "Create a Phase 6 integration configuration with default values");
+
+    // Advanced brain configuration functions
+    m.def("configureBrainForDevelopment", [](std::shared_ptr<Brain> brain) {
+        auto config = brain->getConfig();
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Runtime);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+    }, py::arg("brain"), "Enable development features in a brain configuration");
+
+    m.def("configureBrainForMemory", [](std::shared_ptr<Brain> brain) {
+        auto config = brain->getConfig();
+        config->set("brain.neuron_count", 2000, ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.05f, ConfigSource::Runtime);
+        config->set("working_memory.capacity", 1000, ConfigSource::Runtime);
+        config->set("episodic_memory.max_episodes", 500, ConfigSource::Runtime);
+    }, py::arg("brain"), "Enable advanced memory features in a brain configuration");
+
+    m.def("configureBrainForCognition", [](std::shared_ptr<Brain> brain) {
+        auto config = brain->getConfig();
+        config->set("neural_planner.enabled", true, ConfigSource::Runtime);
+        config->set("concept_formation.enabled", true, ConfigSource::Runtime);
+        config->set("attentional_selection.enabled", true, ConfigSource::Runtime);
+        config->set("prediction.enabled", true, ConfigSource::Runtime);
+    }, py::arg("brain"), "Enable cognitive features in a brain configuration");
+
+    // Utility functions for agent management
+    m.def("enableAllAgentFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"), "Enable all advanced agent features");
+
+    m.def("getAgentStatus", [](std::shared_ptr<AgentBrain> agent) {
+        py::dict status;
+        auto brain = agent->getBrain();
+        if (brain) {
+            status["neuron_count"] = brain->getTotalNeuronCount();
+            status["synapse_count"] = brain->getTotalSynapseCount();
+            status["firing_neurons"] = brain->getFiringNeuronCount();
+            status["avg_firing_rate"] = brain->getAverageFiringRate();
+            status["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        }
+        status["curiosity"] = agent->getCuriosityLevel();
+        status["novelty"] = agent->getNoveltyLevel();
+        status["neuromodulation"] = agent->getNeuromodulationLevel();
+        status["prediction_error"] = agent->getPredictionError();
+        return status;
+    }, py::arg("agent"), "Get comprehensive status information about an agent");
+
+    // Simulation control functions
+    m.def("runPhase6IntegrationDemo", []() {
+        Phase6IntegratedExperiment experiment;
+        Phase6Config config;
+        config.neuronCount = 500;
+        config.maxSteps = 1000;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        
+        auto result = experiment.run(config);
+        
+        py::dict resultDict;
+        resultDict["total_reward"] = result.totalReward;
+        resultDict["avg_firing_rate"] = result.avgFiringRate;
+        resultDict["memory_episodes_stored"] = result.memoryEpisodesStored;
+        resultDict["dopamine_level"] = result.dopamineLevel;
+        resultDict["novelty_level"] = result.noveltyLevel;
+        resultDict["curiosity_level"] = result.curiosityLevel;
+        resultDict["memory_working_memory_integrated"] = result.memoryWorkingMemoryIntegrated;
+        resultDict["memory_episodic_memory_integrated"] = result.memoryEpisodicMemoryIntegrated;
+        resultDict["neuromodulation_integrated"] = result.neuromodulationIntegrated;
+        resultDict["prediction_integrated"] = result.predictionIntegrated;
+        resultDict["development_integrated"] = result.developmentIntegrated;
+        resultDict["checkpointing_works"] = result.checkpointingWorks;
+        resultDict["replay_works"] = result.replayWorks;
+        resultDict["total_wall_clock_time"] = result.totalWallClockTime;
+        
+        return resultDict;
+    }, "Run the complete Phase 6 integration demonstration and return results");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

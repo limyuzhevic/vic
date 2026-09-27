@@ -14,6 +14,7 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_phase6_integration.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)
@@ -22,3 +23,14 @@ target_compile_features(nlm_test PRIVATE cxx_std_20)
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+
+# Phase 6 integration tests
+add_test(NAME nlm_phase6_integration
+    COMMAND nlm_test
+)
+
+set_tests_properties(nlm_phase6_integration
+    PROPERTIES
+    TIMEOUT 300
+    COST 10
+)
