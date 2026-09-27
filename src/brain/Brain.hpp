@@ -24,10 +24,12 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class Dopamine;
+    class Acetylcholine;
+    class Norepinephrine;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -106,8 +108,14 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
+    // Perform sleep/rest cycle (called automatically in step when interval reached)
+    void sleep();
+    
     // Reset brain state
     void reset();
+    
+    // Check if brain is currently resting
+    bool isResting() const { return pImpl->isResting; }
     
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
@@ -174,6 +182,12 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

@@ -291,6 +291,26 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
+// Get concepts similar to a given concept ID
+std::vector<size_t> ConceptFormation::getSimilarConcepts(size_t conceptId) const {
+    std::vector<size_t> similar;
+    
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return similar;
+    
+    // Find similar concepts based on prototype similarity
+    for (const auto& c : concepts_) {
+        if (c.id == conceptId) continue;
+        
+        float similarity = computeSimilarity(concept->prototype, c.prototype);
+        if (similarity >= formationThreshold_) {
+            similar.push_back(c.id);
+        }
+    }
+    
+    return similar;
+}
+
 void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;

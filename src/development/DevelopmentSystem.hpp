@@ -46,6 +46,37 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // ===== ENHANCED DEVELOPMENT EFFECTS =====
+    
+    // Neural excitability modulation
+    void updateNeuralExcitability(Brain* brain, float timeConstant = 0.1f);
+    
+    // Plasticity rule modulation
+    void updatePlasticityRules(Brain* brain, RandomGenerator& rng, float timeConstant = 0.1f);
+    
+    // Attention system effects
+    void updateAttentionSystem(Brain* brain, float timeConstant = 0.1f);
+    
+    // Memory consolidation effects
+    void updateMemorySystems(Brain* brain, float timeConstant = 0.1f);
+    
+    // Neuromodulation integration
+    void updateNeuromodulation(Brain* brain, float timeConstant = 0.1f);
+    
+    // ===== STAGE-SPECIFIC BEHAVIORS =====
+    
+    // Apply critical period effects
+    void applyCriticalPeriodEffects(Brain* brain, RandomGenerator& rng);
+    
+    // Apply maturation effects
+    void applyMaturationEffects(Brain* brain);
+    
+    // Apply adult maintenance effects
+    void applyAdultMaintenanceEffects(Brain* brain);
+    
+    // Apply aging effects
+    void applyAgingEffects(Brain* brain);
+    
 private:
     struct Impl;
     Impl* pImpl;

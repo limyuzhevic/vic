@@ -134,6 +134,32 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
+    // Get concept activation/strength (0-1)
+    float getConceptStrength(size_t conceptId) const {
+        return getConceptStability(conceptId);
+    }
+
+    // Get concepts similar to a given concept ID
+    std::vector<size_t> getSimilarConcepts(size_t conceptId) const {
+        std::vector<size_t> similar;
+        if (!brain_) return similar;
+        
+        const DiscoveredConcept* concept = getConcept(conceptId);
+        if (!concept) return similar;
+        
+        // Find similar concepts based on prototype similarity
+        for (const auto& c : concepts_) {
+            if (c.id == conceptId) continue;
+            
+            float similarity = computeSimilarity(concept->prototype, c.prototype);
+            if (similarity >= formationThreshold_) {
+                similar.push_back(c.id);
+            }
+        }
+        
+        return similar;
+    }
+
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
