@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(pynlm_bindings LANGUAGES CXX)
 
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -12,8 +13,12 @@ endif()
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
 
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+# Try to find pybind11 in system paths if not found via CONFIG
+if(NOT pybind11_FOUND)
+    find_package(pybind11 REQUIRED)
+endif()
 
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
