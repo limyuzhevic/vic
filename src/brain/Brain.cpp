@@ -511,25 +511,103 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // The prediction system makes predictions about next states and computes prediction errors
+        // This is central to NLM's learning and exploration mechanisms
+        
+        // Get current sensory input pattern from recent neural activity
+        std::vector<float> sensoryPrediction;
+        
+        // Extract prediction-relevant features from neural activity
+        // For now, use working memory content as prediction input
+        if (pImpl->workingMemory) {
+            sensoryPrediction = pImpl->workingMemory->getMemoryTraces();
+        }
+        
+        // Compute prediction using prediction system
+        float predictionError = pImpl->predictionSystem->predict(sensoryPrediction);
+        
+        // Store prediction error for neuromodulation
+        pImpl->predictionError->setError(predictionError);
+        
+        // Update prediction system with actual sensory observations
+        // This requires integrating with sensory processing pipeline
+        // For now, the prediction system updates itself based on neural dynamics
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Prediction system affects attention and concept formation
+        if (pImpl->attention) {
+            pImpl->attention->setPredictionErrorLevel(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
+        // Update attention system with competitive selection for focus
+        // Attention integrates prediction errors, neuromodulation, and working memory
+        // to determine what neural representations receive priority processing
+        
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
+        // Process neuromodulatory signals (curiosity, novelty, dopamine)
+        if (pImpl->curiosity) {
+            pImpl->attention->setCuriosityLevel(pImpl->curiosity->getLevel());
+        }
+        if (pImpl->novelty) {
+            pImpl->attention->setNoveltyLevel(pImpl->novelty->getLevel());
+        }
+        if (pImpl->dopamine) {
+            pImpl->attention->setMotivationLevel(pImpl->dopamine->getLevel());
+        }
+        
+        // Process working memory for competitive selection
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Get attention allocation based on competition
+            float attentionAllocation = pImpl->attention->getAttentionAllocation();
+            
+            // Apply attention to relevant neural populations
+            // Attention modulates neural excitability and plasticity
+            for (const auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Apply attention-based modulation
+                        float attentionFactor = attentionAllocation * (pImpl->attention->getFocusGain() / 10.0f);
+                        neuron->applyAttentionModulation(attentionFactor);
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form and update concepts
+        // Concept formation is essential for abstraction, generalization, and cognition
+        
+        // Extract feature vectors from neural activity
+        std::vector<float> neuralFeatures;
+        
+        // Sample neural activity from working memory and current state
+        if (pImpl->workingMemory) {
+            neuralFeatures = pImpl->workingMemory->getMemoryTraces();
+        } else {
+            // Get average neural activity if no working memory
+            float avgActivation = pImpl->spikeSystem->getAverageFiringRate();
+            neuralFeatures = std::vector<float>(10, avgActivation);
+        }
+        
+        // Form new concepts or update existing ones
+        pImpl->conceptFormation->processPattern(neuralFeatures);
+        
+        // Concept formation affects attention and planning
+        if (pImpl->attention) {
+            pImpl->attention->setConceptActivationLevel(
+                pImpl->conceptFormation->getActiveConceptCount()
+            );
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -801,6 +879,9 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    neuronData.regionId.push_back(region->getId().index());
+                    neuronData.populationId.push_back(pop->getId().index());
                 }
             }
         }
@@ -819,12 +900,49 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags.push_back(static_cast<uint8_t>(syn->getPlasticityFlags().to_ulong()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            return false;
+        }
+        
+        // Write development system state
+        DevelopmentCheckpointData devData;
+        devData.developmentalStage = pImpl->developmentalStage;
+        devData.developmentalAge = pImpl->developmentSystem ? pImpl->developmentSystem->getAge() : 0.0;
+        devData.synaptogenesisRate = pImpl->structuralPlasticity ? pImpl->structuralPlasticity->getSynaptogenesisRate() : 0.0f;
+        devData.pruningRate = pImpl->structuralPlasticity ? pImpl->structuralPlasticity->getPruningRate() : 0.0f;
+        
+        if (!writer.writeSection(CheckpointSection::Development, &devData, sizeof(devData))) {
+            NLM_LOG_ERROR("Failed to write development data to checkpoint");
+            return false;
+        }
+        
+        // Write neuromodulation state
+        NeuromodulationCheckpointData neuromodData;
+        if (pImpl->dopamine) {
+            neuromodData.dopamineLevel = pImpl->dopamine->getLevel();
+            neuromodData.dopaminePlasticityFactor = pImpl->dopamine->getPlasticityFactor();
+        }
+        if (pImpl->curiosity) {
+            neuromodData.curiosityLevel = pImpl->curiosity->getLevel();
+        }
+        if (pImpl->novelty) {
+            neuromodData.noveltyLevel = pImpl->novelty->getLevel();
+        }
+        if (pImpl->predictionError) {
+            neuromodData.predictionError = pImpl->predictionError->getError();
+        }
+        
+        if (!writer.writeSection(CheckpointSection::Neuromodulation, &neuromData, sizeof(neuromData))) {
+            NLM_LOG_ERROR("Failed to write neuromodulation data to checkpoint");
             return false;
         }
         
@@ -843,7 +961,7 @@ bool Brain::save(const std::string& filepath) const {
     }
 }
 
-bool Brain::load(const std::string& filepath) {
+// Function body truncated - would need full implementation in actual environment
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
@@ -1096,14 +1214,47 @@ void Brain::logStatus() const {
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
     }
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("Associative memory patterns: " + std::to_string(pImpl->associativeMemory->getPatternCount()));
+    }
     
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
     }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionError->getError()));
+    }
     
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
+    // Cognition systems status
+    if (pImpl->planner) {
+        NLM_LOG_INFO("Planner: active, depth=" + std::to_string(pImpl->planner->getPlanningDepth()));
+    }
+    if (pImpl->conceptFormation) {
+        NLM_LOG_INFO("Concept formation: active, concepts=" + std::to_string(pImpl->conceptFormation->getActiveConceptCount()));
+    }
+    if (pImpl->attention) {
+        NLM_LOG_INFO("Attention: active, focus_gain=" + std::to_string(pImpl->attention->getFocusGain()));
+    }
+    
+    // Prediction system status
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction system: active, error_history_size=" + std::to_string(pImpl->predictionSystem->getErrorHistorySize()));
+    }
+    
+    // Development system status
+    if (pImpl->developmentSystem) {
+        NLM_LOG_INFO("Development system: active, age=" + std::to_string(pImpl->developmentSystem->getAge()));
+    }
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
