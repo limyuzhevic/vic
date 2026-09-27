@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <map>
+#include <algorithm>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,9 +18,280 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/performance/CheckpointSystem.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// ========== HELPER CLASSES FOR PYTHON ==========
+
+class BrainWrapper {
+public:
+    std::shared_ptr<Brain> brain;
+    
+    explicit BrainWrapper(std::shared_ptr<Brain> b) : brain(b) {}
+    
+    bool setupExperiment(const std::string& experimentType) {
+        auto config = brain->getConfig();
+        if (experimentType == "novelty_detection") {
+            config->set("enable_novelty_detection", true);
+        } else if (experimentType == "social_learning") {
+            config->set("enable_social_learning", true);
+        } else if (experimentType == "continual_learning") {
+            config->set("enable_continual_learning", true);
+        }
+        return true;
+    }
+    
+    std::unordered_map<std::string, float> getNeuralTopology() {
+        std::unordered_map<std::string, float> topology;
+        topology["total_neurons"] = static_cast<float>(brain->getTotalNeuronCount());
+        topology["total_synapses"] = static_cast<float>(brain->getTotalSynapseCount());
+        topology["regions"] = static_cast<float>(brain->getRegionCount());
+        topology["avg_firing_rate"] = brain->getAverageFiringRate();
+        topology["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return topology;
+    }
+    
+    bool exportBrainState(const std::string& filepath) {
+        return brain->save(filepath);
+    }
+    
+    bool importBrainState(const std::string& filepath) {
+        return brain->load(filepath);
+    }
+    
+    std::unordered_map<std::string, float> analyzeConnectivity() {
+        std::unordered_map<std::string, float> analysis;
+        auto regions = brain->getRegions();
+        if (regions.empty()) return analysis;
+        
+        float totalWeight = 0.0f;
+        size_t totalSynapses = 0;
+        for (const auto& region : regions) {
+            for (const auto& syn : region->getSynapses()) {
+                totalWeight += std::abs(syn->getWeight());
+                totalSynapses++;
+            }
+        }
+        
+        analysis["avg_synapse_weight"] = totalSynapses > 0 ? totalWeight / totalSynapses : 0.0f;
+        analysis["total_synapses"] = static_cast<float>(totalSynapses);
+        
+        // Check for clustering (simplified)
+        float maxCluster = 0.0f;
+        for (const auto& region : regions) {
+            float regionMax = region->getAverageSynapticWeight();
+            maxCluster = std::max(maxCluster, regionMax);
+        }
+        analysis["max_cluster_strength"] = maxCluster;
+        
+        return analysis;
+    }
+    
+    bool simulateDevelopment(uint64_t steps) {
+        auto developmentSystem = brain->getDevelopmentSystem();
+        if (!developmentSystem) return false;
+        
+        for (uint64_t step = 0; step < steps; step += 1000) {
+            developmentSystem->update(brain.get(), *brain->getRandomGenerator(), 1000.0);
+        }
+        return true;
+    }
+};
+
+class BrainWrapperLegacy {
+public:
+    std::shared_ptr<Brain> brain;
+    explicit BrainWrapperLegacy(std::shared_ptr<Brain> b) : brain(b) {}
+    std::shared_ptr<Brain> getBrain() { return brain; }
+};
+
+class PythonBrainUtilities {
+public:
+    static std::vector<std::shared_ptr<Brain>> createBatchBrains(int count, bool expertMode) {
+        std::vector<std::shared_ptr<Brain>> brains;
+        for (int i = 0; i < count; ++i) {
+            if (expertMode) {
+                auto config = std::make_shared<Config>();
+                config->set("neuron_count", 2000);
+                config->set("region_count", 2);
+                config->set("connection_probability", 0.15f);
+                auto brain = std::make_shared<Brain>(config);
+                brain->initialize();
+                brains.push_back(brain);
+            } else {
+                auto config = std::make_shared<Config>();
+                config->set("neuron_count", 500);
+                config->set("region_count", 1);
+                config->set("connection_probability", 0.1f);
+                auto brain = std::make_shared<Brain>(config);
+                brain->initialize();
+                brains.push_back(brain);
+            }
+        }
+        return brains;
+    }
+    
+    static std::vector<Phase6IntegrationResult> runBatchSimulation(const std::vector<std::shared_ptr<Brain>>& brains, uint64_t steps) {
+        std::vector<Phase6IntegrationResult> results;
+        for (const auto& brain : brains) {
+            Phase6IntegrationResult result;
+            result.totalReward = 0.0f;
+            result.avgFiringRate = brain->getAverageFiringRate();
+            result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
+                static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+            results.push_back(result);
+        }
+        return results;
+    }
+    
+    static std::unordered_map<std::string, float> compareBrainPerformance(const std::vector<std::shared_ptr<Brain>>& brains) {
+        std::unordered_map<std::string, float> comparison;
+        if (brains.empty()) return comparison;
+        
+        float totalNeurons = 0.0f;
+        float totalSpikes = 0.0f;
+        float totalFiring = 0.0f;
+        
+        for (const auto& brain : brains) {
+            totalNeurons += static_cast<float>(brain->getTotalNeuronCount());
+            totalSpikes += static_cast<float>(brain->getTotalSpikeCount());
+            totalFiring += brain->getAverageFiringRate();
+        }
+        
+        size_t count = brains.size();
+        comparison["avg_neurons"] = totalNeurons / count;
+        comparison["avg_total_spikes"] = totalSpikes / count;
+        comparison["avg_firing_rate"] = totalFiring / count;
+        
+        return comparison;
+    }
+};
+
+// ========== STATISTICS AND ANALYSIS FUNCTIONS ==========
+
+Phase6IntegrationResult computeBrainStatistics(std::shared_ptr<Brain> brain) {
+    Phase6IntegrationResult result;
+    result.totalReward = brain->getAverageFiringRate() * 10.0f; // Simplified reward calculation
+    result.avgFiringRate = brain->getAverageFiringRate();
+    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
+        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+    result.noveltyLevel = 0.5f; // Placeholder
+    result.curiosityLevel = 0.5f; // Placeholder
+    result.dopamineLevel = brain->getNeuromodulationLevel();
+    
+    auto regions = brain->getRegions();
+    if (!regions.empty()) {
+        float totalWeight = 0.0f;
+        size_t totalSynapses = 0;
+        for (const auto& region : regions) {
+            for (const auto& syn : region->getSynapses()) {
+                totalWeight += std::abs(syn->getWeight());
+                totalSynapses++;
+            }
+        }
+        result.avgSynapticWeight = totalSynapses > 0 ? totalWeight / totalSynapses : 0.0f;
+    }
+    
+    return result;
+}
+
+std::unordered_map<std::string, float> compareBrainStates(std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2) {
+    std::unordered_map<std::string, float> comparison;
+    
+    comparison["neuron_count_diff"] = static_cast<float>(brain2->getTotalNeuronCount() - brain1->getTotalNeuronCount());
+    comparison["synapse_count_diff"] = static_cast<float>(brain2->getTotalSynapseCount() - brain1->getTotalSynapseCount());
+    comparison["firing_rate_diff"] = brain2->getAverageFiringRate() - brain1->getAverageFiringRate();
+    comparison["e_i_ratio_diff"] = brain2->getExcitationInhibitionRatio() - brain1->getExcitationInhibitionRatio();
+    
+    return comparison;
+}
+
+std::unordered_map<std::string, float> analyzeLearningCurve(const std::vector<float>& rewards) {
+    std::unordered_map<std::string, float> analysis;
+    if (rewards.empty()) return analysis;
+    
+    float sum = 0.0f;
+    float sumSquares = 0.0f;
+    for (float reward : rewards) {
+        sum += reward;
+        sumSquares += reward * reward;
+    }
+    
+    size_t n = rewards.size();
+    analysis["mean_reward"] = sum / n;
+    analysis["std_reward"] = std::sqrt((sumSquares / n) - (sum / n) * (sum / n));
+    
+    // Calculate trend (simple linear regression slope)
+    float x_sum = static_cast<float>(n * (n - 1)) / 2.0f;
+    float x_sum_sq = static_cast<float>(n * (n - 1) * (2 * n - 1)) / 6.0f;
+    float y_sum = sum;
+    float xy_sum = 0.0f;
+    for (size_t i = 0; i < n; ++i) {
+        xy_sum += static_cast<float>(i) * rewards[i];
+    }
+    
+    float denominator = n * x_sum_sq - x_sum * x_sum;
+    if (denominator != 0.0f) {
+        analysis["learning_trend"] = (n * xy_sum - x_sum * y_sum) / denominator;
+    } else {
+        analysis["learning_trend"] = 0.0f;
+    }
+    
+    return analysis;
+}
+
+std::vector<std::string> validateBrainConfiguration(const Config& config) {
+    std::vector<std::string> issues;
+    
+    // Check required configuration
+    if (!config.has("neuron_count")) {
+        issues.push_back("Missing neuron_count configuration");
+    } else {
+        auto count = config.get<size_t>("neuron_count");
+        if (count == 0) issues.push_back("neuron_count cannot be zero");
+        if (count > 100000) issues.push_back("neuron_count too large (recommended max: 100000)");
+    }
+    
+    if (!config.has("connection_probability")) {
+        issues.push_back("Missing connection_probability configuration");
+    } else {
+        auto prob = config.get<float>("connection_probability");
+        if (prob < 0.0f || prob > 1.0f) {
+            issues.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Check for conflicting configurations
+    if (config.has("region_count") && config.has("neuron_count")) {
+        auto regions = config.get<size_t>("region_count");
+        auto neurons = config.get<size_t>("neuron_count");
+        if (regions > neurons) {
+            issues.push_back("region_count cannot exceed neuron_count");
+        }
+    }
+    
+    return issues;
+}
+
+std::unordered_map<std::string, int64_t> getSystemRequirements() {
+    std::unordered_map<std::string, int64_t> requirements;
+    requirements["min_ram_mb"] = 2048; // 2GB minimum
+    requirements["recommended_ram_mb"] = 8192; // 8GB recommended
+    requirements["min_cores"] = 2;
+    requirements["recommended_cores"] = 8;
+    requirements["min_neuron_limit"] = 100;
+    requirements["recommended_neuron_limit"] = 5000;
+    return requirements;
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -416,10 +690,170 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // ========== ADVANCED FACTORY FUNCTIONS ==========
+    
+    m.def("createExpertBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Expert configuration for complex tasks
+        config->set("neuron_count", 2000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.15f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.015f);
+        config->set("synaptogenesis_rate", 0.0002f);
+        config->set("pruning_rate", 0.00002f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            // Enable all advanced features
+            brain->getAgentBrain()->enableRewardModulation(true);
+            brain->getAgentBrain()->enableStructuralPlasticity(true);
+            brain->getAgentBrain()->enableDevelopment(true);
+            brain->getAgentBrain()->enableCuriosity(true);
+        }
+        return brain;
+    }, "Create an expert-level brain optimized for complex tasks");
+
+    m.def("createQuickBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Quick setup for rapid prototyping
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", static_cast<int64_t>(123));
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a quick-start brain for rapid prototyping");
+
+    m.def("createMinimalBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Minimal configuration for basic testing
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.05f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a minimal brain for basic testing");
+
+    // ========== ADVANCED CONVENIENCE METHODS ==========
+
+    py::class_<BrainWrapper>(m, "BrainWrapper", 
+        R"pbdoc(Wrapper class providing advanced brain manipulation methods)pbdoc")
+        .def("setup_experiment", [](BrainWrapper& self, const std::string& experimentType) {
+            return self.brain->setupExperiment(experimentType);
+        }, py::arg("experimentType"), 
+             "Set up brain for a specific experiment type")
+        .def("apply_stdp_learning", [](BrainWrapper& self, bool enable, float ltp, float ltd) {
+            self.brain->getSTDP()->configure(ltp, ltd, 20.0f);
+        }, py::arg("enable"), py::arg("ltp_weight"), py::arg("ltd_weight"),
+             "Configure STDP learning parameters")
+        .def("get_neural_topology", [](BrainWrapper& self) {
+            return self.getNeuralTopology();
+        }, "Get detailed neural topology statistics")
+        .def("export_brain_state", [](BrainWrapper& self, const std::string& filepath) {
+            return self.brain->save(filepath);
+        }, py::arg("filepath"), "Export brain state to file")
+        .def("import_brain_state", [](BrainWrapper& self, const std::string& filepath) {
+            return self.brain->load(filepath);
+        }, py::arg("filepath"), "Import brain state from file")
+        .def("analyze_connectivity", [](BrainWrapper& self) {
+            return self.analyzeConnectivity();
+        }, "Analyze brain connectivity patterns")
+        .def("simulate_development", [](BrainWrapper& self, uint64_t steps) {
+            return self.simulateDevelopment(steps);
+        }, py::arg("steps"), "Simulate developmental changes over time");
+
+    // ========== ADVANCED STATISTICS AND ANALYSIS ==========
+
+    m.def("compute_brain_statistics", [](std::shared_ptr<Brain> brain) {
+        return computeBrainStatistics(brain);
+    }, py::arg("brain"), "Compute comprehensive brain statistics");
+
+    m.def("compare_brains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2) {
+        return compareBrainStates(brain1, brain2);
+    }, py::arg("brain1"), py::arg("brain2"), "Compare two brain states");
+
+    m.def("analyze_learning_curve", [](const std::vector<float>& rewards) {
+        return analyzeLearningCurve(rewards);
+    }, py::arg("rewards"), "Analyze learning curve from reward data");
+
+    // ========== ERROR HANDLING AND VALIDATION ==========
+
+    m.def("validate_brain_config", [](const Config& config) {
+        return validateBrainConfiguration(config);
+    }, py::arg("config"), "Validate brain configuration and return issues");
+
+    m.def("get_system_requirements", []() {
+        return getSystemRequirements();
+    }, "Get recommended system requirements for different brain sizes");
+
+    // ========== LEGACY COMPATIBILITY ==========
+
+    m.def("createLegacyBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        // Legacy Phase 2 configuration
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.15f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create a legacy Phase 2 brain (for backward compatibility)");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
+    // ========== PYTHON-SPECIFIC UTILITIES ==========
+
+    py::class_<PythonBrainUtilities>(m, "PythonBrainUtilities", 
+        R"pbdoc(Utility class for Python-specific brain operations)pbdoc")
+        .def("create_batch_brains", [](int count, bool expertMode) {
+            std::vector<std::shared_ptr<Brain>> brains;
+            for (int i = 0; i < count; ++i) {
+                auto brain = expertMode ? createExpertBrain() : createQuickBrain();
+                brains.push_back(brain);
+            }
+            return brains;
+        }, py::arg("count"), py::arg("expertMode"), "Create multiple brains for batch processing")
+        .def("run_simulation_batch", [](const std::vector<std::shared_ptr<Brain>>& brains, uint64_t steps) {
+            return runBatchSimulation(brains, steps);
+        }, py::arg("brains"), py::arg("steps"), 
+             "Run simulation on multiple brains and collect results")
+        .def("compare_performance", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+            return compareBrainPerformance(brains);
+        }, py::arg("brains"), "Compare performance metrics across multiple brains");
+
+    // Legacy class for compatibility
+    py::class_<BrainWrapperLegacy>(m, "BrainWrapperLegacy", 
+        R"pbdoc(Legacy brain wrapper for backward compatibility)pbdoc")
+        .def("getBrain", &BrainWrapperLegacy::getBrain, 
+             "Get the underlying Brain object (legacy compatibility)")
+        .def("step", [](BrainWrapperLegacy& self, SimulationStep step) {
+            self.brain->step(step);
+        }, py::arg("step"), "Perform a simulation step (legacy compatibility)")
+        .def("produce_action", [](BrainWrapperLegacy& self) {
+            return self.brain->produceAction();
+        }, "Produce motor action (legacy compatibility)");
+
+    // Comprehensive test framework utility
+    m.def("run_integration_tests", []() {
+        return NLMTestSuite::runIntegrationTests();
+    }, "Run comprehensive integration tests");
+
+    m.def("generate_test_report", [](const std::vector<typename NLMTestSuite::TestResult>& results) {
+        return NLMTestSuite::generateTestReport(results);
+    }, py::arg("results"), "Generate a human-readable test report");
+    
+} // PYBIND11_MODULE(pynlm, m)
+
+// Legacy namespace for compatibility
 } // namespace nlm
