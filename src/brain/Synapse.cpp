@@ -94,10 +94,17 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    // Clamp weight to valid bounds to prevent instability
+    pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    // Validate delta to prevent overflow
+    if (std::isinf(delta) || std::isnan(delta)) {
+        NLM_LOG_WARNING("Invalid weight delta: " + std::to_string(delta));
+        return;
+    }
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -188,6 +195,14 @@ float Synapse::getEfficacy() const {
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    // Validate input and clamp to biologically realistic range
+    if (std::isinf(efficacy) || std::isnan(efficacy)) {
+        NLM_LOG_WARNING("Invalid efficacy value: " + std::to_string(efficacy));
+        pImpl->efficacy = 1.0f;
+        return;
+    }
+    
+    // Clamp to biologically realistic range [0, 2]
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
