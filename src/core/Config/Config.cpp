@@ -19,36 +19,49 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to load as JSON first, fallback to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Read entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try to parse as JSON
+    try {
+        auto json = parseJson(content);
+        return applyJsonConfig(json);
+    } catch (...) {
+        // Fallback to simple key=value format
+        file.clear();
+        file.seekg(0);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -56,7 +69,17 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Validate input parameters
+    if (!argv || argc <= 1) {
+        return true; // No arguments to process
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        // Validate argument string
+        if (!argv[i] || strlen(argv[i]) == 0) {
+            continue; // Skip empty or null arguments
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,6 +88,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty() || !isalpha(key[0]) || !is_valid_key(key)) {
+                    continue; // Skip invalid keys
+                }
+                
+                // Validate value
+                if (!is_valid_value(value)) {
+                    continue; // Skip invalid values
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,10 +106,35 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty() || !isalpha(key[0]) || !is_valid_key(key)) {
+                continue; // Skip invalid keys
+            }
+            
+            // Validate value
+            if (!is_valid_value(value)) {
+                continue; // Skip invalid values
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
     return true;
+}
+
+// Check if a key contains only valid characters
+bool Config::isValidKey(const std::string& key) {
+    return std::all_of(key.begin(), key.end(), 
+                      [](char c) { return std::isalnum(c) || c == '_'; });
+}
+
+// Check if a value string is valid
+bool Config::isValidValue(const std::string& value) {
+    // For now, allow any non-empty string
+    // In a more sophisticated implementation, we could parse the value
+    // to ensure it matches the expected type for the key
+    return !value.empty();
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -197,6 +256,27 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Explicit template instantiations
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Check if a key contains only valid characters
+bool Config::isValidKey(const std::string& key) {
+    return std::all_of(key.begin(), key.end(), 
+                      [](char c) { return std::isalnum(c) || c == '_'; });
+}
+
+// Check if a value string is valid
+bool Config::isValidValue(const std::string& value) {
+    // For now, allow any non-empty string
+    // In a more sophisticated implementation, we could parse the value
+    // to ensure it matches the expected type for the key
+    return !value.empty();
 }
 
 // Explicit template instantiations

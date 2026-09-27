@@ -76,14 +76,16 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     std::vector<std::shared_ptr<Experiment>> results;
     
     for (auto& exp : experiments) {
-        // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
+        // Create fresh brain from template
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
         brain->initialize();
         
-        // Would also create fresh environment here
+        // Create fresh environment from template if available
+        auto environment = environmentTemplate ? 
+            environmentTemplate : std::make_shared<Environment>();
+        environment->initialize();
         
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
+        if (runExperiment(exp, brain, environment, maxSteps)) {
             results.push_back(exp);
         }
     }
@@ -113,8 +115,41 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Save experiment results to JSON file
+    try {
+        nlohmann::json j;
+        
+        // Convert experiments to JSON
+        for (const auto& exp : pImpl->experiments) {
+            nlohmann::json expJson;
+            expJson["name"] = exp->getName();
+            expJson["startStep"] = exp->getStartStep();
+            expJson["endStep"] = exp->getEndStep();
+            expJson["totalReward"] = exp->getMetric("total_reward");
+            
+            // Add all metrics
+            for (const auto& metricName : exp->getMetricNames()) {
+                if (metricName != "total_reward") {
+                    expJson["metrics"][metricName] = exp->getMetric(metricName);
+                }
+            }
+            
+            j["experiments"].push_back(expJson);
+        }
+        
+        // Write JSON to file
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << j.dump(2); // Pretty print with 2-space indentation
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Log error
+        return false;
+    }
 }
 
 } // namespace nlm

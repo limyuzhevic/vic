@@ -23,6 +23,85 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
+// Enhanced configuration parameters structure
+struct AdvancedConfig {
+    // Neural network topology parameters
+    struct Topology {
+        int64_t max_regions;
+        int64_t neurons_per_region;
+        std::vector<int64_t> region_sizes;
+        double connection_probability;
+        bool enable_heterogeneous_connectivity;
+        double long_range_connection_weight;
+        int64_t average_degree;
+        double clustering_coefficient_target;
+    } topology;
+    
+    // Neuromodulator control options
+    struct Neuromodulation {
+        bool enable_dopamine;
+        bool enable_curiosity;
+        bool enable_novelty;
+        bool enable_prediction_error;
+        double dopamine_baseline;
+        double dopamine_learning_rate;
+        double curiosity_strength;
+        double novelty_threshold;
+        double prediction_error_decay;
+        std::vector<double> neuromodulator_thresholds;
+    } neuromodulation;
+    
+    // Plasticity tuning parameters
+    struct Plasticity {
+        bool enable_stdp;
+        bool enable_hebbian;
+        bool enable_structural_plasticity;
+        double stdp_ltp_weight;
+        double stdp_ltd_weight;
+        double stdp_time_constant;
+        double stdp_trace_decay;
+        double hebbian_strength;
+        double synaptogenesis_rate;
+        double pruning_rate;
+        double structural_plasticity_threshold;
+        bool enable_adaptive_plasticity;
+        double homeostatic_setpoint;
+        double homeostatic_learning_rate;
+    } plasticity;
+    
+    // Development stage controls
+    struct Development {
+        bool enable_development;
+        double growth_rate;
+        double maturation_rate;
+        double pruning_intensity;
+        double synaptogenesis_intensity;
+        double myelination_rate;
+        double connectivity_maturation;
+        bool enable_experience_dependent_development;
+        double critical_period_start;
+        double critical_period_end;
+        std::vector<double> stage_transition_thresholds;
+    } development;
+    
+    // Advanced brain features
+    struct AdvancedFeatures {
+        bool enable_memory_consolidation;
+        bool enable_social_learning;
+        bool enable_reinforcement_learning;
+        bool enable_supervised_learning;
+        bool enable_meta_learning;
+        double social_influence_strength;
+        double memory_consolidation_rate;
+        double rl_exploration_rate;
+        double rl_discount_factor;
+        double sl_learning_rate;
+        bool enable_neural_duplicate_detection;
+        double duplicate_threshold;
+        double interference_reduction;
+    } advanced;
+};
+
 // Configuration source
 enum class ConfigSource {
     Default,
@@ -100,6 +179,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const std::string& value);
 };
 
 } // namespace nlm
