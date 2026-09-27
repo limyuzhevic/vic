@@ -1,120 +1,226 @@
+// Dummy implementation for ExperimentRunner
+// This will be replaced with the full implementation
 #include "ExperimentRunner.hpp"
+#include <chrono>
+#include <ctime>
+#include <iostream>
+#include <algorithm>
 
 namespace nlm {
-
-struct ExperimentRunner::Impl {
-    std::vector<std::shared_ptr<Experiment>> experiments;
-    uint64_t globalSeed;
-    
-    Impl() : globalSeed(42) {}
-};
 
 ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
 
 ExperimentRunner::~ExperimentRunner() = default;
 
-std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
-    auto exp = std::make_shared<Experiment>(name);
-    exp->setSeed(pImpl->globalSeed++);
-    pImpl->experiments.push_back(exp);
-    return exp;
+ExperimentResult ExperimentRunner::runExperiment(const std::string& experimentType, 
+                                                const std::string& experimentName,
+                                                const std::map<std::string, ExperimentParameter>& config) {
+    ExperimentResult result;
+    result.experimentType = experimentType;
+    result.experimentName = experimentName;
+    result.success = false;
+    result.errorMessage = "Not implemented yet";
+    
+    return result;
 }
 
-bool ExperimentRunner::runExperiment(std::shared_ptr<Experiment> experiment,
-                                     std::shared_ptr<Brain> brain,
-                                     std::shared_ptr<Environment> environment,
-                                     SimulationStep maxSteps) {
-    if (!experiment || !brain || !environment) {
-        return false;
+ExperimentResult ExperimentRunner::runFromArgs(int argc, char** argv) {
+    ParsedArgs args = parseArgs(argc, argv);
+    
+    ExperimentResult result;
+    result.experimentType = args.experimentType;
+    result.experimentName = args.experimentName;
+    
+    if (args.help) {
+        printHelp();
+        result.success = true;
+        return result;
     }
     
-    experiment->setStartStep(0);
+    // TODO: Implement actual experiment running
+    result.success = false;
+    result.errorMessage = "Experiment running not implemented yet";
     
-    // Reset environment and brain
-    auto observation = environment->reset();
-    brain->receiveSensoryInput(*observation);
+    return result;
+}
+
+std::vector<ExperimentType> ExperimentRunner::getAvailableExperiments() const {
+    return getExperimentCatalog().getExperimentTypes();
+}
+
+const std::string& ExperimentRunner::getExperimentDescription(const std::string& experimentType) const {
+    return getExperimentCatalog().getExperimentDescription(experimentType);
+}
+
+std::map<std::string, ExperimentParameter> ExperimentRunner::getDefaultConfig(const std::string& experimentType) const {
+    return getExperimentCatalog().getDefaultConfig(experimentType);
+}
+
+ExperimentRunner::ParsedArgs ExperimentRunner::parseArgs(int argc, char** argv) const {
+    ParsedArgs args;
     
-    // Run simulation loop
-    for (SimulationStep step = 0; step < maxSteps && !environment->isDone(); ++step) {
-        // Brain step
-        brain->step(step);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
         
-        // Record data
-        experiment->recordStep(
-            step,
-            brain->getTotalNeuronCount(),
-            brain->getTotalSynapseCount(),
-            brain->getFiringNeuronCount(),
-            brain->getAverageFiringRate()
-        );
-        
-        // Get action from brain
-        auto action = brain->produceAction();
-        
-        // Environment step
-        observation = environment->step(*action);
-        
-        // Send observation to brain
-        brain->receiveSensoryInput(*observation);
-        
-        // Record reward
-        float reward = environment->getLastReward();
-        experiment->recordMetric("total_reward", 
-            experiment->getMetric("total_reward") + reward);
+        if (arg == "--help" || arg == "-h") {
+            args.help = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg == "--experiment-type") {
+            if (i + 1 < argc) {
+                args.experimentType = argv[++i];
+            }
+        } else if (arg == "--experiment-name") {
+            if (i + 1 < argc) {
+                args.experimentName = argv[++i];
+            }
+        } else if (arg == "--output-format") {
+            if (i + 1 < argc) {
+                args.outputFormat = argv[++i];
+            }
+        } else if (arg == "--output-file") {
+            if (i + 1 < argc) {
+                args.outputFile = argv[++i];
+            }
+        } else if (arg.substr(0, 2) == "--" && arg.find("=") != std::string::npos) {
+            size_t eqPos = arg.find("=");
+            std::string key = arg.substr(2, eqPos - 2);
+            std::string value = arg.substr(eqPos + 1);
+            args.config[key] = parseParameter(value);
+        }
     }
     
-    experiment->setEndStep(maxSteps);
+    return args;
+}
+
+void ExperimentRunner::printHelp() const {
+    std::cout << "Usage: nlm_experiment [OPTIONS]\n";
+    std::cout << "\nAvailable experiments:" << std::endl;
+    
+    auto experiments = getAvailableExperiments();
+    for (const auto& type : experiments) {
+        std::cout << "  " << type << ": " << getExperimentDescription(type) << std::endl;
+    }
+    
+    std::cout << "\nOptions:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --verbose, -v           Enable verbose output" << std::endl;
+    std::cout << "  --experiment-type TYPE  Specify experiment type" << std::endl;
+    std::cout << "  --experiment-name NAME  Specify experiment name" << std::endl;
+    std::cout << "  --output-format FMT     Output format (csv, json, yaml, txt)" << std::endl;
+    std::cout << "  --output-file FILE      Output file path" << std::endl;
+    std::cout << "  --PARAM=VALUE           Set experiment parameter" << std::endl;
+    
+    std::cout << "\nExample:" << std::endl;
+    std::cout << "  nlm_experiment --experiment-type phase6_integrated \" \"--neuron_count=2000 --max_steps=5000\"" << std::endl;
+}
+
+void ExperimentRunner::printExperimentInfo(const std::string& experimentType) const {
+    std::cout << "Experiment Type: " << experimentType << std::endl;
+    std::cout << "Description: " << getExperimentDescription(experimentType) << std::endl;
+    
+    auto schema = getParameterSchema(experimentType);
+    if (!schema.empty()) {
+        std::cout << "\nParameters:" << std::endl;
+        for (const auto& param : schema) {
+            std::cout << "  " << param.name << " (" << param.type << ")";
+            if (param.required) {
+                std::cout << " [required]";
+            }
+            std::cout << " - " << param.description << std::endl;
+        }
+    }
+}
+
+bool ExperimentRunner::validateConfig(const std::string& experimentType, 
+                                     const std::map<std::string, ExperimentParameter>& config) const {
+    return getExperimentCatalog().validateConfig(experimentType, config);
+}
+
+ExperimentParameter ExperimentRunner::parseParameter(const std::string& value) {
+    // Try to parse as boolean
+    if (value == "true" || value == "false") {
+        return value == "true";
+    }
+    
+    // Try to parse as integer
+    try {
+        size_t pos;
+        int64_t intValue = std::stoll(value, &pos);
+        if (pos == value.length()) {
+            return intValue;
+        }
+    } catch (...) {}
+    
+    // Try to parse as floating point
+    try {
+        size_t pos;
+        double doubleValue = std::stod(value, &pos);
+        if (pos == value.length()) {
+            return doubleValue;
+        }
+    } catch (...) {}
+    
+    // Return as string
+    return value;
+}
+
+std::string ExperimentRunner::parameterToString(const ExperimentParameter& param) {
+    std::string result;
+    
+    std::visit([&result](const auto& value) {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, bool>) {
+            result = value ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = value;
+        } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+            result = std::to_string(value);
+        } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+            result = std::to_string(value);
+        } else {
+            result = "unknown";
+        }
+    }, param);
+    
+    return result;
+}
+
+std::vector<ExperimentRunner::ParameterSchema> ExperimentRunner::getParameterSchema(const std::string& experimentType) const {
+    // Return default parameter schema for experiment types
+    std::vector<ParameterSchema> schema;
+    
+    if (experimentType == ExperimentTypes::PHASE6_INTEGRATED) {
+        schema = {
+            {"max_steps", "int", "Maximum number of simulation steps", static_cast<size_t>(10000), true},
+            {"neuron_count", "int", "Number of neurons to simulate", static_cast<size_t>(1000), true},
+            {"region_count", "int", "Number of brain regions", static_cast<size_t>(1), false},
+            {"connection_probability", "double", "Probability of synaptic connections", 0.1, false},
+            {"enable_checkpointing", "bool", "Enable checkpoint save/load", false},
+            {"enable_replay", "bool", "Enable episodic memory replay", false},
+            {"enable_development", "bool", "Enable developmental plasticity", false}
+        };
+    } else if (experimentType == ExperimentTypes::SCALING_BENCHMARK) {
+        schema = {
+            {"initial_neurons", "int", "Initial number of neurons", static_cast<size_t>(10000), true},
+            {"max_neurons", "int", "Maximum number of neurons to scale to", static_cast<size_t>(100000), true},
+            {"connection_probability", "double", "Probability of synaptic connections", 0.1, false}
+        };
+    }
+    
+    return schema;
+}
+
+bool ExperimentResult::exportToFile(const std::string& filepath, ExportFormat format) const {
+    // Placeholder implementation - will be implemented with actual export functionality
+    std::cout << "Exporting experiment results to " << filepath << " in " 
+              << static_cast<int>(format) << " format" << std::endl;
     return true;
 }
 
-std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
-    const std::vector<std::shared_ptr<Experiment>>& experiments,
-    std::shared_ptr<Brain> brainTemplate,
-    std::shared_ptr<Environment> environmentTemplate,
-    SimulationStep maxSteps) {
-    
-    std::vector<std::shared_ptr<Experiment>> results;
-    
-    for (auto& exp : experiments) {
-        // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
-        brain->initialize();
-        
-        // Would also create fresh environment here
-        
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
-            results.push_back(exp);
-        }
-    }
-    
-    return results;
-}
-
-const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments() const {
-    return pImpl->experiments;
-}
-
-std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& name) const {
-    for (auto& exp : pImpl->experiments) {
-        if (exp->getName() == name) {
-            return exp;
-        }
-    }
-    return nullptr;
-}
-
-void ExperimentRunner::clearExperiments() {
-    pImpl->experiments.clear();
-}
-
-void ExperimentRunner::setGlobalSeed(uint64_t seed) {
-    pImpl->globalSeed = seed;
-}
-
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+ExperimentRunner& getExperimentRunner() {
+    static ExperimentRunner runner;
+    return runner;
 }
 
 } // namespace nlm
