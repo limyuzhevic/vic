@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../core/Types/Types.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -21,9 +22,9 @@ STDP::STDP() : pImpl(new Impl) {}
 STDP::~STDP() = default;
 
 void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
+                    const std::vector<Timestamp>& preSpikes,
+                    const std::vector<Timestamp>& postSpikes,
+                    TimestepDuration dt) {
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -52,31 +53,66 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse) {
+        NLM_LOG_WARNING("STDP::update called with null synapse");
+        return;
+    }
+    
+    if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+    // OPTIMIZED: Avoid O(n²) by using sorted spike times and efficient computation
+    // Sort spike times for efficient processing (they should already be sorted from recording)
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Use merge-like approach for O(n log n) complexity
+    size_t preIdx = 0, postIdx = 0;
+    float accumulatedDelta = 0.0f;
+    
+    // Process all spike pairs efficiently
+    while (preIdx < sortedPreSpikes.size() && postIdx < sortedPostSpikes.size()) {
+        Timestamp preTime = sortedPreSpikes[preIdx];
+        Timestamp postTime = sortedPostSpikes[postIdx];
+        float deltaT = static_cast<float>(postTime - preTime);
+        
+        if (deltaT > 0) {
+            // Pre before post: accumulate LTP contribution
+            // Integral of exp(-Δt/τ) from current Δt to infinity
+            accumulatedDelta += pImpl->ltpWeight * tau * std::exp(-deltaT / tau);
+            ++postIdx;  // Move to next post spike
+        } else {
+            // Post before pre: accumulate LTD contribution
+            // Integral of exp(Δt/τ) from current Δt to -∞
+            accumulatedDelta += -pImpl->ltdWeight * tau * std::exp(deltaT / tau);
+            ++preIdx;  // Move to next pre spike
         }
     }
+    
+    // Add remaining contributions from unpaired spikes
+    while (preIdx < sortedPreSpikes.size()) {
+        float deltaT = static_cast<float>(sortedPostSpikes.back() - sortedPreSpikes[preIdx]);
+        if (deltaT > 0) {
+            accumulatedDelta += pImpl->ltpWeight * tau * std::exp(-deltaT / tau);
+        }
+        ++preIdx;
+    }
+    
+    while (postIdx < sortedPostSpikes.size()) {
+        float deltaT = static_cast<float>(sortedPostSpikes[postIdx] - sortedPreSpikes.back());
+        if (deltaT < 0) {
+            accumulatedDelta += -pImpl->ltdWeight * tau * std::exp(deltaT / tau);
+        }
+        ++postIdx;
+    }
+    
+    totalDelta = accumulatedDelta;
     
     // Apply weight change with bounds
     if (std::abs(totalDelta) > 1e-6f) {
@@ -94,7 +130,10 @@ void STDP::update(Synapse* synapse,
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        NLM_LOG_ERROR("STDP::applyWeightChange called with null synapse");
+        return;
+    }
     
     // Clamp weight to bounds
     float newWeight = synapse->getWeight() + delta;

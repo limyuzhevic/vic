@@ -83,4 +83,28 @@ public:
     const char* getName() const override { return "BCM"; }
 };
 
+// Meta-learning: learn from experience and adapt plasticity rules
+// Placeholder - Phase 2 will implement real meta-learning
+class MetaLearningRule : public PlasticityRule {
+public:
+    void update(Synapse* synapse,
+                const std::vector<Timestamp>& preSpikes,
+                const std::vector<Timestamp>& postSpikes,
+                TimestepDuration dt) override {}
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+    const char* getName() const override { return "MetaLearning"; }
+};
+
+// Advanced plasticity: Multi-timescale learning with fast, medium, and slow mechanisms
+// Placeholder - Phase 2 will implement real multi-timescale learning
+class MultiTimescalePlasticity : public PlasticityRule {
+public:
+    void update(Synapse* synapse,
+                const std::vector<Timestamp>& preSpikes,
+                const std::vector<Timestamp>& postSpikes,
+                TimestepDuration dt) override {}
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+    const char* getName() const override { return "MultiTimescalePlasticity"; }
+};
+
 } // namespace nlm

@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "../core/Types/Types.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -13,9 +14,9 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
+    TimestampBuffer spikeHistory;
+    NeuronHandleBuffer incomingSynapses;
+    NeuronHandleBuffer outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
@@ -24,7 +25,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), spikeHistory(MAX_SPIKE_HISTORY) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {

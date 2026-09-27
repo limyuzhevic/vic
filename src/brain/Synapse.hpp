@@ -71,7 +71,10 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Implements real synaptic dynamics including:
+    // - Short-term plasticity (facilitation and depression)
+    // - Eligibility trace for reward-modulated learning
+    // - Synaptic efficacy modulation
     void step(Timestamp currentTime);
     
     // Reset to initial state

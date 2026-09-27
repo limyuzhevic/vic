@@ -1,4 +1,5 @@
 #include "Synapse.hpp"
+#include "../core/Types/Types.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -16,8 +17,8 @@ struct Synapse::Impl {
     SynapseType type;
     
     // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    TimestampBuffer preSpikeHistory;
+    TimestampBuffer postSpikeHistory;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -58,8 +59,6 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->efficacy = 1.0f;
     pImpl->shortTermDepression = 1.0f;
     pImpl->shortTermFacilitation = 0.0f;
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 Synapse::~Synapse() = default;

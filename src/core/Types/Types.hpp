@@ -189,4 +189,136 @@ constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
+// Generic circular buffer for fixed-size storage with efficient operations
+template<typename T>
+class CircularBuffer {
+private:
+    T* buffer;
+    size_t head;
+    size_t tail;
+    size_t capacity;
+    size_t size;
+    
+public:
+    // Construct a circular buffer with fixed capacity
+    explicit CircularBuffer(size_t cap) : head(0), tail(0), capacity(cap), size(0) {
+        buffer = new T[capacity];
+    }
+    
+    ~CircularBuffer() {
+        delete[] buffer;
+    }
+    
+    // Disable copying (pointer management is complex)
+    CircularBuffer(const CircularBuffer&) = delete;
+    CircularBuffer& operator=(const CircularBuffer&) = delete;
+    
+    // Enable moving
+    CircularBuffer(CircularBuffer&& other) noexcept : 
+        buffer(other.buffer), head(other.head), tail(other.tail),
+        capacity(other.capacity), size(other.size) {
+        other.buffer = nullptr;
+        other.head = other.tail = other.size = 0;
+    }
+    
+    CircularBuffer& operator=(CircularBuffer&& other) noexcept {
+        if (this != &other) {
+            delete[] buffer;
+            buffer = other.buffer;
+            head = other.head;
+            tail = other.tail;
+            capacity = other.capacity;
+            size = other.size;
+            
+            other.buffer = nullptr;
+            other.head = other.tail = other.size = 0;
+        }
+        return *this;
+    }
+    
+    // Add element to the end (enqueue)
+    void push(const T& value) {
+        if (size < capacity) {
+            buffer[tail] = value;
+            tail = (tail + 1) % capacity;
+            ++size;
+        } else {
+            // Buffer is full, overwrite oldest element
+            head = (head + 1) % capacity;
+            tail = (tail + 1) % capacity;
+            // size remains at capacity
+        }
+    }
+    
+    // Remove and return element from the front (dequeue)
+    bool pop(T& out) {
+        if (size == 0) return false;
+        
+        out = buffer[head];
+        head = (head + 1) % capacity;
+        --size;
+        return true;
+    }
+    
+    // Get element at index from front (0 = oldest, size-1 = newest)
+    bool get(size_t index, T& out) const {
+        if (index >= size) return false;
+        
+        size_t pos = (head + index) % capacity;
+        out = buffer[pos];
+        return true;
+    }
+    
+    // Get current size
+    size_t getSize() const { return size; }
+    
+    // Get capacity
+    size_t getCapacity() const { return capacity; }
+    
+    // Check if buffer is empty
+    bool isEmpty() const { return size == 0; }
+    
+    // Check if buffer is full
+    bool isFull() const { return size == capacity; }
+    
+    // Clear all elements
+    void clear() {
+        head = tail = size = 0;
+    }
+    
+    // Get all elements (for compatibility with std::vector interface)
+    std::vector<T> getAll() const {
+        std::vector<T> result;
+        result.reserve(size);
+        
+        if (size == 0) return result;
+        
+        for (size_t i = 0; i < size; ++i) {
+            T element;
+            get(i, element);
+            result.push_back(element);
+        }
+        
+        return result;
+    }
+};
+
+// Specialization for Timestamp type used in spike history
+using TimestampBuffer = CircularBuffer<Timestamp>;
+
+// Specialization for SpikeEvent type for event-driven systems
+using SpikeEventBuffer = CircularBuffer<SpikeEvent>;
+
+// Specialization for float type for short-term plasticity
+using FloatBuffer = CircularBuffer<float>;
+
+// Specialization for NeuronHandle type for synapse management
+using NeuronHandleBuffer = CircularBuffer<NeuronHandle>;
+
+// Specialization for SynapseHandle type for synapse management
+using SynapseHandleBuffer = CircularBuffer<SynapseHandle>;
+
+// Specialization for SynapticWeight type for plasticity tracking
+using WeightBuffer = CircularBuffer<SynapticWeight>;
+
 } // namespace nlm

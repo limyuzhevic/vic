@@ -1,4 +1,5 @@
 #include "PlasticityRule.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
@@ -27,6 +28,11 @@ void HebbianRule::update(Synapse* synapse,
     // TODO PHASE 2: Implement real Hebbian learning
     // PLACEHOLDER: Simple correlated firing increases weight
     
+    if (!synapse) {
+        NLM_LOG_WARNING("HebbianRule::update called with null synapse");
+        return;
+    }
+    
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
@@ -48,6 +54,11 @@ void HebbianRule::update(Synapse* synapse,
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    if (!synapse) {
+        NLM_LOG_ERROR("HebbianRule::applyWeightChange called with null synapse");
+        return;
+    }
+    
     synapse->addToWeight(delta);
 }
 
@@ -56,6 +67,9 @@ const char* HebbianRule::getName() const {
 }
 
 void HebbianRule::setLearningRate(float rate) {
+    if (std::abs(rate) > 1.0f) {
+        NLM_LOG_WARNING("HebbianRule::setLearningRate: Rate " + std::to_string(rate) + " exceeds reasonable bounds (1.0)");
+    }
     pImpl->learningRate = rate;
 }
 

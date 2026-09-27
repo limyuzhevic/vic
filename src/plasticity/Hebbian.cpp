@@ -1,5 +1,6 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -19,9 +20,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -49,20 +50,38 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse) {
+        NLM_LOG_WARNING("Hebbian::update called with null synapse");
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // OPTIMIZED: Avoid O(n²) by using efficient correlation computation
+    // Sort spike times for efficient windowed correlation counting
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Count correlated spike pairs efficiently using binary search
     size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    const float CORRELATION_WINDOW = 100.0f;  // 100ms correlation window
+    
+    // Use sliding window approach for O(n log n) complexity
+    for (size_t i = 0; i < sortedPreSpikes.size(); ++i) {
+        Timestamp preTime = sortedPreSpikes[i];
+        
+        // Find posts that correlate with this pre spike
+        // Use binary search to find range of posts within correlation window
+        auto lower = std::lower_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                     preTime - CORRELATION_WINDOW);
+        auto upper = std::upper_bound(sortedPostSpikes.begin(), sortedPostSpikes.end(), 
+                                     preTime + CORRELATION_WINDOW);
+        
+        correlationCount += std::distance(lower, upper);
     }
     
     // Compute weight change based on correlation
@@ -76,7 +95,15 @@ void Hebbian::update(Synapse* synapse,
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        NLM_LOG_ERROR("Hebbian::applyWeightChange called with null synapse");
+        return;
+    }
+    
+    // Clamp delta to reasonable bounds
+    if (std::abs(delta) > 1.0f) {
+        NLM_LOG_WARNING("Hebbian::applyWeightChange: Large delta " + std::to_string(delta) + " may cause instability");
+    }
     
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
