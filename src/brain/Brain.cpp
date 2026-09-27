@@ -588,30 +588,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+// Implement neural activity tracking for prediction and working memory
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->processSensoryInput(this, input);
+    }
     
-    const auto& values = input.getData();
-    if (values.empty()) return;
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current sensory input
+        pImpl->predictionSystem->update(pImpl->timestep);
+    }
     
-    size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (pImpl->attention) {
+        // Update attention system
+        pImpl->attention->update(pImpl->timestep);
+    }
     
-    // Distribute input across sensory neurons
-    for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
+    if (pImpl->conceptFormation) {
+        // Update concept formation system
+        pImpl->conceptFormation->update(pImpl->timestep);
+    }
+    
+    if (pImpl->dopamine) {
+        // Update dopamine (reward) system
+        pImpl->dopamine->update(pImpl->timestep);
+        
+        // Apply dopamine effects to working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->applyModulation(pImpl->dopamine->getLevel());
         }
+    }
+    
+    if (pImpl->curiosity) {
+        // Update curiosity (exploration motivation)
+        pImpl->curiosity->update(pImpl->timestep);
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        // Apply curiosity effects to working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->applyExploration(pImpl->curiosity->getLevel());
+        }
+    }
+    
+    if (pImpl->novelty) {
+        // Update novelty detection
+        pImpl->novelty->update(pImpl->timestep);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Apply novelty effects to attention
+        if (pImpl->attention) {
+            pImpl->attention->processNovelty(pImpl->novelty->getLevel());
         }
     }
 }
