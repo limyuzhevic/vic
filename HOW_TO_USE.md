@@ -70,6 +70,277 @@ make install
 
 ---
 
+## Part 1.5: Advanced Python API Enhancements (Phase 6.5)
+
+NLM now includes advanced Python bindings and utilities that make the neural simulation framework even more powerful and accessible for research and development.
+
+### Overview of Advanced Features
+
+The advanced Python API provides:
+
+1. **Convenience Factory Functions**: Easy setup for common simulation scenarios
+2. **Simulation Presets**: Pre-configured brains for specific research goals
+3. **Advanced Training Tools**: Custom reward functions, curriculum learning, exploration strategies
+4. **Performance Profiling**: Detailed simulation performance analysis
+5. **Brain Activity Visualization**: Pattern detection and statistical analysis
+6. **Comprehensive Debug Monitoring**: Integrated logging and debugging tools
+
+### Quick Start Example
+
+```python
+import pynlm
+from pynlm_advanced import (
+    SimulationPreset, BrainVisualizer, AgentTrainer,
+    SimulationProfiler, create_preset_brain,
+    create_agent_world_setup, setup_debug_monitor
+)
+
+# Create a brain using a preset
+brain_config = create_preset_brain(SimulationPreset.LEARNING_EXPERIMENT)
+brain = brain_config['brain']
+
+# Set up complete agent-world system
+system = create_agent_world_setup(vision_width=16, vision_height=16)
+brain = system['brain']
+world = system['world']
+agent = system['agent']
+
+# Set up comprehensive monitoring
+monitor = setup_debug_monitor(
+    brain=brain, world=world, agent=agent,
+    log_level="INFO", enable_profiling=True
+)
+
+# Run enhanced simulation
+visualizer = BrainVisualizer(brain)
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Collect activity data periodically
+    if step % 100 == 0:
+        visualizer.collect_activity_data(1000, 100)
+
+# Analyze results
+activity_data = visualizer.collect_activity_data(1000, 100)
+analysis = visualizer.analyze_patterns(activity_data)
+print(f"Firing rate trend: {analysis['firing_rate_stats']['trend']:.4f}")
+```
+
+### Key Advanced Features
+
+#### 1. Simulation Presets
+The `create_preset_brain()` function provides pre-configured brains optimized for different research scenarios:
+
+| Preset | Neuron Count | Learning Focus | Best Use Case |
+|--------|--------------|----------------|--------------|
+| `FAST_TEST` | 200 | Minimal | Quick validation, debugging |
+| `LEARNING_EXPERIMENT` | 1000 | Maximum | Studying learning processes |
+| `CONTINUAL_LEARNING` | 1500 | Long-term | Extended learning studies |
+| `BEHAVIORAL_TEST` | 800 | Behavior | Real-world behavior validation |
+| `DEVELOPMENTAL` | 1200 | Growth | Brain development studies |
+| `EXPLORATION` | 1000 | Discovery | Curiosity-driven research |
+| `CONSOLIDATION` | 900 | Memory | Memory consolidation studies |
+
+#### 2. Advanced Training Tools
+The `AgentTrainer` class provides sophisticated training capabilities:
+
+- **Custom Reward Functions**: Define your own reward logic with flexible callbacks
+- **Curriculum Learning**: Progressive training through staged difficulty levels
+- **Exploration Strategies**: Multiple exploration methods comparison
+- **Detailed Performance Tracking**: Comprehensive metrics and analysis
+
+#### 3. Performance and Analysis Tools
+The `SimulationProfiler` provides detailed performance analysis:
+
+- **Timing Analysis**: Precise measurement of simulation performance
+- **Resource Usage**: CPU time and step-by-step profiling
+- **Performance Assessment**: Automatic evaluation of simulation efficiency
+- **Comparative Analysis**: Benchmark your simulations against standards
+
+#### 4. Brain Activity Visualization and Analysis
+The `BrainVisualizer` class provides sophisticated activity analysis:
+
+- **Pattern Detection**: Identify oscillations, trends, and periodic behaviors
+- **Stability Analysis**: Quantify firing rate stability and reliability
+- **Statistical Analysis**: Compute mean, variance, and correlation metrics
+- **Activity Collection**: Systematically record neural activity over time
+
+#### 5. Debug and Monitoring
+The `setup_debug_monitor()` function provides comprehensive debugging tools:
+
+- **Integrated Logging**: Configurable log levels and formatting
+- **Real-time Monitoring**: Track simulation progress during execution
+- **Performance Profiling**: Automatic resource usage tracking
+- **Error Detection**: Identify performance bottlenecks and issues
+
+### Installation and Setup
+
+The advanced features are automatically included when installing the pynlm package:
+
+```bash
+# Install the full package with all features
+pip install pynlm
+
+# Or install in development mode for editing
+pip install -e .
+```
+
+To use the advanced features, import from the `nlm_advanced` module:
+
+```python
+# Advanced utilities for enhanced simulation
+from pynlm_advanced import (
+    SimulationPreset, BrainVisualizer, AgentTrainer,
+    SimulationProfiler, create_preset_brain,
+    create_agent_world_setup, setup_debug_monitor
+)
+```
+
+### Advanced Usage Examples
+
+#### Example 1: Training with Custom Rewards
+
+```python
+import pynlm
+from pynlm_advanced import AgentTrainer, create_agent_world_setup
+
+def curiosity_reward(world, agent, step):
+    """Reward exploration and learning behaviors."""
+    novelty = agent.getNoveltyLevel()
+    curiosity = agent.getCuriosityLevel()
+    prediction_error = abs(agent.getPredictionError())
+    
+    # Combine multiple reward signals
+    reward = novelty * 0.5 + curiosity * 0.3 + prediction_error * 0.2
+    return reward
+
+# Create training system
+system = create_agent_world_setup(vision_width=8, vision_height=8)
+trainer = AgentTrainer(system['brain'], system['world'], system['agent'])
+
+# Train with custom reward function
+results = trainer.train_with_custom_reward(
+    reward_function=curiosity_reward,
+    num_episodes=50,
+    exploration_factor=1.5
+)
+
+print(f"Training complete! Mean reward: {results['mean_reward']:.3f}")
+```
+
+#### Example 2: Curriculum Learning
+
+```python
+from pynlm_advanced import AgentTrainer, create_agent_world_setup
+
+def create_learning_curriculum():
+    """Create progressive difficulty curriculum."""
+    return [
+        {
+            'name': 'Sensory Foundation',
+            'episodes': 5,
+            'steps': 200,
+            'world_config': {'visionWidth': 4, 'visionHeight': 4},
+            'features': {'RewardModulation': True, 'Curiosity': True}
+        },
+        {
+            'name': 'Motor Coordination',
+            'episodes': 8,
+            'steps': 400,
+            'world_config': {'visionWidth': 8, 'visionHeight': 8},
+            'features': {'RewardModulation': True, 'Curiosity': True, 'StructuralPlasticity': True}
+        },
+        {
+            'name': 'Complex Navigation',
+            'episodes': 10,
+            'steps': 600,
+            'world_config': {'visionWidth': 16, 'visionHeight': 16},
+            'features': {'RewardModulation': True, 'Curiosity': True, 'Development': True}
+        }
+    ]
+
+# Run curriculum training
+system = create_agent_world_setup(vision_width=16, vision_height=16)
+trainer = AgentTrainer(system['brain'], system['world'], system['agent'])
+
+print("Starting curriculum learning...")
+curriculum_results = trainer.train_with_curriculum(
+    create_learning_curriculum(), 
+    base_steps=1000
+)
+
+print(f"Curriculum training complete! Final reward: {curriculum_results['final_performance']['mean_reward']:.3f}")
+```
+
+#### Example 3: Simulation Profiling
+
+```python
+import time
+import pynlm
+from pynlm_advanced import SimulationProfiler, create_agent_world_setup
+
+# Create system for profiling
+system = create_agent_world_setup(vision_width=8, vision_height=8)
+brain = system['brain']
+world = system['world']
+agent = system['agent']
+
+# Create profiler and run simulation with profiling
+profiler = SimulationProfiler(brain, world, agent)
+
+print("Running simulation with profiling...")
+start_time = time.time()
+
+for step in range(200):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Generate performance report
+profile_data = profiler.profile_simulation(brain, world, agent, 200, log_interval=50)
+report = profiler.generate_performance_report(profile_data)
+print(report)
+```
+
+### Module Summary
+
+All advanced features are contained in the `pynlm_advanced` module, which provides:
+
+| Class/Function | Purpose | Key Features |
+|----------------|---------|-------------|
+| `SimulationPreset` | Enum of predefined configurations | 7 research-specific presets |
+| `create_preset_brain()` | Create brain with preset config | Easy setup, configurable overrides |
+| `create_agent_world_setup()` | Complete system setup | Vision, motor, world configuration |
+| `BrainVisualizer` | Neural activity analysis | Pattern detection, statistics |
+| `AgentTrainer` | Advanced training utilities | Custom rewards, curriculum, exploration |
+| `SimulationProfiler` | Performance measurement | Timing, resource analysis |
+| `setup_debug_monitor()` | Debugging and monitoring | Logging, real-time monitoring |
+
+### Relationship to Core API
+
+The advanced features build upon the core pynlm API:
+
+- All advanced functions use the same core classes (`Brain`, `SimpleWorld`, `AgentBrain`)
+- Advanced features provide enhanced interfaces and utilities for these core classes
+- The core API remains unchanged and fully backward compatible
+- All advanced features work seamlessly with existing NLM code
+
+### Further Reading
+
+- [Phase 6 Final Integration](README.md#phase-6-final-integration) - Understand the core system integration
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Learn about the NLM brain architecture
+- [SCIENCE.md](docs/SCIENCE.md) - Explore the scientific background and principles
+
+---
+
 ## Part 2: Installing the Python Library
 
 ### From Source (Recommended for Development)
@@ -83,6 +354,34 @@ pip install .
 
 # Or install in development mode
 pip install -e .
+```
+
+### Using pyproject.toml (Modern Python Packaging)
+
+```bash
+# Install with scikit-build-core (used automatically by pip)
+pip install .
+
+# Build only (without installing)
+pip install build
+python -m build
+
+# Install specific build from wheel
+pip install dist/*.whl
+```
+
+### Verifying Installation
+
+```python
+import pynlm
+
+# Check version
+print(pynlm.__version__)
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
 
 ### Using pyproject.toml (Modern Python Packaging)

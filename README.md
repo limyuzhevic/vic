@@ -162,6 +162,92 @@ NLM/
 - Replay and consolidation functional
 - Phase 6 integration experiment created
 
+### Phase 6.5: Advanced Python API Enhancements
+
+Phase 6.5 introduces advanced Python bindings and utilities that make NLM even more powerful and accessible:
+
+#### Enhanced Python Bindings (pynlm_advanced)
+- **Convenience Factory Functions**: Easy setup for common simulation scenarios
+- **Simulation Presets**: Pre-configured brains for specific research goals
+- **Advanced Training Tools**: Custom reward functions, curriculum learning, exploration strategies
+- **Performance Profiling**: Detailed simulation performance analysis
+- **Brain Activity Visualization**: Pattern detection and statistical analysis
+- **Comprehensive Debug Monitoring**: Integrated logging and debugging tools
+
+#### Key New Features:
+1. **Simulation Presets**:
+   - `FAST_TEST` - Quick validation and testing
+   - `LEARNING_EXPERIMENT` - Optimal for studying learning processes
+   - `CONTINUAL_LEARNING` - Extended learning capabilities
+   - `BEHAVIORAL_TEST` - Real-world behavior validation
+   - `DEVELOPMENTAL` - Brain development studies
+   - `EXPLORATION` - Curiosity-driven exploration
+   - `CONSOLIDATION` - Memory consolidation research
+
+2. **Advanced Training Utilities**:
+   - Custom reward functions with flexible callbacks
+   - Curriculum learning for staged training
+   - Multiple exploration strategies comparison
+   - Detailed performance tracking and analysis
+
+3. **Performance and Analysis Tools**:
+   - Simulation profiling with timing analysis
+   - Brain activity pattern detection
+   - Stability analysis and trend identification
+   - Comprehensive reporting
+
+4. **Development Tools**:
+   - Integrated logging and debugging
+   - Activity monitoring and collection
+   - Real-time statistics collection
+   - Export capabilities for further analysis
+
+#### Getting Started with Advanced Features
+
+```python
+import pynlm
+from pynlm_advanced import (
+    SimulationPreset, BrainVisualizer, AgentTrainer, 
+    SimulationProfiler, create_preset_brain,
+    create_agent_world_setup, setup_debug_monitor
+)
+
+# Create a brain using a preset
+brain_config = create_preset_brain(SimulationPreset.LEARNING_EXPERIMENT)
+brain = brain_config['brain']
+
+# Set up complete agent-world system
+system = create_agent_world_setup(vision_width=16, vision_height=16)
+brain = system['brain']
+world = system['world']
+agent = system['agent']
+
+# Set up comprehensive monitoring
+monitor = setup_debug_monitor(
+    brain=brain, world=world, agent=agent,
+    log_level="INFO", enable_profiling=True
+)
+
+# Run enhanced simulation
+visualizer = BrainVisualizer(brain)
+for step in range(1000):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Collect activity data periodically
+    if step % 100 == 0:
+        visualizer.collect_activity_data(1000, 100)
+
+# Analyze results
+activity_data = visualizer.collect_activity_data(1000, 100)
+analysis = visualizer.analyze_patterns(activity_data)
+print(f"Firing rate trend: {analysis['firing_rate_stats']['trend']:.4f}")
+```
+
 ## Scientific Limitations
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
