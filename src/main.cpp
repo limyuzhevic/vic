@@ -382,6 +382,22 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Set default values for Phase 2
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -394,6 +410,10 @@ int main(int argc, char** argv) {
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep));
+        return 1;
+    }
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
@@ -402,27 +422,72 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    try {
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during brain initialization: " + std::string(e.what()));
         return 1;
     }
     
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    try {
+        NLM_LOG_INFO("=== Starting Basic Connectivity Test ===");
+        runBasicConnectivityTest(brain);
+        NLM_LOG_INFO("Basic connectivity test completed successfully");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during basic connectivity test: " + std::string(e.what()));
+        return 1;
+    }
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    try {
+        NLM_LOG_INFO("=== Resetting Brain for Plasticity Experiment ===");
+        brain->reset();
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to re-initialize brain after reset");
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during brain reset: " + std::string(e.what()));
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    try {
+        NLM_LOG_INFO("=== Starting Plasticity Learning Experiment ===");
+        runPlasticityExperiment(brain);
+        NLM_LOG_INFO("Plasticity learning experiment completed successfully");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during plasticity experiment: " + std::string(e.what()));
+        return 1;
+    }
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    try {
+        NLM_LOG_INFO("=== Resetting Brain for STDP Verification ===");
+        brain->reset();
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to re-initialize brain after reset");
+            return 1;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during brain reset: " + std::string(e.what()));
+        return 1;
+    }
+    
+    try {
+        NLM_LOG_INFO("=== Starting STDP Verification ===");
+        runStdpVerification(brain);
+        NLM_LOG_INFO("STDP verification completed successfully");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during STDP verification: " + std::string(e.what()));
+        return 1;
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

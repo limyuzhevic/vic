@@ -1,13 +1,7 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
+#include <memory>
 
 using namespace nlm;
 
@@ -28,7 +22,7 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     if (!integrationOK) {
-        std::cerr << "ERROR: Integration verification failed!" << std::endl;
+        NLM_LOG_ERROR("ERROR: Integration verification failed!");
         return 1;
     }
     

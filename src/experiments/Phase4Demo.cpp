@@ -13,7 +13,6 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -60,7 +59,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
     if (!brain->initialize()) {
-        std::cerr << "Failed to initialize brain!\n";
+        NLM_LOG_ERROR("Failed to initialize brain!");
         return 1;
     }
     
