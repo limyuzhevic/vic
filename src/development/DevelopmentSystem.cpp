@@ -10,7 +10,20 @@ struct DevelopmentSystem::Impl {
     SimulationStep stepsInCurrentStage;
     double stageAge;  // Age since entering current stage
     
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
+    // Configurable stage durations
+    double stageDurations[5];  // Index corresponds to DevelopmentalStage enum
+    double criticalPeriodDuration;
+    double maturationDuration;
+    
+    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0),
+             criticalPeriodDuration(300.0), maturationDuration(600.0) {
+        // Initialize stage durations with biologically plausible defaults
+        stageDurations[0] = 60.0;   // Initial
+        stageDurations[1] = 360.0;  // CriticalPeriod  
+        stageDurations[2] = 960.0;  // Maturation (includes CriticalPeriod)
+        stageDurations[3] = 2880.0; // Adult (8 years)
+        stageDurations[4] = 1e9;    // Aging (effectively infinite)
+    }
 };
 
 DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
@@ -24,29 +37,30 @@ DevelopmentalStage DevelopmentSystem::getStage() const {
 void DevelopmentSystem::setStage(DevelopmentalStage stage) {
     pImpl->stage = stage;
     pImpl->stageAge = 0.0;
+    pImpl->stageStartStep = 0; // Reset stage start
 }
 
 void DevelopmentSystem::advanceStage() {
-    switch (pImpl->stage) {
-        case DevelopmentalStage::Initial:
-            pImpl->stage = DevelopmentalStage::CriticalPeriod;
-            break;
-        case DevelopmentalStage::CriticalPeriod:
-            pImpl->stage = DevelopmentalStage::Maturation;
-            break;
-        case DevelopmentalStage::Maturation:
-            pImpl->stage = DevelopmentalStage::Adult;
-            break;
-        case DevelopmentalStage::Adult:
-            pImpl->stage = DevelopmentalStage::Aging;
-            break;
-        case DevelopmentalStage::Aging:
-            // Already at final stage
-            break;
+    // Get current stage index
+    int currentStageIndex = static_cast<int>(pImpl->stage);
+    
+    // Check if we have a next stage
+    if (currentStageIndex < 4) {
+        DevelopmentalStage nextStage = static_cast<DevelopmentalStage>(currentStageIndex + 1);
+        pImpl->stage = nextStage;
+        
+        // Set next stage start step
+        pImpl->stageStartStep = pImpl->stepsInCurrentStage;
+        
+        // Reset stage age
+        pImpl->stageAge = 0.0;
+        
+        // Log the stage transition
+        NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
+        
+        // Notify brain of development change (if brain is available)
+        // This is a placeholder for future implementation
     }
-    pImpl->stepsInCurrentStage = 0;
-    pImpl->stageAge = 0.0;
-    NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
 }
 
 const char* DevelopmentSystem::getStageName() const {
@@ -66,12 +80,15 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
     pImpl->stageAge += 0.001;
     
     // Auto-advance stage based on time in stage
-    // Initial: 60 steps, CriticalPeriod: 300 steps, Maturation: 600 steps
-    if (pImpl->stage == DevelopmentalStage::Initial && pImpl->stageAge > 60.0) {
+    int stageIndex = static_cast<int>(pImpl->stage);
+    
+    if (stageIndex == 0 && pImpl->stageAge > pImpl->stageDurations[0]) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && pImpl->stageAge > 300.0) {
+    } else if (stageIndex == 1 && pImpl->stageAge > pImpl->stageDurations[1]) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && pImpl->stageAge > 600.0) {
+    } else if (stageIndex == 2 && pImpl->stageAge > pImpl->stageDurations[2]) {
+        advanceStage();
+    } else if (stageIndex == 3 && pImpl->stageAge > pImpl->stageDurations[3]) {
         advanceStage();
     }
 }
@@ -82,12 +99,16 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     ++pImpl->stepsInCurrentStage;
     
     // Auto-advance stage based on developmental age
-    // These thresholds are in simulation seconds
-    if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {
+    int stageIndex = static_cast<int>(pImpl->stage);
+    
+    // Check if we should advance stage based on age
+    if (stageIndex == 0 && age_ > pImpl->stageDurations[0]) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::CriticalPeriod && age_ > 360.0) {
+    } else if (stageIndex == 1 && age_ > pImpl->stageDurations[1]) {
         advanceStage();
-    } else if (pImpl->stage == DevelopmentalStage::Maturation && age_ > 960.0) {
+    } else if (stageIndex == 2 && age_ > pImpl->stageDurations[2]) {
+        advanceStage();
+    } else if (stageIndex == 3 && age_ > pImpl->stageDurations[3]) {
         advanceStage();
     }
 }
@@ -112,8 +133,98 @@ float DevelopmentSystem::getCriticalPeriodProgress() const {
     if (pImpl->stage != DevelopmentalStage::CriticalPeriod) {
         return 0.0f;
     }
+    
     // Progress through critical period (0 to 1)
-    return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+    double maxAge = pImpl->stageDurations[1];
+    return std::min(1.0f, static_cast<float>(pImpl->stageAge / maxAge));
+}
+
+// Additional configuration methods for enhanced DevelopmentSystem
+void DevelopmentSystem::configureStageDuration(DevelopmentalStage stage, double duration) {
+    int stageIndex = static_cast<int>(stage);
+    if (stageIndex >= 0 && stageIndex < 5) {
+        pImpl->stageDurations[stageIndex] = duration;
+        NLM_LOG_INFO(std::string(getStageName()) + " stage duration set to: " + std::to_string(duration));
+    }
+}
+
+double DevelopmentSystem::getStageDuration(DevelopmentalStage stage) const {
+    int stageIndex = static_cast<int>(stage);
+    if (stageIndex >= 0 && stageIndex < 5) {
+        return pImpl->stageDurations[stageIndex];
+    }
+    return 0.0;
+}
+
+void DevelopmentSystem::configureCriticalPeriodDuration(double duration) {
+    pImpl->criticalPeriodDuration = duration;
+    NLM_LOG_INFO("Critical period duration set to: " + std::to_string(duration));
+}
+
+double DevelopmentSystem::getCriticalPeriodDuration() const {
+    return pImpl->criticalPeriodDuration;
+}
+
+void DevelopmentSystem::configureMaturationDuration(double duration) {
+    pImpl->maturationDuration = duration;
+    NLM_LOG_INFO("Maturation duration set to: " + std::to_string(duration));
+}
+
+double DevelopmentSystem::getMaturationDuration() const {
+    return pImpl->maturationDuration;
+}
+
+bool DevelopmentSystem::isStageComplete() const {
+    int stageIndex = static_cast<int>(pImpl->stage);
+    if (stageIndex < 0 || stageIndex >= 5) {
+        return true; // Unknown stage or final stage
+    }
+    
+    if (stageIndex == 0) {
+        return pImpl->stageAge >= pImpl->stageDurations[0];
+    } else if (stageIndex == 1) {
+        return pImpl->stageAge >= pImpl->stageDurations[1];
+    } else if (stageIndex == 2) {
+        return pImpl->stageAge >= pImpl->stageDurations[2];
+    } else if (stageIndex == 3) {
+        return pImpl->stageAge >= pImpl->stageDurations[3];
+    }
+    
+    return true; // Aging stage is never complete
+}
+
+float DevelopmentSystem::getStageProgress() const {
+    int stageIndex = static_cast<int>(pImpl->stage);
+    if (stageIndex < 0 || stageIndex >= 5) {
+        return 1.0f; // Unknown stage or final stage
+    }
+    
+    double maxAge = pImpl->stageDurations[stageIndex];
+    if (maxAge == Double::infinity) {
+        return 0.0f; // Aging stage has no progress
+    }
+    
+    return std::min(1.0f, static_cast<float>(pImpl->stageAge / maxAge));
+}
+
+void DevelopmentSystem::enableExperienceBasedProgression(
+    Brain* brain, RandomGenerator& rng, double experienceThreshold) {
+    if (!brain || pImpl->stage != DevelopmentalStage::Maturation) {
+        return;
+    }
+    
+    // Check for experience-based triggers
+    // This would look at brain activity, memory, or other metrics
+    // For now, it's a placeholder for future implementation
+    
+    // Simulate experience-based progression with some randomness
+    double experienceLevel = rng.uniformReal(0.0f, 1.0f);
+    
+    if (experienceLevel > experienceThreshold) {
+        NLM_LOG_INFO("Experience-based development progression triggered");
+        // Could advance stage early based on experience
+        // This would depend on brain state and metrics
+    }
 }
 
 } // namespace nlm

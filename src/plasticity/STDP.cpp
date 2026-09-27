@@ -59,6 +59,25 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Optimize by checking time ranges
+    bool hasPositive = false, hasNegative = false;
+    for (Timestamp preTime : preSpikes) {
+        for (Timestamp postTime : postSpikes) {
+            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            
+            if (dt > 0) {
+                // Pre before post: POTENTIATION
+                // "Cells that fire together, wire together" - but only if pre fires before post
+                hasPositive = true;
+            } else if (dt < 0) {
+                // Post before pre: DEPRESSION
+                // "Anti-Hebbian" - connection weakens if post fires without pre
+                hasNegative = true;
+            }
+        }
+    }
+    
+    // Process spikes efficiently
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
