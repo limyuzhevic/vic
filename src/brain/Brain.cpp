@@ -403,18 +403,64 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Update working memory with current neural activity
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Process working memory to identify important traces for long-term storage
+        if (pImpl->workingMemory->hasImportantTraces()) {
+            // Forward important traces to episodic memory for consolidation
+            auto importantTraces = pImpl->workingMemory->getImportantTraces();
+            for (const auto& trace : importantTraces) {
+                pImpl->workingMemory->markAsConsolidated(trace);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Novelty affects exploration behavior
+        float noveltyLevel = pImpl->novelty->getNoveltyLevel();
+        if (noveltyLevel > 0.5f) {
+            // High novelty increases exploration by injecting random current into motor neurons
+            for (auto* neuron : pImpl->motorNeurons) {
+                neuron->injectCurrent(noveltyLevel * 5.0f);
+            }
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+        
+        // Curiosity affects learning and exploration
+        float curiosityLevel = pImpl->curiosity->getCuriosityLevel();
+        if (curiosityLevel > 0.5f) {
+            // High curiosity increases synaptic plasticity
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    // Increase plasticity based on curiosity
+                    float currentPlasticity = syn->getEligibilityTrace();
+                    syn->setEligibilityTrace(currentPlasticity * (1.0f + curiosityLevel));
+                }
+            }
+        }
+    }
+    
+    // Update prediction error signal
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(pImpl->timestep);
+        
+        // Prediction error affects learning
+        float predictionError = pImpl->predictionError->getPredictionError();
+        if (predictionError > 0.1f) {
+            // High prediction error increases exploration
+            for (auto* neuron : pImpl->motorNeurons) {
+                neuron->injectCurrent(predictionError * 3.0f);
+            }
+        }
     }
     
     // Update dopamine (reward prediction error)
@@ -434,6 +480,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
+                }
+            }
+        }
+        
+        // Dopamine affects synaptic plasticity
+        if (dopamineLevel > 0.5f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    // Enhance plasticity based on dopamine
+                    float currentEligibility = syn->getEligibilityTrace();
+                    syn->setEligibilityTrace(currentEligibility * (1.0f + dopamineLevel * 0.5f));
                 }
             }
         }
@@ -488,7 +545,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons with their synaptic states for richer episodes
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
@@ -502,7 +559,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward prediction error as part of episode for learning
+            if (pImpl->predictionError) {
+                episode.predictionError = pImpl->predictionError->getPredictionError();
+            }
+            
+            // Store neuromodulation levels for contextual learning
+            if (pImpl->novelty) {
+                episode.noveltyLevel = pImpl->novelty->getNoveltyLevel();
+            }
+            if (pImpl->curiosity) {
+                episode.curiosityLevel = pImpl->curiosity->getCuriosityLevel();
+            }
+            
+            // Store developmental stage for developmental context
+            episode.developmentalStage = pImpl->developmentalStage;
+            
+            // Store rich synaptic context for replay
+            for (auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    // Only store synapses that are plastic and have recent activity
+                    if (syn->getPlasticityFlags().stdp || syn->getPlasticityFlags().hebbian) {
+                        const auto& preSpikes = syn->getPreSpikeHistory();
+                        const auto& postSpikes = syn->getPostSpikeHistory();
+                        
+                        if (!preSpikes.empty() || !postSpikes.empty()) {
+                            // Store synaptic state for replay
+                            episode.synapseChanges.push_back(
+                                {syn->getSourceNeuron().index(), 
+                                 syn->getDestinationNeuron().index(),
+                                 syn->getWeight(),
+                                 static_cast<uint8_t>(syn->getType()),
+                                 syn->getPreSpikeHistory().size(),
+                                 syn->getPostSpikeHistory().size()});
+                        }
+                    }
+                }
+            }
+            
+            // Store reward in episode (duplicate for API compatibility)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
@@ -511,8 +606,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // The prediction system maintains a model of the environment and generates predictions
+        
+        // Get current sensory input through working memory
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            // Get sensory neuron activity from working memory
+            currentSensoryState = pImpl->workingMemory->getSensoryPattern();
+        }
+        
+        // Update prediction system with current sensory state
+        pImpl->predictionSystem->update(currentSensoryState, pImpl->timestep);
+        
+        // Get prediction error and use it for learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Apply prediction error to neuromodulation systems
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setPredictionError(predictionError);
+        }
+        
+        // Use prediction error to modulate learning rates
+        if (pImpl->dopamine) {
+            // Scale dopamine based on prediction error (better predictions = more dopamine)
+            float predictionAccuracy = 1.0f / (1.0f + std::abs(predictionError));
+            pImpl->dopamine->setLevel(predictionAccuracy);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +644,83 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Get attention allocation from attention system
+        auto attentionAllocation = pImpl->attention->getAttentionAllocation();
+        
+        // Apply attention effects to neural processing
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Get attention level for this neuron (if available)
+                    float attentionLevel = 1.0f; // Default no attention
+                    for (const auto& alloc : attentionAllocation) {
+                        if (alloc.neuronId == neuron->getId()) {
+                            attentionLevel = alloc.level;
+                            break;
+                        }
+                    }
+                    
+                    // Apply attention effects
+                    if (attentionLevel > 0.0f) {
+                        // Attention enhances neural excitability
+                        neuron->injectCurrent(attentionLevel * 2.0f);
+                    }
+                }
+            }
+        }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== Additional Cognitive Integration ==========
+    // Connect concept formation and planning
+    if (pImpl->conceptFormation && pImpl->planner) {
+        // Get current concepts
+        auto currentConcepts = pImpl->conceptFormation->getCurrentConcepts();
+        
+        if (!currentConcepts.empty()) {
+            // Apply concepts to planner for action planning
+            pImpl->planner->setAvailableConcepts(currentConcepts);
+            
+            // Get planning recommendations based on concepts
+            auto plannedActions = pImpl->planner->planAction();
+            
+            // Apply planned actions to motor system
+            for (const auto& action : plannedActions) {
+                // Convert action to motor command and send to motor neurons
+                switch (action.getType()) {
+                    case ActionType::MoveForward:
+                        // Inject current into motor neurons to move forward
+                        for (auto* neuron : pImpl->motorNeurons) {
+                            neuron->injectCurrent(10.0f);  // Strong motor activation
+                        }
+                        break;
+                    case ActionType::MoveBackward:
+                        for (auto* neuron : pImpl->motorNeurons) {
+                            neuron->injectCurrent(-8.0f);
+                        }
+                        break;
+                    case ActionType::TurnLeft:
+                        for (auto* neuron : pImpl->motorNeurons) {
+                            neuron->injectCurrent(5.0f);
+                        }
+                        break;
+                    case ActionType::TurnRight:
+                        for (auto* neuron : pImpl->motorNeurons) {
+                            neuron->injectCurrent(-5.0f);
+                        }
+                        break;
+                    case ActionType::Interact:
+                        for (auto* neuron : pImpl->motorNeurons) {
+                            neuron->injectCurrent(15.0f);
+                        }
+                        break;
+                    case ActionType::Wait:
+                    default:
+                        // No action, motor neurons remain at baseline
+                        break;
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

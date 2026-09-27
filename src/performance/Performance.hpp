@@ -30,7 +30,15 @@
  *    - Thread-local neuron processing
  *    - Synchronized spike processing
  * 
+ * 6. CheckpointSystem
+ *    - Robust checkpointing for large-scale neural simulations
+ *    - Incremental saves, version compatibility, and validation
+ *    - Complete brain state serialization
+ * 
  * This infrastructure is designed to scale from 10k to 100M+ neurons.
+ * 
+ * Integration Status: Available as OptimizedBrain (inherits from Brain)
+ * All performance features can be enabled via compile-time flags
  */
 
 #ifndef NLM_PERFORMANCE_HPP
@@ -44,6 +52,7 @@
     #define NLM_USE_SPARE_CONNECTIVITY 1
     #define NLM_USE_MULTITHREADING 1
     #define NLM_USE_SIMD 1
+    #define NLM_USE_CHECKPOINT 1
 #else
     #define NLM_USE_MEMORY_POOL 0
     #define NLM_USE_SOA 0
@@ -51,6 +60,7 @@
     #define NLM_USE_SPARE_CONNECTIVITY 0
     #define NLM_USE_MULTITHREADING 0
     #define NLM_USE_SIMD 0
+    #define NLM_USE_CHECKPOINT 0
 #endif
 
 // SIMD configuration
