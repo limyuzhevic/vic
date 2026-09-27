@@ -9,6 +9,15 @@
 #include <memory>
 #include <string>
 
+// Include Brain implementation headers
+#include "BrainMain.hpp"
+#include "BrainSensory.hpp"
+#include "BrainMemory.hpp"
+#include "BrainPlasticity.hpp"
+#include "BrainDevelopment.hpp"
+#include "BrainCheckpoint.hpp"
+#include "BrainStatistics.hpp"
+
 namespace nlm {
 
 // Forward declarations
