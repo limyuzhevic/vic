@@ -6,6 +6,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Find nlohmann_json (modern C++ JSON library)
+find_package(nlohmann_json 3.11.2 QUIET)
+if (NOT nlohmann_json_FOUND)
+    # Use FetchContent if not found
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -87,10 +100,12 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
+# Link with nlohmann_json if available
+if (TARGET nlohmann_json::nlohmann_json)
+    target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
+elseif (nlohmann_json_FOUND)
+    target_link_libraries(nlm_core PUBLIC nlohmann_json)
+endif()
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
