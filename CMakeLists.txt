@@ -55,13 +55,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -78,7 +74,7 @@ add_library(nlm_core STATIC
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
+    src/motor/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -139,12 +135,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 experiment library
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (final integration)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

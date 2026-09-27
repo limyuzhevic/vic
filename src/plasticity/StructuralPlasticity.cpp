@@ -1,6 +1,6 @@
 #include "StructuralPlasticity.hpp"
-#include "../../brain/Brain.hpp"
-#include "../../brain/NeuralRegion.hpp"
+#include "../brain/Brain.hpp"
+#include "../brain/NeuralRegion.hpp"
 #include <algorithm>
 #include <cmath>
 

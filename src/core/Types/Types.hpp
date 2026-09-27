@@ -189,4 +189,5 @@ constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
+// Hash specializations for ID types in std namespace\nnamespace std {\n    template<>\n    struct hash<nlm::NeuronId> {\n        size_t operator()(const nlm::NeuronId& id) const {\n            return std::hash<uint64_t>()(id.value);\n        }\n    };\n    template<>\n    struct hash<nlm::SynapseId> {\n        size_t operator()(const nlm::SynapseId& id) const {\n            return std::hash<uint64_t>()(id.value);\n        }\n    };\n    template<>\n    struct hash<nlm::RegionId> {\n        size_t operator()(const nlm::RegionId& id) const {\n            return std::hash<uint64_t>()(id.value);\n        }\n    };\n    template<>\n    struct hash<nlm::PopulationId> {\n        size_t operator()(const nlm::PopulationId& id) const {\n            return std::hash<uint64_t>()(id.value);\n        }\n    };\n}
 } // namespace nlm
