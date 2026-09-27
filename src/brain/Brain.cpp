@@ -576,13 +576,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // ========== STEP 14: Sleep/rest cycle ==========
+    // Check if brain should enter rest state
+    if (pImpl->stepsSinceLastEpisode > 100 && pImpl->totalSpikesThisStep < 10 && !pImpl->isResting) {
+        pImpl->isResting = true;
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    if (pImpl->isResting) {
+        // Process rest state - maintain minimal activity for synaptic downscaling
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Reduced excitability during rest
+                    neuron->injectCurrent(-0.1f);
+                    
+                    // Some synaptic weakening occurs naturally during rest
+                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+                    for (Synapse* syn : incomingSynapses) {
+                        if (syn->getWeight() > 0.01f) {
+                            float decay = 0.01f * pImpl->timestep;
+                            syn->setWeight(std::max(0.01f, syn->getWeight() - decay));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 15: Periodic memory consolidation ==========
+    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+        // Consolidate important memories, remove weak ones
+        // Determine consolidation strength based on neuromodulation
+        float consolidationStrength = 1.0f;
+        if (pImpl->novelty) {
+            consolidationStrength += pImpl->novelty->getLevel() * 0.5f;
+        }
+        if (pImpl->dopamine) {
+            consolidationStrength += pImpl->dopamine->getLevel() * 0.3f;
+        }
+        
+        // Consolidated important memories
+        pImpl->episodicMemory->consolidate(consolidationStrength * 0.3f);
+        
+        // Remove weak memories (those with low activation and age > 100 steps)
+        if (pImpl->episodicMemory) {
+            auto& episodes = pImpl->episodicMemory->getEpisodes();
+            // Filter out weak episodes
+            std::erase_if(episodes, [this](const EpisodicMemoryItem& episode) {
+                // Remove episodes with low activation and old age
+                float avgActivation = 0.0f;
+                if (!episode.neuronActivations.empty()) {
+                    avgActivation = std::accumulate(episode.neuronActivations.begin(),
+                                                  episode.neuronActivations.end(), 0.0f) / episode.neuronActivations.size();
+                }
+                // Remove if low activation (avg < 0.1) and episode is old (step > 100)
+                return avgActivation < 0.1f && (currentStep - episode.timestamp) > 100;
+            });
+        }
+        
+        // Update consolidation criteria based on prediction error
+        if (pImpl->predictionError) {
+            float errorMagnitude = pImpl->predictionError->getMagnitude();
+            // High prediction error triggers more aggressive consolidation
+            if (errorMagnitude > 0.5f) {
+                pImpl->consolidationInterval = std::max<size_t>(50, pImpl->consolidationInterval / 2);
+            }
+        }
+    }
+    
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
