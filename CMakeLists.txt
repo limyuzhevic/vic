@@ -139,6 +139,13 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Command-line tool executable
+add_executable(nlm_cmd
+    tools/nlm_cmd.cpp
+)
+target_include_directories(nlm_cmd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(nlm_cmd PUBLIC nlm_core nlm_agent nlm_world)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
@@ -147,5 +154,8 @@ add_subdirectory(tests)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+install(TARGETS nlm_cmd
     RUNTIME DESTINATION bin
 )

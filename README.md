@@ -18,51 +18,38 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+## Key Improvements in Phase 6
+
+### 1. **Modular Architecture**
+- Main executable refactored into modular functions
+- Command-line interface for advanced usage
+- JSON configuration support with fallback to simple format
+- Separated concerns: configuration, brain management, and experiment execution
+
+### 2. **Enhanced Configuration System**
+- JSON configuration parser with full support for nested objects, arrays, and all data types
+- Automatic format detection based on file extension (.json, .jsonc, .jsonl)
+- Backward compatibility with simple key=value format
+- Command-line option support for runtime configuration
+
+### 3. **Command-Line Interface**
+- `nlm_cmd` advanced command-line tool
+- Multiple modes: `run`, `monitor`, `validate`
+- Flexible experiment configuration
+- JSON output support for programmatic consumption
+- Debug and profiling capabilities
+
+### 4. **Improved User Experience**
+- Better error messages and help documentation
+- Progress logging and metrics reporting
+- Checkpoint saving and loading support
+- Quiet mode for automated execution
+
 ## Current Phase
 
 **PHASE 6: FINAL INTEGRATION**
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
-
-### Phase 6 Integration Achievements
-
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
 
 ## Building
 
@@ -82,36 +69,73 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Advanced Command-Line Tool
+```bash
+./nlm_cmd --help
+./nlm_cmd --experiment learning --steps 5000 --quiet
+./nlm_cmd --mode monitor --experiment stdp --debug
+```
+
+### Using JSON Configuration
+Create `config.json`:
+```json
+{
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1
+  },
+  "plasticity": {
+    "stdp_enabled": true,
+    "hebbian_enabled": true,
+    "structural_enabled": true
+  }
+}
+```
+
+Run with JSON config:
+```bash
+./nlm_phase6_demo --config config.json
+```
+
 ## Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── docs/                    # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── src/                    # Source code
+│   ├── core/              # Core utilities
+│   ├── brain/             # Neural components (integrated)
+│   ├── dynamics/          # Neural dynamics
+│   ├── plasticity/        # Plasticity rules
+│   ├── development/       # Developmental system
+│   ├── neuromodulation/    # Neuromodulators (integrated)
+│   ├── memory/           # Memory systems (integrated)
+│   ├── prediction/        # Prediction systems (integrated)
+│   ├── cognition/         # Cognitive mechanisms (integrated)
+│   ├── sensory/           # Sensory processing
+│   ├── motor/             # Motor system
+│   ├── environment/       # Environment interface
+│   ├── experiments/       # Experiment framework (Phase 6)
+│   └── visualization/     # Visualization
+├── tools/                 # Command-line tools
+│   ├── nlm_cmd.h
+│   └── nlm_cmd.cpp
+├── tests/                 # Unit tests
+│   ├── test_config.cpp
+│   ├── test_json_config.cpp
+│   ├── test_main.cpp
+│   └── test_cmd.cpp
+└── configs/               # Configuration files
+    └── default.cfg
 ```
 
 ## Phase Summary
@@ -179,7 +203,7 @@ Phase 6 does NOT claim:
 - Human-like reasoning
 - Genuine subjective experience
 
-Phase 6 DOES investigate:
+Phase 6 investigates:
 - Whether memory systems can integrate with neural dynamics
 - Whether neuromodulation can affect plasticity in a coordinated way
 - Whether prediction can become a central organizing principle
@@ -228,3 +252,44 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Testing
+
+Run the test suite:
+```bash
+./test_neuron
+./test_json_config
+./test_cmd
+```
+
+Or use CTest:
+```bash
+ctest --output-on-failure
+```
+
+## Quick Start
+
+1. **Build the project**
+   ```bash
+   mkdir build && cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Run the basic demo**
+   ```bash
+   ./nlm_phase6_demo
+   ```
+
+3. **Try the advanced command-line tool**
+   ```bash
+   ./nlm_cmd --help
+   ./nlm_cmd --experiment learning --steps 1000
+   ```
+
+4. **Test the JSON configuration**
+   ```bash
+   ./nlm_cmd --experiment stdp --no-plasticity
+   ```
+
+That's it! You're now ready to use the advanced NLM system with modular architecture, JSON configuration support, and powerful command-line interface.
