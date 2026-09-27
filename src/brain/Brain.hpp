@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -24,10 +25,9 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -42,6 +42,73 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Network export structure
+struct NetworkNode {
+    uint64_t id;
+    std::string type;           // neuron, region, population
+    double x;                   // Position in visualization space
+    double y;                   // Position in visualization space
+    double radius;              // Size in visualization space
+    std::string label;          // Display label
+    std::string color;          // Hex color code
+    double activityLevel;       // 0.0 to 1.0
+    uint64_t incomingConnections;
+    uint64_t outgoingConnections;
+    bool isActive;
+};
+
+struct NetworkEdge {
+    uint64_t sourceId;
+    uint64_t targetId;
+    double weight;             // Connection strength
+    double activity;           // Current activity level
+    std::string color;         // Edge color
+    bool isActive;
+    double delay;              // Synaptic delay in ms
+};
+
+// Spikes export structure
+struct SpikeExport {
+    uint64_t neuronId;
+    double time;              // Time in seconds
+    uint64_t step;
+    std::string color;         // Spike color
+    double amplitude;          // Spike amplitude
+};
+
+// Memory export structure
+struct MemoryExport {
+    uint64_t id;
+    std::string type;          // working, episodic, semantic, procedural, associative
+    std::string label;
+    double x;                  // Position in memory space
+    double y;                  // Position in memory space
+    double size;               // Size in memory space
+    double activationLevel;    // 0.0 to 1.0
+    std::string color;         // Color based on type
+    uint64_t accessCount;
+    double lastAccessTime;     // Time since last access
+};
+
+// Memory connection export structure
+struct MemoryConnectionExport {
+    uint64_t sourceId;
+    uint64_t targetId;
+    double strength;           // Association strength
+    double activation;         // Current activation level
+    std::string color;
+    bool isBidirectional;
+};
+
+// Behavior export structure
+struct BehaviorExport {
+    uint64_t step;
+    std::string actionType;
+    std::string actionDescription;
+    double confidence;         // Confidence in action (0.0 to 1.0)
+    double reward;            // Reward value
 };
 
 // Brain: The central coordinator of the neural system
@@ -184,6 +251,15 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
@@ -192,6 +268,20 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== EXPORT FUNCTIONALITY ==========
+    
+    // Export neural network in specified format
+    std::string exportNetwork(const std::string& format = "dot");
+    
+    // Export spike train data in specified format
+    std::string exportSpikes(const std::string& format = "txt");
+    
+    // Export memory contents in specified format
+    std::string exportMemory(const std::string& format = "txt");
+    
+    // Export behavioral data in specified format
+    std::string exportBehavior(const std::string& format = "txt");
     
 private:
     struct Impl;
