@@ -1,14 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <functional>
-#include <unordered_map>
-
-namespace nlm {
-
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
 //
@@ -91,7 +80,7 @@ private:
     size_t capacity_;
     float decayRate_;
     
-    // Memory content
+    // Memory content - optimized struct of arrays
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
@@ -104,6 +93,24 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+};
+
+// NeuralWorkingMemory::Impl struct implementation
+struct NeuralWorkingMemory::Impl {
+    Brain* brain;
+    
+    // Maintenance connections (recurrent)
+    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+    
+    // Memory trace ages
+    std::vector<SimulationStep> traceAges;
+    
+    // Optimized data structures for O(1) lookups
+    std::unordered_map<NeuronId, size_t> neuronIndexMap;
+    std::unordered_set<NeuronId> neuronSet;
+    std::unordered_map<NeuronId, float> neuronActivationMap;
+    
+    Impl() : brain(nullptr) {}
 };
 
 // AttentionalSelection: Neural attention through competition
@@ -126,7 +133,7 @@ public:
     // Process competing sensory inputs and select winners
     // Returns IDs of winning neural populations
     std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
-                                              float globalInhibition = 0.5f);
+                                               float globalInhibition = 0.5f);
 
     // Apply attention to a specific region (focus processing there)
     void focusOnRegion(RegionId region);
