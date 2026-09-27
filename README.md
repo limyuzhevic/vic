@@ -80,7 +80,51 @@ make -j4
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected. It includes:
+
+1. **Integration Verification** - Tests that all systems are accessible and connected
+2. **Individual System Tests** - Tests memory, neuromodulation, checkpointing, and replay systems  
+3. **Full Integration Experiment** - Runs a complete lifetime simulation with development, plasticity, and memory systems working together
+
+### Phase 4 Demo (Emergent Cognition)
+```bash
+./nlm_phase4_demo
+```
+
+This demonstrates cognitive abilities emerging from neural interaction:
+
+- Temporal prediction learning
+- Working memory development
+- Episodic memory recall
+- Social learning and imitation
+
+### Phase 2 Demo (Real Neural Computation)
+```bash
+./nlm
+```
+
+This demonstrates basic neural computation with:
+
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+
+## Phase 6 Demo Options
+
+The Phase 6 demo accepts command line arguments:
+
+```bash
+./nlm_phase6_demo [episodes] [steps_per_episode]
+```
+
+Defaults: 3 episodes, 100 steps per episode
+
+Examples:
+```bash
+./nlm_phase6_demo 5 200    # 5 episodes, 200 steps each
+./nlm_phase6_demo 1 50     # 1 episode, 50 steps
+```
 
 ## Project Structure
 
