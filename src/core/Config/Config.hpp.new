@@ -1,0 +1,454 @@
+#ifndef NLM_CONFIG_H
+#define NLM_CONFIG_H
+
+#include <string>
+#include <memory>
+#include <vector>
+#include <variant>
+#include <optional>
+#include <unordered_map>
+#include <stdexcept>
+#include <sstream>
+#include <algorithm>
+
+namespace nlm {
+
+// Forward declarations
+class Config;
+
+/**
+ * @enum ConfigSource
+ * @brief Configuration value source
+ * 
+ * Identifies where a configuration value originated from, which determines
+ * its precedence and mutability.
+ */
+enum class ConfigSource {
+public:
+    /** Default configuration values */
+    Default = 0,
+    /** Values loaded from configuration files */
+    File = 1,
+    /** Values from command-line arguments */
+    CommandLine = 2,
+    /** Values set at runtime */
+    Runtime = 3,
+    /** Values from environment variables */
+    Environment = 4
+};
+
+/**
+ * @struct ConfigEntry
+ * @brief Single configuration entry with metadata
+ * 
+ * Represents a single configuration parameter with its value, source,
+ * and description. This structure is used internally by the Config class.
+ */
+struct ConfigEntry {
+    std::string key;           //!< Configuration key/name
+    ConfigValue value;         //!< Configuration value
+    ConfigSource source;       //!< Source of this value
+    std::string description;   //!< Human-readable description
+    std::string filename;      //!< File where this value was defined (if applicable)
+    int lineNumber;            //!< Line number in file (if applicable)
+    
+    /**
+     * @brief Default constructor
+     */
+    ConfigEntry() 
+        : key(), value(), source(ConfigSource::Default), description(), 
+          filename(), lineNumber(0) {}
+    
+    /**
+     * @brief Parameterized constructor
+     * 
+     * @param k Configuration key
+     * @param v Configuration value
+     * @param s Source of the value
+     * @param desc Description of the parameter
+     * @param fn Filename where defined
+     * @param ln Line number in file
+     */
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& fn = "", 
+                int ln = 0)
+        : key(k), value(v), source(s), description(desc), 
+          filename(fn), lineNumber(ln) {}
+    
+    /**
+     * @brief Check if this entry is the same as another
+     * 
+     * @param other Other entry to compare
+     * @return true if entries are equivalent
+     */
+    bool operator==(const ConfigEntry& other) const {
+        return key == other.key && value == other.value && 
+               source == other.source;
+    }
+    
+    /**
+     * @brief Check if this entry differs from another
+     * 
+     * @param other Other entry to compare
+     * @return true if entries differ
+     */
+    bool operator!=(const ConfigEntry& other) const {
+        return !(*this == other);
+    }
+};
+
+/**
+ * @class Config
+ * @brief Configuration management for NLM
+ * 
+ * The Config class provides a comprehensive configuration system for managing
+ * all NLM configuration parameters. It supports multiple sources, type-safe
+ * access, file persistence, and command-line argument loading.
+ * 
+ * Key features:
+ * - Type-safe access to configuration values
+ * - Multiple configuration sources with precedence
+ * - File I/O for configuration persistence
+ * - Command-line argument parsing
+ * - Default configuration management
+ * - Validation and error handling
+ * - Performance-optimized for large numbers of parameters
+ * 
+ * Configuration values can be of the following types:
+ * - int, int64_t
+ * - double, bool
+ * - std::string
+ * - std::vector<int>, std::vector<double>, std::vector<std::string>
+ * 
+ * @see ConfigSource
+ * @see ConfigEntry
+ */
+class Config {
+public:
+    /**
+     * @brief Constructor - creates empty configuration
+     */
+    Config();
+    
+    /**
+     * @brief Destructor
+     */
+    ~Config();
+    
+    // ============================================================================
+    // Lifecycle Management
+    // ============================================================================
+    
+    /**
+     * @brief Disable copying
+     */
+    Config(const Config&) = delete;
+    
+    /**
+     * @brief Disable assignment
+     */
+    Config& operator=(const Config&) = delete;
+    
+    /**
+     * @brief Move constructor
+     */
+    Config(Config&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator
+     */
+    Config& operator=(Config&&) noexcept;
+    
+    // ============================================================================
+    // Configuration File Operations
+    // ============================================================================
+    
+    /**
+     * @brief Load configuration from JSON file
+     * 
+     * Loads configuration parameters from a JSON file. The file should contain
+     * key-value pairs where keys are parameter names and values can be simple types
+     * or arrays. Duplicate keys are allowed, with later values taking precedence.
+     * 
+     * @param filepath Path to the JSON configuration file
+     * @return true if file was loaded successfully, false otherwise
+     * 
+     * @throws std::runtime_error if file cannot be read
+     * @see saveToFile
+     */
+    bool loadFromFile(const std::string& filepath);
+    
+    /**
+     * @brief Load configuration from command-line arguments
+     * 
+     * Parses command-line arguments in the format `--key=value` or `--key value`.
+     * Only parameters that are already defined in the configuration will be set.
+     * 
+     * @param argc Argument count (from main())
+     * @param argv Argument values (from main())
+     * @return true if arguments were parsed successfully, false otherwise
+     * 
+     * @see loadFromArgs
+     */
+    bool loadFromArgs(int argc, char** argv);
+    
+    /**
+     * @brief Save configuration to JSON file
+     * 
+     * Saves all configuration parameters to a JSON file. Only parameters that
+     * have a non-default source (not Default) will be saved. The output format
+     * is compatible with loadFromFile.
+     * 
+     * @param filepath Path where to save the configuration file
+     * @return true if file was saved successfully, false otherwise
+     * 
+     * @see loadFromFile
+     */
+    bool saveToFile(const std::string& filepath) const;
+    
+    // ============================================================================
+    // Value Access and Modification
+    // ============================================================================
+    
+    /**
+     * @brief Get configuration value with type checking
+     * 
+     * Retrieves a configuration value with automatic type conversion. If the
+     * configured value has a different type, a type conversion attempt is made.
+     * If conversion fails, an empty optional is returned.
+     * 
+     * @tparam T Type of value to retrieve (must be one of the supported types)
+     * @param key Configuration key
+     * @return Optional containing the value, or empty if key doesn't exist or type mismatch
+     * 
+     * @see getOr
+     * @see set
+     */
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    /**
+     * @brief Get configuration value with default fallback
+     * 
+     * Retrieves a configuration value, returning a default value if the key
+     * doesn't exist or has a different type. This method never returns empty.
+     * 
+     * @tparam T Type of value to retrieve
+     * @param key Configuration key
+     * @param defaultValue Value to return if key doesn't exist
+     * @return The configuration value or default
+     * 
+     * @see get
+     */
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
+    
+    /**
+     * @brief Set configuration value
+     * 
+     * Sets a configuration value with a specific source. The source determines
+     * the precedence and mutability of the value. Runtime and CommandLine values
+     * can be overridden, but File and Default values cannot be changed.
+     * 
+     * @param key Configuration key
+     * @param value Configuration value
+     * @param source Source of the value (default: Runtime)
+     * @see set overloads
+     */
+    void set(const std::string& key, const ConfigValue& value, 
+             ConfigSource source = ConfigSource::Runtime);
+    
+    /**
+     * @brief Set configuration value as string
+     * 
+     * Convenience overload for setting string values.
+     * 
+     * @param key Configuration key
+     * @param value String value
+     * @param source Source of the value
+     */
+    void set(const std::string& key, const std::string& value, 
+             ConfigSource source = ConfigSource::Runtime);
+    
+    /**
+     * @brief Set configuration value as integer
+     * 
+     * Convenience overload for setting integer values.
+     * 
+     * @param key Configuration key
+     * @param value Integer value
+     * @param source Source of the value
+     */
+    void set(const std::string& key, int value, 
+             ConfigSource source = ConfigSource::Runtime);
+    
+    /**
+     * @brief Set configuration value as double
+     * 
+     * Convenience overload for setting double values.
+     * 
+     * @param key Configuration key
+     * @param value Double value
+     * @param source Source of the value
+     */
+    void set(const std::string& key, double value, 
+             ConfigSource source = ConfigSource::Runtime);
+    
+    /**
+     * @brief Set configuration value as boolean
+     * 
+     * Convenience overload for setting boolean values.
+     * 
+     * @param key Configuration key
+     * @param value Boolean value
+     * @param source Source of the value
+     */
+    void set(const std::string& key, bool value, 
+             ConfigSource source = ConfigSource::Runtime);
+    
+    // ============================================================================
+    // Configuration Inspection
+    // ============================================================================
+    
+    /**
+     * @brief Check if configuration key exists
+     * 
+     * @param key Configuration key to check
+     * @return true if key exists in configuration
+     */
+    bool has(const std::string& key) const;
+    
+    /**
+     * @brief Remove configuration key
+     * 
+     * Removes a configuration parameter and all its history. The key will no
+     * longer exist in the configuration.
+     * 
+     * @param key Configuration key to remove
+     */
+    void remove(const std::string& key);
+    
+    /**
+     * @brief Get all configuration keys
+     * 
+     * @return Vector of all configuration keys
+     */
+    std::vector<std::string> getKeys() const;
+    
+    /**
+     * @brief Get all configuration entries
+     * 
+     * @return Vector of all configuration entries
+     */
+    std::vector<ConfigEntry> getAllEntries() const;
+    
+    /**
+     * @brief Clear all configuration
+     * 
+     * Removes all configuration parameters and resets to empty state.
+     * All values will be considered default after this operation.
+     */
+    void clear();
+    
+    // ============================================================================
+    // Configuration Analysis
+    // ============================================================================
+    
+    /**
+     * @brief Get configuration summary
+     * 
+     * Generates a human-readable summary of the configuration, including
+     * parameter counts by source, file locations, and usage statistics.
+     * 
+     * @return Formatted configuration summary
+     */
+    std::string summary() const;
+    
+    /**
+     * @brief Validate configuration
+     * 
+     * Validates all configuration values, checking for type mismatches,
+     * invalid ranges, and other constraints. Returns detailed error information
+     * for any validation failures.
+     * 
+     * @return Vector of validation error messages
+     */
+    std::vector<std::string> validate() const;
+    
+    /**
+     * @brief Merge configuration with another
+     * 
+     * Merges another configuration into this one. Parameters from the other
+     * configuration will override existing values unless they have a lower
+     * source priority.
+     * 
+     * @param other Configuration to merge
+     * @param override Whether to override existing parameters
+     */
+    void merge(const Config& other, bool override = true);
+    
+    // ============================================================================
+    // Configuration Statistics
+    // ============================================================================
+    
+    /**
+     * @brief Get configuration parameter count
+     * 
+     * @return Total number of configuration parameters
+     */
+    size_t getParameterCount() const;
+    
+    /**
+     * @brief Get configuration source count
+     * 
+     * @param source Configuration source
+     * @return Number of parameters from the specified source
+     */
+    size_t getSourceCount(ConfigSource source) const;
+    
+    /**
+     * @brief Get configuration size in bytes
+     * 
+     * @return Approximate memory usage in bytes
+     */
+    size_t getMemoryUsage() const;
+
+private:
+    // ============================================================================
+    // Internal Implementation
+    // ============================================================================
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Internal helper methods
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string toUpper(const std::string& str);
+    static std::string boolToString(bool value);
+    static bool stringToBool(const std::string& str);
+    static double stringToDouble(const std::string& str);
+    static int stringToInt(const std::string& str);
+    
+    // Type conversion helpers
+    template<typename T>
+    bool tryConvert(const ConfigValue& value, T& output) const;
+    
+    // Validation helpers
+    static std::vector<std::string> validateValue(const ConfigValue& value, 
+                                                  const std::string& key) const;
+    
+    // File I/O helpers
+    static bool parseJSONFile(const std::string& filepath, 
+                             std::vector<ConfigEntry>& entries);
+    static bool writeJSONFile(const std::string& filepath, 
+                              const std::vector<ConfigEntry>& entries) const;
+    
+    // Command-line parsing helpers
+    static bool parseCommandLineArgs(int argc, char** argv, 
+                                    std::vector<ConfigEntry>& entries);
+};
+
+} // namespace nlm
+
+#endif // NLM_CONFIG_H
