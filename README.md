@@ -64,13 +64,17 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+## Python Installation
+
+For Python users, install via pip:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+pip install .
+```
+
+Or in development mode:
+```bash
+pip install -e .
 ```
 
 ## Running
@@ -97,11 +101,21 @@ NLM/
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
+│   │   ├── Config/               # Configuration system
+│   │   ├── Random/               # Random number generation
+│   │   ├── Logger/               # Logging framework
+│   │   └── SimulationClock/      # Time management
 │   ├── brain/          # Neural components (integrated)
+│   │   ├── Brain.cpp            # Main brain class
+│   │   ├── Brain.hpp            # Brain header
+│   │   ├── Neuron.cpp           # LIF neuron implementation
+│   │   ├── Synapse.cpp          # Synaptic connections
+│   │   ├── NeuralRegion.cpp     # Brain regions
+│   │   └── NeuralPopulation.cpp # Neuron populations
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
 │   ├── cognition/      # Cognitive mechanisms (integrated)
@@ -110,8 +124,12 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
+├── python/            # Python bindings
+│   └── bindings.cpp   # PyBind11 interface
 ├── tests/
-└── configs/
+│   ├── test_*.cpp     # Unit tests
+│   └── benchmark.cpp  # Performance benchmarks
+└── configs/           # Configuration examples
 ```
 
 ## Phase Summary

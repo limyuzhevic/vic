@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format with backward compatibility)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -63,6 +64,16 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // JSON/YAML specific file operations
+    bool loadFromJsonFile(const std::string& filepath);
+    bool loadFromYamlFile(const std::string& filepath);
+    bool saveToJsonFile(const std::string& filepath) const;
+    bool saveToYamlFile(const std::string& filepath) const;
+    std::string toJsonString() const;
+    std::string toYamlString() const;
+    bool isJsonFile(const std::string& filepath) const;
+    bool isYamlFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -100,6 +111,20 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    nlohmann::json configToJson() const;
+    nlohmann::json configValueToJson(const ConfigValue& value);
+    ConfigValue jsonToConfigValue(const nlohmann::json& j);
+    
+    // Backward compatibility methods
+    bool loadFromSimpleFile(const std::string& filepath) const;
+    std::string configValueToString(const ConfigValue& value) const;
+    ConfigValue configStringToValue(const std::string& str) const;
 };
+
+// JSON/YAML conversion helpers (free functions)
+nlohmann::json configEntryToJson(const ConfigEntry& entry);
+ConfigEntry configEntryFromJson(const nlohmann::json& j);
 
 } // namespace nlm

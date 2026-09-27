@@ -142,24 +142,91 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system with advanced validation and schema support)pbdoc")
         .def(py::init<>())
+        .def(py::init<const std::string&>(), py::arg("filepath"),
+             "Load configuration from file in constructor")
+        
+        // File operations
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        
+        // Configuration access and manipulation
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::get, py::arg("key"), py::arg("default") = nullptr,
+             "Get configuration value by key")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set configuration value")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        
+        // Validation and schema
+        .def("validate", &Config::validate,
+             "Validate configuration and return list of errors")
+        .def("validateSchema", &Config::validateSchema,
+             "Validate configuration against schema")
+        .def("getSchema", &Config::getSchema,
+             "Get configuration schema definition")
+        
+        // Configuration inheritance and merging
+        .def("merge", &Config::merge, py::arg("other"),
+             "Merge configuration with another config")
+        .def("inherit", &Config::inherit, py::arg("parent"),
+             "Inherit configuration from parent")
+        
+        // Environment variable integration
+        .def("fromEnv", &Config::fromEnv,
+             "Load configuration from environment variables")
+        .def("fromEnvWithPrefix", &Config::fromEnvWithPrefix, py::arg("prefix"),
+             "Load configuration from environment variables with prefix")
+        
+        // Configuration versioning
+        .def("getVersion", &Config::getVersion,
+             "Get current configuration version")
+        .def("setVersion", &Config::setVersion, py::arg("version"),
+             "Set configuration version")
+        .def("getSchemaVersion", &Config::getSchemaVersion,
+             "Get schema version for validation")
+        
+        // Configuration templates
+        .def("applyTemplate", &Config::applyTemplate, py::arg("templateName"),
+             "Apply predefined configuration template")
+        .def("saveTemplate", &Config::saveTemplate, py::arg("filename"),
+             "Save current configuration as template")
+        .def("getAvailableTemplates", &Config::getAvailableTemplates,
+             "Get list of available configuration templates")
+        
+        // Configuration utility methods
         .def("clear", &Config::clear,
              "Clear all configuration entries")
+        .def("copy", &Config::copy,
+             "Create a copy of the configuration")
+        .def("clone", &Config::clone,
+             "Clone the configuration")
+        
+        // Advanced features
+        .def("watchForChanges", &Config::watchForChanges,
+             "Watch configuration for changes")
+        .def("reload", &Config::reload,
+             "Reload configuration from source")
+        
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("toDict", &Config::toDict,
+             "Convert configuration to Python dictionary")
+        .def("fromDict", &Config::fromDict, py::arg("configDict"),
+             "Load configuration from Python dictionary")
+        .def("toJSON", &Config::toJSON,
+             "Export configuration as JSON string")
+        .def("fromJSON", &Config::fromJSON, py::arg("jsonString"),
+             "Load configuration from JSON string")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -263,42 +330,185 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation with advanced extensions)pbdoc")
         .def(py::init<>())
+        
+        // Basic configuration
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions and vision")
+        .def("reset", &SimpleWorld::reset,
+             "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        
+        // Advanced world configuration
+        .def("configureAdvanced", &SimpleWorld::configureAdvanced, 
+             py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+             py::arg("maxEnergy"), py::arg("energyDecayRate"), py::arg("resourceEnergyGain"),
+             "Configure world with advanced parameters")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible simulations")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get current random seed")
+        
+        // Simulation controls
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state with timestep")
+        .def("step", &SimpleWorld::update, py::arg("timestep"),
+             "Alias for update (for consistency)")
+        
+        // Advanced motor command application
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command with detailed result")
+        .def("applyAction", &SimpleWorld::applyAction,
+             py::arg("action"), py::arg("currentTime"),
+             "Apply action with automatic command conversion")
+        
+        // Enhanced sensory processing
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get current sensory percept")
+        .def("addSensoryModality", &SimpleWorld::addSensoryModality,
+             py::arg("name"), py::arg("processor"),
+             "Add custom sensory modality processor")
+        .def("removeSensoryModality", &SimpleWorld::removeSensoryModality,
+             py::arg("name"),
+             "Remove sensory modality")
+        .def("getSensoryModalities", &SimpleWorld::getSensoryModalities,
+             "Get list of active sensory modalities")
+        
+        // World event handling
+        .def("addEventListener", &SimpleWorld::addEventListener,
+             py::arg("eventType"), py::arg("callback"),
+             "Add event listener for world events")
+        .def("removeEventListener", &SimpleWorld::removeEventListener,
+             py::arg("eventType"), py::arg("callback"),
+             "Remove event listener")
+        .def("triggerEvent", &SimpleWorld::triggerEvent,
+             py::arg("eventType"), py::arg("data"),
+             "Trigger custom world event")
+        
+        // Advanced object management
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add object to world")
+        .def("addObjectAdvanced", &SimpleWorld::addObjectAdvanced,
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f,
+             "Add object with advanced parameters")
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             "Get object at position")
+        .def("getObjects", &SimpleWorld::getObjects,
+             "Get all world objects")
+        .def("removeObjectAt", &SimpleWorld::removeObjectAt, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("getObjectsInRadius", &SimpleWorld::getObjectsInRadius,
+             py::arg("x"), py::arg("y"), py::arg("radius"),
+             "Get objects within radius")
+        
+        // Environment simulation controls
+        .def("enableEnvironmentalPhysics", &SimpleWorld::enableEnvironmentalPhysics,
+             py::arg("enable"),
+             "Enable/disable environmental physics simulation")
+        .def("enableResourceDynamics", &SimpleWorld::enableResourceDynamics,
+             py::arg("enable"),
+             "Enable/disable resource dynamics")
+        .def("enableHazards", &SimpleWorld::enableHazards,
+             py::arg("enable"),
+             "Enable/disable hazard simulation")
+        .def("setHazardDensity", &SimpleWorld::setHazardDensity, py::arg("density"),
+             "Set hazard density (0.0-1.0)")
+        .def("addHazard", &SimpleWorld::addHazard, py::arg("x"), py::arg("y"), py::arg("type"),
+             "Add hazard at position")
+        .def("getHazardCount", &SimpleWorld::getHazardCount,
+             "Get total number of hazards")
+        
+        // Vision and perception
+        .def("getVision", &SimpleWorld::getVision,
+             "Get vision sensory data")
+        .def("getVisionWidth", &SimpleWorld::getVisionWidth,
+             "Get vision width in cells")
+        .def("getVisionHeight", &SimpleWorld::getVisionHeight,
+             "Get vision height in cells")
+        
+        // Agent body state
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("updateAgentBody", &SimpleWorld::updateAgentBody, py::arg("agent"),
+             "Update agent body state directly")
+        
+        // Utility functions
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall)")
+        .def("getWorldBounds", &SimpleWorld::getWorldBounds,
+             "Get world boundary coordinates")
+        .def("getAccessibleArea", &SimpleWorld::getAccessibleArea,
+             "Get accessible area where agent can move")
+        
+        // Simulation time and statistics
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setSimulationTime", &SimpleWorld::setSimulationTime, py::arg("time"),
+             "Set simulation time")
+        .def("getStepCount", &SimpleWorld::getStepCount,
+             "Get number of simulation steps taken")
+        
+        // Resource management
+        .def("getResourceCount", &SimpleWorld::getResourceCount,
+             "Get number of resources in world")
+        .def("getHazardCount", &SimpleWorld::getHazardCount,
+             "Get number of hazards in world")
+        .def("getAgentEnergy", &SimpleWorld::getAgentEnergy,
+             "Get agent current energy")
+        .def("setAgentEnergy", &SimpleWorld::setAgentEnergy, py::arg("energy"),
+             "Set agent energy level")
+        
+        // Visualization and debugging
+        .def("generateMap", &SimpleWorld::generateMap, py::arg("format") = "ascii",
+             "Generate world map for visualization")
+        .def("exportState", &SimpleWorld::exportState, py::arg("filepath"),
+             "Export world state to file")
+        .def("importState", &SimpleWorld::importState, py::arg("filepath"),
+             "Import world state from file")
+        .def("logState", &SimpleWorld::logState,
+             "Log current world state for debugging")
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
+        
+        // Simulation operations
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
+        
+        // Batch processing capabilities
+        .def("batchStep", &Brain::batchStep, py::arg("steps"), py::arg("timestep"),
+             "Perform multiple simulation steps in batch")
+        .def("runSimulation", &Brain::runSimulation, py::arg("steps"), py::arg("timestep"), py::arg("startStep"),
+             "Run complete simulation with specified steps")
+        
+        // Parallel processing support
+        .def("parallelStep", &Brain::parallelStep, py::arg("steps"), py::arg("timestep"), py::arg("workers"),
+             "Perform parallel simulation steps")
+        .def("setWorkerCount", &Brain::setWorkerCount, py::arg("workers"),
+             "Set number of worker threads for parallel processing")
+        
+        // Brain cloning and copying
+        .def("clone", &Brain::clone,
+             "Create a deep copy of the brain")
+        .def("copy", &Brain::copy,
+             "Create a shallow copy of the brain")
+        .def("duplicate", &Brain::duplicate,
+             "Duplicate brain configuration and state")
+        
+        // Input and output operations
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -310,12 +520,18 @@ PYBIND11_MODULE(pynlm, m) {
              "Inject current into all neurons of a specific type")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
+        
+        // State management
         .def("reset", &Brain::reset,
              "Reset brain state")
+        .def("clear", &Brain::clear,
+             "Clear all neural state and data")
         .def("save", &Brain::save, py::arg("filepath"),
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        
+        // Brain structure manipulation
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),
@@ -328,6 +544,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
+        
+        // Neural population statistics
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
@@ -342,21 +560,57 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        
+        // Developmental control
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
+        
+        // Data access and analysis
+        .def("getActivityData", &Brain::getActivityData,
+             "Get neural activity data as array")
+        .def("getSpikeTimes", &Brain::getSpikeTimes,
+             "Get spike times for all neurons")
+        .def("getNeuronStates", &Brain::getNeuronStates,
+             "Get current states of all neurons")
+        .def("getConnectionMatrix", &Brain::getConnectionMatrix,
+             "Get synaptic connection matrix")
+        
+        // Configuration and status
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Performance monitoring and profiling
+        .def("startProfiler", &Brain::startProfiler,
+             "Start performance profiling")
+        .def("stopProfiler", &Brain::stopProfiler,
+             "Stop performance profiling")
+        .def("getProfilingStats", &Brain::getProfilingStats,
+             "Get profiling statistics")
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+             "Get performance metrics")
+        
+        // Visualization
+        .def("visualize", &Brain::visualize, py::arg("outputFormat") = "text",
+             "Generate visualization of brain state")
+        .def("generateHeatmap", &Brain::generateHeatmap, py::arg("neuronType"),
+             "Generate activity heatmap for neuron type")
+        .def("generateConnectivityPlot", &Brain::generateConnectivityPlot,
+             "Generate connectivity visualization")
+        .def("exportForVisualization", &Brain::exportForVisualization, py::arg("format"),
+             "Export brain data for external visualization tools");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world with enhanced sensory processing)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
+        
+        // Advanced sensory processing options
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
@@ -369,24 +623,71 @@ PYBIND11_MODULE(pynlm, m) {
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
+        
+        // Custom action selection strategies
+        .def("selectAction", &AgentBrain::selectAction,
+             "Select action using advanced strategies (curiosity, exploration, etc.)")
+        .def("setActionSelectionStrategy", &AgentBrain::setActionSelectionStrategy,
+             py::arg("strategy"),
+             "Set action selection strategy (epsilon-greedy, Thompson sampling, etc.)")
+        .def("getActionSelectionStrategy", &AgentBrain::getActionSelectionStrategy,
+             "Get current action selection strategy")
+        
+        // Advanced neuromodulation controls
+        .def("updateNeuromodulation", &AgentBrain::updateNeuromodulation,
+             "Update all neuromodulation systems")
+        .def("setNeuromodulationLevel", &AgentBrain::setNeuromodulationLevel,
+             py::arg("level"),
+             "Set global neuromodulation level")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        
+        // Development stage management
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+        .def("setDevelopmentalStage", &AgentBrain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get current learning rate")
+        .def("setLearningRate", &AgentBrain::setLearningRate,
+             py::arg("rate"),
+             "Set learning rate for plasticity")
+        
+        // Neuromodulation system access
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+        .def("getDopamineLevel", &AgentBrain::getDopamineLevel,
+             "Get dopamine level")
+        
+        // Advanced sensory processing
+        .def("addCustomSensoryModality", &AgentBrain::addCustomSensoryModality,
+             py::arg("name"), py::arg("processor"),
+             "Add custom sensory modality processor")
+        .def("setSensoryWeighting", &AgentBrain::setSensoryWeighting,
+             py::arg("modality"), py::arg("weight"),
+             "Set weighting for a sensory modality")
+        .def("getSensoryWeights", &AgentBrain::getSensoryWeights,
+             "Get current sensory modality weights")
+        
+        // Reset and state management
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+        .def("clear", &AgentBrain::clear,
+             "Clear agent state")
+        .def("saveState", &AgentBrain::saveState, py::arg("filepath"),
+             "Save agent state to file")
+        .def("loadState", &AgentBrain::loadState, py::arg("filepath"),
+             "Load agent state from file")
+        
+        // Configuration flags
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -395,10 +696,53 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
+        .def("enableExploration", &AgentBrain::enableExploration,
+             py::arg("enable"))
+        .def("enableNoveltyDetection", &AgentBrain::enableNoveltyDetection,
+             py::arg("enable"))
+        .def("enablePrediction", &AgentBrain::enablePrediction,
+             py::arg("enable"))
+        
+        // Status checking
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("isExplorationEnabled", &AgentBrain::isExplorationEnabled)
+        .def("isNoveltyDetectionEnabled", &AgentBrain::isNoveltyDetectionEnabled)
+        .def("isPredictionEnabled", &AgentBrain::isPredictionEnabled)
+        
+        // Advanced analysis
+        .def("analyzeBehavior", &AgentBrain::analyzeBehavior,
+             "Analyze agent behavior patterns")
+        .def("getBehaviorStats", &AgentBrain::getBehaviorStats,
+             "Get behavioral statistics")
+        .def("getPerformanceMetrics", &AgentBrain::getPerformanceMetrics,
+             "Get performance metrics")
+        
+        // Context management
+        .def("createContext", &AgentBrain::createContext,
+             py::arg("name"), py::arg("params") = "",
+             "Create execution context")
+        .def("getContext", &AgentBrain::getContext,
+             py::arg("name"),
+             "Get execution context")
+        .def("getAllContexts", &AgentBrain::getAllContexts,
+             "Get all execution contexts")
+        .def("removeContext", &AgentBrain::removeContext,
+             py::arg("name"),
+             "Remove execution context")
+        
+        // Memory management
+        .def("getMemoryUsage", &AgentBrain::getMemoryUsage,
+             "Get memory usage statistics")
+        .def("clearMemory", &AgentBrain::clearMemory,
+             "Clear internal memory buffers")
+        
+        // Brain reference
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
