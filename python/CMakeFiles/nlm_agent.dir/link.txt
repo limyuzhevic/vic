@@ -1,0 +1,2 @@
+/usr/bin/x86_64-linux-gnu-ar qc libnlm_agent.a CMakeFiles/nlm_agent.dir/src/agent/SensoryPercept.cpp.o CMakeFiles/nlm_agent.dir/src/agent/AgentBrain.cpp.o
+/usr/bin/x86_64-linux-gnu-ranlib libnlm_agent.a

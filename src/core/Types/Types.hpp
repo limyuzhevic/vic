@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <cstddef>
+#include <functional>
 
 namespace nlm {
 
@@ -19,6 +21,13 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Hash function for use in unordered containers
+    struct Hash {
+        size_t operator()(const NeuronId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
 };
 
 // Synapse identifier
@@ -33,6 +42,18 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Increment operators
+    SynapseId& operator++() { // prefix
+        ++value;
+        return *this;
+    }
+    
+    SynapseId operator++(int) { // postfix
+        SynapseId result = *this;
+        ++value;
+        return result;
+    }
 };
 
 // Region identifier
@@ -190,3 +211,18 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+// Hash function specializations for use in unordered containers
+namespace std {
+    template<> struct hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
+    
+    template<> struct hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const {
+            return std::hash<uint64_t>()(id.value);
+        }
+    };
+}

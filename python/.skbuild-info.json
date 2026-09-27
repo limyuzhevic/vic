@@ -1,0 +1,8 @@
+{
+  "source_dir": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_19a57964-cac4-4986-b4d0-6dcc999f4ae4",
+  "build_dir": "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_19a57964-cac4-4986-b4d0-6dcc999f4ae4/python",
+  "cmake_path": "/usr/bin/cmake",
+  "skbuild_path": "/tmp/pip-build-env-dklni7v1/overlay/local/lib/python3.10/dist-packages/scikit_build_core",
+  "skbuild_version": "1.1.0",
+  "python_executable": "/usr/bin/python3"
+}

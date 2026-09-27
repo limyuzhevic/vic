@@ -1,0 +1,1 @@
+/usr/bin/x86_64-linux-gnu-g++ -O3 -DNDEBUG CMakeFiles/nlm.dir/src/main.cpp.o -o nlm  libnlm_core.a 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Random/Random.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
 #include <vector>

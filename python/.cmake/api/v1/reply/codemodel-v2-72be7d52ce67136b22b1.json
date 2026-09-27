@@ -1,0 +1,152 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Release-16eb49beb751c5bba41f.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						8
+					]
+				},
+				{
+					"build" : "tests",
+					"jsonFile" : "directory-tests-Release-b01f6abb0ab61427ef3b.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "tests",
+					"targetIndexes" : 
+					[
+						7
+					]
+				}
+			],
+			"name" : "Release",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1
+					],
+					"name" : "NLM",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm-Release-8ce1bb739e99a8ce12e3.json",
+					"name" : "nlm",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_agent::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_agent-Release-62fd7cb237368cd758b9.json",
+					"name" : "nlm_agent",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_core::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_core-Release-593f9d9a18c4cdb13394.json",
+					"name" : "nlm_core",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_phase3::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_phase3-Release-4a2b5dd461730273aa51.json",
+					"name" : "nlm_phase3",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_phase3_demo::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_phase3_demo-Release-074d0afdf6d8d21dd071.json",
+					"name" : "nlm_phase3_demo",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_phase4::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_phase4-Release-b2bac6ab62ebf9f98c6e.json",
+					"name" : "nlm_phase4",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_phase4_demo::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_phase4_demo-Release-4645dea8f7ccf5ebfb25.json",
+					"name" : "nlm_phase4_demo",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "nlm_test::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-nlm_test-Release-1329a83d42933affaacd.json",
+					"name" : "nlm_test",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "nlm_world::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nlm_world-Release-40ba731e7b5407c5fdb5.json",
+					"name" : "nlm_world",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_19a57964-cac4-4986-b4d0-6dcc999f4ae4/python",
+		"source" : "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_19a57964-cac4-4986-b4d0-6dcc999f4ae4"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

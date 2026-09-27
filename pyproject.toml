@@ -41,7 +41,7 @@ Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
 
 [tool.scikit-build]
-cmake.minimum-version = "3.16"
+build-dir = "python"
 cmake.build-type = "Release"
 cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
