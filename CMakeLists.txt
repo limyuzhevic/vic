@@ -77,7 +77,7 @@ add_library(nlm_core STATIC
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
-    src/environment/Observation.cpp
+    src/environment/SensorObservation.cpp
     src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp

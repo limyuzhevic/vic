@@ -2,7 +2,7 @@
 #include "brain/Synapse.hpp"
 #include "plasticity/STDP.hpp"
 #include "core/Random/Random.hpp"
-#include <cassert>
+#include "core/Exception.hpp"
 #include <iostream>
 #include <cmath>
 
@@ -11,9 +11,18 @@ namespace test_stdp {
 void testSTDPCreation() {
     nlm::STDP stdp;
     
-    assert(stdp.getLTPWeight() == 0.01f);
-    assert(stdp.getLTDWeight() == 0.012f);
-    assert(stdp.getTimeConstant() == 20.0f);
+    if (stdp.getLTPWeight() != 0.01f) {
+        throw nlm::NLMTestException("STDP creation failed: LTP weight should be 0.01f, got " + 
+                                   std::to_string(stdp.getLTPWeight()));
+    }
+    if (stdp.getLTDWeight() != 0.012f) {
+        throw nlm::NLMTestException("STDP creation failed: LTD weight should be 0.012f, got " + 
+                                   std::to_string(stdp.getLTDWeight()));
+    }
+    if (stdp.getTimeConstant() != 20.0f) {
+        throw nlm::NLMTestException("STDP creation failed: time constant should be 20.0f, got " + 
+                                   std::to_string(stdp.getTimeConstant()));
+    }
     
     std::cout << "    testSTDPCreation passed" << std::endl;
 }
@@ -25,9 +34,18 @@ void testSTDPConfiguration() {
     stdp.setLTDWeight(0.06f);
     stdp.setTimeConstant(30.0f);
     
-    assert(stdp.getLTPWeight() == 0.05f);
-    assert(stdp.getLTDWeight() == 0.06f);
-    assert(stdp.getTimeConstant() == 30.0f);
+    if (stdp.getLTPWeight() != 0.05f) {
+        throw nlm::NLMTestException("STDP configuration failed: LTP weight should be 0.05f, got " + 
+                                   std::to_string(stdp.getLTPWeight()));
+    }
+    if (stdp.getLTDWeight() != 0.06f) {
+        throw nlm::NLMTestException("STDP configuration failed: LTD weight should be 0.06f, got " + 
+                                   std::to_string(stdp.getLTDWeight()));
+    }
+    if (stdp.getTimeConstant() != 30.0f) {
+        throw nlm::NLMTestException("STDP configuration failed: time constant should be 30.0f, got " + 
+                                   std::to_string(stdp.getTimeConstant()));
+    }
     
     std::cout << "    testSTDPConfiguration passed" << std::endl;
 }
@@ -37,9 +55,18 @@ void testSTDPConfigure() {
     
     stdp.configure(0.03f, 0.035f, 25.0f);
     
-    assert(stdp.getLTPWeight() == 0.03f);
-    assert(stdp.getLTDWeight() == 0.035f);
-    assert(stdp.getTimeConstant() == 25.0f);
+    if (stdp.getLTPWeight() != 0.03f) {
+        throw nlm::NLMTestException("STDP configure failed: LTP weight should be 0.03f, got " + 
+                                   std::to_string(stdp.getLTPWeight()));
+    }
+    if (stdp.getLTDWeight() != 0.035f) {
+        throw nlm::NLMTestException("STDP configure failed: LTD weight should be 0.035f, got " + 
+                                   std::to_string(stdp.getLTDWeight()));
+    }
+    if (stdp.getTimeConstant() != 25.0f) {
+        throw nlm::NLMTestException("STDP configure failed: time constant should be 25.0f, got " + 
+                                   std::to_string(stdp.getTimeConstant()));
+    }
     
     std::cout << "    testSTDPConfigure passed" << std::endl;
 }
@@ -47,8 +74,14 @@ void testSTDPConfigure() {
 void testSTDPName() {
     nlm::STDP stdp;
     
-    assert(stdp.getName() != nullptr);
-    assert(std::string(stdp.getName()) == "STDP");
+    const char* name = stdp.getName();
+    if (!name) {
+        throw nlm::NLMTestException("STDP name failed: name is null");
+    }
+    if (std::string(name) != "STDP") {
+        throw nlm::NLMTestException("STDP name failed: expected 'STDP', got '" + 
+                                   std::string(name) + "'");
+    }
     
     std::cout << "    testSTDPName passed" << std::endl;
 }
@@ -73,7 +106,11 @@ void testSTDPPotentiation() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have increased due to pre-before-post
-    assert(finalWeight > initialWeight);
+    if (finalWeight <= initialWeight) {
+        throw nlm::NLMTestException("STDP potentiation failed: weight should increase, " + 
+                                   "got " + std::to_string(finalWeight) + " (initial: " + 
+                                   std::to_string(initialWeight) + ")");
+    }
     
     std::cout << "    testSTDPPotentiation passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -98,7 +135,11 @@ void testSTDPDepression() {
     float finalWeight = synapse.getWeight();
     
     // Weight should have decreased due to post-before-pre
-    assert(finalWeight < initialWeight);
+    if (finalWeight >= initialWeight) {
+        throw nlm::NLMTestException("STDP depression failed: weight should decrease, " + 
+                                   "got " + std::to_string(finalWeight) + " (initial: " + 
+                                   std::to_string(initialWeight) + ")");
+    }
     
     std::cout << "    testSTDPDepression passed (Δ=" 
               << (finalWeight - initialWeight) << ")" << std::endl;
@@ -115,13 +156,21 @@ void testSTDPEmptySpikes() {
     std::vector<nlm::Timestamp> postSpikes = {1.0, 2.0};
     
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    if (synapse.getWeight() != initialWeight) {
+        throw nlm::NLMTestException("STDP empty spikes failed: weight should not change with empty pre spikes, " + 
+                                   "got " + std::to_string(synapse.getWeight()) + " (initial: " + 
+                                   std::to_string(initialWeight) + ")");
+    }
     
     // Empty post spikes - should not change
     preSpikes = {1.0, 2.0};
     postSpikes = {};
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
-    assert(synapse.getWeight() == initialWeight);
+    if (synapse.getWeight() != initialWeight) {
+        throw nlm::NLMTestException("STDP empty spikes failed: weight should not change with empty post spikes, " + 
+                                   "got " + std::to_string(synapse.getWeight()) + " (initial: " + 
+                                   std::to_string(initialWeight) + ")");
+    }
     
     std::cout << "    testSTDPEmptySpikes passed" << std::endl;
 }
@@ -140,7 +189,10 @@ void testSTDPWeightBounds() {
     stdp.update(&synapse, preSpikes, postSpikes, 0.001);
     
     // Weight should be clamped to max
-    assert(synapse.getWeight() <= 1.0f);
+    if (synapse.getWeight() > 1.0f) {
+        throw nlm::NLMTestException("STDP weight bounds failed: weight should not exceed 1.0, " + 
+                                   "got " + std::to_string(synapse.getWeight()));
+    }
     
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }

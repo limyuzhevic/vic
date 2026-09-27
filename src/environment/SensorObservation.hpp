@@ -1,15 +1,15 @@
 #pragma once
 
-#include "Action.hpp"
+#include "SensoryInput.hpp"
 
 namespace nlm {
 
 // Sensory input observation
-class Observation {
+class SensorObservation {
 public:
-    Observation();
-    Observation(const SensoryInput& input);
-    ~Observation();
+    SensorObservation();
+    SensorObservation(const SensoryInput& input);
+    ~SensorObservation();
     
     // Get the sensory input
     const SensoryInput* getSensoryInput() const;
@@ -18,10 +18,13 @@ public:
     bool isValid() const;
     
     // Clone
-    std::unique_ptr<Observation> clone() const;
+    std::unique_ptr<SensorObservation> clone() const;
     
 private:
     std::unique_ptr<SensoryInput> sensoryInput_;
 };
+
+// Backward compatibility alias
+using Observation = SensorObservation;
 
 } // namespace nlm

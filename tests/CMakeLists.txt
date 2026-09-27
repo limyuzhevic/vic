@@ -13,6 +13,18 @@ add_executable(nlm_test
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
+    test_hebbian.cpp
+    test_structural_plasticity.cpp
+    test_synaptogenesis.cpp
+    test_pruning.cpp
+    test_maturation.cpp
+    test_curiosity.cpp
+    test_novelty.cpp
+    test_prediction_error.cpp
+    test_working_memory.cpp
+    test_episodic_memory.cpp
+    test_associative_memory.cpp
+    test_integration.cpp
     test_brain.cpp
 )
 

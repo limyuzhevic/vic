@@ -9,25 +9,25 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Reward.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../plasticity/STDP.hpp"
+#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/StructuralPlasticity.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <unordered_map>
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
-    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -77,6 +77,12 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Neuron lookup map for O(1) access by ID
+    std::unordered_map<NeuronId, Neuron*> neuronLookupMap;
+    
+    // Neuron type map for O(1) access by type
+    std::unordered_map<NeuronType, std::vector<Neuron*>> neuronsByType;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -155,7 +161,71 @@ struct Brain::Impl {
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
-};
+    
+    // Update neuron lookup map when neuron is added
+    void updateNeuronLookupMap(Neuron* neuron) {
+        if (neuron) {
+            neuronLookupMap[neuron->getId()] = neuron;
+            neuronsByType[neuron->getType()].push_back(neuron);
+        }
+    }
+    
+    // Remove neuron from both lookup maps
+    void removeFromNeuronLookupMap(NeuronId neuronId) {
+        auto it = neuronLookupMap.find(neuronId);
+        if (it != neuronLookupMap.end()) {
+            Neuron* neuron = it->second;
+            neuronLookupMap.erase(it);
+            
+            // Also remove from type map
+            NeuronType type = neuron->getType();
+            auto& neuronsOfType = neuronsByType[type];
+            neuronsOfType.erase(std::remove(neuronsOfType.begin(), neuronsOfType.end(), neuron), neuronsOfType.end());
+        }
+    }
+    
+    // Find neuron by ID in O(1) time
+    Neuron* findNeuronById(NeuronId id) {
+        auto it = neuronLookupMap.find(id);
+        return (it != neuronLookupMap.end()) ? it->second : nullptr;
+    }
+    
+    // Find all neurons by type in O(1) time
+    const std::vector<Neuron*>& getNeuronsByType(NeuronType type) {
+        static const std::vector<Neuron*> emptyVector;
+        auto it = neuronsByType.find(type);
+        return (it != neuronsByType.end()) ? it->second : emptyVector;
+    }
+    
+    // Add neuron to type map (use when neuron type changes)
+    void updateNeuronInTypeMap(Neuron* neuron, NeuronType oldType, NeuronType newType) {
+        if (!neuron) return;
+        
+        // Remove from old type map if it was in it
+        if (oldType != newType) {
+            auto& oldNeurons = neuronsByType[oldType];
+            oldNeurons.erase(std::remove(oldNeurons.begin(), oldNeurons.end(), neuron), oldNeurons.end());
+        }
+        
+        // Add to new type map
+        neuronsByType[newType].push_back(neuron);
+    }
+    
+    // Remove all neurons from type map (for reset)
+    void clearNeuronsByType() {
+        neuronsByType.clear();
+    }
+    
+    // Add neurons from a population to type map
+    void addPopulationNeuronsToTypeMap(NeuralPopulation* population) {
+        if (!population) return;
+        const auto& neurons = population->getNeurons();
+        NeuronType type = population->getNeuronType();
+        
+        for (Neuron* neuron : neurons) {
+            neuronsByType[type].push_back(neuron);
+        }
+    }
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -200,18 +270,25 @@ bool Brain::initialize() {
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+                        // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
                     pImpl->sensoryNeurons.push_back(neuron);
+                    pImpl->updateNeuronLookupMap(neuron);
                 }
             }
             if (motorPop) {
                 for (auto* neuron : motorPop->getNeurons()) {
                     pImpl->motorNeurons.push_back(neuron);
+                    pImpl->updateNeuronLookupMap(neuron);
                 }
+            }
+            
+            // Add all neurons from this region to type map
+            for (auto* pop : region->getAllPopulations()) {
+                pImpl->addPopulationNeuronsToTypeMap(pop);
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
@@ -269,20 +346,19 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        // O(1) lookup using neuron lookup map
+        Neuron* neuron = pImpl->findNeuronById(event.destination_neuron);
+        if (neuron) {
+            // Apply synaptic weight as current
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                neuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                neuron->receiveInhibitoryInput(-synapticCurrent);
             }
+        } else {
+            // Log warning if neuron not found (should not happen in normal operation)
+            NLM_LOG_WARNING("Destination neuron not found in lookup map during spike delivery");
         }
     });
     
@@ -617,30 +693,37 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
-                n->injectCurrent(current);
-                return;
-            }
-        }
+    // O(1) lookup using neuron lookup map
+    Neuron* n = pImpl->findNeuronById(neuron);
+    if (n) {
+        n->injectCurrent(current);
+    } else {
+        // Log warning if neuron not found
+        NLM_LOG_WARNING("Neuron not found for current injection");
     }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
-                }
-            }
+    // Get all neurons by type using O(1) type-indexed map
+    const auto& neurons = pImpl->getNeuronsByType(type);
+    
+    // Inject current to all neurons of the specified type
+    for (Neuron* neuron : neurons) {
+        if (neuron) {
+            neuron->injectCurrent(current);
         }
     }
 }
 
-SpikeSystem* Brain::getSpikeSystem() {
+Neuron* Brain::findNeuronById(NeuronId id) {
+    return pImpl->findNeuronById(id);
+}
+
+const std::vector<Neuron*>& Brain::getNeuronsByType(NeuronType type) {
+    return pImpl->getNeuronsByType(type);
+}
+
+SpikeSystem* Brain::getSpikeSystem() { {
     return pImpl->spikeSystem.get();
 }
 
@@ -745,6 +828,9 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    // Clear type-indexed neuron map
+    pImpl->clearNeuronsByType();
+    
     for (auto& region : pImpl->regions) {
         region->reset();
     }
@@ -765,9 +851,19 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Use transaction-based checkpointing for atomic writes
+        nlm::CheckpointTransaction transaction(filepath, CompressionLevel::Balanced);
+        
+        if (!transaction.begin()) {
+            NLM_LOG_ERROR("Failed to begin checkpoint transaction");
+            return false;
+        }
+        
+        // Create temporary writer for transaction
         CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+        if (!writer.create(transaction.getTempFilePath(), CompressionLevel::Balanced)) {
+            NLM_LOG_ERROR("Failed to create temporary checkpoint file: " + transaction.getTempFilePath());
+            transaction.abort();
             return false;
         }
         
@@ -807,6 +903,7 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            transaction.abort();
             return false;
         }
         
@@ -825,18 +922,32 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            transaction.abort();
             return false;
         }
         
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
+            transaction.abort();
             return false;
         }
         
-        NLM_LOG_INFO("Brain state saved successfully (" + std::to_string(writer.getBytesWritten()) + " bytes)");
+        // Close the temporary writer
+        writer.close();
+        
+        // Commit the transaction (atomic rename)
+        if (!transaction.commit()) {
+            NLM_LOG_ERROR("Failed to commit checkpoint transaction");
+            return false;
+        }
+        
+        NLM_LOG_INFO("Brain state saved successfully to " + filepath);
         return true;
         
+    } catch (const nlm::CheckpointTransaction::Exception& e) {
+        NLM_LOG_ERROR(std::string("Checkpoint transaction exception saving brain: ") + e.what());
+        return false;
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
         return false;

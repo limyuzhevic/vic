@@ -1,7 +1,7 @@
 // Brain Tests
 #include "brain/Brain.hpp"
 #include "core/Config/Config.hpp"
-#include <cassert>
+#include "core/Exception.hpp"
 #include <iostream>
 
 namespace test_brain {
@@ -25,12 +25,23 @@ void testBrainInitialization() {
     nlm::Brain brain(config);
     
     bool success = brain.initialize();
-    assert(success);
+    if (!success) {
+        throw nlm::NLMTestException("Brain initialization test failed: initialize() returned false");
+    }
     
     // Verify brain initialized with expected properties
-    assert(brain.getRegionCount() == 2);
-    assert(brain.getTotalNeuronCount() == 100);
-    assert(brain.getTotalSynapseCount() > 0);
+    if (brain.getRegionCount() != 2) {
+        throw nlm::NLMTestException("Brain initialization test failed: expected 2 regions, got " + 
+                                   std::to_string(brain.getRegionCount()));
+    }
+    if (brain.getTotalNeuronCount() != 100) {
+        throw nlm::NLMTestException("Brain initialization test failed: expected 100 neurons, got " + 
+                                   std::to_string(brain.getTotalNeuronCount()));
+    }
+    if (brain.getTotalSynapseCount() <= 0) {
+        throw nlm::NLMTestException("Brain initialization test failed: expected > 0 synapses, got " + 
+                                   std::to_string(brain.getTotalSynapseCount()));
+    }
     
     std::cout << "    testBrainInitialization passed" << std::endl;
 }
@@ -49,7 +60,10 @@ void testBrainStep() {
     }
     
     // Just verify it doesn't crash
-    assert(brain.getTotalNeuronCount() == 100);
+    if (brain.getTotalNeuronCount() != 100) {
+        throw nlm::NLMTestException("Brain step test failed: expected 100 neurons, got " + 
+                                   std::to_string(brain.getTotalNeuronCount()));
+    }
     
     std::cout << "    testBrainStep passed" << std::endl;
 }
@@ -66,7 +80,10 @@ void testBrainReset() {
     brain.reset();
     
     // Verify reset worked
-    assert(brain.getTotalNeuronCount() == 50);
+    if (brain.getTotalNeuronCount() != 50) {
+        throw nlm::NLMTestException("Brain reset test failed: expected 50 neurons after reset, got " + 
+                                   std::to_string(brain.getTotalNeuronCount()));
+    }
     
     std::cout << "    testBrainReset passed" << std::endl;
 }
@@ -80,11 +97,16 @@ void testBrainRegions() {
     brain.initialize();
     
     auto regionIds = brain.getRegionIds();
-    assert(regionIds.size() == 3);
+    if (regionIds.size() != 3) {
+        throw nlm::NLMTestException("Brain regions test failed: expected 3 regions, got " + 
+                                   std::to_string(regionIds.size()));
+    }
     
     for (auto rid : regionIds) {
         auto* region = brain.getRegion(rid);
-        assert(region != nullptr);
+        if (region == nullptr) {
+            throw nlm::NLMTestException("Brain regions test failed: getRegion returned nullptr for region ID");
+        }
     }
     
     std::cout << "    testBrainRegions passed" << std::endl;
@@ -99,7 +121,9 @@ void testBrainActionProduction() {
     brain.initialize();
     
     auto action = brain.produceAction();
-    assert(action != nullptr);
+    if (action == nullptr) {
+        throw nlm::NLMTestException("Brain action production test failed: produceAction returned nullptr");
+    }
     
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
@@ -113,10 +137,22 @@ void testBrainStatus() {
     brain.initialize();
     
     // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    if (brain.getTotalNeuronCount() <= 0) {
+        throw nlm::NLMTestException("Brain status test failed: total neuron count should be > 0, got " + 
+                                   std::to_string(brain.getTotalNeuronCount()));
+    }
+    if (brain.getTotalSynapseCount() < 0) {
+        throw nlm::NLMTestException("Brain status test failed: total synapse count should be >= 0, got " + 
+                                   std::to_string(brain.getTotalSynapseCount()));
+    }
+    if (brain.getFiringNeuronCount() < 0) {
+        throw nlm::NLMTestException("Brain status test failed: firing neuron count should be >= 0, got " + 
+                                   std::to_string(brain.getFiringNeuronCount()));
+    }
+    if (brain.getAverageFiringRate() < 0.0f) {
+        throw nlm::NLMTestException("Brain status test failed: average firing rate should be >= 0.0, got " + 
+                                   std::to_string(brain.getAverageFiringRate()));
+    }
     
     std::cout << "    testBrainStatus passed" << std::endl;
 }
