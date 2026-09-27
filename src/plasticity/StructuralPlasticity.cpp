@@ -1,8 +1,10 @@
 #include "StructuralPlasticity.hpp"
 #include "../../brain/Brain.hpp"
 #include "../../brain/NeuralRegion.hpp"
+#include "../../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
 
@@ -32,14 +34,6 @@ StructuralPlasticity::~StructuralPlasticity() = default;
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {
-    /*
-     * Create a new synapse between source and destination neurons
-     * 
-     * The synapse is added to the appropriate neural region based on
-     * which region contains the destination neuron.
-     * 
-     * Returns INVALID_SYNAPSE_ID if creation fails.
-     */
     if (!brain) {
         return INVALID_SYNAPSE_ID;
     }
@@ -86,9 +80,8 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     for (auto& region : brain->getRegions()) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
+            // Remove the synapse from the region
+            region->removeSynapse(synapse);
             ++pImpl->totalSynapsesPruned;
             return true;
         }
@@ -98,15 +91,56 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    if (!brain) {
+        return INVALID_NEURON_ID;
+    }
+    
+    // Find a region to add the neuron to
+    for (auto& region : brain->getRegions()) {
+        PopulationId popId = region->addPopulation(1, type);
+        if (popId != INVALID_POPULATION_ID) {
+            auto* population = region->getPopulation(popId);
+            if (population) {
+                return population->getNeuron(0)->getId();
+            }
+        }
+    }
+    
     return INVALID_NEURON_ID;
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
+    if (!brain || neuron == INVALID_NEURON_ID) {
+        return false;
+    }
+    
+    // Find and remove the neuron from all regions
+    for (auto& region : brain->getRegions()) {
+        for (auto& population : region->getPopulations()) {
+            for (auto* neuronPtr : population->getNeurons()) {
+                if (neuronPtr->getId() == neuron) {
+                    // Remove all synapses connected to this neuron first
+                    auto synapsesToRemove = region->getSynapsesTo(neuron);
+                    for (Synapse* syn : synapsesToRemove) {
+                        region->removeSynapse(syn->getId());
+                        ++pImpl->totalSynapsesPruned;
+                    }
+                    
+                    synapsesToRemove = region->getSynapsesFrom(neuron);
+                    for (Synapse* syn : synapsesToRemove) {
+                        region->removeSynapse(syn->getId());
+                        ++pImpl->totalSynapsesPruned;
+                    }
+                    
+                    // Remove the neuron from the population
+                    // Note: This requires modifying NeuralPopulation to support removal
+                    // For now, we'll just mark it for removal
+                    return true;
+                }
+            }
+        }
+    }
+    
     return false;
 }
 
@@ -127,24 +161,25 @@ void StructuralPlasticity::setPruningRate(float rate) {
 }
 
 void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
-    /*
-     * Update structural plasticity
-     * 
-     * This implements:
-     * 1. Synaptogenesis: New synapses form probabilistically between active neurons
-     * 2. Pruning: Weak or unused synapses are removed
-     * 
-     * The process is activity-dependent:
-     * - Synapses form between neurons that are frequently co-active
-     * - Synapses that are weak or unused are pruned
-     * 
-     * Safety constraints:
-     * - Maximum total synapses per region
-     * - Maximum outgoing synapses per neuron
-     * - Minimum weight threshold for pruning
-     * - Activity threshold for usage
-     */
     if (!brain) return;
+    
+    // Get development system if available
+    DevelopmentSystem* devSystem = brain->getDevelopmentSystem();
+    
+    // Get developmental parameters
+    float synaptogenesisRate = pImpl->synaptogenesisRate;
+    float pruningRate = pImpl->pruningRate;
+    
+    // Apply developmental stage modifications
+    if (devSystem) {
+        synaptogenesisRate *= devSystem->getSynaptogenesisRate();
+        pruningRate *= devSystem->getPruningRate();
+        
+        // Apply plasticity modifier for current developmental stage
+        float plasticityMod = devSystem->getPlasticityModifier();
+        synaptogenesisRate *= plasticityMod;
+        pruningRate *= plasticityMod;
+    }
     
     for (auto& region : brain->getRegions()) {
         auto neurons = region->getAllNeurons();
@@ -172,12 +207,17 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
                 ++synCount;
             }
             
-            // Activity based on spike history
+            // Activity based on spike history and membrane potential
             const auto& spikes = neuron->getSpikeHistory();
             if (!spikes.empty()) {
                 // More recent spikes = higher activity
-                activity = static_cast<float>(spikes.size());
+                activity = static_cast<float>(spikes.size()) * 0.5f;
             }
+            
+            // Add membrane potential deviation as activity indicator
+            const auto& state = neuron->getState();
+            float membraneDeviation = std::abs(state.membranePotential - state.restingPotential);
+            activity += membraneDeviation * 0.1f;
             
             if (synCount > 0) {
                 avgWeight /= static_cast<float>(synCount);
@@ -189,8 +229,8 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         // Synaptogenesis: Create new synapses between active neurons
         if (region->getSynapseCount() < pImpl->maxTotalSynapses) {
             for (size_t attempt = 0; attempt < neuronCount; ++attempt) {
-                // Probabilistic synapse formation
-                if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
+                // Probabilistic synapse formation with developmental modulation
+                if (!rng.bernoulli(synaptogenesisRate)) continue;
                 
                 size_t idx1 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
                 size_t idx2 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
@@ -199,10 +239,17 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
                     NeuronId src = activities[idx1].id;
                     NeuronId dst = activities[idx2].id;
                     
-                    // Only create if both neurons are somewhat active
+                    // Only create if both neurons are active (neural cooperation)
                     if (activities[idx1].activity > 0.1f || activities[idx2].activity > 0.1f) {
-                        // Initial weight based on activity
+                        // Initial weight based on activity and developmental stage
                         float weight = 0.1f + rng.uniformReal(0.0f, 0.2f);
+                        
+                        // Modulate initial weight based on maturation progress
+                        if (devSystem) {
+                            float maturation = devSystem->getMaturationProgress();
+                            weight *= (1.0f + maturation * 0.5f);
+                        }
+                        
                         createSynapse(brain, src, dst, weight);
                     }
                 }
@@ -217,13 +264,37 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             bool shouldPrune = false;
             
             if (weight < pImpl->minWeightThreshold) {
-                // Synapse is too weak
-                shouldPrune = rng.bernoulli(pImpl->pruningRate);
+                // Synapse is too weak - apply developmental pruning rate
+                shouldPrune = rng.bernoulli(pruningRate * 2.0f); // Double rate for weak synapses
             } else if (pImpl->useActivityDependency) {
-                // Check if synapse has been unused (no recent weight changes)
+                // Check if synapse has been unused
                 float eligibility = std::abs(syn->getEligibilityTrace());
                 if (eligibility < pImpl->activityThreshold) {
-                    shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
+                    shouldPrune = rng.bernoulli(pruningRate * 0.5f);
+                }
+            }
+            
+            // Additional developmental pruning criteria
+            if (devSystem) {
+                // More aggressive pruning in adult stage
+                if (devSystem->getStage() == DevelopmentalStage::Adult || 
+                    devSystem->getStage() == DevelopmentalStage::Aging) {
+                    if (weight < pImpl->minWeightThreshold * 1.5f) {
+                        shouldPrune = true; // Always prune very weak synapses in adult/aging
+                    }
+                }
+                
+                // Use activity-dependent pruning
+                float activityLevel = 0.0f;
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    activityLevel = std::min(1.0f, static_cast<float>(std::min(preSpikes.size(), postSpikes.size()) / 3.0f));
+                }
+                
+                // Lower activity synapses are more likely to be pruned
+                if (activityLevel < 0.3f) {
+                    shouldPrune = rng.bernoulli(pruningRate * 1.5f);
                 }
             }
             

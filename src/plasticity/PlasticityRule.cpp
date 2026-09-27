@@ -24,31 +24,64 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
+    // Implement real Hebbian learning using covariance rule
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+    // Compute weight change using covariance rule: Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    
+    // Count correlated spike pairs (coactivity)
+    size_t coactivity = 0;
+    float totalPreRate = 0.0f;
+    float totalPostRate = 0.0f;
+    
+    for (Timestamp preTime : preSpikes) {
+        totalPreRate += 1.0f / (dt > 0 ? dt : 1.0f);
+        for (Timestamp postTime : postSpikes) {
+            float dtBetween = std::abs(postTime - preTime);
+            // Count spikes within 50ms as correlated (Hebbian window)
+            if (dtBetween < 50.0f) {
+                coactivity++;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Compute expected activity under independence
+    float preRate = totalPreRate / static_cast<float>(preSpikes.size());
+    float postRate = totalPostRate / static_cast<float>(postSpikes.size());
+    float expectedCoactivity = preRate * postRate * dt * 50.0f; // Approximate
+    
+    // Compute Hebbian delta with covariance rule
+    float correlation = static_cast<float>(coactivity) - expectedCoactivity;
+    
+    // Apply Hebbian update with learning rate
+    float delta = pImpl->learningRate * correlation;
+    
+    // Apply with anti-Hebbian threshold to prevent runaway potentiation
+    if (correlation > 0) {
+        // Potentiation with soft bound
+        float maxPotentiation = std::max(0.0f, 1.0f - synapse->getWeight());
+        delta = std::min(delta, maxPotentiation);
+    } else if (correlation < 0) {
+        // Depression with soft bound
+        float maxDepression = std::min(0.0f, -1.0f - synapse->getWeight());
+        delta = std::max(delta, maxDepression);
+    }
+    
+    // Apply weight change
+    if (std::abs(delta) > 1e-6f) {
+        applyWeightChange(synapse, delta);
     }
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    synapse->addToWeight(delta);
+    if (!synapse) return;
+    
+    // Clamp weight to biological bounds
+    float newWeight = synapse->getWeight() + delta;
+    newWeight = std::clamp(newWeight, -1.0f, 1.0f);
+    synapse->setWeight(newWeight);
 }
 
 const char* HebbianRule::getName() const {
@@ -56,7 +89,7 @@ const char* HebbianRule::getName() const {
 }
 
 void HebbianRule::setLearningRate(float rate) {
-    pImpl->learningRate = rate;
+    pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
 }
 
 float HebbianRule::getLearningRate() const {

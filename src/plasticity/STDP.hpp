@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Implements real STDP with biological accuracy based on spike-timing correlation
 
 class STDP : public PlasticityRule {
 public:

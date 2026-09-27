@@ -113,8 +113,49 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    ExperimentResultsSystem resultsSystem;
+    
+    // Collect results from all experiments
+    auto comprehensiveResults = resultsSystem.aggregateBatchResults(pImpl->experiments);
+    
+    if (comprehensiveResults.empty()) {
+        NLM_LOG_WARNING("No experiments to save results from");
+        return false;
+    }
+    
+    // Determine output format based on file extension
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    bool success = false;
+    
+    if (extension == "json" || extension.empty()) {
+        success = resultsSystem.exportToJSON(comprehensiveResults[0], filepath);
+    } else if (extension == "csv") {
+        success = resultsSystem.exportToCSV(comprehensiveResults[0], filepath);
+    } else if (extension == "txt" || extension == "text") {
+        success = resultsSystem.exportToText(comprehensiveResults[0], filepath);
+    } else if (extension == "bin" || extension == "binary") {
+        success = resultsSystem.exportToBinary(comprehensiveResults[0], filepath);
+    } else {
+        NLM_LOG_ERROR("Unsupported file format: " + extension);
+        NLM_LOG_INFO("Supported formats: json, csv, txt, bin");
+        return false;
+    }
+    
+    // Generate visualization and summary
+    if (success) {
+        std::string vizPath = filepath.substr(0, filepath.find_last_of('.')) + "_viz.txt";
+        std::string summaryPath = filepath.substr(0, filepath.find_last_of('.')) + "_summary.txt";
+        
+        resultsSystem.generateVisualization(comprehensiveResults[0], vizPath);
+        resultsSystem.generateSummaryReport(comprehensiveResults[0], summaryPath);
+    }
+    
+    return success;
 }
 
 } // namespace nlm

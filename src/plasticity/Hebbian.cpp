@@ -4,16 +4,6 @@
 
 namespace nlm {
 
-struct Hebbian::Impl {
-    float learningRate;
-    float maxWeight;
-    float minWeight;
-    float covarianceThreshold;  // For covariance rule
-    
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
-};
-
 Hebbian::Hebbian() : pImpl(new Impl) {}
 
 Hebbian::~Hebbian() = default;
@@ -22,54 +12,52 @@ void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
                       const std::vector<Timestamp>& postSpikes,
                       TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
-    
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // Compute weight change using covariance rule: Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    // Simplified for spike-based systems: Δw = η * (coactivity - baseline)
+    
+    // Count correlated spike pairs (coactivity)
+    size_t coactivity = 0;
+    float totalPreRate = 0.0f;
+    float totalPostRate = 0.0f;
+    
     for (Timestamp preTime : preSpikes) {
+        totalPreRate += 1.0f / (dt > 0 ? dt : 1.0f);
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            float dtBetween = std::abs(postTime - preTime);
+            // Count spikes within 50ms as correlated (Hebbian window)
+            if (dtBetween < 50.0f) {
+                coactivity++;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Compute expected activity under independence
+    float preRate = totalPreRate / static_cast<float>(preSpikes.size());
+    float postRate = totalPostRate / static_cast<float>(postSpikes.size());
+    float expectedCoactivity = preRate * postRate * dt * 50.0f; // Approximate
     
-    // Apply with bounds
+    // Compute Hebbian delta with covariance rule
+    float correlation = static_cast<float>(coactivity) - expectedCoactivity;
+    
+    // Apply Hebbian update with learning rate
+    float delta = pImpl->learningRate * correlation;
+    
+    // Apply with anti-Hebbian threshold to prevent runaway potentiation
+    if (correlation > 0) {
+        // Potentiation with soft bound
+        float maxPotentiation = std::max(0.0f, pImpl->maxWeight - synapse->getWeight());
+        delta = std::min(delta, maxPotentiation);
+    } else if (correlation < 0) {
+        // Depression with soft bound
+        float maxDepression = std::min(0.0f, pImpl->minWeight - synapse->getWeight());
+        delta = std::max(delta, maxDepression);
+    }
+    
+    // Apply weight change
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
     }

@@ -64,6 +64,18 @@ void NeuralPopulation::addNeuron(Neuron* neuron) {
     }
 }
 
+bool NeuralPopulation::removeNeuron(NeuronId neuronId) {
+    auto it = std::find_if(pImpl->neurons.begin(), pImpl->neurons.end(),
+                          [neuronId](const Neuron* n) { return n->getId() == neuronId; });
+    if (it != pImpl->neurons.end()) {
+        delete *it;
+        pImpl->neurons.erase(it);
+        pImpl->size = pImpl->neurons.size();
+        return true;
+    }
+    return false;
+}
+
 const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
     return pImpl->neurons;
 }

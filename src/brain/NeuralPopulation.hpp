@@ -37,6 +37,9 @@ public:
     // Add neuron to population
     void addNeuron(Neuron* neuron);
     
+    // Remove neuron from population by ID
+    bool removeNeuron(NeuronId neuronId);
+    
     // Get all neurons
     const std::vector<Neuron*>& getNeurons() const;
     

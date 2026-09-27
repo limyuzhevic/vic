@@ -3,6 +3,9 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <functional>
+#include <string>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -14,8 +17,8 @@ public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    // Store item in neural working memory
+    // REAL PHASE 2: Implement real storage with neural mechanisms
     void store(NeuronId neuron, float value);
     
     // Retrieve item

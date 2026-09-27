@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/nlm.dir/src/main.cpp.o -o nlm  libnlm_core.a /usr/lib/x86_64-linux-gnu/libOpenGL.so /usr/lib/x86_64-linux-gnu/libGLX.so /usr/lib/x86_64-linux-gnu/libGLU.so /usr/lib/x86_64-linux-gnu/libglfw.so /usr/lib/x86_64-linux-gnu/libGLEW.so 

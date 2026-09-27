@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Novelty detection signal
-// Computes novelty from comparison with previous observations
+// Real novelty system: neural-based novelty detection and adaptation
 
 class Novelty {
 public:
@@ -15,7 +15,7 @@ public:
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
-    // Get novelty level
+    // Get current novelty level
     float getLevel() const;
     void setLevel(float level);
     
@@ -33,6 +33,16 @@ public:
     // Get novelty history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Get novelty statistics
+    float getNoveltyMean() const;
+    float getNoveltyVariance() const;
+    float getLastNoveltyChange() const;
+    
+    // Set novelty detection parameters
+    void setNoveltyThreshold(float threshold);
+    void setPatternMatchingThreshold(float threshold);
+    void setAdaptationRate(float rate);
     
 private:
     struct Impl;

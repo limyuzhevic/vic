@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// Phase 2: Real visualization with GLFW/OpenGL support
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -32,6 +32,15 @@ public:
     void setUpdateRate(double hz);
     double getUpdateRate() const;
     
+    // Configure visualization options
+    void setShowNetwork(bool show);
+    void setShowActivity(bool show);
+    void setShowSpikes(bool show);
+    void setShowWeights(bool show);
+    void setView(int view); // 0: Network, 1: Activity, 2: Spikes, 3: Weights
+    void setNodeSize(float size);
+    void setConnectionWidth(float width);
+    
     // Network visualization
     void visualizeNetwork(const class Brain& brain);
     
@@ -43,6 +52,11 @@ public:
     
     // Weight matrix visualization
     void visualizeWeights(const class Brain& brain);
+    
+    // Get current view for debugging
+    int getCurrentView() const;
+    float getNodeSize() const;
+    float getConnectionWidth() const;
     
 private:
     struct Impl;

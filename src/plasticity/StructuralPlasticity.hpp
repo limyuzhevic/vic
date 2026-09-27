@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
 
 namespace nlm {
 
@@ -14,21 +13,17 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
-    SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
+    SynapseId createSynapse(class Brain* brain, NeuronId source, 
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
-    bool removeSynapse(Brain* brain, SynapseId synapse);
+    bool removeSynapse(class Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
-    NeuronId createNeuron(Brain* brain, NeuronType type);
+    NeuronId createNeuron(class Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
-    bool removeNeuron(Brain* brain, NeuronId neuron);
+    bool removeNeuron(class Brain* brain, NeuronId neuron);
     
     // Get creation rate
     float getSynaptogenesisRate() const;
@@ -39,7 +34,7 @@ public:
     void setPruningRate(float rate);
     
     // Update structural plasticity
-    void update(Brain* brain, class RandomGenerator& rng);
+    void update(class Brain* brain, class RandomGenerator& rng);
     
 private:
     struct Impl;

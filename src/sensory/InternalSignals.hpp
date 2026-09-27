@@ -1,6 +1,8 @@
 #pragma once
 
 #include "SensoryInput.hpp"
+#include "../brain/Brain.hpp"
+#include "core/Types/Types.hpp"
 
 namespace nlm {
 
@@ -20,6 +22,9 @@ public:
     
     // Get homeostasis signals
     const std::vector<float>& getHomeostaticSignals() const;
+    
+    // Set brain reference for neural integration
+    void setBrain(Brain* brain);
     
 private:
     struct Impl;

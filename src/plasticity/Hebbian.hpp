@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Hebbian learning implementation
-class Hebbian : public PlasticityRule {
+// Implements real Hebbian learning with neural mechanisms
 public:
     Hebbian();
     ~Hebbian() override;

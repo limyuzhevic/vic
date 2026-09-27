@@ -13,7 +13,6 @@ public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -66,7 +65,7 @@ public:
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
+                 TimestepDuration dt) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "AntiHebbian"; }
 };

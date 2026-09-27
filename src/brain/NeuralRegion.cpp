@@ -120,6 +120,30 @@ const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
     return nullptr;
 }
 
+bool NeuralRegion::removeSynapse(SynapseId id) {
+    // Remove from synapses vector
+    auto it = std::remove_if(pImpl->synapses.begin(), pImpl->synapses.end(),
+                            [id](const std::unique_ptr<Synapse>& syn) {
+                                return syn->getId() == id;
+                            });
+    if (it == pImpl->synapses.end()) {
+        return false; // Synapse not found
+    }
+    
+    // Remove from outgoing and incoming synapse maps
+    for (auto& [source, synapseIds] : pImpl->outgoingSynapses) {
+        synapseIds.erase(std::remove(synapseIds.begin(), synapseIds.end(), id),
+                        synapseIds.end());
+    }
+    for (auto& [dest, synapseIds] : pImpl->incomingSynapses) {
+        synapseIds.erase(std::remove(synapseIds.begin(), synapseIds.end(), id),
+                        synapseIds.end());
+    }
+    
+    pImpl->synapses.erase(it, pImpl->synapses.end());
+    return true;
+}
+
 size_t NeuralRegion::getSynapseCount() const {
     return pImpl->synapses.size();
 }

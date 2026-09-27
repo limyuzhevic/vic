@@ -9,6 +9,7 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -56,6 +57,9 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Phase 2: Motor system for action selection
+    std::unique_ptr<class MotorSystem> motorSystem;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -93,20 +97,16 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    // Initialize plasticity systems
+    spikeSystem = std::make_unique<SpikeSystem>();
+    stdp = std::make_unique<STDP>();
+    hebbian = std::make_unique<Hebbian>();
+    structuralPlasticity = std::make_unique<StructuralPlasticity>();
+    
+    // Phase 2: Initialize motor system
+    motorSystem = std::make_unique<MotorSystem>();
+    
+    // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
@@ -114,7 +114,9 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        pImpl->predictionSystem = std::make_unique<PredictionSystem>();
+        // Initialize with brain reference for neural substrate access
+        pImpl->predictionSystem->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -237,7 +239,6 @@ bool Brain::initialize() {
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -257,7 +258,13 @@ bool Brain::initialize() {
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    
+    // Update curiosity with novelty and prediction error
+    pImpl->curiosity->update(
+        pImpl->novelty->getLevel(),
+        pImpl->predictionError->getError(),
+        pImpl->timestep
+    );
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -328,6 +335,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    
+    // Update prediction system step
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->updateStep(currentStep);
+    }
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -660,6 +672,14 @@ StructuralPlasticity* Brain::getStructuralPlasticity() {
     return pImpl->structuralPlasticity.get();
 }
 
+MotorSystem* Brain::getMotorSystem() {
+    return pImpl->motorSystem.get();
+}
+
+const MotorSystem* Brain::getMotorSystem() const {
+    return pImpl->motorSystem.get();
+}
+
 float Brain::getExcitationInhibitionRatio() const {
     float totalExcitatory = 0.0f;
     float totalInhibitory = 0.0f;
@@ -690,30 +710,25 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
-    
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
-    }
-    
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Check if motor system exists
+    if (motorSystem) {
+        // Find motor region (should be the one with NeuronType::Motor)
+        NeuralRegion* motorRegion = nullptr;
+        for (auto& region : pImpl->regions) {
+            for (auto& population : region->getPopulations()) {
+                if (population->getNeuronType() == NeuronType::Motor) {
+                    motorRegion = region.get();
+                    break;
+                }
+            }
+            if (motorRegion) break;
+        }
+        
+        // Use motor system to select action
+        if (motorRegion) {
+            return motorSystem->selectAction(*motorRegion, pImpl->dopamine.get());
         }
     }
-    
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
-    }
-    
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
@@ -963,6 +978,20 @@ void Brain::removeInterRegionConnection(RegionId source, RegionId target) {
                       }),
         pImpl->interRegionConnections.end()
     );
+}
+
+void Brain::addRegion(const std::string& name) {
+    RegionId regionId = pImpl->regions.size() + 1;
+    pImpl->regions.push_back(std::make_unique<NeuralRegion>(regionId, name));
+}
+
+NeuralRegion* Brain::getRegion(RegionId id) {
+    for (auto& region : pImpl->regions) {
+        if (region->getId() == id) {
+            return region.get();
+        }
+    }
+    return nullptr;
 }
 
 size_t Brain::getTotalNeuronCount() const {

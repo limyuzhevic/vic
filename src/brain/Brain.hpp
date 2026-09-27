@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MotorSystem;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -84,15 +85,13 @@ public:
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
     
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    // Get motor system
+    MotorSystem* getMotorSystem();
+    const MotorSystem* getMotorSystem() const;
     
     // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    size_t getTotalNeuronCount() const;
+    size_t getTotalSynapseCount() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
@@ -119,8 +118,6 @@ public:
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
     
     // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
@@ -129,13 +126,6 @@ public:
     void addInterRegionConnection(RegionId source, RegionId target, 
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
     
     // ========== MEMORY SYSTEMS ==========
     
@@ -183,6 +173,10 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Get motor system
+    MotorSystem* getMotorSystem();
+    const MotorSystem* getMotorSystem() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

@@ -18,41 +18,67 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Forward declarations for helper functions
+void Config::loadFromJSON(const nlohmann::json& json);
+void Config::loadFromYAML(const YAML::Node& yaml);
+void Config::saveToJSON(const std::string& filepath) const;
+void Config::saveToYAML(const std::string& filepath) const;
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Phase 2: Use proper JSON/YAML parser
+    try {
+        // Determine file type based on extension
+        std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Clear existing entries
+        clear();
+        
+        // Parse based on file type
+        if (ext == "json" || nlm::ConfigParser::isJSONFile(filepath)) {
+            // Parse JSON file
+            return nlm::ConfigParser::parseJSONFromFile(filepath, jsonConfig);
+        } else if (ext == "yml" || ext == "yaml" || nlm::ConfigParser::isYAMLFile(filepath)) {
+            // Parse YAML file
+            return nlm::ConfigParser::parseYAMLFromFile(filepath, yamlConfig);
+        } else {
+            // Fallback to simple key=value format for backward compatibility
+            std::ifstream file(filepath);
+            if (!file.is_open()) {
+                return false;
             }
             
-            set(key, value, ConfigSource::File);
+            std::string line;
+            while (std::getline(file, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
+            return true;
         }
+        
+    } catch (const std::exception& e) {
+        // Log error (would use Logger in full implementation)
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -78,18 +104,362 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+void Config::loadFromJSON(const nlohmann::json& json) {
+    // Parse JSON and convert to Config entries
+    // Implementation would go here
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        std::string key = it.key();
+        ConfigValue value;
+        
+        // Convert JSON value to ConfigValue
+        if (it->is_number_integer()) {
+            value = it->get<int>();
+        } else if (it->is_number_float()) {
+            value = it->get<double>();
+        } else if (it->is_boolean()) {
+            value = it->get<bool>();
+        } else if (it->is_string()) {
+            value = it->get<std::string>();
+        } else if (it->is_array()) {
+            // Handle arrays
+            if (!it->empty()) {
+                if (it->front().is_number_integer()) {
+                    std::vector<int> vec;
+                    vec.reserve(it->size());
+                    for (const auto& item : *it) {
+                        vec.push_back(item.get<int>());
+                    }
+                    value = vec;
+                } else if (it->front().is_number_float()) {
+                    std::vector<double> vec;
+                    vec.reserve(it->size());
+                    for (const auto& item : *it) {
+                        vec.push_back(item.get<double>());
+                    }
+                    value = vec;
+                } else if (it->front().is_string()) {
+                    std::vector<std::string> vec;
+                    vec.reserve(it->size());
+                    for (const auto& item : *it) {
+                        vec.push_back(item.get<std::string>());
+                    }
+                    value = vec;
+                }
+            }
+        } else if (it->is_object()) {
+            // Handle nested objects
+            std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> nestedMap;
+            for (auto obj_it = it->begin(); obj_it != it->end(); ++obj_it) {
+                nestedMap[obj_it.key()] = jsonValueFromJSON(*obj_it);
+            }
+            value = nestedMap;
+        }
+        
+        set(key, value, ConfigSource::File);
+    }
+}
+
+void Config::loadFromYAML(const YAML::Node& yaml) {
+    // Parse YAML and convert to Config entries
+    // Implementation would go here
+    if (yaml.IsMap()) {
+        for (auto it = yaml.begin(); it != yaml.end(); ++it) {
+            std::string key = it->first.as<std::string>();
+            ConfigValue value;
+            
+            // Convert YAML node to ConfigValue
+            if (it->IsScalar()) {
+                if (it->Tag() == "!!int" || (it->IsScalar() && it->as<std::string>().find('.') == std::string::npos)) {
+                    value = it->as<int>();
+                } else if (it->Tag() == "!!float" || it->Tag() == "!!double" || (it->IsScalar() && it->as<std::string>().find('.') != std::string::npos)) {
+                    value = it->as<double>();
+                } else if (it->Tag() == "!!bool" || it->as<std::string>() == "true" || it->as<std::string>() == "false") {
+                    value = it->as<bool>();
+                } else {
+                    value = it->as<std::string>();
+                }
+            } else if (it->IsSequence()) {
+                // Handle sequences
+                if (!it->empty()) {
+                    if (it->front().IsScalar()) {
+                        if (it->front().Tag() == "!!int" || (it->front().IsScalar() && it->front().as<std::string>().find('.') == std::string::npos)) {
+                            std::vector<int> vec;
+                            vec.reserve(it->size());
+                            for (const auto& item : *it) {
+                                vec.push_back(item.as<int>());
+                            }
+                            value = vec;
+                        } else if (it->front().Tag() == "!!float" || it->front().Tag() == "!!double" || (it->front().IsScalar() && it->front().as<std::string>().find('.') != std::string::npos)) {
+                            std::vector<double> vec;
+                            vec.reserve(it->size());
+                            for (const auto& item : *it) {
+                                vec.push_back(item.as<double>());
+                            }
+                            value = vec;
+                        } else {
+                            std::vector<std::string> vec;
+                            vec.reserve(it->size());
+                            for (const auto& item : *it) {
+                                vec.push_back(item.as<std::string>());
+                            }
+                            value = vec;
+                        }
+                    }
+                }
+            } else if (it->IsMap()) {
+                // Handle nested maps
+                std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> nestedMap;
+                for (auto map_it = it->begin(); map_it != it->end(); ++map_it) {
+                    nestedMap[map_it->first.as<std::string>()] = yamlValueToVariant(*map_it);
+                }
+                value = nestedMap;
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+}
+
+void Config::saveToJSON(const std::string& filepath) const {
+    // Save configuration to JSON file
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        return;
     }
+    
+    nlohmann::json json;
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        json[entry.key] = variantToJSON(entry.value);
     }
     
-    return true;
+    file << json.dump(2); // Pretty print with 2-space indentation
+}
+
+void Config::saveToYAML(const std::string& filepath) const {
+    // Save configuration to YAML file
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return;
+    }
+    
+    YAML::Emitter emitter;
+    emitter << YAML::BeginMap;
+    
+    for (const auto& entry : pImpl->entries) {
+        emitter << YAML::Key << entry.key;
+        emitter << YAML::Value << variantToYAML(entry.value);
+    }
+    
+    emitter << YAML::EndMap;
+    
+    file << emitter.c_str();
+}
+
+// Helper functions for JSON/YAML conversion
+std::variant<int, int64_t, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> Config::jsonValueFromJSON(const nlohmann::json& json) {
+    if (json.is_number_integer()) {
+        return json.get<int>();
+    } else if (json.is_number_float()) {
+        return json.get<double>();
+    } else if (json.is_boolean()) {
+        return json.get<bool>();
+    } else if (json.is_string()) {
+        return json.get<std::string>();
+    } else if (json.is_array()) {
+        if (!json.empty()) {
+            if (json[0].is_number_integer()) {
+                std::vector<int> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.get<int>());
+                }
+                return vec;
+            } else if (json[0].is_number_float()) {
+                std::vector<double> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.get<double>());
+                }
+                return vec;
+            } else if (json[0].is_string()) {
+                std::vector<std::string> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.get<std::string>());
+                }
+                return vec;
+            }
+        }
+        return std::vector<int>{};
+    } else if (json.is_object()) {
+        std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> nestedMap;
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            nestedMap[it.key()] = jsonValueFromJSON(*it);
+        }
+        return nestedMap;
+    }
+    
+    throw ConfigParser::ParseError("Unsupported JSON value type");
+}
+
+std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> Config::yamlValueToVariant(const YAML::Node& node) {
+    if (node.IsScalar()) {
+        if (node.Tag() == "!!int" || (node.IsScalar() && node.as<std::string>().find('.') == std::string::npos)) {
+            return node.as<int>();
+        } else if (node.Tag() == "!!float" || node.Tag() == "!!double" || (node.IsScalar() && node.as<std::string>().find('.') != std::string::npos)) {
+            return node.as<double>();
+        } else if (node.Tag() == "!!bool" || node.as<std::string>() == "true" || node.as<std::string>() == "false") {
+            return node.as<bool>();
+        } else {
+            return node.as<std::string>();
+        }
+    } else if (node.IsSequence()) {
+        if (node.empty()) {
+            return std::vector<int>{};
+        }
+        
+        if (node[0].IsScalar()) {
+            if (node[0].Tag() == "!!int" || (node[0].IsScalar() && node[0].as<std::string>().find('.') == std::string::npos)) {
+                std::vector<int> vec;
+                vec.reserve(node.size());
+                for (const auto& item : node) {
+                    vec.push_back(item.as<int>());
+                }
+                return vec;
+            } else if (node[0].Tag() == "!!float" || node[0].Tag() == "!!double" || (node[0].IsScalar() && node[0].as<std::string>().find('.') != std::string::npos)) {
+                std::vector<double> vec;
+                vec.reserve(node.size());
+                for (const auto& item : node) {
+                    vec.push_back(item.as<double>());
+                }
+                return vec;
+            } else {
+                std::vector<std::string> vec;
+                vec.reserve(node.size());
+                for (const auto& item : node) {
+                    vec.push_back(item.as<std::string>());
+                }
+                return vec;
+            }
+        }
+    } else if (node.IsMap()) {
+        std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> nestedMap;
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            nestedMap[it->first.as<std::string>()] = yamlValueToVariant(*it);
+        }
+        return nestedMap;
+    }
+    
+    throw ConfigParser::ParseError("Unsupported YAML value type");
+}
+
+nlohmann::json Config::variantToJSON(const ConfigValue& value) {
+    if (std::holds_alternative<int>(value)) {
+        return std::get<int>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        return std::get<double>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value);
+    } else if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    } else if (std::holds_alternative<std::vector<int>>(value)) {
+        nlohmann::json jsonArray = nlohmann::json::array();
+        for (const auto& item : std::get<std::vector<int>>(value)) {
+            jsonArray.push_back(item);
+        }
+        return jsonArray;
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
+        nlohmann::json jsonArray = nlohmann::json::array();
+        for (const auto& item : std::get<std::vector<double>>(value)) {
+            jsonArray.push_back(item);
+        }
+        return jsonArray;
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+        nlohmann::json jsonArray = nlohmann::json::array();
+        for (const auto& item : std::get<std::vector<std::string>>(value)) {
+            jsonArray.push_back(item);
+        }
+        return jsonArray;
+    } else if (std::holds_alternative<std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> (value)) {
+        nlohmann::json jsonObject;
+        for (const auto& pair : std::get<std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>>(value)) {
+            jsonObject[pair.first] = variantToJSON(pair.second);
+        }
+        return jsonObject;
+    }
+    
+    throw ConfigParser::ParseError("Unsupported variant type");
+}
+
+YAML::Node Config::variantToYAML(const ConfigValue& value) {
+    YAML::Node node;
+    if (std::holds_alternative<int>(value)) {
+        node = std::get<int>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        node = std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        node = std::get<double>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        node = std::get<bool>(value);
+    } else if (std::holds_alternative<std::string>(value)) {
+        node = std::get<std::string>(value);
+    } else if (std::holds_alternative<std::vector<int>>(value)) {
+        YAML::Node seqNode = YAML::Node(YAML::NodeType::Sequence);
+        for (const auto& item : std::get<std::vector<int>>(value)) {
+            seqNode.push_back(item);
+        }
+        node = seqNode;
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
+        YAML::Node seqNode = YAML::Node(YAML::NodeType::Sequence);
+        for (const auto& item : std::get<std::vector<double>>(value)) {
+            seqNode.push_back(item);
+        }
+        node = seqNode;
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+        YAML::Node seqNode = YAML::Node(YAML::NodeType::Sequence);
+        for (const auto& item : std::get<std::vector<std::string>>(value)) {
+            seqNode.push_back(item);
+        }
+        node = seqNode;
+    } else if (std::holds_alternative<std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>> (value)) {
+        YAML::Node mapNode = YAML::Node(YAML::NodeType::Map);
+        for (const auto& pair : std::get<std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>, std::unordered_map<std::string, std::variant<int, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>>>>(value)) {
+            mapNode[pair.first] = variantToYAML(pair.second);
+        }
+        node = mapNode;
+    }
+    
+    throw ConfigParser::ParseError("Unsupported variant type");
+}
+
+// Update saveToFile to use JSON/YAML format based on file extension
+bool Config::saveToFile(const std::string& filepath) const {
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == "json") {
+        saveToJSON(filepath);
+        return true;
+    } else if (ext == "yml" || ext == "yaml") {
+        saveToYAML(filepath);
+        return true;
+    } else {
+        // Fallback to simple key=value format for backward compatibility
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << toString(entry.value) << "\n";
+        }
+        
+        return true;
+    }
 }
 
 template<typename T>
@@ -177,6 +547,27 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << arg[i] << "\"";
+                }
+                oss << "]";
             } else {
                 oss << arg;
             }

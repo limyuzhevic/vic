@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Curiosity drive: exploration motivation based on novelty and prediction error
-// Computed as weighted combination of novelty and prediction error
+// Real curiosity system: biologically-inspired exploration algorithm
 
 class Curiosity {
 public:
@@ -24,12 +24,19 @@ public:
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
     
-    // Set curiosity parameters
+    // Set curiosity parameters with biological tuning
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
+    void setBaselineCuriosity(float baseline);
+    void setLearningRate(float rate);
     
-    // Reset
+    // Reset curiosity state
     void reset();
+    
+    // Get curiosity statistics
+    float getNoveltyContribution() const;
+    float getPredictionErrorContribution() const;
+    float getExplorationBonus() const;
     
 private:
     struct Impl;

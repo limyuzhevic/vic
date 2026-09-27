@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Prediction error signal for curiosity and learning
-// Computes difference between predicted and actual values
+// Real prediction error: neural-based prediction error signaling system
 
 class PredictionError {
 public:
@@ -15,21 +15,32 @@ public:
     // Initialize with brain reference
     void initialize(class Brain* brain);
     
-    // Get error value
+    // Get current prediction error
     float getError() const;
     
     // Compute prediction error
     void computeError(float predicted, float actual);
     
-    // Update prediction
+    // Update prediction with new value
     void updatePrediction(float newPrediction);
     
-    // Get history
+    // Get prediction error history
     const std::vector<float>& getHistory() const;
     void clearHistory();
     
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
+    
+    // Get temporal difference components
+    float getTemporalDifference() const;
+    
+    // Get prediction confidence
+    float getPredictionConfidence() const;
+    
+    // Set prediction parameters
+    void setPredictionHorizon(float horizon);
+    void setErrorSensitivity(float sensitivity);
+    void setLearningRate(float rate);
     
 private:
     struct Impl;

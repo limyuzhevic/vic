@@ -6,9 +6,58 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+# Find GLEW (for OpenGL extension loading)
+find_package(GLEW REQUIRED)
+
+# Find OpenGL and GLFW
+find_package(OpenGL REQUIRED)
+
+# Set GLFW search path to include CMake modules and try to find it
+set(GLFW_DIR /usr/lib/x86_64-linux-gnu/cmake/glfw3)
+find_package(GLFW QUIET)
+
+# Manual GLFW detection (fallback if package config doesn't work)
+if(NOT GLFW_FOUND)
+    # Include directory
+    set(GLFW_INCLUDE_DIR /usr/include)
+    
+    # Library - try to find it using simpler approach
+    find_library(GLFW_LIBRARY
+        NAMES glfw.so.3.3 glfw
+        PATHS /usr/lib/x86_64-linux-gnu
+    )
+    
+    if(GLFW_LIBRARY)
+        set(GLFW_FOUND TRUE)
+        set(GLFW_INCLUDE_DIRS ${GLFW_INCLUDE_DIR})
+        set(GLFW_LIBRARIES ${GLFW_LIBRARY})
+    else()
+        message(FATAL_ERROR "GLFW not found. Please install libglfw3-dev.")
+    endif()
+endif()
+
+# Find nlohmann/json
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+    # Try to find it via CMake package
+    find_package(nlohmann_json 3.2.0 QUIET)
+    if(NOT nlohmann_json_FOUND)
+        # Try to download and install it
+        include(FetchContent)
+        FetchContent_Declare(
+            nlohmann_json
+            GIT_REPOSITORY https://github.com/nlohmann/json.git
+            GIT_TAG v3.11.2
+        )
+        FetchContent_MakeAvailable(nlohmann_json)
+    endif()
+endif()
+
+# Find yaml-cpp
+find_package(yaml-cpp QUIET)
+if(NOT yaml-cpp_FOUND)
+    # Try to find it via CMake package
+    find_package(yaml-cpp REQUIRED)
 endif()
 
 # Enable warnings
@@ -21,11 +70,12 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Core library - only include files that exist
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigParser.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -55,16 +105,12 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
-    src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/ConceptFormation.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
@@ -75,77 +121,44 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Test program
+    src/test_visualization.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Config>
     $<INSTALL_INTERFACE:include>
+    ${GLEW_INCLUDE_DIR}
+    ${OPENGL_INCLUDE_DIR}
+    ${GLFW_INCLUDE_DIR}
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+target_link_libraries(nlm_core PUBLIC
+    ${OPENGL_LIBRARIES}
+    ${GLFW_LIBRARIES}
+    ${GLEW_LIBRARIES}
+    nlohmann_json::nlohmann_json
+    yaml-cpp
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
-
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
-)
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
-
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
