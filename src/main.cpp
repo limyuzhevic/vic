@@ -48,37 +48,70 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
-    
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
-    
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
-        initialWeights.clear();
-        
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
-            }
-        }
-        
-        NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
-        if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
-        }
+// Phase selection options
+enum Phase {
+    Phase2 = 2,
+    Phase3 = 3,
+    Phase4 = 4,
+    Phase5 = 5,
+    Phase6 = 6
+};
+
+// Configuration for different phases
+void setPhaseDefaults(std::shared_ptr<Config> config, Phase phase) {
+    switch (phase) {
+        case Phase2:
+            // Phase 2 defaults (existing behavior)
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            
+            // STDP parameters
+            config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            config->set("stdp_tau", 20.0f, ConfigSource::Default);
+            
+            // Structural plasticity parameters
+            config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+            config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+            break;
+            break;
+        case Phase3:
+            // Phase 3 defaults
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+            config->set("connection_probability", 0.2f, ConfigSource::Default);
+            break;
+        case Phase4:
+            // Phase 4 defaults
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(5), ConfigSource::Default);
+            config->set("connection_probability", 0.25f, ConfigSource::Default);
+            break;
+        case Phase5:
+            // Phase 5 defaults
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.0005, ConfigSource::Default);  // Faster timestep
+            config->set("neuron_count", static_cast<int64_t>(3000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(8), ConfigSource::Default);
+            config->set("connection_probability", 0.3f, ConfigSource::Default);
+            break;
+        case Phase6:
+            // Phase 6 defaults
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.0005, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(10), ConfigSource::Default);
+            config->set("connection_probability", 0.35f, ConfigSource::Default);
+            break;
     }
+}
     
     void recordFinalState() {
         finalWeights.clear();
@@ -321,10 +354,31 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+// Help information
+HelpInfo helpInfo = {
+    "nlm",
+    "1.0.0",
+    "Neural Learning Machine (NLM) - An experimental artificial developmental brain system",
+    "Usage: nlm [OPTIONS]\n       nlm [OPTIONS] --phase <2|3|4|5|6> [options]\n",
+    {
+        {"phase", "p", "Phase to run (2, 3, 4, 5, or 6)", "2", false, nullptr, {"string"}},
+        {"config", "c", "Configuration file path", "configs/default.cfg", false, nullptr, {"string"}},
+        {"help", "h", "Show this help message", "", false, nullptr, {"bool"}},
+        {"version", "v", "Show version information", "", false, nullptr, {"bool"}},
+        {"verbose", "", "Enable verbose logging", "false", false, nullptr, {"bool"}},
+        {"seed", "s", "Random seed for reproducibility", "42", false, nullptr, {"int"}},
+        {"timestep", "t", "Simulation timestep in seconds", "0.001", false, nullptr, {"double"}},
+        {"neurons", "n", "Number of neurons", "500", false, nullptr, {"int64"}},
+        {"regions", "r", "Number of neural regions", "1", false, nullptr, {"int64"}},
+        {"connectivity", "", "Connection probability between neurons", "0.15", false, nullptr, {"double"}},
+    }
+};
+
+// Set up CLI argument definitions
+std::map<std::string, CLIArgument> arguments;
+for (const auto& arg : helpInfo.arguments) {
+    arguments[arg.name] = arg;
+}
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

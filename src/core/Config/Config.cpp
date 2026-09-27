@@ -56,25 +56,75 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    return loadFromArgs(argc, argv, HelpInfo());
+}
+
+bool Config::loadFromArgsWithValidation(int argc, char** argv, 
+                                        const std::map<std::string, CLIArgument>& arguments,
+                                        const HelpInfo& helpInfo) {
+    // Handle help/version flags first
+    if (handleHelpFlag(argc, argv, helpInfo)) {
+        return false;  // Should exit
+    }
+    
+    // Process arguments with validation
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Skip if it's a help/version flag that was already handled
+        if (arg == "--help" || arg == "-h" || arg == "--version") {
+            continue;
+        }
+        
+        // Handle --key=value format with validation
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate argument if we have definition
+                auto it = arguments.find(key);
+                if (it != arguments.end()) {
+                    std::string error = validateArgument(it->second, value);
+                    if (!error.empty()) {
+                        std::cerr << "ERROR: " << error << "\n";
+                        std::cerr << "Use --help for available options.\n";
+                        return false;
+                    }
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
+        // Handle -key value format with validation
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate argument if we have definition
+            auto it = arguments.find(key);
+            if (it != arguments.end()) {
+                std::string error = validateArgument(it->second, value);
+                if (!error.empty()) {
+                    std::cerr << "ERROR: " << error << "\n";
+                    std::cerr << "Use --help for available options.\n";
+                    return false;
+                }
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
+        // Handle boolean flags
+        else if (arg == "--" + key) {
+            set(key, true, ConfigSource::CommandLine);
+        }
+        else if (arg.substr(0, 2) == "--" && arg.size() > 2 && arg[2] == '-') {
+            std::string key = arg.substr(2);
+            set(key, true, ConfigSource::CommandLine);
+        }
     }
+    
     return true;
 }
 
@@ -193,13 +243,123 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
+// Helper function to convert string to lowercase
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
 
-// Explicit template instantiations
+// Static helper methods
+bool Config::handleHelpFlag(int argc, char** argv, const HelpInfo& helpInfo) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp(helpInfo);
+            return true;
+        } else if (arg == "--version") {
+            printVersion(helpInfo);
+            return true;
+        }
+    }
+    return false;
+}
+
+void Config::printHelp(const HelpInfo& helpInfo) {
+    std::cout << "Usage: " << helpInfo.usage << "\n";
+    std::cout << "\n";
+    std::cout << helpInfo.description << "\n";
+    std::cout << "\n";
+    
+    if (!helpInfo.arguments.empty()) {
+        std::cout << "Options:\n";
+        for (const auto& arg : helpInfo.arguments) {
+            std::cout << "  ";
+            if (!arg.shortName.empty()) {
+                std::cout << "-" << arg.shortName << ", ";
+            }
+            std::cout << "--" << arg.name;
+            
+            if (!arg.defaultValue.empty()) {
+                std::cout << "=" << arg.defaultValue;
+            }
+            
+            std::cout << "\n";
+            std::cout << "    " << arg.description << "\n";
+            
+            if (arg.required) {
+                std::cout << "    [Required]" << "\n";
+            }
+        }
+    }
+    
+    if (!helpInfo.version.empty()) {
+        std::cout << "\nVersion: " << helpInfo.version << "\n";
+    }
+}
+
+void Config::printVersion(const HelpInfo& helpInfo) {
+    std::cout << helpInfo.programName << " version " << helpInfo.version << "\n";
+    if (!helpInfo.description.empty()) {
+        std::cout << helpInfo.description << "\n";
+    }
+}
+
+std::string Config::validateArgument(const CLIArgument& arg, const std::string& value) {
+    // Check required arguments
+    if (arg.required && value.empty()) {
+        return "Missing required argument: --" + arg.name;
+    }
+    
+    // Type validation
+    for (const auto& type : arg.valueTypes) {
+        if (type == "string") {
+            return "";  // Any string is valid
+        } else if (type == "int") {
+            try {
+                size_t pos;
+                int val = std::stoi(value, &pos);
+                if (pos != value.size()) {
+                    continue; // Not all characters consumed, try next type
+                }
+                return "";  // Valid integer
+            } catch (...) {
+                // Invalid, try next type
+                continue;
+            }
+        } else if (type == "double") {
+            try {
+                size_t pos;
+                double val = std::stod(value, &pos);
+                if (pos != value.size()) {
+                    continue; // Not all characters consumed, try next type
+                }
+                return "";  // Valid double
+            } catch (...) {
+                // Invalid, try next type
+                continue;
+            }
+        } else if (type == "bool") {
+            if (value == "true" || value == "false" || value == "1" || value == "0") {
+                return "";  // Valid boolean
+            }
+            // Try next type
+            continue;
+        }
+    }
+    
+    // Get all supported types for error message
+    std::string types = "";
+    for (size_t i = 0; i < arg.valueTypes.size(); ++i) {
+        if (i > 0) types += "/";
+        types += arg.valueTypes[i];
+    }
+    
+    return "Invalid value '" + value + "' for argument --" + arg.name + ". Expected one of: " + types;
+}
+
+// Explicit template instantiations (existing ones)
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
@@ -212,4 +372,3 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm

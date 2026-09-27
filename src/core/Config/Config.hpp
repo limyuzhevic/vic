@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
 
 namespace nlm {
 
@@ -43,6 +45,26 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// CLI argument definition
+struct CLIArgument {
+    std::string name;
+    std::string shortName;
+    std::string description;
+    std::string defaultValue;
+    bool required;
+    std::function<void(const std::string&)> callback;
+    std::vector<std::string> valueTypes; // string, int, double, bool
+};
+
+// Help and version information
+struct HelpInfo {
+    std::string programName;
+    std::string version;
+    std::string description;
+    std::string usage;
+    std::vector<CLIArgument> arguments;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -59,7 +81,12 @@ public:
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    bool loadFromArgs(int argc, char** argv, const HelpInfo& helpInfo = HelpInfo());
+    
+    // Load from command line arguments with validation
+    bool loadFromArgsWithValidation(int argc, char** argv, 
+                                  const std::map<std::string, CLIArgument>& arguments,
+                                  const HelpInfo& helpInfo = HelpInfo());
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,6 +120,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Help and validation methods
+    static bool handleHelpFlag(int argc, char** argv, const HelpInfo& helpInfo = HelpInfo());
+    static void printHelp(const HelpInfo& helpInfo);
+    static void printVersion(const HelpInfo& helpInfo);
+    static std::string validateArgument(const CLIArgument& arg, const std::string& value);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +133,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Argument parsing helpers
+    static bool parseKeyValueFormat(const std::string& arg, Config& config, const std::map<std::string, CLIArgument>& arguments);
+    static bool parseFlagFormat(const std::string& arg, Config& config);
 };
 
 } // namespace nlm
