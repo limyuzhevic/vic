@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "commandline/CommandLineParser.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +26,11 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <unordered_map>
+#include <algorithm>
+#include <cstdint>
+#include <chrono>
 
 using namespace nlm;
 
@@ -46,6 +52,74 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << R"(
+=== NLM Phase 2: Real Neural Computation ===
+
+USAGE:
+  nlm [OPTIONS] [--config=file.cfg]
+
+OPTIONS:
+  --help                     Show this help message
+  --version                  Show version information
+  --verbose                  Enable verbose output
+  --quiet                    Quiet mode (errors only)
+  --config=file.cfg          Load configuration from file
+  --neuron_count=N           Number of neurons (default: 500)
+  --region_count=N           Number of brain regions (default: 1)
+  --connection_probability=F Number of connections per neuron (default: 0.15)
+  --simulation_timestep=F    Time step in seconds (default: 0.001)
+  --random_seed=N            Random seed (default: 42)
+  --stdp_ltp_weight=F         STDP long-term potentiation weight (default: 0.02)
+  --stdp_ltd_weight=F         STDP long-term depression weight (default: 0.015)
+  --stdp_tau=F               STDP time constant (default: 20.0)
+  --synaptogenesis_rate=F    Structural synaptogenesis rate (default: 0.0001)
+  --pruning_rate=F           Structural pruning rate (default: 0.00001)
+  --enable_stdp              Enable STDP plasticity
+  --enable_hebbian           Enable Hebbian plasticity
+  --enable_structural        Enable structural plasticity
+  --enable_reward            Enable reward modulation
+  --max_steps=N              Maximum simulation steps (default: 1000)
+  --checkpoint_file=F         Save checkpoint to file (default: ./checkpoint.bin)
+  --load_checkpoint=F        Load checkpoint from file
+  --enable_logging           Enable detailed logging
+  --disable_logging          Disable logging
+  --enable_visualization      Enable visualization (if available)
+  --enable_performance       Enable performance monitoring
+  --save_all_checkpoints      Save checkpoints at every 1000 steps
+  --checkpoint_interval=N    Checkpoint interval in steps (default: 1000)
+  --enable_developer_mode     Enable developer features (debugging tools)
+
+ENVIRONMENT:
+  NLM_CONFIG_FILE            Path to configuration file (alternative to --config)
+  NLM_LOG_LEVEL              Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  NLM_LOG_FILE               Log output file
+
+EXAMPLES:
+  nlm --neuron_count=2000 --region_count=2 --enable_stdp
+  nlm --max_steps=5000 --checkpoint_file=./mybrain.bin --load_checkpoint=./save.bin
+  nlm --enable_reward --enable_structural --verbose
+
+For more information, visit: https://github.com/nlm-project/nlm
+
+=== Phase 2 Complete ===
+  ✓ Real LIF neuron dynamics implemented
+  ✓ Event-driven spike propagation with delays
+  ✓ STDP plasticity rule
+  ✓ Hebbian plasticity rule
+  ✓ Structural plasticity (synaptogenesis/pruning)
+  ||nlm Project Team
+  ||熙然 (Xiran)
+  ||An experimental artificial developmental brain project
+";
+}
+
+void printVersion() {
+    std::cout << "NLM - Neural Learning Machine v2.0.0 (Phase 2)" << std::endl;
+    std::cout << "Built with C++20 support for real spiking neural computation." << std::endl;
+    std::cout << "Experimental artificial developmental brain project." << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -196,8 +270,8 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+                         " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                         " thresh=" + std::to_string(neurons[i]->getThreshold()));
         }
     }
 }
@@ -233,8 +307,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     
@@ -267,7 +341,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                     " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +375,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                     " after: " + std::to_string(synapses[i]->getWeight()) +
+                     " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -326,9 +400,42 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Parse command line arguments
+    bool showHelp = false;
+    bool showVersion = false;
+    bool enableVerbose = false;
+    bool enableQuiet = false;
+    
+    // Simple argument parsing
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--verbose") {
+            enableVerbose = true;
+        } else if (arg == "--quiet") {
+            enableQuiet = true;
+        }
+    }
+    
+    // Handle help/version flags
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
+    
+    // Initialize logger based on verbosity settings
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(enableVerbose ? LogLevel::Debug : 
+                                                         enableQuiet ? LogLevel::Error : LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -371,7 +478,6 @@ int main(int argc, char** argv) {
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);

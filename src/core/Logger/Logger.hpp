@@ -1,34 +1,33 @@
 #pragma once
 
 #include <string>
-#include <memory>
-#include <sstream>
-#include <functional>
-#include <vector>
 #include <chrono>
+#include <memory>
+#include <mutex>
+#include <vector>
 
 namespace nlm {
 
-// Log severity levels
+// Log level enumeration
 enum class LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Critical = 4
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Critical
 };
 
 // Log entry structure
 struct LogEntry {
-    LogLevel level;
+    LogLevel level = LogLevel::Info;
     std::string message;
     std::string file;
-    int line;
+    int line = 0;
     std::string function;
-    std::chrono::system_clock::time_point timestamp;
+    std::chrono::system_clock::time_point timestamp = std::chrono::system_clock::now();
 };
 
-// Logger interface
+// ILogger interface
 class ILogger {
 public:
     virtual ~ILogger() = default;
@@ -37,105 +36,92 @@ public:
     virtual LogLevel getLevel() const = 0;
 };
 
-// Console logger implementation
+// ConsoleLogger implementation
 class ConsoleLogger : public ILogger {
 public:
     ConsoleLogger();
-    explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
-    
+    ConsoleLogger(LogLevel level);
+    ~ConsoleLogger() override = default;
+
     void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
-    
-    // Enable/disable colors
     void setUseColors(bool useColors);
     bool getUseColors() const;
-    
-    // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
-    
+
+    std::string levelToString(LogLevel level) const;
+    std::string levelToColor(LogLevel level) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
 };
 
-// Main Logger class
+// Logger class with multiple loggers
 class Logger {
 public:
     Logger();
-    ~Logger();
-    
-    // Disable copying
-    Logger(const Logger&) = delete;
-    Logger& operator=(const Logger&) = delete;
-    
-    // Add logger sink
+    ~Logger() = default;
+
     void addLogger(std::shared_ptr<ILogger> logger);
-    
-    // Remove all loggers
     void clearLoggers();
-    
-    // Set minimum level for all loggers
     void setLevel(LogLevel level);
-    
-    // Global logging functions
-    void log(LogLevel level, const std::string& message, 
-             const std::string& file = "", int line = 0, 
+    void log(LogLevel level, const std::string& message,
+             const std::string& file = "", int line = 0,
              const std::string& function = "");
-    
-    // Convenience methods
-    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    
-    // Check if level is enabled
+    void debug(const std::string& message,
+               const std::string& file = "", int line = 0,
+               const std::string& function = "");
+    void info(const std::string& message,
+              const std::string& file = "", int line = 0,
+              const std::string& function = "");
+    void warning(const std::string& message,
+                 const std::string& file = "", int line = 0,
+                 const std::string& function = "");
+    void error(const std::string& message,
+               const std::string& file = "", int line = 0,
+               const std::string& function = "");
+    void critical(const std::string& message,
+                  const std::string& file = "", int line = 0,
+                  const std::string& function = "");
     bool isEnabled(LogLevel level) const;
-    
-    // Get global logger instance
+
     static Logger& getGlobal();
-    
-    // Set global logger
-    static void setGlobal(std::shared_ptr<Logger> logger);
+    void setGlobal(std::shared_ptr<Logger> logger);
 
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
-
-// Stream-style logging helper
+// LogStream for easy logging
 class LogStream {
 public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
+    LogStream(LogLevel level, const std::string& file,
+              int line, const std::string& function);
     ~LogStream();
-    
+
     template<typename T>
     LogStream& operator<<(const T& value) {
         oss_ << value;
         return *this;
     }
-    
+
 private:
     LogLevel level_;
-    std::ostringstream oss_;
     std::string file_;
     int line_;
     std::string function_;
+    std::ostringstream oss_;
 };
 
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+// Logging macros
+#define NLM_LOG_DEBUG(msg) ::nlm::LogStream(::nlm::LogLevel::Debug, __FILE__, __LINE__, __func__) << msg
+#define NLM_LOG_INFO(msg) ::nlm::LogStream(::nlm::LogLevel::Info, __FILE__, __LINE__, __func__) << msg
+#define NLM_LOG_WARNING(msg) ::nlm::LogStream(::nlm::LogLevel::Warning, __FILE__, __LINE__, __func__) << msg
+#define NLM_LOG_ERROR(msg) ::nlm::LogStream(::nlm::LogLevel::Error, __FILE__, __LINE__, __func__) << msg
+#define NLM_LOG_CRITICAL(msg) ::nlm::LogStream(::nlm::LogLevel::Critical, __FILE__, __LINE__, __func__) << msg
 
 } // namespace nlm
