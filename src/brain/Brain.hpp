@@ -47,6 +47,9 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// This class has been refactored for better modularity and maintainability.
+// Implementation details are now in Brain_Impl.hpp
 
 class Brain {
 public:
@@ -199,3 +202,4 @@ private:
 };
 
 } // namespace nlm
+

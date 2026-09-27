@@ -1,117 +1,308 @@
+// Phase 6 Command-Line Interface Enhancements
+// Provides enhanced command-line interface for Phase 6 systems
+
 #pragma once
 
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
+#include <iostream>
+#include <string>
 #include <vector>
+#include <map>
+#include <unordered_set>
+#include <memory>
+#include <algorithm>
+#include <sstream>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
-class AgentBrain {
+/**
+ * Command-line option definition
+ */
+struct CommandLineOption {
+    std::string name;
+    char shortOpt;
+    std::string longOpt;
+    std::string description;
+    std::string defaultValue;
+    std::string type;  // "string", "int", "float", "bool", "choice"
+    std::string category;  // "neural", "memory", "plasticity", "neuromodulation", "simulation", "checkpoint", "visualization"
+    std::string constraint;  // Validation regex or range
+    std::vector<std::string> choices;  // For choice type
+    bool required;
+    bool (*validator)(const std::string&);  // Custom validator
+};
+
+/**
+ * Phase 6 command-line interface manager
+ */
+class Phase6CLI {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
-    ~AgentBrain();
+    Phase6CLI();
+    ~Phase6CLI();
     
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
+    // Parse command line arguments
+    bool parse(int argc, char** argv);
     
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    // Get option value
+    template<typename T>
+    std::optional<T> getOption(const std::string& name) const;
     
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    // Check if option was provided
+    bool hasOption(const std::string& name) const;
     
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
+    // Get all options
+    std::vector<std::string> getOptionNames() const;
     
-    // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
+    // Show help
+    void showHelp() const;
     
-    // Apply neuromodulation based on reward
-    void applyRewardModulation(float reward, float predictedReward);
+    // Show version
+    void showVersion() const;
     
-    // Update development system
-    void updateDevelopment(double timestep);
+    // Get configuration file path
+    std::string getConfigFile() const { return configFile_; }
     
-    // Get current developmental stage
-    DevelopmentalStage getDevelopmentalStage() const;
+    // Get verbosity level
+    int getVerbosity() const { return verbosity_; }
     
-    // Get neuromodulation level
-    float getNeuromodulationLevel() const;
+    // Get experiment configuration
+    std::string getExperimentConfig() const { return experimentConfig_; }
     
-    // Get curiosity level
-    float getCuriosityLevel() const;
+    // Get checkpoint configuration
+    std::string getCheckpointConfig() const { return checkpointConfig_; }
     
-    // Get novelty level
-    float getNoveltyLevel() const;
+    // Get simulation configuration
+    std::string getSimulationConfig() const { return simulationConfig_; }
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Get visualization configuration
+    std::string getVisualizationConfig() const { return visualizationConfig_; }
     
-    // Reset agent for new episode
-    void reset();
+    // Apply options to configuration
+    bool applyToConfig(std::shared_ptr<Config> config) const;
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Validate all options
+    bool validate() const;
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const { return validationErrors_; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Set verbosity level
+    void setVerbosity(int level) { verbosity_ = level; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Define Phase 6 command-line options
+    void initializeOptions();
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Parse option string (e.g., "--neuron-count=1000")
+    bool parseOption(const std::string& arg, std::string& key, std::string& value);
     
-    std::shared_ptr<Brain> brain_;
+    // Convert option value to appropriate type
+    std::string convertValue(const std::string& value, const std::string& type) const;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Validate option value
+    bool validateOption(const std::string& name, const std::string& value) const;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Check if option exists
+    bool optionExists(const std::string& name) const;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Get option definition
+    CommandLineOption getOptionDefinition(const std::string& name) const;
     
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
+    // Show option help
+    void showOptionHelp(const std::string& name) const;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Apply single option to configuration
+    bool applyOptionToConfig(const std::string& name, const std::string& value, 
+                           std::shared_ptr<Config> config) const;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Map option names to config keys
+    static std::map<std::string, std::string> getOptionToConfigKeyMap();
+    
+    // Registered options
+    std::vector<CommandLineOption> options_;
+    
+    // Parsed option values
+    std::map<std::string, std::string> parsedOptions_;
+    
+    // Configuration file
+    std::string configFile_;
+    
+    // Verbosity level
+    int verbosity_;
+    
+    // Experiment configuration
+    std::string experimentConfig_;
+    
+    // Checkpoint configuration
+    std::string checkpointConfig_;
+    
+    // Simulation configuration
+    std::string simulationConfig_;
+    
+    // Visualization configuration
+    std::string visualizationConfig_;
+    
+    // Validation errors
+    std::vector<stdشرات� string> validationErrors_;
+};
+
+/**
+ * Command-line interface for Phase 6 demo
+ */
+class Phase6DemoCLI : public Phase6CLI {
+public:
+    Phase6DemoCLI(int argc, char** argv);
+    
+    // Run demo with parsed options
+    bool runDemo() const;
+    
+    // Get demo configuration
+    Phase6Config getDemoConfig() const;
+    
+    // Show demo status
+    void showDemoStatus() const;
+    
+private:
+    // Parse demo-specific options
+    void parseDemoOptions();
+    
+    // Convert string to experiment type
+    static std::string experimentTypeToString(int type);
+    
+    // Convert string to demo mode
+    static std::string demoModeToString(int mode);
+    
+    // Demo configuration
+    Phase6Config demoConfig_;
+};
+
+/**
+ * Command-line interface for experiment runner
+ */
+class ExperimentRunnerCLI : public Phase6CLI {
+public:
+    ExperimentRunnerCLI(int argc, char** argv);
+    
+    // Run experiment with parsed options
+    bool runExperiment() const;
+    
+    // Get experiment configuration
+    ExperimentConfig getExperimentConfig() const;
+    
+    // Show experiment status
+    void showExperimentStatus() const;
+    
+private:
+    // Parse experiment-specific options
+    void parseExperimentOptions();
+    
+    // Convert experiment type
+    static std::string experimentTypeToString(int type);
+    
+    // Experiment configuration
+    ExperimentConfig experimentConfig_;
+};
+
+/**
+ * Option validators
+ */
+namespace OptionValidators {
+    
+    // Validate integer range
+    bool validateInt(const std::string& value, int min, int max);
+    
+    // Validate float range
+    bool validateFloat(const std::string& value, float min, float max);
+    
+    // Validate probability
+    bool validateProbability(const std::string& value);
+    
+    // Validate file path
+    bool validateFilePath(const std::string& value);
+    
+    // Validate choice
+    bool validateChoice(const std::string& value, const std::vector<std::string>& choices);
+    
+    // Validate positive integer
+    bool validatePositiveInt(const std::string& value);
+    
+    // Validate positive float
+    bool validatePositiveFloat(const std::string& value);
+    
+    // Validate string length
+    bool validateStringLength(const std::string& value, size_t minLength, size_t maxLength);
+    
+    // Validate JSON-like structure
+    bool validateJSON(const std::string& value);
+    
+    // Validate comma-separated values
+    bool validateCSV(const std::string& value);
+}
+
+/**
+ * Help text generator
+ */
+class HelpGenerator {
+public:
+    static std::string generateOptionHelp(const CommandLineOption& option);
+    static std::string generateSectionHelp(const std::string& title, const std::vector<CommandLineOption>& options);
+    static std::string generateAllHelp(const std::vector<CommandLineOption>& options);
+    static std::string generateUsage(const std::string& programName);
+    static std::string generateExample(const std::string& programName);
+};
+
+/**
+ * Configuration file utilities
+ */
+class ConfigFileUtils {
+public:
+    // Generate example configuration file
+    static std::string generateExampleConfig();
+    
+    // Validate configuration file
+    static std::vector<std::string> validateConfigFile(const std::string& filepath);
+    
+    // Merge configuration files
+    static bool mergeConfigFiles(const std::string& baseFile, const std::string& overrideFile, 
+                                const std::string& outputFile);
+    
+    // Parse environment variables from configuration file
+    static std::map<std::string, std::string> parseEnvironmentVariables(const std::string& configContent);
+};
+
+/**
+ * Command-line parser utilities
+ */
+class CLIUtils {
+public:
+    // Parse comma-separated values
+    static std::vector<std::string> parseCSV(const std::string& value);
+    
+    // Parse key-value pairs
+    static std::map<std::string, std::string> parseKeyValuePairs(const std::string& value);
+    
+    // Parse boolean value
+    static bool parseBool(const std::string& value);
+    
+    // Parse optional value
+    static std::string trim(const std::string& value);
+    
+    // Check if string starts with prefix
+    static bool startsWith(const std::string& str, const std::string& prefix);
+    
+    // Check if string ends with suffix
+    static bool endsWith(const std::string& str, const std::string& suffix);
+    
+    // Convert string to lowercase
+    static std::string toLower(const std::string& str);
+    
+    // Convert string to uppercase
+    static std::string toUpper(const std::string& str);
+    
+    // Replace all occurrences
+    static std::string replaceAll(const std::string& str, const std::string& from, const std::string& to);
+    
+    // Split string by delimiter
+    static std::vector<std::string> split(const std::string& str, char delimiter);
 };
 
 } // namespace nlm
