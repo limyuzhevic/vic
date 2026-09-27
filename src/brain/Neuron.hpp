@@ -10,7 +10,34 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
+// NeuronState: Complete state representation for a single neuron
+// Efficient struct for storing all LIF neuron state variables to minimize memory footprint
+
+/**
+ * @struct NeuronState
+ * @brief Complete state representation for a single neuron implementing LIF dynamics
+ * 
+ * This structure contains all state variables needed for Leaky Integrate-and-Fire (LIF) neuron
+ * dynamics. It is designed for efficient memory access patterns and cache locality.
+ * 
+ * State Components:
+ * - Membrane potentials: representing electrical state of neuron
+ * - Firing properties: threshold, reset, refractory period
+ * - Dynamics variables: adaptation, spike timing
+ * - Network connections: synaptic inputs
+ * 
+ * Default Values:
+ * - Resting potential: -70 mV (typical for cortical neurons)
+ * - Threshold: -55 mV (typical for action potential initiation)
+ * - Refractory period: 5 simulation steps
+ * - Leak conductance: 10 nS (determines membrane time constant)
+ * 
+ * @note This structure is used internally by Neuron class and can be exposed for optimization
+ * @see Neuron
+ * @see NeuronType
+ * @ingroup core
+ */
+
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
@@ -25,6 +52,15 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    /**
+     * @brief Default constructor initializes all state variables to physiological defaults
+     * 
+     * Sets initial state consistent with typical cortical neuron properties:
+     * - Resting near -70 mV
+     * - Ready to fire at -55 mV
+     * - Short refractory period to limit firing rate
+     * - Moderate leak for appropriate time constant
+     */
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -40,8 +76,43 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Neuron: Single computational neuron implementing Leaky Integrate-and-Fire dynamics
+// Core processing unit for the NLM brain, capable of complex spiking patterns and learning
+
+/**
+ * @class Neuron
+ * @brief Single computational neuron implementing Leaky Integrate-and-Fire dynamics
+ * 
+ * The Neuron class represents the fundamental processing unit of the NLM brain. It implements
+ * LIF dynamics where membrane potential integrates incoming inputs with exponential decay.
+ * When threshold is reached, the neuron emits a spike, resetting membrane potential.
+ * 
+ * Key Features:
+ * - Biophysical LIF dynamics with realistic membrane properties
+ * - Support for multiple input types (excitatory, inhibitory, modulatory)
+ * - Plasticity support for synaptic strengthening/weakening
+ * - Population and region membership for large-scale network organization
+ * - Spike history tracking for STDP learning rules
+ * - Refractory period to limit firing rates and ensure biological realism
+ * 
+ * Biological Plausibility:
+ * - Uses membrane potentials measured in mV (consistent with biology)
+ * - Implements spike-frequency adaptation via adaptation variable
+ * - Includes refractory period to prevent unrealistic firing
+ * - Supports ion channel-like properties (leak conductance)
+ * 
+ * Performance Characteristics:
+ * - Computationally lightweight: O(1) per step with constant memory
+ * - Event-driven: Only updates on relevant inputs or time steps
+ * - Memory efficient: Uses struct for state and handles for connections
+ * 
+ * @note Phase 2 TODO: Implement complete integrate-and-fire dynamics in step() method
+ * @see NeuronState
+ * @see Synapse
+ * @see PlasticityFlags
+ * @ingroup core
+ */
+
 class Neuron {
 public:
     // Create neuron with ID

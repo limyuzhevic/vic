@@ -25,8 +25,31 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <set>
+#include <sstream>
+#include <stdexcept>
+#include <algorithm>
+#include <variant>
+#include <optional>
+#include <chrono>
+#include <ctime>
+#include <fstream>
+#include <unordered_map>
 
 using namespace nlm;
+
+// Forward declarations
+void printBanner();
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+// Version information
+const std::string NLM_VERSION = "NLM Phase 2.0.0";
+
+// Global CLI parser instance
+static CLIParser cliParser;
 
 void printBanner() {
     std::cout << R"(
@@ -267,7 +290,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +324,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -322,23 +345,71 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Print banner
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize NLM log facility
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Version: " + std::string(NLM_VERSION));
+    
+    // Parse CLI arguments
+    auto parsed = cliParser.parseArgs(argc, argv);
+    
+    // Handle help and version requests
+    if (parsed.helpRequested) {
+        cliParser.printHelp(argv[0]);
+        return 0;
+    }
+    
+    if (parsed.versionRequested) {
+        std::cout << cliParser.getVersion() << std::endl;
+        return 0;
+    }
+    
+    // Process CLI errors
+    if (parsed.error) {
+        std::cerr << "Error: " << parsed.errorMessage << std::endl;
+        cliParser.printHelp(argv[0]);
+        return 1;
+    }
+    
+    // Validate parsed arguments
+    if (!cliParser.validateParsedArgs(parsed)) {
+        return 1;
+    }
+    
+    // Initialize logger with proper log level
+    if (parsed.flags.find("debug") != parsed.flags.end()) {
+        consoleLogger->setLevel(LogLevel::Debug);
+        logger->setLevel(LogLevel::Debug);
+    } else if (parsed.flags.find("verbose") != parsed.flags.end()) {
+        consoleLogger->setLevel(LogLevel::Info);
+        logger->setLevel(LogLevel::Info);
+    } else if (parsed.values.find("log-level") != parsed.values.end()) {
+        std::string levelStr = parsed.values["log-level"];
+        LogLevel level = LogLevel::Info;
+        if (levelStr == "Debug") level = LogLevel::Debug;
+        else if (levelStr == "Warning") level = LogLevel::Warning;
+        else if (levelStr == "Error") level = LogLevel::Error;
+        else if (levelStr == "Critical") level = LogLevel::Critical;
+        consoleLogger->setLevel(level);
+        logger->setLevel(level);
+    }
+    
+    if (parsed.flags.find("no-colors") != parsed.flags.end()) {
+        consoleLogger->setUseColors(false);
+    }
+    
+    // Log startup information
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Version: " + std::string(NLM_VERSION));
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -366,6 +437,54 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Apply CLI-specific configuration overrides
+    for (const auto& [key, value] : parsed.values) {
+        // Handle special CLI options
+        if (key == "set") {
+            // Parse key=value from the value
+            size_t pos = value.find('=');
+            if (pos != std::string::npos) {
+                std::string setKey = value.substr(0, pos);
+                std::string setValue = value.substr(pos + 1);
+                config->set(setKey, setValue, ConfigSource::CommandLine);
+            }
+        } else if (key == "unset") {
+            config->remove(value);
+        } else if (key == "steps" || key == "neurons" || key == "regions" || 
+                  key == "connections" || key == "random-seed" ||
+                  key == "timestep" || key == "novelty-threshold" ||
+                  key == "curiosity-gain") {
+            // Map CLI keys to config keys
+            std::string configKey;
+            if (key == "random-seed") configKey = "random_seed";
+            else if (key == "connection_probability") configKey = "connection_probability";
+            else configKey = key;
+            
+            // Convert string to appropriate type
+            if (key.find("num") != std::string::npos) {
+                try {
+                    int64_t intVal = std::stoll(value);
+                    config->set(configKey, intVal, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_WARNING("Failed to parse integer value for " + configKey + ": " + value);
+                }
+            } else if (key.find("float") != std::string::npos) {
+                try {
+                    double doubleVal = std::stod(value);
+                    config->set(configKey, doubleVal, ConfigSource::CommandLine);
+                } catch (...) {
+                    NLM_LOG_WARNING("Failed to parse float value for " + configKey + ": " + value);
+                }
+            } else if (key == "bool") {
+                bool boolVal = (value == "true" || value == "1");
+                config->set(configKey, boolVal, ConfigSource::CommandLine);
+            }
+        } else if (key == "brain-type" || key == "plasticity-enable") {
+            // Handle brain configuration
+            config->set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -392,10 +511,80 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Show config if requested
+    if (parsed.flags.find("show-config") != parsed.flags.end()) {
+        cliParser.printConfig(*config);
+    }
+    
+    // Validate config if requested
+    if (parsed.flags.find("validate") != parsed.flags.end()) {
+        if (!cliParser.validateConfig(*config)) {
+            return 1;
+        }
+    }
+    
+    // Validate config file if requested
+    if (parsed.flags.find("validate-config") != parsed.flags.end()) {
+        // This would validate the config file if specified
+        std::cout << "Configuration file validation requested (not implemented)" << std::endl;
+    }
+    
+    // Dry run if requested
+    if (parsed.flags.find("dry-run") != parsed.flags.end()) {
+        NLM_LOG_INFO("Dry run mode - configuration parsed successfully, but no execution performed.");
+        return 0;
+    }
+    
+    // Set up simulation parameters
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    // Override config with CLI parameters if provided
+    if (parsed.values.find("steps") != parsed.values.end()) {
+        try {
+            int64_t steps = std::stoll(parsed.values["steps"]);
+            config->set("neuron_count", steps, ConfigSource::CommandLine); // Using neuron_count as proxy for steps
+        } catch (...) {
+            NLM_LOG_WARNING("Failed to parse steps value: " + parsed.values["steps"]);
+        }
+    }
+    
+    if (parsed.values.find("timestep") != parsed.values.end()) {
+        try {
+            double ts = std::stod(parsed.values["timestep"]);
+            config->set("simulation_timestep", ts, ConfigSource::CommandLine);
+        } catch (...) {
+            NLM_LOG_WARNING("Failed to parse timestep value: " + parsed.values["timestep"]);
+        }
+    }
+    
+    if (parsed.values.find("neurons") != parsed.values.end()) {
+        try {
+            int64_t neurons = std::stoll(parsed.values["neurons"]);
+            config->set("neuron_count", neurons, ConfigSource::CommandLine);
+        } catch (...) {
+            NLM_LOG_WARNING("Failed to parse neurons value: " + parsed.values["neurons"]);
+        }
+    }
+    
+    if (parsed.values.find("regions") != parsed.values.end()) {
+        try {
+            int64_t regions = std::stoll(parsed.values["regions"]);
+            config->set("region_count", regions, ConfigSource::CommandLine);
+        } catch (...) {
+            NLM_LOG_WARNING("Failed to parse regions value: " + parsed.values["regions"]);
+        }
+    }
+    
+    if (parsed.values.find("connections") != parsed.values.end()) {
+        try {
+            double conn = std::stod(parsed.values["connections"]);
+            config->set("connection_probability", static_cast<float>(conn), ConfigSource::CommandLine);
+        } catch (...) {
+            NLM_LOG_WARNING("Failed to parse connections value: " + parsed.values["connections"]);
+        }
+    }
     
     // Initialize brain
     NLM_LOG_INFO("");
@@ -409,20 +598,37 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests based on run-test or all tests if not specified
+    int testToRun = -1;
+    if (parsed.values.find("run-test") != parsed.values.end()) {
+        try {
+            testToRun = std::stoi(parsed.values["run-test"]);
+        } catch (...) {
+            NLM_LOG_WARNING("Invalid run-test value: " + parsed.values["run-test"]);
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (testToRun == 1 || testToRun == -1) {
+        runBasicConnectivityTest(brain);
+        if (testToRun != -1) {
+            // If a specific test was requested, reset for next test
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (testToRun == 2 || testToRun == -1) {
+        runPlasticityExperiment(brain);
+        if (testToRun != -1) {
+            // If a specific test was requested, reset for next test
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (testToRun == 3 || testToRun == -1) {
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

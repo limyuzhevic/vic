@@ -10,6 +10,41 @@ class Neuron;
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
 
+/**
+ * @class Synapse
+ * @brief Represents a synaptic connection between two neurons
+ * 
+ * The Synapse class models the biological process of synaptic transmission, where
+ * electrical signals from a presynaptic neuron propagate to a postsynaptic neuron
+ * through chemical or electrical mechanisms. This implementation supports:
+ * 
+ * Key Features:
+ * - Realistic synaptic transmission with time delays
+ * - Multiple synaptic types (excitatory, inhibitory, modulatory, electrical)
+ * - Short-term plasticity mechanisms for dynamic weight modulation
+ * - Spike-timing dependent plasticity (STDP) support
+ * - Reward-modulated learning capabilities
+ * - Eligibility traces for delayed reward signaling
+ * 
+ * Biological Plausibility:
+ * - Synaptic delays reflect biological transmission times (milliseconds to seconds)
+ * - Weight dynamics mirror synaptic strength changes observed in learning
+ * - Spike history recording enables temporal learning rules
+ * - Plasticity flags allow selective rule application per synapse
+ * 
+ * Performance Characteristics:
+ * - Lightweight: O(1) for most operations
+ * - Event-driven: Only updates on spike events
+ * - Memory efficient: Uses opaque implementation pointer
+ * 
+ * @note Phase 2 TODO: Implement complete synaptic dynamics in step() method
+ * @see Neuron
+ * @see PlasticityFlags
+ * @see STDP
+ * @see Hebbian
+ * @ingroup core
+ */
+
 class Synapse {
 public:
     // Create synapse with IDs

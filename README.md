@@ -2,70 +2,140 @@
 
 **An Experimental Artificial Developmental Brain**
 
-## What is NLM?
+## Project Overview
 
 NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+## Documentation Structure
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+This document serves as the main entry point to the NLM documentation. The complete documentation is organized as follows:
 
-## Current Phase
+### **Core Documentation**
+- **Inline Source Code Documentation** (`src/`): Doxygen-style documentation for all classes and functions
+- **Module-Level READMEs** (`docs/modules/`): API documentation for major subsystems
+- **Code Examples** (`docs/examples/`): Usage patterns and tutorials
 
-**PHASE 6: FINAL INTEGRATION**
+### **High-Level Documentation**
+- **Architecture** (`docs/ARCHITECTURE.md`): System design and components
+- **Science** (`docs/SCIENCE.md`): Scientific principles and background
+- **Research Methods** (`docs/RESEARCH_METHODS.md`): Experimental approach and methodology
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+### **Development & Testing**
+- **Phase 6 Final Audit** (`docs/PHASE6_FINAL_AUDIT.md`): Integration verification and results
+- **Roadmap** (`docs/ROADMAP.md`): Future development plans
+- **Experiments** (`docs/EXPERIMENTS.md`): Experimental framework and findings
+- **Limitations** (`docs/LIMITATIONS.md`, `docs/FINAL_LIMITATIONS.md`): Current constraints and future directions
 
-### Phase 6 Integration Achievements
+## Code Documentation Standards
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+All inline source code documentation follows **Doxygen style** with the following conventions:
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+### Doxygen Tags Used
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+**Class Documentation:**
+```cpp
+/**
+ * @class ClassName
+ * @brief Brief description of the class purpose
+ * @details Detailed explanation of design rationale, algorithms, and internal structure
+ * @see RelatedClasses
+ * @note Important implementation notes
+ * @warning Potential issues or limitations
+ */
+```
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+**Method Documentation:**
+```cpp
+/**
+ * @brief Brief description of method functionality
+ * @param[in] paramName Description of input parameter
+ * @param[out] paramName Description of output parameter
+ * @param[in,out] paramName Description of bidirectional parameter
+ * @return Return value description
+ * @throws ExceptionType Description of possible exceptions
+ * @see RelatedMethods
+ * @note Important implementation details or performance considerations
+ * @warning Potential issues or edge cases
+ * @example
+ * ```cpp
+ * // Example usage
+ * Class obj;
+ * obj.method();
+ * ```
+ */
+```
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+### Key Documentation Areas
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+1. **Purpose and Design Rationale**: Why the class exists and its role in the system
+2. **Parameters**: All parameters with types and constraints
+3. **Return Values**: Description of outputs and return semantics
+4. **Exceptions**: Error conditions and thrown exceptions
+5. **Performance Characteristics**: Time complexity and memory usage
+6. **Usage Examples**: Code snippets for common use cases
+7. **Algorithm Details**: For complex operations or data structures
+8. **Memory Management**: Ownership semantics and lifecycle management
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+## Core API Reference
 
-## Building
+### Neural Computation Core
+- **Brain Class** (`src/brain/Brain.hpp`): Central coordinator with integrated systems
+- **Neuron Class** (`src/brain/Neuron.hpp`): Leaky Integrate-and-Fire dynamics
+- **Synapse Class** (`src/brain/Synapse.hpp`): Synaptic transmission with delays
+- **NeuralRegion Class** (`src/brain/NeuralRegion.hpp`): Regional organization and connectivity
+- **NeuralPopulation Class** (`src/brain/NeuralPopulation.hpp`): Neuron grouping and population dynamics
 
+### Configuration System
+- **Config Class** (`src/core/Config/Config.hpp`): Complete configuration management
+- **Types** (`src/core/Types/Types.hpp`): Strongly-typed identifiers and utilities
+- **Logger Class** (`src/core/Logger/Logger.hpp`): Logging interface and implementations
+- **SimulationClock** (`src/core/SimulationClock/SimulationClock.hpp`): Time management
+
+### Memory Systems
+- **Working Memory** (`src/memory/NeuralWorkingMemory.hpp`): Active information management
+- **Episodic Memory** (`src/memory/NeuralEpisodicMemory.hpp`): Experience encoding and replay
+- **Associative Memory** (`src/memory/Memory.hpp`): Pattern associations
+
+### Plasticity and Learning
+- **STDP** (`src/plasticity/STDP.hpp`): Spike-Timing Dependent Plasticity
+- **Hebbian Learning** (`src/plasticity/Hebbian.hpp`): Correlation-based learning
+- **Structural Plasticity** (`src/plasticity/StructuralPlasticity.hpp`): Structural modifications
+
+### Neuromodulation
+- **Dopamine** (`src/neuromodulation/Dopamine.hpp`): Reward and reinforcement
+- **Curiosity** (`src/neuromodulation/Curiosity.hpp`): Exploration motivation
+- **Novelty** (`src/neuromodulation/Novelty.hpp`): Novelty detection
+- **Prediction Error** (`src/neuromodulation/PredictionError.hpp`): Learning signals
+
+### Cognition and Prediction
+- **Prediction System** (`src/prediction/NeuralPrediction.hpp`): Forward models and prediction
+- **Concept Formation** (`src/cognition/ConceptFormation.hpp`): Pattern discovery
+- **Neural Planner** (`src/cognition/NeuralPlanner.hpp`): Action planning and evaluation
+- **Attention System** (`src/cognition/AttentionalSelection.hpp`): Competitive selection
+
+### Development and Environment
+- **Development System** (`src/development/DevelopmentSystem.hpp`): Age-dependent plasticity modulation
+- **Pruning** (`src/development/Pruning.hpp`): Synaptic elimination
+- **Synaptogenesis** (`src/development/Synaptogenesis.hpp`): New synapse formation
+
+## Configuration Documentation
+
+The configuration system supports multiple formats and includes extensive validation. Key configuration options include:
+
+### Core Configuration Sections
+- `brain`: Neural system parameters (region counts, neuron types, etc.)
+- `memory`: Memory system settings (working, episodic, associative)
+- `plasticity`: Learning algorithm parameters (STDP, Hebbian, structural)
+- `neuromodulation`: Neuromodulator settings and behaviors
+- `prediction`: Prediction system parameters
+- `cognition`: Cognitive system configurations
+- `development`: Developmental stage parameters
+- `simulation`: Simulation settings (timestep, duration, etc.)
+- `logging`: Logging configuration and levels
+
+## Building and Running
+
+### Building from Source
 ```bash
 mkdir build
 cd build
@@ -73,153 +143,115 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
+### Running Integration Test
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected and functioning correctly.
 
-## Project Structure
+## Development Guidelines
 
+### Code Quality
+- Follow consistent coding style across all modules
+- Maintain comprehensive documentation for all public APIs
+- Include examples where APIs are complex or have multiple use cases
+- Document performance characteristics and optimization opportunities
+- Explain design decisions and trade-offs in class and method documentation
+
+### Testing Documentation
+- Document test setup and execution procedures
+- Include debugging techniques for common issues
+- Provide troubleshooting guidance for configuration and runtime problems
+- Document expected behavior and edge cases
+
+## API Usage Examples
+
+### Basic Brain Initialization
+```cpp
+#include "Brain.hpp"
+#include "Config.hpp"
+
+int main() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("brain.regions", 4);
+    config->set("brain.region.0.size", 100);
+    
+    auto brain = std::make_unique<nlm::Brain>(config);
+    if (brain->initialize()) {
+        // Run simulation
+        for (uint64_t step = 0; step < 1000; ++step) {
+            brain->step(step);
+        }
+    }
+    return 0;
+}
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+### Memory System Configuration
+```cpp
+// Configure working memory
+brain->getWorkingMemory()->setCapacity(1000);
+brain->getWorkingMemory()->setDecayRate(0.01f);
+
+// Configure episodic memory
+brain->getEpisodicMemory()->setEncodingRate(0.5f);
+brain->getEpisodicMemory()->enableReplay(true);
 ```
 
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+### Plasticity Configuration
+```cpp
+// Configure STDP learning
+auto* stdp = brain->getSTDP();
+stdp->setLearningRate(0.01f);
+stdp->setTimeWindow(20);
+stdp->enableRewardModulation(true);
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+
+## Performance Considerations
+
+### Time Complexity
+- **Brain Step**: O(total_neuron_count + total_synapse_count)
+- **Memory Access**: O(1) for working memory, O(log n) for episodic memory
+- **Plasticity Updates**: O(number of spiking events)
+
+### Memory Usage Patterns
+- **Neuron State**: ~100 bytes per neuron (LIF dynamics storage)
+- **Synaptic Weights**: ~32 bytes per synapse
+- **Memory Systems**: Configurable based on requirements
+
+### Optimization Opportunities
+- Use SIMD vectorization for parallel processing (see `src/performance/SIMDVectorization.hpp`)
+- Implement memory pools for efficient allocation (see `src/performance/MemoryPool.hpp`)
+- Use event queues for async spike propagation (see `src/performance/EventQueue.hpp`)
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+**Issue**: Simulation fails to initialize
+- **Cause**: Invalid configuration parameters
+- **Solution**: Check configuration values and run validation
+
+**Issue**: Memory usage exceeds limits
+- **Cause**: Large brain configuration or inefficient memory management
+- **Solution**: Use memory pools and optimize memory layout
+
+**Issue**: Performance bottlenecks
+- **Cause**: Synchronous operations where async would work
+- **Solution**: Profile with `src/performance/Performance.hpp` and use event-driven patterns
+
+**Issue**: Plasticity not updating
+- **Cause**: Incorrect plasticity flags or disabled learning rules
+- **Solution**: Verify plasticity configuration and neuron spike recording
+
+## References and Further Reading
+
+1. **Phase 6 Final Results** (`docs/PHASE6_FINAL_RESULTS.md`): Complete integration test outcomes
+2. **Architecture Documentation** (`docs/PHASE6_ARCHITECTURE.md`): Detailed system design
+3. **Performance Documentation** (`docs/PERFORMANCE.md`): Performance benchmarks and optimizations
+4. **Scientific Background** (`docs/SCIENCE.md`): Biological and computational principles
+5. **Research Methods** (`docs/RESEARCH_METHODS.md`): Experimental approach and validation
 
 ## License
 
@@ -227,4 +259,8 @@ MIT
 
 ## Authors
 
-Research project — See docs for scientific background.
+Research project — See documentation for scientific background and implementation details.
+
+---
+
+**Note**: This documentation is continuously updated as the codebase evolves. For the latest information, refer to the inline source code documentation and recent commits in the repository.
