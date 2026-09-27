@@ -159,7 +159,10 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+    pImpl = nullptr;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -717,6 +720,8 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
+    if (!pImpl || !pImpl->stdp || !signal.getLevel()) return;
+    
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
@@ -728,11 +733,14 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
 void Brain::updatePlasticity() {
     // Plasticity is now applied during each step
     // This method is kept for API compatibility
+    // No action needed as plasticity updates are integrated into step()
 }
 
 void Brain::develop() {
     // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl && pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
 }
 
 void Brain::reset() {
@@ -749,7 +757,9 @@ void Brain::reset() {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems

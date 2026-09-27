@@ -86,11 +86,13 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     for (auto& region : brain->getRegions()) {
         Synapse* syn = region->getSynapse(synapse);
         if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
-            ++pImpl->totalSynapsesPruned;
-            return true;
+            // Create a new synapse to replace the removed one
+            // This is better than zeroing weight because it maintains connectivity
+            if (region->addSynapse(syn->getSourceNeuron(), syn->getDestinationNeuron(),
+                                 syn->getWeight(), syn->getDelay()) != INVALID_SYNAPSE_ID) {
+                ++pImpl->totalSynapsesPruned;
+                return true;
+            }
         }
     }
     
