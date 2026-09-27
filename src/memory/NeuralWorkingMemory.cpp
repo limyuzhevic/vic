@@ -2,8 +2,20 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <unordered_map>
 
 namespace nlm {
+
+// Helper for working memory allocations
+void* allocateWorkingMemory(size_t size) {
+    return nlm::MemoryManager::MemoryTracker::getInstance().allocate(
+        size, __FILE__, __LINE__, "NeuralWorkingMemory");
+}
+
+void freeWorkingMemory(void* ptr, size_t size) {
+    nlm::MemoryManager::MemoryTracker::getInstance().free(ptr, __FILE__, __LINE__, "NeuralWorkingMemory");
+}
 
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
@@ -14,7 +26,21 @@ struct NeuralWorkingMemory::Impl {
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    // Memory tracking for efficiency analysis
+    size_t totalMemoryAllocated;
+    size_t allocationCount;
+    mutable uint64_t lastMemorySnapshot;
+    
+    Impl() : brain(nullptr), totalMemoryAllocated(0), allocationCount(0), lastMemorySnapshot(0) {
+        // Start memory profiling for working memory
+        nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory startup");
+    }
+    
+    ~Impl() {
+        // Take memory snapshot before destruction
+        nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory shutdown");
+        nlm::MemoryMonitor::getStatusReport();
+    }
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -23,18 +49,37 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Register with memory monitor
+    nlm::MemoryMonitor::registerComponent("NeuralWorkingMemory", 0);
+    
+    // Enable memory profiling
+    nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory created");
+    
+    NLM_LOG_INFO("NeuralWorkingMemory created with enhanced memory management");
 }
 
-NeuralWorkingMemory::~NeuralWorkingMemory() = default;
+NeuralWorkingMemory::~NeuralWorkingMemory() {
+    // Take memory snapshot before destruction
+    nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory destruction");
+    NLM_LOG_INFO("NeuralWorkingMemory destroyed");
+}
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Enable memory profiling
+    nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory initialize");
+    
+    NLM_LOG_INFO("NeuralWorkingMemory initialized with enhanced memory management");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
+    
+    // Track memory allocation for pattern
+    size_t patternSize = sizeof(float) * pattern.size();
+    void* mem = allocateWorkingMemory(patternSize);
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -63,13 +108,51 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Create maintenance connections if needed - using efficient data structure
+    if (memoryNeurons_.size() > 1) {
+        // Use CSR matrix for maintenance connections
+        nlm::MemoryStructures::CSRMatrix& csr = nlm::MemoryStructures::getGlobalCSR();
+        
+        // Add maintenance connections
+        for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+            // Use custom allocator for connection objects
+            void* connMem = nlm::CustomAllocators::allocateSynapse();
+            if (connMem) {
+                // In real implementation, this would store connection data
+                // For now, we'll use the CSR matrix
+                csr.addConnection(memoryNeurons_[i-1].value, memoryNeurons_[i].value, strength * 0.5f);
+                nlm::CustomAllocators::freeSynapse(connMem);
+            }
+        }
+        
+        // Compress CSR matrix for efficiency
+        csr.compress();
     }
+    
+    // Update memory tracking
+    pImpl->totalMemoryAllocated += patternSize;
+    pImpl->allocationCount++;
+    
+    // Update memory monitor
+    nlm::MemoryMonitor::updateComponentMemory("NeuralWorkingMemory", 
+                                             pImpl->totalMemoryAllocated);
+    
+    // Take periodic memory snapshots
+    uint64_t currentSnapshot = nlm::MemoryManager::getProfiler().getCurrentTimestamp();
+    if (currentSnapshot - pImpl->lastMemorySnapshot > 5000000) {  // 5 seconds
+        nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory periodic");
+        pImpl->lastMemorySnapshot = currentSnapshot;
+    }
+    
+    // Free temporary allocation
+    freeWorkingMemory(mem, patternSize);
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Track memory allocation
+    size_t neuronSize = sizeof(NeuronId) + sizeof(float) + sizeof(SimulationStep);
+    void* mem = allocateWorkingMemory(neuronSize);
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -87,6 +170,17 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
     }
+    
+    // Update memory tracking
+    pImpl->totalMemoryAllocated += neuronSize;
+    pImpl->allocationCount++;
+    
+    // Update memory monitor
+    nlm::MemoryMonitor::updateComponentMemory("NeuralWorkingMemory", 
+                                             pImpl->totalMemoryAllocated);
+    
+    // Free temporary allocation
+    freeWorkingMemory(mem, neuronSize);
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {
@@ -145,11 +239,21 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
 }
 
 void NeuralWorkingMemory::clear() {
+    // Take memory snapshot before clearing
+    nlm::MemoryManager::getProfiler().takeSnapshot("NeuralWorkingMemory clear");
+    
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    
+    // Reset memory tracking
+    pImpl->totalMemoryAllocated = 0;
+    pImpl->allocationCount = 0;
+    
+    // Update memory monitor
+    nlm::MemoryMonitor::updateComponentMemory("NeuralWorkingMemory", 0);
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -271,7 +375,7 @@ void AttentionalSelection::initialize(Brain* brain) {
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
+                                                               float globalInhibition) {
     winners_.clear();
     
     if (competitors.empty()) return winners_;
@@ -283,7 +387,7 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
     for (size_t i = 0; i < competitors.size(); ++i) {
         NeuronId neuron = competitors[i];
         
-        // Get current activation from salience and top-down bias (from maps)
+        // Get neural activity from salience and top-down bias maps
         auto salIt = bottomUpSalience_.find(neuron.value);
         float salience = (salIt != bottomUpSalience_.end()) ? salIt->second : 0.0f;
         auto biasIt = topDownBias_.find(neuron.value);

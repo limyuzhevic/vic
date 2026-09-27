@@ -2,10 +2,15 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../core/MemoryManager/MemoryManager.hpp"
+#include "../core/MemoryManager/MemoryProfiler.hpp"
+#include "../core/MemoryManager/MemoryMonitor.hpp"
+#include "../core/MemoryManager/MemoryFragmentation.hpp"
+#include "../core/MemoryManager/MemoryStructures.hpp"
+#include "../core/MemoryManager/CustomAllocators.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
-#include <unordered_map>
 
 namespace nlm {
 
