@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(pynlm_bindings LANGUAGES CXX)
 
+# C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -14,7 +15,8 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-set(NLM_CORE_SOURCES
+# Core NLM libraries
+add_library(nlm_core STATIC
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
@@ -40,7 +42,11 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
-    ${NLM_SOURCE_DIR}/memory/Memory.cpp
+    ${NLM_SOURCE_DIR}/memory/WorkingMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/EpisodicMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/SemanticMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/ProceduralMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/AssociativeMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
@@ -60,43 +66,84 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
-)
-
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
-)
-
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
     $<INSTALL_INTERFACE:include>
 )
+
 target_compile_options(nlm_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
+# Agent libraries
+add_library(nlm_agent STATIC
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+)
+
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
+# World libraries
+add_library(nlm_world STATIC
+    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+)
+
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Phase 2 demo (new refactored version)
+add_executable(nlm_phase2_demo
+    ${NLM_SOURCE_DIR}/main.cpp
+)
+target_link_libraries(nlm_phase2_demo PUBLIC nlm_core)
+
+# Legacy demo
+add_executable(nlm
+    ${NLM_SOURCE_DIR}/main_legacy.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# Enhanced Python bindings module
+pybind11_add_module(pynlm
+    src/pynlm_bindings/pybind11_bindings.cpp
+    src/pynlm_bindings/pybind11_basic_types.cpp
+    src/pynlm_bindings/pybind11_config_module.cpp
+    src/pynlm_bindings/pybind11_sensory_module.cpp
+    src/pynlm_bindings/pybind11_motor_module.cpp
+    src/pynlm_bindings/pybind11_world_module.cpp
+    src/pynlm_bindings/pybind11_brain_module.cpp
+    src/pynlm_bindings/pybind11_agent_module.cpp
+)
+
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_include_directories(pynlm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_options(pynlm PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Include directories for headers
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/pynlm_bindings)
+
+# Installation
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Install demo executables
+install(TARGETS nlm_phase2_demo nlm
+    RUNTIME DESTINATION bin
 )
