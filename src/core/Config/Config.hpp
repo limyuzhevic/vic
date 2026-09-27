@@ -41,6 +41,47 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Get string representation of the value for file serialization
+    std::optional<std::string> getValueString() const {
+        std::string result;
+        std::visit([&result](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                result = "\"" + arg + "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                // Convert vector of strings to a format that can be easily parsed back
+                result = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) result += ", ";
+                    result += "\"" + arg[i] + "\"";
+                }
+                result += "]";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                result = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) result += ", ";
+                    result += std::to_string(arg[i]);
+                }
+                result += "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                result = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) result += ", ";
+                    result += std::to_string(arg[i]);
+                }
+                result += "]";
+            } else {
+                // For basic types (int, int64_t, double, bool)
+                if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                             std::is_same_v<T, double> || std::is_same_v<T, bool>) {
+                    result = std::to_string(arg);
+                }
+            }
+        }, value);
+        
+        return result.empty() ? std::nullopt : std::optional<std::string>(result);
+    }
 };
 
 // Main configuration class

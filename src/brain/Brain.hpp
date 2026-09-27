@@ -6,6 +6,9 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../plasticity/AntiHebbianRule.hpp"
+#include "../plasticity/BCMRule.hpp"
+#include "../plasticity/PlasticityRuleFactory.hpp"
 #include <memory>
 #include <string>
 

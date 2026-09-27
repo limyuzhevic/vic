@@ -61,7 +61,7 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
-    if (min >= max) {
+    if (min > max) {
         throw std::invalid_argument("min must be < max");
     }
     std::uniform_real_distribution<double> dist(min, max);
@@ -69,7 +69,7 @@ double RandomGenerator::uniformReal(double min, double max) {
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
-    if (min >= max) {
+    if (min > max) {
         throw std::invalid_argument("min must be < max");
     }
     std::uniform_real_distribution<float> dist(min, max);
@@ -118,8 +118,11 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
-    for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
+    std::uniform_int_distribution<uint32_t> dist(0, 255);
+    for (size_t i = 0; i < size; i += 4) {
+        uint32_t val = dist(pImpl->gen);
+        size_t remaining = std::min<size_t>(4, size - i);
+        std::memcpy(bytes + i, &val, remaining);
     }
 }
 

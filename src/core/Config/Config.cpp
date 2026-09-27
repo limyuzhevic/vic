@@ -86,7 +86,17 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Use the new getValueString method to serialize the value
+        auto valueStr = entry.getValueString();
+        if (valueStr.has_value()) {
+            file << *valueStr;
+        } else {
+            // Fallback for unknown types
+            file << "UNKNOWN_TYPE";
+        }
+        file << "\n";
     }
     
     return true;

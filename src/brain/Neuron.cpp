@@ -42,7 +42,7 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
-    if (this != &other) {
+    if (this != &other && pImpl != other.pImpl) {
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;
@@ -148,10 +148,10 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    if (pImpl->spikeHistory.size() == Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    pImpl->spikeHistory.push_back(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
@@ -220,7 +220,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(dt) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -250,7 +250,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step

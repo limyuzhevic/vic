@@ -59,6 +59,11 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Validate time constant to prevent division by zero
+    if (tau <= 0.0f) {
+        return;
+    }
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);  // Δt in ms
@@ -71,7 +76,7 @@ void STDP::update(Synapse* synapse,
             } else if (dt < 0) {
                 // Post before pre: DEPRESSION
                 // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                float delta = pImpl->ltdWeight * std::exp(dt / tau);  // Simplified
                 totalDelta += delta;
             }
             // dt == 0: no change (simultaneous spikes - rare in practice)

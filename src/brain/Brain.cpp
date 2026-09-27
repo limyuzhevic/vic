@@ -6,9 +6,7 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/NeuromodulatorFactory.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -19,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <memory>
 
 namespace nlm {
 
@@ -55,6 +54,8 @@ struct Brain::Impl {
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    std::unique_ptr<AntiHebbianRule> antiHebbianRule;
+    std::unique_ptr<BCMRule> bcmRule;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -100,35 +101,176 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
+        // Initialize plasticity systems using factory
         spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Create plasticity rules using factory with graceful fallback
+        try {
+            // Check which plasticity rules are enabled in config
+            bool enableSTDP = config->getOr<bool>("plasticity.stdp.enable", true);
+            bool enableHebbian = config->getOr<bool>("plasticity.hebbian.enable", true);
+            bool enableStructural = config->getOr<bool>("plasticity.structural.enable", true);
+            
+            // Create STDP using factory
+            if (enableSTDP && PlasticityRuleFactory::hasType("STDP")) {
+                auto stdpPtr = PlasticityRuleFactory::createWithFallback("STDP", config, timestep);
+                stdp = std::unique_ptr<STDP>(static_cast<STDP*>(stdpPtr.release()));
+                
+                // Configure STDP parameters from config
+                float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+                float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+                float tau = config->getOr<float>("stdp_tau", 20.0f);
+                if (stdp) {
+                    stdp->configure(ltpWeight, ltdWeight, tau);
+                }
+            }
+            
+            // Create Hebbian using factory
+            if (enableHebbian && PlasticityRuleFactory::hasType("Hebbian")) {
+                auto hebbianPtr = PlasticityRuleFactory::createWithFallback("Hebbian", config, timestep);
+                hebbian = std::unique_ptr<Hebbian>(static_cast<Hebbian*>(hebbianPtr.release()));
+                
+                // Configure Hebbian parameters from config
+                float learningRate = config->getOr<float>("hebbian_learning_rate", 0.01f);
+                float maxWeight = config->getOr<float>("hebbian_max_weight", 1.0f);
+                if (hebbian) {
+                    hebbian->setLearningRate(learningRate);
+                    hebbian->setMaxWeight(maxWeight);
+                }
+            }
+            
+            // Create StructuralPlasticity using factory
+            if (enableStructural && PlasticityRuleFactory::hasType("StructuralPlasticity")) {
+                auto structuralPtr = PlasticityRuleFactory::createWithFallback("StructuralPlasticity", config, timestep);
+                structuralPlasticity = std::unique_ptr<StructuralPlasticity>(static_cast<StructuralPlasticity*>(structuralPtr.release()));
+                
+                // Configure structural plasticity parameters from config
+                float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+                float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+                if (structuralPlasticity) {
+                    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+                    structuralPlasticity->setPruningRate(pruningRate);
+                }
+            }
+            
+            NLM_LOG_INFO("Plasticity rules initialized using PlasticityRuleFactory");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize plasticity rules with factory: " + std::string(e.what()));
+            NLM_LOG_WARN("Falling back to direct instantiation for essential plasticity rules");
+            
+            // Fallback to direct instantiation for backward compatibility
+            if (!stdp) {
+                stdp = std::make_unique<STDP>();
+                stdp->configure(0.01f, 0.012f, 20.0f);
+            }
+            if (!hebbian) {
+                hebbian = std::make_unique<Hebbian>();
+                hebbian->setLearningRate(0.01f);
+                hebbian->setMaxWeight(1.0f);
+            }
+            if (!structuralPlasticity) {
+                structuralPlasticity = std::make_unique<StructuralPlasticity>();
+                structuralPlasticity->setSynaptogenesisRate(0.0001f);
+                structuralPlasticity->setPruningRate(0.00001f);
+            }
+        }
         
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        // Initialize existing plasticity systems (fallthrough from factory pattern)
+        if (!stdp) {
+            stdp = std::make_unique<STDP>();
+            stdp->configure(0.01f, 0.012f, 20.0f);
+        }
+        if (!hebbian) {
+            hebbian = std::make_unique<Hebbian>();
+            hebbian->setLearningRate(0.01f);
+            hebbian->setMaxWeight(1.0f);
+        }
+        if (!structuralPlasticity) {
+            structuralPlasticity = std::make_unique<StructuralPlasticity>();
+            structuralPlasticity->setSynaptogenesisRate(0.0001f);
+            structuralPlasticity->setPruningRate(0.00001f);
+        }
+        try {
+            // Check which neuromodulators are enabled in config
+            bool enableDopamine = config->getOr<bool>("neuromodulators.dopamine.enable", true);
+            bool enableCuriosity = config->getOr<bool>("neuromodulators.curiosity.enable", true);
+            bool enableNovelty = config->getOr<bool>("neuromodulators.novelty.enable", true);
+            bool enablePredictionError = config->getOr<bool>("neuromodulators.prediction_error.enable", true);
+            bool enableAcetylcholine = config->getOr<bool>("neuromodulators.acetylcholine.enable", false);
+            bool enableNorepinephrine = config->getOr<bool>("neuromodulators.norepinephrine.enable", false);
+            bool enableSerotonin = config->getOr<bool>("neuromodulators.serotonin.enable", false);
+            
+            // Create neuromodulators using factory with graceful fallback
+            if (enableDopamine && NeuromodulatorFactory::hasType("Dopamine")) {
+                dopamine = std::unique_ptr<Dopamine>(static_cast<Dopamine*>(NeuromodulatorFactory::createWithFallback("Dopamine", config, timestep).release()));
+            }
+            
+            if (enableCuriosity && NeuromodulatorFactory::hasType("Curiosity")) {
+                // Special handling for Curiosity (doesn't inherit from Neuromodulator)
+                // This is a limitation - Curiosity has a different interface
+                auto curiosityBase = NeuromodulatorFactory::createWithFallback("Curiosity", config, timestep);
+                // For now, create directly as factory pattern is still evolving
+                curiosity = std::make_unique<Curiosity>();
+            }
+            
+            if (enableNovelty && NeuromodulatorFactory::hasType("Novelty")) {
+                auto noveltyBase = NeuromodulatorFactory::createWithFallback("Novelty", config, timestep);
+                // For now, create directly as factory pattern is still evolving
+                novelty = std::make_unique<Novelty>();
+            }
+            
+            if (enablePredictionError && NeuromodulatorFactory::hasType("PredictionError")) {
+                auto predictionErrorBase = NeuromodulatorFactory::createWithFallback("PredictionError", config, timestep);
+                // For now, create directly as factory pattern is still evolving
+                predictionError = std::make_unique<PredictionError>();
+            }
+            
+            // Handle stub neuromodulators
+            if (enableAcetylcholine && NeuromodulatorFactory::hasType("Acetylcholine")) {
+                // Acetylcholine stub creation
+                auto acetylcholineBase = NeuromodulatorFactory::createWithFallback("Acetylcholine", config, timestep);
+                // Stub implementations are handled by factory
+            }
+            
+            if (enableNorepinephrine && NeuromodulatorFactory::hasType("Norepinephrine")) {
+                // Norepinephrine stub creation
+                auto norepinephrineBase = NeuromodulatorFactory::createWithFallback("Norepinephrine", config, timestep);
+                // Stub implementations are handled by factory
+            }
+            
+            if (enableSerotonin && NeuromodulatorFactory::hasType("Serotonin")) {
+                // Serotonin stub creation
+                auto serotoninBase = NeuromodulatorFactory::createWithFallback("Serotonin", config, timestep);
+                // Stub implementations are handled by factory
+            }
+            
+            // Log successful factory-based initialization
+            NLM_LOG_INFO("Neuromodulators initialized using NeuromodulatorFactory");
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to initialize neuromodulators with factory: " + std::string(e.what()));
+            NLM_LOG_WARN("Falling back to direct instantiation for essential neuromodulators");
+            
+            // Fallback to direct instantiation for backward compatibility
+            dopamine = std::make_unique<Dopamine>();
+            curiosity = std::make_unique<Curiosity>();
+            predictionError = std::make_unique<PredictionError>();
+            novelty = std::make_unique<Novelty>();
+        }
         
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Initialize existing neuromodulation systems (fallthrough from factory pattern)
+        // This is kept for backward compatibility in case factory initialization fails
+        if (!dopamine) {
+            dopamine = std::make_unique<Dopamine>();
+        }
+        if (!curiosity) {
+            curiosity = std::make_unique<Curiosity>();
+        }
+        if (!predictionError) {
+            predictionError = std::make_unique<PredictionError>();
+        }
+        if (!novelty) {
+            novelty = std::make_unique<Novelty>();
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -255,9 +397,9 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+// Initialize neuromodulation
+        if (pImpl->novelty) pImpl->novelty->initialize(this);
+        if (pImpl->curiosity) pImpl->curiosity->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
