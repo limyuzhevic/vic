@@ -24,7 +24,7 @@ Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Curiosity system initialized");
+    NLM_LOG_INFO("Curiosity", "Curiosity system initialized");
 }
 
 float Curiosity::getLevel() const {

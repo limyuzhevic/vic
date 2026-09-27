@@ -25,7 +25,7 @@ NeuralPlanner::~NeuralPlanner() = default;
 void NeuralPlanner::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralPlanner initialized");
+    NLM_LOG_INFO("NeuralPlanner", "NeuralPlanner initialized");
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
@@ -272,7 +272,7 @@ SelfModel::~SelfModel() = default;
 void SelfModel::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("SelfModel initialized");
+    NLM_LOG_INFO("SelfModel", "SelfModel initialized");
 }
 
 void SelfModel::recordSelfAction(ActionType action,
@@ -457,7 +457,7 @@ SocialLearning::~SocialLearning() = default;
 void SocialLearning::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("SocialLearning initialized");
+    NLM_LOG_INFO("SocialLearning", "SocialLearning initialized");
 }
 
 void SocialLearning::observeAgentAction(ActionType observedAction,

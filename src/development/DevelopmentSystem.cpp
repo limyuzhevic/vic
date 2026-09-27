@@ -46,7 +46,7 @@ void DevelopmentSystem::advanceStage() {
     }
     pImpl->stepsInCurrentStage = 0;
     pImpl->stageAge = 0.0;
-    NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
+    NLM_LOG_INFO("Development", "Development advanced to stage: " + std::string(getStageName()));
 }
 
 const char* DevelopmentSystem::getStageName() const {

@@ -15,16 +15,68 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/SelfModel.hpp"
+#include "../src/cognition/SocialLearning.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/cognition/SpatialRepresentation.hpp"
+#include "../src/cognition/TemporalRelation.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
 
 namespace py = pybind11;
 namespace nlm {
 
+void bind_neural_planner(py::module& m);
+void bind_concept_formation(py::module& m);
+void bind_attentional_selection(py::module& m);
+void bind_neural_working_memory(py::module& m);
+void bind_neuromodulators(py::module& m);
+void bind_prediction_system(py::module& m);
+void bind_self_model(py::module& m);
+void bind_social_learning(py::module& m);
+void bind_spatial_representation(py::module& m);
+void bind_temporal_relation(py::module& m);
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        NLM (Neural Learning Machine) Python Bindings - Phase 4+ Cognitive Systems
+        -----------------------------------------------------------------------------------------
+        A comprehensive Python binding for the NLM C++ neural simulation framework.
+        
+        Phase 4+ Cognitive Systems Bindings:
+        - NeuralPlanner: Planning and action sequences
+        - ConceptFormation: Abstract concept learning
+        - AttentionalSelection: Competitive attention mechanisms
+        - PredictionSystem: Predictive coding
+        - NeuralWorkingMemory: Working memory with competition
+        - NeuralEpisodicMemory: Episodic memory
+        - NeuralAssociativeMemory: Associative memory
+        - Dopamine: Reward prediction error neuromodulator
+        - Curiosity: Exploration motivation neuromodulator
+        - PredictionError: Prediction error neuromodulator
+        - Novelty: Novelty detection neuromodulator
+        
+        Self-model and social learning:
+        - SelfModel: Internal model of the agent
+        - SocialLearning: Learning from observation
+        
+        Core Systems (existing):
+        - Brain: Central neural simulation brain class
+        - Config: Configuration management
+        - AgentBrain: Agent brain interface
+        - SimpleWorld: Simple 2D world
+        - SensoryInput: Sensory input base class
+        - Vision, Audio, InternalSignals: Sensory modalities
+        - Action: Motor output representation
+        - AgentBody: Agent body state
+        - WorldObject: World object representation
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -420,6 +472,17 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Phase 4+ Cognitive Systems Bindings
+    bind_neural_planner(m);
+    bind_concept_formation(m);
+    bind_neural_working_memory(m);
+    bind_neuromodulators(m);
+    bind_prediction_system(m);
+    bind_self_model(m);
+    bind_social_learning(m);
+    bind_spatial_representation(m);
+    bind_temporal_relation(m);
 }
 
 } // namespace nlm

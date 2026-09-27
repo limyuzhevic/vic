@@ -30,7 +30,7 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    NLM_LOG_INFO("NeuralWorkingMemory", "NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
@@ -267,7 +267,7 @@ AttentionalSelection::~AttentionalSelection() = default;
 void AttentionalSelection::initialize(Brain* brain) {
     pImpl = std::make_unique<Impl>();
     brain_ = brain;
-    NLM_LOG_INFO("AttentionalSelection initialized");
+    NLM_LOG_INFO("AttentionalSelection", "AttentionalSelection initialized");
 }
 
 std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,

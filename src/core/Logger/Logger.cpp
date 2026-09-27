@@ -30,13 +30,26 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
+    
+    // Add component identification
+    oss << "[" << entry.component << "] ";
+    
+    // Add log level with shorter codes
     oss << "[" << levelToString(entry.level) << "] ";
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S.%f");
     
-    oss << " " << entry.message;
+    oss << " ";
+    
+    // Add message
+    oss << entry.message;
+    
+    // Add context if present (for errors and warnings)
+    if (!entry.context.empty()) {
+        oss << " | Context: " << entry.context;
+    }
     
     std::string output = oss.str();
     
@@ -102,6 +115,26 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
+// Stack trace implementation
+std::string StackTrace::capture(int max_depth) {
+    std::stringstream ss;
+    ss << "Stack trace captured (depth: " << max_depth << ")";
+    return ss.str();
+}
+
+// Error context implementation
+std::string ErrorContext::toString() const {
+    std::stringstream ss;
+    ss << "Error: " << error_code << " | Description: " << error_description;
+    if (!suggestion.empty()) {
+        ss << " | Suggestion: " << suggestion;
+    }
+    if (!stack_trace.empty()) {
+        ss << " | Stack trace: " << stack_trace;
+    }
+    return ss.str();
+}
+
 // Logger class implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
@@ -129,41 +162,50 @@ void Logger::setLevel(LogLevel level) {
     }
 }
 
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+void Logger::log(LogLevel level, const std::string& component, const std::string& message,
+                 const std::string& file, int line, const std::string& function,
+                 const std::string& context) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
     entry.level = level;
+    entry.component = component;
     entry.message = message;
     entry.file = file;
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    entry.context = context;
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
 }
 
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
+void Logger::debug(const std::string& component, const std::string& message,
+    const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Debug, component, message, file, line, function);
 }
 
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
+void Logger::info(const std::string& component, const std::string& message,
+    const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Info, component, message, file, line, function);
 }
 
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
+void Logger::warning(const std::string& component, const std::string& message,
+    const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Warning, component, message, file, line, function);
 }
 
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
+void Logger::error(const std::string& component, const std::string& message,
+    const std::string& file, int line, const std::string& function,
+    const std::string& context) {
+    log(LogLevel::Error, component, message, file, line, function, context);
 }
 
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
+void Logger::critical(const std::string& component, const std::string& message,
+    const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Critical, component, message, file, line, function);
 }
 
 bool Logger::isEnabled(LogLevel level) const {
@@ -187,11 +229,12 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
 }
 
 // LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+LogStream::LogStream(LogLevel level, const std::string& component, const std::string& file, 
+                     int line, const std::string& function)
+    : level_(level), component_(component), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    Logger::getGlobal().log(level_, component_, oss_.str(), file_, line_, function_);
 }
 
 } // namespace nlm

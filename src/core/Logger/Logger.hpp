@@ -21,11 +21,13 @@ enum class LogLevel {
 // Log entry structure
 struct LogEntry {
     LogLevel level;
+    std::string component;
     std::string message;
     std::string file;
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    std::string context;  // Additional context for errors/warnings
 };
 
 // Logger interface
@@ -83,17 +85,22 @@ public:
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
     
-    // Global logging functions
-    void log(LogLevel level, const std::string& message, 
+    // Global logging functions with component identification
+    void log(LogLevel level, const std::string& component, const std::string& message,
              const std::string& file = "", int line = 0, 
-             const std::string& function = "");
+             const std::string& function = "", const std::string& context = "");
     
     // Convenience methods
-    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void debug(const std::string& component, const std::string& message, 
+               const std::string& file = "", int line = 0, const std::string& function = "");
+    void info(const std::string& component, const std::string& message, 
+              const std::string& file = "", int line = 0, const std::string& function = "");
+    void warning(const std::string& component, const std::string& message,
+                 const std::string& file = "", int line = 0, const std::string& function = "");
+    void error(const std::string& component, const std::string& message,
+               const std::string& file = "", int line = 0, const std::string& function = "", const std::string& context = "");
+    void critical(const std::string& component, const std::string& message,
+                  const std::string& file = "", int line = 0, const std::string& function = "");
     
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
@@ -103,23 +110,25 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+// Standard logging macros with component identification
+#define NLM_LOG_DEBUG(component, msg) nlm::Logger::getGlobal().debug(component, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_INFO(component, msg) nlm::Logger::getGlobal().info(component, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_WARNING(component, msg) nlm::Logger::getGlobal().warning(component, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_ERROR(component, msg, ctx) nlm::Logger::getGlobal().error(component, msg, __FILE__, __LINE__, __func__, ctx)
+#define NLM_LOG_ERROR_SIMPLE(component, msg) nlm::Logger::getGlobal().error(component, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_CRITICAL(component, msg) nlm::Logger::getGlobal().critical(component, msg, __FILE__, __LINE__, __func__)
 
-// Stream-style logging helper
+// Stream-style logging helper with component support
 class LogStream {
 public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
+    LogStream(LogLevel level, const std::string& component, const std::string& file, 
+              int line, const std::string& function);
     ~LogStream();
     
     template<typename T>
@@ -130,12 +139,11 @@ public:
     
 private:
     LogLevel level_;
+    std::string component_;
     std::ostringstream oss_;
     std::string file_;
     int line_;
     std::string function_;
 };
 
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
-
-} // namespace nlm
+#define NLM_LOG_STREAM(component, level) nlm::LogStream(level, component, __FILE__, __LINE__, __func__)

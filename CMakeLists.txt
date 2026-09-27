@@ -149,3 +149,16 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# NLM CLI Application
+add_executable(nlm_cli
+    src/main_cli.cpp
+    src/cli/NLMCLI.cpp
+)
+
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Installation targets (future)
+install(TARGETS nlm_cli
+    RUNTIME DESTINATION bin
+)

@@ -175,14 +175,14 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
-    NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    NLM_LOG_INFO("Brain", "Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
+    NLM_LOG_INFO("Brain", "Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
     // Create regions
@@ -214,7 +214,7 @@ bool Brain::initialize() {
                 }
             }
             
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+            NLM_LOG_INFO("Brain", "Created populations in region " + std::to_string(i + 1) + 
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
@@ -234,13 +234,16 @@ bool Brain::initialize() {
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
+    NLM_LOG_INFO("Brain", "Working memory initialized");
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
+    NLM_LOG_INFO("Brain", "Episodic memory initialized");
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    NLM_LOG_INFO("Brain", "Associative memory initialized");
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -248,16 +251,20 @@ bool Brain::initialize() {
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
+    NLM_LOG_INFO("Brain", "Neural planner initialized");
     
     pImpl->conceptFormation->initialize(this);
+    NLM_LOG_INFO("Brain", "Concept formation initialized");
     
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    NLM_LOG_INFO("Brain", "Attentional selection initialized");
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    NLM_LOG_INFO("Brain", "Neuromodulation systems initialized");
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -290,11 +297,11 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    NLM_LOG_INFO("Brain", "NLM Brain initialization complete (Phase 6 - Integrated)");
+    NLM_LOG_INFO("Brain", "Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Brain", "Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Brain", "Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
+    NLM_LOG_INFO("Brain", "Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
     
     return true;
 }

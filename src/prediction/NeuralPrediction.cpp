@@ -45,7 +45,7 @@ void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     
-    NLM_LOG_INFO("NeuralPrediction initialized");
+    NLM_LOG_INFO("NeuralPrediction", "NeuralPrediction initialized");
 }
 
 void NeuralPrediction::recordSensoryState(const std::vector<float>& sensoryState, 

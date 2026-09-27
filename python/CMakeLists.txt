@@ -45,6 +45,8 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
     ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
+    ${NLM_SOURCE_DIR}/cognition/SelfModel.cpp
+    ${NLM_SOURCE_DIR}/cognition/SocialLearning.cpp
     ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
     ${NLM_SOURCE_DIR}/sensory/Vision.cpp
     ${NLM_SOURCE_DIR}/sensory/Audio.cpp
@@ -58,6 +60,13 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+)
+
+# Additional C++ source files for complete Phase 4+ integration
+set(NLM_ADDITIONAL_SOURCES
+    ${NLM_SOURCE_DIR}/cognition/SelfModel.cpp
+    ${NLM_SOURCE_DIR}/cognition/SocialLearning.cpp
+    ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
 )
 
 set(NLM_AGENT_SOURCES

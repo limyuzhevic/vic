@@ -22,7 +22,7 @@ Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+    NLM_LOG_INFO("Novelty", "Novelty detection initialized");
 }
 
 float Novelty::getLevel() const {

@@ -20,7 +20,7 @@ PredictionError::~PredictionError() = default;
 
 void PredictionError::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("PredictionError system initialized");
+    NLM_LOG_INFO("PredictionError", "PredictionError system initialized");
 }
 
 float PredictionError::getError() const {

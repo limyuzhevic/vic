@@ -60,6 +60,9 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    NLM_LOG_INFO("Synapse", "Created synapse ID: " + std::to_string(id) + 
+                 " (source: " + std::to_string(source) + 
+                 ", destination: " + std::to_string(destination) + ")");
 }
 
 Synapse::~Synapse() = default;
@@ -223,6 +226,8 @@ void Synapse::step(Timestamp currentTime) {
 }
 
 void Synapse::reset() {
+    NLM_LOG_INFO("Synapse", "Resetting synapse ID: " + std::to_string(pImpl->id) + 
+                 " (weight: " + std::to_string(pImpl->weight) + ")");
     pImpl->weight = 0.0f;
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
