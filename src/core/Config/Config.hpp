@@ -5,6 +5,15 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
+#include <map>
+#include <unordered_map>
+
+// JSON support
+#include "../external/json.hpp"
+
+// YAML support
+#include <yaml-cpp/yaml.h> // May need to be installed separately
 
 namespace nlm {
 

@@ -1,7 +1,7 @@
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
+\n#include "../core/Logger/Logger.hpp"\n#include "../core/Logger/NeuralLogger.hpp"\n#include "../core/Logger/PerformanceLogger.hpp"\n#include "../core/Logger/DebugLogger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
@@ -79,8 +79,7 @@ struct Brain::Impl {
     std::unique_ptr<CheckpointManager> checkpointManager;
     
     Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
+        : config(std::move(cfg))
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -325,73 +324,121 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // Phase 7: ERROR HANDLING - Validate brain is properly initialized
+    // Checks if the brain implementation is properly initialized before proceeding
+    if (!pImpl || !pImpl->config) {
+        NLM_LOG_ERROR("Brain::step - Brain not properly initialized (null pImpl or config)");
+        // Return early to prevent null pointer dereference and potential crash
+        return;
+    }
+    
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_WARNING("Brain::step - spikeSystem not initialized, skipping delayed spike processing");
+    } else {
+        pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    }
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_WARNING("Brain::step - null region encountered");
+            continue;
+        }
         for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_WARNING("Brain::step - null population encountered");
+                continue;
+            }
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) {
+                    NLM_LOG_WARNING("Brain::step - null neuron encountered");
+                    continue;
+                }
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
-                const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
-                if (justFired) {
-                    // Neuron fired this step - queue the spike
-                    SpikeEvent event(neuron->getId(), currentTime, currentStep);
-                    pImpl->spikeSystem->queueSpike(event);
-
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_WARNING("Brain::step - spikeSystem not initialized, skipping spike detection");
+    } else {
+        for (auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_WARNING("Brain::step - null region encountered");
+                continue;
+            }
+            for (auto& pop : region->getPopulations()) {
+                if (!pop) {
+                    NLM_LOG_WARNING("Brain::step - null population encountered");
+                    continue;
+                }
+                for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        NLM_LOG_WARNING("Brain::step - null neuron encountered");
+                        continue;
                     }
+                    // Check if neuron just fired this step
+                    const auto& state = neuron->getState();
+                    bool justFired = (state.firingState == FiringState::Refractory &&
+                                     state.lastSpikeTime >= 0.0f &&
+                                     std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
 
-                    // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
-                    for (Synapse* syn : outgoingSynapses) {
-                        // Create delayed spike event
-                        Delay delay = syn->getDelay();
-                        SimulationStep deliveryStep = currentStep + delay;
-                        Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+                    if (justFired) {
+                        // Neuron fired this step - queue the spike
+                        SpikeEvent event(neuron->getId(), currentTime, currentStep);
+                        pImpl->spikeSystem->queueSpike(event);
 
-                        DelayedSpikeEvent delayedEvent(
-                            neuron->getId(),
-                            syn->getDestinationNeuron(),
-                            syn->getId(),
-                            syn->getWeight(),
-                            syn->getType(),
-                            currentTime,
-                            deliveryTime,
-                            currentStep,
-                            deliveryStep
-                        );
+                        // Record post-synaptic spike for incoming synapses (plasticity)
+                        auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+                        for (Synapse* syn : incomingSynapses) {
+                            if (!syn) {
+                                NLM_LOG_WARNING("Brain::step - null synapse encountered");
+                                continue;
+                            }
+                            syn->recordPostSpike(currentTime);
+                        }
 
-                        pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+                        // Get outgoing synapses and schedule delayed spike events
+                        auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+                        for (Synapse* syn : outgoingSynapses) {
+                            if (!syn) {
+                                NLM_LOG_WARNING("Brain::step - null synapse encountered");
+                                continue;
+                            }
+                            // Create delayed spike event
+                            Delay delay = syn->getDelay();
+                            SimulationStep deliveryStep = currentStep + delay;
+                            Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
 
-                        // Record pre-synaptic spike for plasticity
-                        syn->recordPreSpike(currentTime);
-                    }
-                    
-                    // Store to working memory - neurons that fire become part of working memory
-                    if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                            DelayedSpikeEvent delayedEvent(
+                                neuron->getId(),
+                                syn->getDestinationNeuron(),
+                                syn->getId(),
+                                syn->getWeight(),
+                                syn->getType(),
+                                currentTime,
+                                deliveryTime,
+                                currentStep,
+                                deliveryStep
+                            );
+
+                            pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
+
+                            // Record pre-synaptic spike for plasticity
+                            syn->recordPreSpike(currentTime);
+                        }
+                        
+                        // Store to working memory - neurons that fire become part of working memory
+                        if (pImpl->workingMemory) {
+                            pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                                std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        }
                     }
                 }
             }
@@ -399,7 +446,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -477,6 +526,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    // Calculate neuromodulation factor for plasticity
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    if (pImpl->stdp) {
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (!syn) {
+                    NLM_LOG_WARNING("Brain::step - null synapse encountered in STDP processing");
+                    continue;
+                }
+                // Apply STDP with neuromodulation
+                if (syn->getPlasticityFlags().stdp) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        // Modify weight change based on dopamine
+                        pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                        float weight = syn->getWeight();
+                        weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                        syn->setWeight(weight);
+                    }
+                }
+            }
+        }
+    }
+    
+    if (pImpl->hebbian) {
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (!syn) {
+                    NLM_LOG_WARNING("Brain::step - null synapse encountered in Hebbian processing");
+                    continue;
+                }
+                // Apply Hebbian learning
+                if (syn->getPlasticityFlags().hebbian) {
+                    const auto& preSpikes = syn->getPreSpikeHistory();
+                    const auto& postSpikes = syn->getPostSpikeHistory();
+                    
+                    if (!preSpikes.empty() && !postSpikes.empty()) {
+                        pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    }
+                }
+            }
+        }
+    }
+    
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
@@ -490,8 +590,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
+                if (!region) {
+                    NLM_LOG_WARNING("Brain::step - null region encountered");
+                    continue;
+                }
                 for (auto& pop : region->getPopulations()) {
+                    if (!pop) {
+                        NLM_LOG_WARNING("Brain::step - null population encountered");
+                        continue;
+                    }
                     for (auto* neuron : pop->getNeurons()) {
+                        if (!neuron) {
+                            NLM_LOG_WARNING("Brain::step - null neuron encountered");
+                            continue;
+                        }
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -533,7 +645,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % 100 == 0 && pImpl->structuralPlasticity && pImpl->rng) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
@@ -542,37 +654,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+            if (episode) {
+                pImpl->episodicMemory->replayEpisode(episode);
+            }
         }
     }
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem && pImpl->rng) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
@@ -600,6 +716,12 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
+        // Check if neuron is valid before accessing
+        if (!pImpl->sensoryNeurons[i]) {
+            NLM_LOG_WARNING("Brain::receiveSensoryInput - null sensory neuron at index " + std::to_string(i));
+            continue;
+        }
+        
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
@@ -641,22 +763,42 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
 }
 
 SpikeSystem* Brain::getSpikeSystem() {
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_WARNING("Brain::getSpikeSystem - spikeSystem not initialized or null");
+        return nullptr;
+    }
     return pImpl->spikeSystem.get();
 }
 
 const SpikeSystem* Brain::getSpikeSystem() const {
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_WARNING("Brain::getSpikeSystem (const) - spikeSystem not initialized or null");
+        return nullptr;
+    }
     return pImpl->spikeSystem.get();
 }
 
 STDP* Brain::getSTDP() {
+    if (!pImpl || !pImpl->stdp) {
+        NLM_LOG_WARNING("Brain::getSTDP - stdp not initialized or null");
+        return nullptr;
+    }
     return pImpl->stdp.get();
 }
 
 Hebbian* Brain::getHebbian() {
+    if (!pImpl || !pImpl->hebbian) {
+        NLM_LOG_WARNING("Brain::getHebbian - hebbian not initialized or null");
+        return nullptr;
+    }
     return pImpl->hebbian.get();
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    if (!pImpl || !pImpl->structuralPlasticity) {
+        NLM_LOG_WARNING("Brain::getStructuralPlasticity - structuralPlasticity not initialized or null");
+        return nullptr;
+    }
     return pImpl->structuralPlasticity.get();
 }
 
@@ -732,6 +874,14 @@ void Brain::updatePlasticity() {
 
 void Brain::develop() {
     // Development updates structural plasticity
+    if (!pImpl->structuralPlasticity) {
+        NLM_LOG_WARNING("Brain::develop - structuralPlasticity not initialized, skipping development");
+        return;
+    }
+    if (!pImpl->rng) {
+        NLM_LOG_WARNING("Brain::develop - rng not initialized, skipping development");
+        return;
+    }
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
 }
 
@@ -749,7 +899,11 @@ void Brain::reset() {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    } else {
+        NLM_LOG_WARNING("Brain::reset - spikeSystem is null, cannot reset");
+    }
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -1005,41 +1159,83 @@ float Brain::getAverageFiringRate() const {
 
 // ========== MEMORY SYSTEM ACCESSORS ==========
 
+// Phase 7: ERROR HANDLING - Memory system accessors with null checks
+// These methods provide safe access to memory systems, returning nullptr if not initialized
+// This prevents null pointer dereference in calling code
+
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl || !pImpl->workingMemory) {
+        NLM_LOG_WARNING("Brain::getWorkingMemory - workingMemory not initialized or null");
+        return nullptr;
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl || !pImpl->episodicMemory) {
+        NLM_LOG_WARNING("Brain::getEpisodicMemory - episodicMemory not initialized or null");
+        return nullptr;
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl || !pImpl->associativeMemory) {
+        NLM_LOG_WARNING("Brain::getAssociativeMemory - associativeMemory not initialized or null");
+        return nullptr;
+    }
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
+// Phase 7: ERROR HANDLING - Prediction system accessor with null checks
+// Returns nullptr if prediction system is not initialized
+
 PredictionSystem* Brain::getPredictionSystem() {
+    if (!pImpl || !pImpl->predictionSystem) {
+        NLM_LOG_WARNING("Brain::getPredictionSystem - predictionSystem not initialized or null");
+        return nullptr;
+    }
     return pImpl->predictionSystem.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
+// Phase 7: ERROR HANDLING - Cognition system accessors with null checks
+// These methods provide safe access to cognition systems, returning nullptr if not initialized
+
 NeuralPlanner* Brain::getPlanner() {
+    if (!pImpl || !pImpl->planner) {
+        NLM_LOG_WARNING("Brain::getPlanner - planner not initialized or null");
+        return nullptr;
+    }
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    if (!pImpl || !pImpl->conceptFormation) {
+        NLM_LOG_WARNING("Brain::getConceptFormation - conceptFormation not initialized or null");
+        return nullptr;
+    }
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    if (!pImpl || !pImpl->attention) {
+        NLM_LOG_WARNING("Brain::getAttention - attention not initialized or null");
+        return nullptr;
+    }
     return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    if (!pImpl || !pImpl->developmentSystem) {
+        NLM_LOG_WARNING("Brain::getDevelopmentSystem - developmentSystem not initialized or null");
+        return nullptr;
+    }
     return pImpl->developmentSystem.get();
 }
 
@@ -1053,27 +1249,54 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
+// Phase 7: ERROR HANDLING - Neuromodulation system accessors with null checks
+// These methods provide safe access to neuromodulation systems, returning nullptr if not initialized
+
 Dopamine* Brain::getDopamine() {
+    if (!pImpl || !pImpl->dopamine) {
+        NLM_LOG_WARNING("Brain::getDopamine - dopamine not initialized or null");
+        return nullptr;
+    }
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    if (!pImpl || !pImpl->curiosity) {
+        NLM_LOG_WARNING("Brain::getCuriosity - curiosity not initialized or null");
+        return nullptr;
+    }
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    if (!pImpl || !pImpl->novelty) {
+        NLM_LOG_WARNING("Brain::getNovelty - novelty not initialized or null");
+        return nullptr;
+    }
     return pImpl->novelty.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
+    if (!pImpl || !pImpl->predictionError) {
+        NLM_LOG_WARNING("Brain::getPredictionErrorSignal - predictionError not initialized or null");
+        return nullptr;
+    }
     return pImpl->predictionError.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
+    if (!pImpl) {
+        NLM_LOG_WARNING("Brain::getConfig - pImpl is null");
+        return nullptr;
+    }
     return pImpl->config;
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
+    if (!pImpl || !pImpl->rng) {
+        NLM_LOG_WARNING("Brain::getRandomGenerator - rng not initialized or null");
+        return nullptr;
+    }
     return pImpl->rng.get();
 }
 
