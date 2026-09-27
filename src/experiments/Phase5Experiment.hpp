@@ -173,7 +173,23 @@ struct LifetimeExperimentResult {
     time_t endTime;
     double totalWallClockTime;
     
-    LifetimeExperimentResult();
+    LifetimeExperimentResult()
+        : config()
+        , phaseResults()
+        , totalReward(0.0f)
+        , avgRewardPerStep(0.0f)
+        , overallLearningEfficiency(0.0f)
+        , finalPerformance(0.0f)
+        , memoryCapacity(0.0f)
+        , predictionAccuracy(0.0f)
+        , generalizationAbility(0.0f)
+        , scaleVsPerformance()
+        , capabilityScores()
+        , failures()
+        , warnings()
+        , startTime(0)
+        , endTime(0)
+        , totalWallClockTime(0.0) {}
     
     std::string toJSON() const;
     std::string summary() const;
@@ -187,6 +203,12 @@ struct ContinualTask {
     std::string description;
     std::function<float(class Brain*)> evaluateFunction;
     uint64_t stepsBetweenTasks;
+    
+    ContinualTask()
+        : name()
+        , description()
+        , evaluateFunction(nullptr)
+        , stepsBetweenTasks(0) {}
 };
 
 /**

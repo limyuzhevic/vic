@@ -13,7 +13,6 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -32,9 +31,9 @@ void printResult(const std::string& name, float value, float max = 1.0f) {
     std::cout << "\n";
 }
 
-void printSection(const std::string& title) {
-    std::cout << "\n--- " << title << " ---\n";
-}
+std::cout << std::string(60, '=') << std::endl;
+    std::cout << "  " << title << std::endl;
+    std::cout << std::string(60, '=') << std::endl;
 
 int main(int argc, char* argv[]) {
     std::cout << "NLM Phase 4: Emerging Cognition\n";
@@ -43,7 +42,19 @@ int main(int argc, char* argv[]) {
     // Parse command line arguments
     size_t numTrials = 50;
     if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+        try {
+            numTrials = std::stoi(argv[1]);
+            if (numTrials == 0) {
+                std::cerr << "Error: Number of trials cannot be zero.\n";
+                return 1;
+            }
+            if (numTrials > 10000) {
+                std::cout << "Warning: High number of trials may take a long time.\n";
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid number of trials: " << argv[1] << "\n";
+            return 1;
+        }
     }
     
     // Create configuration

@@ -242,16 +242,24 @@ private:
 
 } // namespace nlm
 
-// Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
+    // Parse command line arguments
     if (argc > 1) {
         numEpisodes = std::atoi(argv[1]);
+        if (numEpisodes < 0) {
+            std::cerr << "Error: Number of episodes must be non-negative.\n";
+            return 1;
+        }
     }
     if (argc > 2) {
         stepsPerEpisode = std::atoi(argv[2]);
+        if (stepsPerEpisode < 0) {
+            std::cerr << "Error: Steps per episode must be non-negative.\n";
+            return 1;
+        }
     }
     
     nlm::Phase3Demo demo;
