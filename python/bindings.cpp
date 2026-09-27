@@ -420,6 +420,184 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Module metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__license__") = "MIT";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
+
+    // Custom exception classes
+    py::register_exception<std::runtime_error>(m, "NLMError", PyExc_RuntimeError);
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError", PyExc_ValueError);
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    py::register_exception<std::logic_error>(m, "LogicError", PyExc_RuntimeError);
+
+    // Module-level utility functions
+    m.def("get_version", []() {
+        return std::make_tuple("0.1.0", "NLM Authors", "MIT", "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework");
+    }, "Get module version and metadata");
+
+    m.def("list_available_configs", []() {
+        auto config = std::make_shared<Config>();
+        auto defaultConfig = std::make_shared<Config>();
+        // Add some default configuration keys
+        defaultConfig->set("brain.neuron_count", 1000LL);
+        defaultConfig->set("brain.synapse_density", 0.1f);
+        defaultConfig->set("brain.connection_probability", 0.05f);
+        defaultConfig->set("brain.v_thresh", -50.0);
+        defaultConfig->set("brain.v_rest", -70.0);
+        return defaultConfig->getKeys();
+    }, "List available configuration keys");
+
+    m.def("create_config_from_dict", [](const py::dict& py_dict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : py_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value = item.second;
+            
+            if (value.is_none()) {
+                // Skip null values
+                continue;
+            } else if (py::isinstance<py::bool_>(value)) {
+                config->set(key, py::cast<bool>(value));
+            } else if (py::isinstance<py::int_>(value)) {
+                config->set(key, py::cast<long>(value));
+            } else if (py::isinstance<py::float_>(value)) {
+                config->set(key, py::cast<double>(value));
+            } else if (py::isinstance<py::str>(value)) {
+                config->set(key, py::cast<std::string>(value));
+            } else if (py::isinstance<py::list>(value)) {
+                py::list py_list = py::cast<py::list>(value);
+                std::vector<double> vec;
+                for (auto item : py_list) {
+                    vec.push_back(py::cast<double>(item));
+                }
+                config->set(key, vec);
+            } else {
+                throw std::invalid_argument("Unsupported configuration value type for key: " + key);
+            }
+        }
+        return config;
+    }, py::arg("py_dict"), "Create configuration from Python dictionary");
+
+    m.def("export_config_to_dict", [](const std::shared_ptr<Config>& config) {
+        py::dict result;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            if (config->has(key)) {
+                auto val = config->get<std::string>(key);
+                if (val) {
+                    result[key.c_str()] = val.value();
+                } else {
+                    // Try other types
+                    auto intVal = config->get<long>(key);
+                    if (intVal) {
+                        result[key.c_str()] = intVal.value();
+                    } else {
+                        auto doubleVal = config->get<double>(key);
+                        if (doubleVal) {
+                            result[key.c_str()] = doubleVal.value();
+                        } else {
+                            auto boolVal = config->get<bool>(key);
+                            if (boolVal) {
+                                result[key.c_str()] = boolVal.value();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }, py::arg("config"), "Export configuration to Python dictionary");
+
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        auto keys = config->getKeys();
+        std::vector<std::string> errors;
+        
+        // Basic validation for common keys
+        if (config->has("brain.neuron_count")) {
+            auto neurons = config->getOr<long>("brain.neuron_count", 1000);
+            if (neurons < 1) {
+                errors.push_back("brain.neuron_count must be >= 1");
+            }
+        }
+        
+        if (config->has("brain.synapse_density")) {
+            auto density = config->getOr<double>("brain.synapse_density", 0.1);
+            if (density < 0.0 || density > 1.0) {
+                errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (config->has("brain.connection_probability")) {
+            auto prob = config->getOr<double>("brain.connection_probability", 0.05);
+            if (prob < 0.0 || prob > 1.0) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (!errors.empty()) {
+            std::string errorMsg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                errorMsg += "  - " + error + "\n";
+            }
+            throw std::invalid_argument(errorMsg);
+        }
+        
+        return true;
+    }, py::arg("config"), "Validate configuration and return true if valid");
+
+    m.def("create_default_config_with_preset", [](const std::string& presetName) {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "small") {
+            config->set("brain.neuron_count", 1000LL);
+            config->set("brain.synapse_density", 0.05f);
+            config->set("brain.connection_probability", 0.02f);
+        } else if (presetName == "medium") {
+            config->set("brain.neuron_count", 5000LL);
+            config->set("brain.synapse_density", 0.1f);
+            config->set("brain.connection_probability", 0.05f);
+        } else if (presetName == "large") {
+            config->set("brain.neuron_count", 10000LL);
+            config->set("brain.synapse_density", 0.15f);
+            config->set("brain.connection_probability", 0.1f);
+        } else if (presetName == "debug") {
+            config->set("brain.neuron_count", 100LL);
+            config->set("brain.synapse_density", 0.5f);
+            config->set("brain.connection_probability", 0.3f);
+        } else {
+            throw std::invalid_argument("Unknown preset: " + presetName + ". Available presets: small, medium, large, debug");
+        }
+        
+        return config;
+    }, py::arg("presetName"), "Create configuration with preset values");
+
+    m.def("estimate_simulation_time", [](const std::shared_ptr<Config>& config, double durationSeconds = 1.0) {
+        auto neurons = config->getOr<long>("brain.neuron_count", 1000);
+        auto density = config->getOr<double>("brain.synapse_density", 0.1);
+        
+        // Rough estimate: O(N^2) connectivity for small networks, O(N log N) for larger ones
+        size_t synapses;
+        if (neurons < 1000) {
+            synapses = static_cast<size_t>(neurons * neurons * density * 0.5);
+        } else {
+            synapses = static_cast<size_t>(neurons * log(neurons) * density);
+        }
+        
+        // Estimate time based on synaptic operations
+        double operations = static_cast<double>(neurons + synapses * 10); // Rough estimate
+        double estimatedSeconds = operations / 1e6; // Assume 1M operations per second
+        
+        return std::make_tuple(
+            neurons,
+            synapses,
+            estimatedSeconds,
+            estimatedSeconds * durationSeconds
+        );
+    }, py::arg("config"), py::arg("durationSeconds") = 1.0, "Estimate simulation time and resource usage");
 }
 
 } // namespace nlm
