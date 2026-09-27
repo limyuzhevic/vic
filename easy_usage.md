@@ -284,14 +284,46 @@ print("Agent simulation complete!")
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+---
+
+## New Enhanced Features
+
+### Version Information
+**NLM Python Bindings Version:** `0.1.0`
+
+This guide has been enhanced with new features:
+
+- **Improved Python bindings** with better error handling and validation
+- **Comprehensive examples directory** with advanced usage patterns
+- **Helper functions** for specialized agent behaviors
+- **Session management** for saving and loading agent states
+- **Performance profiling** tools for optimization
+
+### Additional Resources
+
+For more advanced usage, check out:
+
+- `examples/advanced_examples.py` - Advanced simulation techniques
+- `examples/agent_behavior_examples.py` - Specialized agent behaviors
+- `examples/profiling_examples.py` - Performance profiling
+- `examples/session_management.py` - Save/load functionality
+- `helpers/advanced_helpers.py` - Helper functions and utilities
 
 ---
 
-## Next Steps
+## New Troubleshooting Solutions
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### Performance Issues
+- **Enable profiling** to identify bottlenecks: `python examples/profiling_examples.py`
+- **Use specialized agent configurations** for better performance: `create_explorer_agent()`, `create_survival_agent()`
+- **Implement session management** to save progress during long simulations
 
-That's it! You're now ready to use NLM.
+### Session Management Issues
+- **Check session paths** and ensure directories exist
+- **Verify brain state serialization** is supported
+- **Include custom metadata** for easier session identification
+
+### Advanced Usage Issues
+- **Use helper functions** for complex configurations: `create_agent_with_behavior()`
+- **Validate parameters** with validation functions: `validate_brain_config()`, `validate_world_dimensions()`
+- **Import all examples** with comprehensive imports from `examples/` and `helpers/`

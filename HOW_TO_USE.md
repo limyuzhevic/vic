@@ -526,7 +526,310 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+## Part 8: Enhanced Python Features and Examples
+
+The NLM Python bindings have been significantly enhanced with new features and comprehensive examples:
+
+### New Python Module Features
+
+#### 1. Module Version
+```python
+import pynlm
+
+# Get the NLM module version
+print(f"NLM Version: {pynlm.__version__}")  # "0.1.0"
+```
+
+#### 2. Enhanced Error Handling
+```python
+import pynlm
+
+# Use enhanced error handling
+try:
+    config = pynlm.createDefaultConfig()
+    # Configuration operations that may raise exceptions
+except pynlm.RuntimeError as e:
+    print(f"Runtime error: {e}")
+except pynlm.InvalidArgument as e:
+    print(f"Invalid argument: {e}")
+```
+
+#### 3. Input Validation
+```python
+import pynlm
+
+# Validate configuration parameters
+pynlm.validate_brain_config(config)
+
+# Validate world dimensions
+pynlm.validate_world_dimensions(20, 20, 8, 8)
+```
+
+#### 4. Comprehensive Examples Directory
+
+The enhanced NLM includes a comprehensive examples directory:
+
+```
+examples/
+├── basic_examples.py           # Fundamental usage patterns
+├── advanced_examples.py        # Advanced simulation techniques  
+├── agent_behavior_examples.py   # Specialized agent behaviors
+├── profiling_examples.py       # Performance profiling tools
+├── session_management.py       # Save/load functionality
+└── README.md                   # Examples documentation
+```
+
+#### 5. Helper Functions and Utilities
+
+Import from `helpers/advanced_helpers.py`:
+
+```python
+from helpers.advanced_helpers import (
+    # Agent creation and configuration
+    create_agent_with_behavior,
+    create_explorer_agent,
+    create_survival_agent,
+    create_developer_agent,
+    
+    # Simulation and analysis
+    simulate_episode,
+    run_multiple_episodes,
+    analyze_episode_results,
+    
+    # Session management
+    save_agent_session,
+    load_agent_session,
+    
+    # Performance tools
+    NLMProfiler,
+    create_profiling_wrapper,
+    
+    # Enums and constants
+    NLMTaskTypes,
+    NLMActionTypes
+)
+```
+
+### Example Usage Patterns
+
+#### Advanced Configuration
+```python
+import pynlm
+from helpers.advanced_helpers import create_agent_with_behavior, NLMTaskTypes
+
+# Create agent with advanced configuration
+brain, world, agent = create_agent_with_behavior(
+    world_width=30,
+    world_height=30,
+    task_type=NLMTaskTypes.EXPLORATION,
+    enable_subsystems={
+        "reward_modulation": True,
+        "structural_plasticity": True,
+        "development": True,
+        "curiosity": True
+    }
+)
+```
+
+#### Development Experiment
+```python
+import pynlm
+from helpers.advanced_helpers import create_explorer_agent, simulate_episode
+
+# Create development agent
+brain, world, agent = create_explorer_agent()
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Run development experiment
+episode_results = []
+for episode in range(5):
+    result = simulate_episode(brain, world, agent, max_steps=500, verbose=True)
+    episode_results.append(result)
+```
+
+#### Performance Profiling
+```python
+import pynlm
+from helpers.advanced_helpers import NLMProfiler
+
+# Create profiler
+profiler = NLMProfiler("My Simulation")
+
+# Run simulation with profiling
+for step in range(100):
+    world, time_update = profiler.time_operation("world_update", world.update, 0.1)
+    brain, time_brain = profiler.time_operation("brain_step", brain.step, step)
+    action, time_action = profiler.time_operation("action_decode", agent.decodeMotorCommand)
+    world, time_apply = profiler.time_operation("action_apply", world.applyMotorCommand, action, world.getSimulationTime())
+
+# Get performance report
+report = profiler.get_summary()
+print(f"Total time: {report['total_time']:.2f}s")
+print(f"Average operation time: {report['average_operation_time']:.4f}s")
+```
+
+#### Session Management
+```python
+import pynlm
+from helpers.advanced_helpers import save_agent_session
+
+# Create and run agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=6, visionHeight=6)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Save agent session
+session = save_agent_session(
+    brain, world, agent,
+    session_name="my_exploration",
+    custom_metadata={
+        "task": "exploration",
+        "duration": 500,
+        "neurons": 1000
+    }
+)
+```
+
+#### Advanced Examples
+
+Run the comprehensive examples:
+
+```bash
+# Launch basic examples
+python examples/basic_examples.py
+
+# Run advanced examples  
+python examples/advanced_examples.py
+
+# Run profiling examples
+python examples/profiling_examples.py
+
+# Run session management examples
+python examples/session_management.py
+```
+
+Each example directory provides:
+
+- **Documentation and comments** explaining the concepts
+- **Complete runnable examples** with output analysis
+- **Error handling** for robust operation
+- **Performance monitoring** where applicable
+- **Session management** for reproducibility
+
+### Key Enhancements Summary
+
+#### 1. Python Module Improvements
+- ✅ Added module version (`__version__ = "0.1.0"`)
+- ✅ Enhanced error handling with custom exception classes
+- ✅ Input validation functions for configuration and parameters
+- ✅ Template-based ID class bindings to reduce boilerplate
+
+#### 2. Examples and Documentation
+- ✅ Comprehensive examples directory with multiple use cases
+- ✅ Helper functions for common tasks and configurations
+- ✅ Performance profiling tools for optimization
+- ✅ Session management for reproducibility
+- ✅ Updated documentation with enhanced features
+
+#### 3. Advanced Capabilities
+- ✅ Development stage experiments
+- ✅ Memory system analysis
+- ✅ Curiosity-driven behavior
+- ✅ Performance profiling and optimization
+- ✅ Agent behavior specialization
+
+### Quick Start with Enhanced Features
+
+For users who want to leverage the enhanced features:
+
+```python
+# 1. Import enhanced modules
+import pynlm
+from helpers.advanced_helpers import create_explorer_agent, NLMProfiler
+
+# 2. Create advanced agent
+brain, world, agent = create_explorer_agent()
+
+# 3. Run simulation with profiling
+profiler = NLMProfiler("Advanced Simulation")
+
+for step in range(200):
+    world, _ = profiler.time_operation("world_update", world.update, 0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# 4. Get performance report
+report = profiler.get_summary()
+print(f"Simulation completed in {report['total_time']:.2f}s")
+```
+
+### Migration Guide
+
+If you're upgrading from previous versions:
+
+#### Breaking Changes
+- None - all changes are backward compatible
+- Enhanced functionality adds to existing API
+- New features are opt-in via imports
+
+#### New Features Available
+```python
+# Old way (still works)
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# New way with enhanced features
+brain, world, agent = create_explorer_agent()
+```
+
+#### Additional Resources
+- `examples/` - Comprehensive examples directory
+- `helpers/advanced_helpers.py` - Utility functions and helpers
+- `docs/` - Technical documentation and architecture
+- `README.md` - Project overview and setup instructions
+
+## Quick Reference: Enhanced NLM Python API
+
+| Feature | Import | Description |
+|---------|--------|-------------|
+| Module Version | `import pynlm` | `pynlm.__version__` returns "0.1.0" |
+| Error Handling | `import pynlm` | Custom exception classes for better error messages |
+| Validation | `import pynlm` | `validate_brain_config()`, `validate_world_dimensions()` |
+| Agent Creation | `helpers/advanced_helpers` | `create_explorer_agent()`, `create_survival_agent()`, etc. |
+| Simulation | `helpers/advanced_helpers` | `simulate_episode()`, `run_multiple_episodes()` |
+| Profiling | `helpers/advanced_helpers` | `NLMProfiler`, `create_profiling_wrapper()` |
+| Sessions | `helpers/advanced_helpers` | `save_agent_session()`, `load_agent_session()` |
+
+### Recommended Workflow
+
+1. **Start with basic usage** using the existing `easy_usage.md` guide
+2. **Explore examples** in the `examples/` directory
+3. **Use helper functions** for common tasks and configurations
+4. **Enable profiling** for performance optimization
+5. **Implement session management** for reproducibility
+6. **Create custom examples** using the helper functions and utilities
+
+The enhanced NLM Python bindings provide a comprehensive toolkit for neural simulation, from simple getting started examples to advanced research and development scenarios.
+
+### Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
