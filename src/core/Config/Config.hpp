@@ -6,6 +6,12 @@
 #include <variant>
 #include <optional>
 
+// JSON support
+#include <nlohmann/json.hpp>
+
+// YAML support  
+#include <yaml-cpp/yaml.h>
+
 namespace nlm {
 
 // Forward declarations
@@ -43,6 +49,13 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// File format enumeration
+enum class ConfigFormat {
+    Simple,
+    JSON,
+    YAML
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,7 +68,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +113,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static ConfigFormat detectFileFormat(const std::string& filepath);
+    static bool parseJSONFile(const std::string& filepath, Config& config);
+    static bool parseYAMLFile(const std::string& filepath, Config& config);
+    static ConfigValue convertJSONToConfigValue(const nlohmann::json& value);
+    static nlohmann::json convertConfigValueToJSON(const ConfigValue& value);
+    static std::string convertConfigValueToSimpleFormat(const ConfigValue& value);
 };
 
 } // namespace nlm

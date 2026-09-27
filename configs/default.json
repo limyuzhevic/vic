@@ -1,0 +1,74 @@
+{
+    "brain": {
+        "neuron_count": 1000,
+        "region_count": 1,
+        "connection_probability": 0.1,
+        "initial_weight_mean": 0.5,
+        "initial_weight_std": 0.1
+    },
+    "neuron": {
+        "v_thresh": -50.0,
+        "v_rest": -70.0,
+        "v_reset": -75.0,
+        "tau_mem": 20.0,
+        "tau_ref": 2.0
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.001,
+            "tau_plus": 20.0,
+            "tau_minus": 20.0
+        },
+        "hebbian": {
+            "enable": true,
+            "learning_rate": 0.01
+        },
+        "structural": {
+            "enable": true,
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001
+        }
+    },
+    "neuromod": {
+        "dopamine": {
+            "scale": 1.0
+        },
+        "curiosity": {
+            "enable": true,
+            "exploration_rate": 0.1
+        },
+        "novelty": {
+            "enable": true,
+            "threshold": 0.5
+        }
+    },
+    "development": {
+        "enable": true,
+        "critical_period_start": 100.0,
+        "critical_period_end": 1000.0,
+        "plasticity_decay_rate": 0.01
+    },
+    "memory": {
+        "working": {
+            "capacity": 100,
+            "decay_rate": 0.01
+        },
+        "episodic": {
+            "capacity": 1000,
+            "replay_frequency": 0.1
+        },
+        "associative": {
+            "strength": 0.5,
+            "decay_rate": 0.001
+        }
+    },
+    "world": {
+        "width": 20,
+        "height": 20,
+        "vision_width": 8,
+        "vision_height": 8,
+        "max_energy": 100.0,
+        "energy_decay_rate": 0.01
+    }
+}
