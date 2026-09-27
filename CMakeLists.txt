@@ -20,12 +20,13 @@ endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(NLM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
+    include/nlm/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp

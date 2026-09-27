@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -22,6 +23,33 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// JSON/YAML parsing utilities
+namespace config_parser {
+
+// Parse JSON string to ConfigValue
+std::optional<ConfigValue> parseJsonValue(const std::string& jsonStr);
+
+// Parse YAML string to ConfigValue  
+std::optional<ConfigValue> parseYamlValue(const std::string& yamlStr);
+
+// Convert ConfigValue to JSON string
+std::string configValueToJson(const ConfigValue& value);
+
+// Convert ConfigValue to YAML string
+std::string configValueToYaml(const ConfigValue& value);
+
+// Detect format from file extension
+enum class ConfigFormat {
+    Unknown,
+    KeyValue,
+    Json,
+    Yaml
+};
+
+ConfigFormat detectFormat(const std::string& filepath);
+
+}} // namespace config_parser
 
 // Configuration source
 enum class ConfigSource {
