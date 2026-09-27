@@ -65,10 +65,18 @@ struct LearningExperiment {
         initialWeights.clear();
         
         // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) {
+            NLM_LOG_ERROR("Expected region not found for initial state recording");
+            return;
+        }
+        
+        for (const auto& syn : region->getSynapses()) {
+            if (!syn) {
+                NLM_LOG_WARNING("Null synapse encountered during weight recording");
+                continue;
             }
+            initialWeights.push_back(syn->getWeight());
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -84,13 +92,26 @@ struct LearningExperiment {
         finalWeights.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
-            }
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) {
+            NLM_LOG_ERROR("Expected region not found for final state recording");
+            return;
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        for (const auto& syn : region->getSynapses()) {
+            if (!syn) {
+                NLM_LOG_WARNING("Null synapse encountered during weight recording");
+                continue;
+            }
+            finalWeights.push_back(syn->getWeight());
+        }
+        
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (spikeSystem) {
+            mostActiveNeurons = spikeSystem->getMostActiveNeurons(10);
+        } else {
+            NLM_LOG_ERROR("Spike system not available for most active neurons");
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -107,7 +128,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded");
             return;
         }
         
@@ -163,9 +184,16 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
+    // Get initial spike count
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    
+    // Inject strong current into first 10 neurons
+    NLM_LOG_INFO("  Injecting current into 10 neurons...");
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_WARNING("Region not found for basic connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -173,12 +201,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         return;
     }
     
-    // Get initial spike count
-    size_t initialSpikes = brain->getTotalSpikeCount();
-    
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+        if (!neurons[i]) {
+            NLM_LOG_WARNING("Null neuron encountered during current injection");
+            continue;
+        }
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
