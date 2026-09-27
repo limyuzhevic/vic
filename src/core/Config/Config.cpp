@@ -19,40 +19,114 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try JSON parser first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+    // Read entire file
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Remove whitespace and comments
+    std::string cleanContent;
+    for (size_t i = 0; i < content.size(); ++i) {
+        if (content[i] == '/' && i + 1 < content.size() && content[i + 1] == '/') {
+            // Skip line comment
+            while (i < content.size() && content[i] != '\n') ++i;
+            if (i < content.size()) cleanContent += '\n';
+        } else if (content[i] != '\n' && content[i] != '\r') {
+            cleanContent += content[i];
         }
     }
     
-    return true;
+    // Parse both simple key=value and JSON-like format
+    bool inString = false;
+    std::string currentKey;
+    std::string currentValue;
+    bool parsingKey = true;
+    bool isJSONFormat = false;
+    
+    // Check if this looks like JSON (has braces or string quotes)
+    for (char c : cleanContent) {
+        if (c == '{' || c == '}' || (c == '"' && currentKey.empty())) {
+            isJSONFormat = true;
+            break;
+        }
+    }
+    
+    if (isJSONFormat) {
+        // JSON format: "key": "value", ... or key: value
+        for (size_t i = 0; i < cleanContent.size(); ++i) {
+            char c = cleanContent[i];
+            
+            if (c == '"' && (i == 0 || cleanContent[i-1] != '\\')) {
+                // Toggle string mode
+                inString = !inString;
+                continue;
+            }
+            
+            if (inString) {
+                if (parsingKey) {
+                    currentKey += c;
+                } else {
+                    currentValue += c;
+                }
+            } else {
+                if (c == ':') {
+                    parsingKey = false;
+                    currentKey = trim(currentKey);
+                } else if (c == ',') {
+                    // End of entry
+                    if (!currentKey.empty()) {
+                        set(currentKey, currentValue, ConfigSource::File);
+                    }
+                    currentKey.clear();
+                    currentValue.clear();
+                    parsingKey = true;
+                } else if (c != ' ' && c != '\t' && c != '\n' && c != '{' && c != '}') {
+                    if (parsingKey) {
+                        currentKey += c;
+                    } else {
+                        currentValue += c;
+                    }
+                }
+            }
+        }
+    } else {
+        // Simple key=value format (legacy)
+        std::istringstream stream(cleanContent);
+        std::string line;
+        while (std::getline(stream, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+    }
+    
+    // Handle last entry
+    if (!currentKey.empty()) {
+        set(currentKey, currentValue, ConfigSource::File);
+    }
+    
+    return !pImpl->entries.empty();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +158,39 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "// NLM Configuration File" << std::endl;
+    file << "// Generated by NLM " << "熙然" << std::endl;
+    file << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << " (from ";
+        switch (entry.source) {
+            case ConfigSource::Default: file << "default";
+                break;
+            case ConfigSource::File: file << "file";
+                break;
+            case ConfigSource::CommandLine: file << "command line";
+                break;
+            case ConfigSource::Runtime: file << "runtime";
+                break;
+        }
+        file << ")" << std::endl;
+        
+        file << "\"" << entry.key << "\": ";
+        
+        // Convert variant to string
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << std::endl << std::endl;
     }
     
     return true;
