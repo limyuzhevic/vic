@@ -5,20 +5,8 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../agent/AgentBrain.hpp"
+#include <unordered_map>
 
 namespace nlm {
 
@@ -55,6 +43,27 @@ struct Brain::Impl {
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Cognitive integration state
+    std::shared_ptr<AgentBrain> agentBrain_;  // Reference to AgentBrain for integration
+    
+    // Cognitive processing buffers
+    std::vector<DiscoveredConcept> conceptFormedPatterns;
+    std::vector<std::vector<ActionType>> plannerInputHistory;
+    std::vector<ActionType> currentPlan;
+    
+    // Current cognitive state (for AgentBrain integration)
+    struct CognitiveState {
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> neuronActivations;
+        std::vector<ActionType> recentActions;
+        std::vector<DiscoveredConcept> concepts;
+        std::vector<ActionType> plannedActions;
+        AttentionState attentionState;
+    } cognitiveState;
+    
+    // Attention system state
+    AttentionState attentionState;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -526,10 +535,128 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Get active neuron representations for cognitive processing
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                if (neuron->isFiring() || 
+                    std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                    activeNeurons.push_back(neuron->getId());
+                    neuronActivations.push_back(
+                        std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                }
+            }
+        }
+    }
+    
+    // Update concept formation with current neural patterns
+    if (pImpl->conceptFormation && !activeNeurons.empty()) {
+        // Simplified concept formation: store current neural patterns as concepts
+        // In a real implementation, this would cluster similar patterns
+        for (size_t i = 0; i < activeNeurons.size(); ++i) {
+            if (neuronActivations[i] > 0.1f) {
+                DiscoveredConcept concept;
+                concept.id = conceptFormedPatterns.size();
+                concept.categoryHint = "neural_pattern";
+                concept.totalObservations = 1;
+                concept.avgStability = neuronActivations[i];
+                conceptFormedPatterns.push_back(concept);
+            }
+        }
+    }
+    
+    // Update neural planner with current state and goals
+    if (pImpl->planner && !activeNeurons.empty()) {
+        // Generate action plan based on current neural activity
+        // This is a simplified version - real implementation would be more sophisticated
+        currentPlan.clear();
+        
+        // Simple action selection based on neural activation
+        float maxActivation = 0.0f;
+        size_t bestNeuronIdx = 0;
+        
+        for (size_t i = 0; i < neuronActivations.size(); ++i) {
+            if (neuronActivations[i] > maxActivation) {
+                maxActivation = neuronActivations[i];
+                bestNeuronIdx = i;
+            }
+        }
+        
+        // Convert neuron index to action type
+        if (bestNeuronIdx < pImpl->motorNeurons.size()) {
+            currentPlan.push_back(ActionType::MoveForward);  // Simplified: all neurons map to move forward
+        }
+    }
+    
+    // Update attention system based on neural activity patterns
+    if (pImpl->attention && !activeNeurons.empty()) {
+        // Apply bottom-up salience based on neural activations
+        for (size_t i = 0; i < activeNeurons.size(); ++i) {
+            float salience = neuronActivations[i] * 2.0f;  // Amplify activations
+            pImpl->attention->applyBottomUpSalience(activeNeurons[i], salience);
+        }
+        
+        // Apply top-down bias based on current plan
+        if (!currentPlan.empty()) {
+            // Simple top-down bias: all actions get equal attention
+            for (const auto& action : currentPlan) {
+                // Convert action to top-down bias
+                // This would need actual region mapping in a real implementation
+                float bias = 1.0f / currentPlan.size();
+                pImpl->attention->applyTopDownBias(RegionId(1), bias);
+            }
+        }
+        
+        // Update attention state
+        pImpl->attention->update(pImpl->timestep);
+    }
+    
+    // Integrate cognitive outputs into neural processing
+    // Cognitive signals can modulate neural excitability and plasticity
+    
+    // Apply attentional modulation to neural processing
+    if (pImpl->attention) {
+        float globalInhibition = pImpl->attention->getGlobalInhibitionLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (!pImpl->attention->isAttended(neuron->getId())) {
+                        // Apply attentional inhibition to non-attended neurons
+                        neuron->injectCurrent(-globalInhibition * 0.5f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply planning-based modulation
+    if (!currentPlan.empty() && pImpl->dopamine) {
+        // Use planning to guide dopamine release
+        float planningSignal = currentPlan.size() * 0.1f;
+        pImpl->dopamine->setLevel(std::clamp(planningSignal, 0.0f, 1.0f));
+    }
+    
+    // Apply concept-based modulation
+    if (!conceptFormedPatterns.empty() && pImpl->novelty) {
+        // Novel concepts increase novelty signals
+        float noveltySignal = static_cast<float>(conceptFormedPatterns.size()) * 0.05f;
+        pImpl->novelty->setLevel(std::clamp(noveltySignal, 0.0f, 1.0f));
+    }
+    
+    // Store cognitive state for AgentBrain integration
+    cognitiveState.activeNeurons = activeNeurons;
+    cognitiveState.neuronActivations = neuronActivations;
+    cognitiveState.recentActions = currentPlan;
+    cognitiveState.concepts = conceptFormedPatterns;
+    cognitiveState.plannedActions = currentPlan;
+    
+    // Update AgentBrain with cognitive state if available
+    if (pImpl->agentBrain_) {
+        pImpl->agentBrain_->updateCognitiveState(cognitiveState);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -895,8 +1022,76 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Apply synapse states - we need to find matching synapses or create new ones
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            // Create a mapping from neuron ID to neuron pointer for this region
+            std::unordered_map<NeuronId, Neuron*> neuronMap;
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuronMap[neuron->getId()] = neuron;
+                }
+            }
+            
+            // Process synapses for this region
+            size_t synapsesToProcess = region->getSynapseCount();
+            for (size_t i = 0; i < synapsesToProcess; ++i) {
+                if (synapseIdx >= synapseData.weight.size()) {
+                    break; // No more synapse data
+                }
+                
+                NeuronId sourceId(synapseData.sourceNeuron[synapseIdx]);
+                NeuronId destId(synapseData.destinationNeuron[synapseIdx]);
+                float weight = synapseData.weight[synapseIdx];
+                Delay delay = synapseData.delay[synapseIdx];
+                uint8_t type = synapseData.synapseType[synapseIdx];
+                float eligibilityTrace = synapseData.eligibilityTrace[synapseIdx];
+                
+                // Find source and destination neurons
+                Neuron* sourceNeuron = nullptr;
+                Neuron* destNeuron = nullptr;
+                
+                // Search through all regions for the neurons
+                for (auto& r : pImpl->regions) {
+                    for (auto& pop : r->getPopulations()) {
+                        for (auto* n : pop->getNeurons()) {
+                            if (n->getId() == sourceId) sourceNeuron = n;
+                            if (n->getId() == destId) destNeuron = n;
+                        }
+                    }
+                }
+                
+                if (sourceNeuron && destNeuron) {
+                    // Check if this synapse already exists
+                    bool synapseExists = false;
+                    for (auto* syn : region->getSynapses()) {
+                        if (syn->getSourceNeuron().index() == sourceId.index() &&
+                            syn->getDestinationNeuron().index() == destId.index()) {
+                            // Update existing synapse
+                            syn->setWeight(weight);
+                            syn->setDelay(delay);
+                            syn->setType(static_cast<SynapseType>(type));
+                            syn->setEligibilityTrace(eligibilityTrace);
+                            synapseExists = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!synapseExists) {
+                        // Create new synapse (this is complex as we need to understand synapse creation)
+                        // For now, just log that we can't create new synapses
+                        NLM_LOG_WARN("Cannot create new synapses during load - existing synapses will be preserved");
+                    }
+                } else {
+                    NLM_LOG_WARN("Could not find neurons for synapse " + 
+                               std::to_string(sourceId.index()) + " -> " + 
+                               std::to_string(destId.index()));
+                }
+                
+                synapseIdx++;
+            }
+        }
+        
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");

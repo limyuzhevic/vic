@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class AgentBrain;  // For cognitive integration
+class AgentBrain;  // For cognitive integration
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -140,13 +142,19 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    NeuralWorkingMemory* getWorkingMemory() {
+        return nullptr;  // These will be implemented in Brain.cpp
+    }
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralEpisodicMemory* getEpisodicMemory() {
+        return nullptr;  // These will be implemented in Brain.cpp
+    }
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    NeuralAssociativeMemory* getAssociativeMemory() {
+        return nullptr;  // These will be implemented in Brain.cpp
+    }
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -184,14 +192,21 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Set AgentBrain reference for integration (mutual integration)
+    void setAgentBrain(std::shared_ptr<AgentBrain> agentBrain) {
+        if (pImpl) {
+            pImpl->agentBrain_ = agentBrain;
+        }
+    }
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // Get current cognitive state (for AgentBrain integration)
+    CognitiveState getCognitiveState() const {
+        CognitiveState state;
+        if (pImpl) {
+            state = pImpl->cognitiveState;
+        }
+        return state;
+    }
     
 private:
     struct Impl;
