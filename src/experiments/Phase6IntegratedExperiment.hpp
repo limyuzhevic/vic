@@ -35,6 +35,9 @@ struct Phase6IntegrationResult {
     bool neuromodulationIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
+    bool plannerIntegrated;
+    bool conceptFormationIntegrated;
+    bool attentionIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
     
@@ -58,6 +61,9 @@ struct Phase6IntegrationResult {
         , neuromodulationIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
+        , plannerIntegrated(false)
+        , conceptFormationIntegrated(false)
+        , attentionIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
         , totalReward(0.0f)
