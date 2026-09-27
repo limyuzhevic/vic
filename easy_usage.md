@@ -6,7 +6,7 @@ NLM is a **brain simulator** for computers. It lets you create virtual brains th
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
@@ -116,17 +116,15 @@ def run_simulation(brain, world, agent, num_steps):
         
         # 2. Get what the agent sees
         percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
         agent.processSensoryInput(percept)
         
-        # 4. Brain thinks
+        # 3. Brain thinks
         brain.step(step)
         
-        # 5. Get action from brain
+        # 4. Get action from brain
         action = agent.decodeMotorCommand()
         
-        # 6. Do action in world
+        # 5. Do action in world
         world.applyMotorCommand(action, world.getSimulationTime())
 
 # Use it like this:
@@ -256,20 +254,82 @@ print("Agent simulation complete!")
 
 ---
 
-## Quick Reference
+## Advanced Features
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+For more advanced features, check out the complete documentation:
 
----
+- **Full API Reference**: [NLM_PYTHON_API.md](NLM_PYTHON_API.md) - Complete API documentation with examples
+- **Advanced Examples**: [NLM_ADVANCED_EXAMPLES.md](NLM_ADVANCED_EXAMPLES.md) - Complex use cases and patterns
+- **Configuration Presets**: [NLM_CONFIGURATION_PRESETS.md](NLM_CONFIGURATION_PRESETS.md) - Pre-configured settings for different use cases
+
+### Quick Advanced Examples
+
+#### Create a brain with learning enabled
+```python
+import pynlm
+
+# Create brain with preset configuration
+config = pynlm.create_preset_config("standard")
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable advanced features
+brain.enableWorkingMemory(True)
+brain.enableCuriosity(True)
+brain.enableDevelopment(True)
+```
+
+#### Run a simulation with monitoring
+```python
+import pynlm
+
+# Create brain with monitoring
+config = pynlm.create_preset_config("advanced")
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create world and agent
+world = pynlm.create_world_with_obstacles(30, 30, 10)
+agent = pynlm.create_agent_with_monitoring(brain, world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run simulation with error handling
+for episode in range(10):
+    world.reset()
+    
+    # Safe simulation step
+    step_result = pynlm.safe_simulation_step(brain, agent, world, episode)
+    if not step_result["success"]:
+        print(f"Simulation error: {step_result['errors']}")
+    
+    # Monitor progress
+    stats = pynlm.get_detailed_stats(brain, agent, world)
+    print(f"Episode {episode}: {stats['brain']['average_firing_rate']:.2f} Hz")
+```
+
+#### Create custom configuration
+```python
+import pynlm
+
+# Create custom configuration for reinforcement learning
+def create_rl_config(learning_style="td_error"):
+    config = pynlm.create_preset_config("standard")
+    
+    if learning_style == "td_error":
+        config.set("enable_reward_modulation", True)
+        config.set("enable_curiosity", True)
+        config.set("discount_factor", 0.95)
+    
+    return config
+
+# Use custom configuration
+config = create_rl_config("td_error")
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
 
 ## Troubleshooting
 
@@ -285,13 +345,32 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Errors in simulation"**
+- Use safe simulation: `result = pynlm.safe_simulation_step(brain, agent, world, step)`
+- Check for configuration errors: `validation = pynlm.validate_configuration(config)`
+
+**"Performance issues"**
+- Use smaller simulations first: `config = pynlm.create_preset_config("minimal")`
+- Enable checkpointing for long simulations
+- Use batch processing for multiple simulations
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read** [NLM_PYTHON_API.md](NLM_PYTHON_API.md) for comprehensive API documentation
+2. **Explore** [NLM_ADVANCED_EXAMPLES.md](NLM_ADVANCED_EXAMPLES.md) for advanced use cases
+3. **Customize** [NLM_CONFIGURATION_PRESETS.md](NLM_CONFIGURATION_PRESETS.md) for your specific needs
+4. **Experiment** with different configurations and features!
+
+That's it! You're now ready to use NLM - both at a basic level and with advanced features!
+
+## License
+
+MIT License - See LICENSE file for details.
+
+## Authors
+
+Research project — See docs for scientific background.
