@@ -46,6 +46,7 @@ print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 
 ```python
 import pynlm
+import numpy as np
 
 # Create everything
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
