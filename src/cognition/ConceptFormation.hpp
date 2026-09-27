@@ -74,11 +74,11 @@ struct DiscoveredConcept {
 
 class ConceptFormation {
 public:
-    ConceptFormation();
-    ~ConceptFormation();
-
     // Initialize with brain reference
     void initialize(Brain* brain);
+
+    // Update concept formation with current sensory and neural patterns
+    void update(const std::vector<float>& sensoryPattern, const std::vector<float>& neuralActivity, float reward);
 
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
@@ -107,11 +107,11 @@ public:
     // Measure concept stability (0-1)
     float getConceptStability(size_t conceptId) const;
 
-    // Get number of concepts discovered
-    size_t getConceptCount() const { return concepts_.size(); }
+    // Update concepts based on prediction error
+    void updateWithPredictionError(float predictionError);
 
-    // Merge two concepts (when discovered they are actually the same)
-    void mergeConcepts(size_t conceptA, size_t conceptB);
+    // Get last sensory pattern used
+    const std::vector<float>& getLastSensoryPattern() const { return pImpl->lastSensoryPattern; }
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
@@ -137,6 +137,31 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+
+private:
+    // Create new concept from pattern
+    size_t createConcept(const std::vector<float>& pattern,
+                        const std::vector<float>& features,
+                        float reward);
+
+    // Update concept prototype using Hebbian averaging
+    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
+
+    // Check if concept is stable enough to be considered "discovered"
+    bool isConceptStable(size_t conceptId) const;
+
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+    Brain* brain_;
+    std::vector<DiscoveredConcept> concepts_;
+    size_t nextConceptId_;
+    
+    // Parameters
+    float formationThreshold_;  // Similarity threshold for forming new concept
+    float stabilityThreshold_;   // Stability needed to be considered stable
+    size_t stabilityWindow_;    // How many observations to consider for stability
+};
 
 private:
     // Create new concept from pattern

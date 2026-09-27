@@ -25,6 +25,7 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -153,16 +154,23 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+    // ========== WORKING MEMORY INTEGRATION ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Store information in working memory with predictive integration
+    void storeToWorkingMemory(const std::vector<float>& pattern, float strength = 1.0f);
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // Update working memory with attention selection
+    void updateWorkingMemoryWithAttention(const std::vector<NeuronId>& competitors);
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Apply neuromodulation to memory consolidation
+    void applyNeuromodulationToMemory(float dopamineLevel, float acetylcholineLevel = 0.0f);
+    
+    // Integrate working memory with concept formation
+    void integrateWithConceptFormation(size_t conceptId, const std::vector<float>& pattern);
+    
+    // Get working memory integration statistics
+    float getWorkingMemoryIntegrationScore() const;
+    std::vector<size_t> getConceptIdsInWorkingMemory() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     
@@ -184,11 +192,11 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get current simulation step
+    SimulationStep getCurrentStep() const { return pImpl->currentStep; }
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get current simulation time
+    Timestamp getCurrentTime() const { return pImpl->currentTime; }
     
     // Logging
     void logStatus() const;
