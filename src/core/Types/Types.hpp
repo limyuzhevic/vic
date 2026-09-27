@@ -1,192 +1,367 @@
+// Code Quality Improvements - Header File
 #pragma once
 
 #include <cstdint>
-#include <type_traits>
+#include <string>
+#include <vector>
+#include <map>
+#include <unordered_map>
+#include <memory>
+#include <functional>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <algorithm>
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
+// Type aliases for better code clarity
+typedef int64_t Timestamp;
+typedef double TimeStep;
+typedef float Weight;
+typedef int SimulationStep;
 
-// Neuron identifier
-struct NeuronId {
-    uint64_t value;
-    
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+// Error codes for better error handling
+enum class ErrorCode {
+    Success = 0,
+    InvalidArgument = 1,
+    NotInitialized = 2,
+    MemoryError = 3,
+    ConfigurationError = 4,
+    FileError = 5,
+    NetworkError = 6,
+    Unknown = 99
 };
 
-// Synapse identifier
-struct SynapseId {
-    uint64_t value;
+// Error information structure
+struct ErrorInfo {
+    ErrorCode code;
+    std::string message;
+    std::string context;
+    std::map<std::string, std::string> details;
     
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
+    ErrorInfo(ErrorCode c, const std::string& msg, const std::string& ctx = "")
+        : code(c), message(msg), context(ctx) {}
     
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+    void addDetail(const std::string& key, const std::string& value) {
+        details[key] = value;
+    }
 };
 
-// Region identifier
-struct RegionId {
-    uint64_t value;
+// Exception class for better error handling
+class NLMException : public std::runtime_error {
+public:
+    NLMException(const ErrorInfo& errorInfo)
+        : std::runtime_error(errorInfo.message), errorInfo_(errorInfo) {}
     
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
+    const ErrorInfo& getErrorInfo() const { return errorInfo_; }
     
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+private:
+    ErrorInfo errorInfo_;
 };
 
-// Population identifier
-struct PopulationId {
-    uint64_t value;
+// Debugging and profiling utilities
+class DebugLogger {
+public:
+    enum class Level {
+        DEBUG,
+        INFO,
+        WARNING,
+        ERROR,
+        CRITICAL
+    };
     
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
+    struct LogEntry {
+        Level level;
+        Timestamp timestamp;
+        std::string context;
+        std::string message;
+        std::map<std::string, std::string> metadata;
+    };
     
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
+    static DebugLogger& getInstance() {
+        static DebugLogger instance;
+        return instance;
+    }
     
-    constexpr uint64_t index() const { return value; }
-};
-
-// Simulation step counter
-using SimulationStep = uint64_t;
-
-// Simulation time in seconds (floating point)
-using Timestamp = double;
-
-// Timestep duration in seconds
-using TimestepDuration = double;
-
-// Index types for arrays
-using NeuronIndex = uint64_t;
-using SynapseIndex = uint64_t;
-using PopulationIndex = uint64_t;
-using RegionIndex = uint64_t;
-
-// Synaptic weight type
-using SynapticWeight = float;
-
-// Membrane potential type
-using MembranePotential = float;
-
-// Neuron firing rate type
-using FiringRate = float;
-
-// Connection delay in simulation steps
-using Delay = uint32_t;
-
-// Typed enums for neuron types
-enum class NeuronType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Sensory,
-    Motor,
-    Internal
-};
-
-// Typed enums for synapse types
-enum class SynapseType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Electrical,
-    GapJunction
-};
-
-// Synaptic plasticity state flags
-struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
+    void setLevel(Level level) { currentLevel_ = level; }
+    Level getLevel() const { return currentLevel_; }
     
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
-                                  reward_modulated(false), structural(false), 
-                                  eligible(false) {}
-};
-
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
-};
-
-// Spike event for event-driven computation
-struct SpikeEvent {
-    NeuronId source_neuron;
-    Timestamp timestamp;
-    SimulationStep step;
+    void log(Level level, const std::string& context, const std::string& message);
+    void logError(const ErrorInfo& error);
     
-    SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
-    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
-        : source_neuron(nid), timestamp(ts), step(s) {}
-};
-
-// Delayed spike event for synaptic transmission with delay
-struct DelayedSpikeEvent {
-    NeuronId source_neuron;
-    NeuronId destination_neuron;
-    SynapseId synapse_id;
-    SynapticWeight weight;  // Weight at time of spike (frozen)
-    SynapseType synapse_type;
-    Timestamp timestamp;      // When spike occurs
-    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
-    SimulationStep step;      // Current simulation step
-    SimulationStep delivery_step;  // Step when spike should be delivered
-    bool is_excitatory;  // Cached for quick lookup
+    void enableProfiling() { profilingEnabled_ = true; }
+    void disableProfiling() { profilingEnabled_ = false; }
+    bool isProfilingEnabled() const { return profilingEnabled_; }
     
-    DelayedSpikeEvent()
-        : source_neuron(), destination_neuron(), synapse_id()
-        , weight(0.0f), synapse_type(SynapseType::Excitatory)
-        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
-        , is_excitatory(true) {}
+    void startTimer(const std::string& operation);
+    void stopTimer(const std::string& operation);
+    double getElapsedTime(const std::string& operation) const;
     
-    DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,
-                      SynapticWeight w, SynapseType type,
-                      Timestamp ts, Timestamp delivery, SimulationStep s, SimulationStep deliveryS)
-        : source_neuron(src), destination_neuron(dst), synapse_id(syn)
-        , weight(w), synapse_type(type)
-        , timestamp(ts), delivery_time(delivery)
-        , step(s), delivery_step(deliveryS)
-        , is_excitatory(type == SynapseType::Excitatory) {}
+    void exportLog(const std::string& filename) const;
+    
+private:
+    DebugLogger() : currentLevel_(Level::INFO), profilingEnabled_(false) {}
+    
+    Level currentLevel_;
+    bool profilingEnabled_;
+    std::vector<LogEntry> logEntries_;
+    std::map<std::string, std::chrono::high_resolution_clock::time_point> timers_;
+    std::map<std::string, double> elapsedTimes_;
 };
 
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
+// Configuration validation and schema
+class ConfigValidator {
+public:
+    struct ValidationRule {
+        std::string key;
+        std::string type; // "integer", "float", "string", "boolean", "array"
+        std::string pattern; // Regex pattern for validation
+        double minValue; // For numeric types
+        double maxValue;
+        bool required;
+        std::vector<std::string> allowedValues;
+        std::string description;
+    };
+    
+    static bool validate(const std::map<std::string, std::string>& config,
+                        const std::vector<ValidationRule>& rules,
+                        std::vector<std::string>& errors);
+    
+    static std::string sanitizeString(const std::string& input);
+    static bool isValidKey(const std::string& key);
+    static bool isValidConfigName(const std::string& name);
 };
 
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
+// Performance monitoring utilities
+class PerformanceMonitor {
+public:
+    struct PerformanceMetrics {
+        std::string operation;
+        Timestamp startTime;
+        Timestamp endTime;
+        double duration; // in milliseconds
+        uint64_t memoryUsage; // in bytes
+        std::map<std::string, std::string> metrics;
+    };
+    
+    static PerformanceMonitor& getInstance() {
+        static PerformanceMonitor instance;
+        return instance;
+    }
+    
+    void recordOperation(const std::string& operation, uint64_t memoryBefore = 0, uint64_t memoryAfter = 0);
+    void addCustomMetric(const std::string& key, const std::string& value);
+    
+    double getAverageTime(const std::string& operation) const;
+    uint64_t getPeakMemoryUsage() const;
+    size_t getOperationCount(const std::string& operation) const;
+    
+    void exportMetrics(const std::string& filename) const;
+    
+    void clear();
+    
+private:
+    PerformanceMonitor() = default;
+    
+    std::vector<PerformanceMetrics> metrics_;
+    std::unordered_map<std::string, std::vector<double>> operationTimes_;
+    std::map<std::string, size_t> operationCounts_;
+};
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Utility functions for better code quality
+namespace utils {
+    // String utilities
+    std::string trim(const std::string& str);
+    std::string toLower(const std::string& str);
+    std::string toUpper(const std::string& str);
+    std::string capitalize(const std::string& str);
+    std::string join(const std::vector<std::string>& strings, const std::string& delimiter);
+    
+    // Numeric utilities
+    template<typename T>
+    T clamp(T value, T min, T max);
+    
+    template<typename T>
+    bool inRange(T value, T min, T max);
+    
+    // Array and container utilities
+    template<typename T>
+    size_t safeIndex(size_t index, size_t maxSize, size_t defaultIndex = 0);
+    
+    // Random number generation with better entropy
+    class RandomGenerator {
+    public:
+        RandomGenerator() : seed_(std::chrono::high_resolution_clock::now().time_since_epoch().count()) {}
+        RandomGenerator(uint64_t seed) : seed_(seed) {}
+        
+        void setSeed(uint64_t seed) { seed_ = seed; }
+        uint64_t getSeed() const { return seed_; }
+        
+        float uniformReal(float min = 0.0f, float max = 1.0f);
+        int uniformInt(int min = 0, int max = 100);
+        double normalDistribution(double mean = 0.0, double stddev = 1.0);
+        
+    private:
+        uint64_t seed_;
+    };
+    
+    // File operations
+    bool fileExists(const std::string& path);
+    bool directoryExists(const std::string& path);
+    std::string getFileExtension(const std::string& filename);
+    std::string getFileNameWithoutExtension(const std::string& filename);
+    
+    // Math utilities for neural computations
+    template<typename T>
+    T sigmoid(T x);
+    
+    template<typename T>
+    T relu(T x);
+    
+    template<typename T>
+    T leakyRelu(T x, T alpha = 0.01f);
+    
+    template<typename T>
+    T deriveSigmoid(T x);
+    
+    template<typename T>
+    T deriveReLU(T x);
+    
+    template<typename T>
+    T gaussian(T x, T mean, T sigma);
+} // namespace utils
+
+// Constants for better code maintainability
+namespace constants {
+    // Default configuration values
+    constexpr int DEFAULT_NEURON_COUNT = 1000;
+    constexpr int DEFAULT_REGION_COUNT = 2;
+    constexpr float DEFAULT_CONNECTION_PROBABILITY = 0.1f;
+    constexpr float DEFAULT_SIMULATION_TIMESTEP = 0.001f;
+    constexpr int DEFAULT_RANDOM_SEED = 42;
+    
+    // Neural network parameters
+    constexpr float DEFAULT_V_TH = -50.0f;  // Threshold potential
+    constexpr float DEFAULT_V_REST = -70.0f; // Resting potential
+    constexpr float DEFAULT_V_RESET = -75.0f; // Reset potential
+    constexpr float DEFAULT_TAU_MEM = 20.0f; // Membrane time constant
+    constexpr float DEFAULT_TAU_REF = 2.0f; // Refractory period
+    
+    // Plasticity parameters
+    constexpr float DEFAULT_STDP_LTP_WEIGHT = 0.02f;
+    constexpr float DEFAULT_STDP_LTD_WEIGHT = 0.015f;
+    constexpr float DEFAULT_STDP_TIME_CONSTANT = 20.0f;
+    constexpr float DEFAULT_HEBBIAN_LEARNING_RATE = 0.01f;
+    constexpr float DEFAULT_STRUCTURED Plasticity_RATE = 0.0001f;
+    
+    // Development parameters
+    constexpr float DEFAULT_DEVELOPMENT_SYNAPTOGENESIS_RATE = 0.001f;
+    constexpr float DEFAULT_DEVELOPMENT_PRUNING_RATE = 0.0001f;
+    
+    // Neuromodulation parameters
+    constexpr float DEFAULT_DOPAMINE_BASELINE = 0.1f;
+    constexpr float DEFAULT_NOVELTY_THRESHOLD = 0.5f;
+    
+    // World parameters
+    constexpr int DEFAULT_WORLD_WIDTH = 20;
+    constexpr int DEFAULT_WORLD_HEIGHT = 20;
+    constexpr float DEFAULT_VISION_WIDTH = 8.0f;
+    constexpr float DEFAULT_VISION_HEIGHT = 8.0f;
+    
+    // Debug and logging
+    constexpr utils::DebugLogger::Level DEFAULT_LOG_LEVEL = utils::DebugLogger::Level::INFO;
+    constexpr bool DEFAULT_VERBOSE_LOGGING = false;
+    constexpr bool DEFAULT_ENABLE_PROFILING = false;
+    constexpr size_t DEFAULT_LOG_BUFFER_SIZE = 1024;
+    
+    // Performance
+    constexpr size_t DEFAULT_PERFORMANCE_SAMPLE_SIZE = 100;
+    constexpr double DEFAULT_PERFORMANCE_THRESHOLD = 100.0; // milliseconds
+    
+    // Memory management
+    constexpr size_t DEFAULT_MEMORY_POOL_SIZE = 1024 * 1024; // 1MB
+    constexpr float MEMORY_POOL_GROWTH_FACTOR = 1.5f;
+    
+    // Safety limits
+    constexpr size_t MAX_NEURON_COUNT = 100000;
+    constexpr size_t MAX_SYNAPSE_COUNT = 1000000;
+    constexpr float MAX_WEIGHT = 100.0f;
+    constexpr float MIN_WEIGHT = -100.0f;
+    constexpr float MAX_SIMULATION_STEPS = 1000000;
+} // namespace constants
+
+// Forward declarations
+class Brain;
+class Config;
+class Environment;
+
+// Abstract base class for pluggable components
+class PluggableComponent {
+public:
+    virtual ~PluggableComponent() = default;
+    virtual std::string getName() const = 0;
+    virtual std::string getVersion() const = 0;
+    virtual bool initialize(const Config& config) = 0;
+    virtual void shutdown() = 0;
+    virtual bool isEnabled() const = 0;
+    virtual void setEnabled(bool enabled) = 0;
+};
+
+// Plugin manager for extensibility
+class PluginManager {
+public:
+    static PluginManager& getInstance() {
+        static PluginManager instance;
+        return instance;
+    }
+    
+    bool loadPlugin(const std::string& path);
+    bool unloadPlugin(const std::string& name);
+    bool isPluginLoaded(const std::string& name) const;
+    
+    std::vector<std::string> getLoadedPlugins() const;
+    std::vector<std::string> getAvailablePlugins() const;
+    
+    template<typename T>
+    std::shared_ptr<T> getPlugin(const std::string& name);
+    
+    bool registerComponent(std::shared_ptr<PluggableComponent> component);
+    std::vector<std::shared_ptr<PluggableComponent>> getComponents() const;
+    
+private:
+    PluginManager() = default;
+    
+    std::map<std::string, std::shared_ptr<PluggableComponent>> components_;
+    std::map<std::string, std::string> pluginPaths_;
+};
+
+// Logging utilities
+#define NLM_LOG_ERROR(msg) DebugLogger::getInstance().log(DebugLogger::Level::ERROR, "NLM", msg)
+#define NLM_LOG_WARNING(msg) DebugLogger::getInstance().log(DebugLogger::Level::WARNING, "NLM", msg)
+#define NLM_LOG_INFO(msg) DebugLogger::getInstance().log(DebugLogger::Level::INFO, "NLM", msg)
+#define NLM_LOG_DEBUG(msg) DebugLogger::getInstance().log(DebugLogger::Level::DEBUG, "NLM", msg)
+
+#define NLM_THROW_ERROR(code, msg, context) \
+    do { \
+        ErrorInfo error(code, msg, context); \
+        throw NLMException(error); \
+    } while(0)
+
+#define NLM_CHECK(condition, code, msg) \
+    do { \
+        if (!(condition)) { \
+            NLM_THROW_ERROR(code, msg, #condition); \
+        } \
+    } while(0)
+
+#define NLM_CHECK_RANGE(value, min, max, code, msg) \
+    do { \
+        if (!(value >= min && value <= max)) { \
+            NLM_THROW_ERROR(code, msg, "Range check failed"); \
+        } \
+    } while(0)
 
 } // namespace nlm
