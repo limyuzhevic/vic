@@ -5,17 +5,18 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with enhanced Pythonic API, error handling, and simulation helpers"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience", "python-bindings"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,6 +26,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Neuroscience",
 ]
 
 dependencies = []
