@@ -87,6 +87,8 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Process all sensory modalities and store in working memory
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
@@ -94,6 +96,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+            
+            // Store in working memory for episodic memory consolidation
+            if (auto* workingMemory = brain_->getWorkingMemory()) {
+                workingMemory->storeToNeuron(sensoryVision_[i]->getId(), current / 10.0f);
+            }
         }
     }
     
@@ -103,6 +110,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+            
+            // Store in working memory for episodic memory
+            if (auto* workingMemory = brain_->getWorkingMemory()) {
+                workingMemory->storeToNeuron(sensoryTouch_[i]->getId(), current / 10.0f);
+            }
         }
     }
     
@@ -146,6 +158,38 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Store visual input in episodic memory for experience encoding
+    if (auto* episodicMemory = brain_->getEpisodicMemory()) {
+        float novelty = calculateVisualNovelty(vision);
+        episodicMemory->storeSensoryInput(vision, novelty);
+    }
+    
+    // Store in episodic memory for experience encoding  
+    static uint64_t perceptionTimestamp = 0;
+    if (auto* episodicMemory = brain_->getEpisodicMemory()) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = perceptionTimestamp++;
+        episode.vision = vision;
+        episode.touch = touch;
+        episode.internal = intern;
+        episode.proprioception = proprio;
+        episode.reward = expectedReward_;
+        episode.novelty = noveltyLevel_;
+        
+        // Store episode
+        episodicMemory->storeEpisode(episode);
+    }
+    
+    // Process concept formation from current sensory patterns
+    if (auto* conceptFormation = brain_->getConceptFormation()) {
+        conceptFormation->processSensoryInput(vision, touch, intern, proprio);
+    }
+    
+    // Update prediction system with current sensory state
+    if (auto* predictionSystem = brain_->getPredictionSystem()) {
+        predictionSystem->updatePrediction(vision, touch, intern, proprio);
     }
 }
 
