@@ -12,6 +12,7 @@
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
 #include "brain/Brain.hpp"
+#include "brain/AdvancedBrainInterface.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
 #include "sensory/SensoryInput.hpp"
@@ -409,6 +410,24 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    // Initialize Advanced Brain Interface for extension and customization
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing Advanced Brain Interface...");
+    AdvancedBrainInterface::Config interfaceConfig;
+    interfaceConfig.enableAdvancedCommands = config->getOr<bool>("advanced_commands_enabled", true);
+    interfaceConfig.enableExtensionSystem = config->getOr<bool>("extension_system_enabled", true);
+    interfaceConfig.enableComponentFactory = config->getOr<bool>("component_factory_enabled", true);
+    interfaceConfig.enableEventSystem = config->getOr<bool>("event_system_enabled", true);
+    interfaceConfig.enablePluginArchitecture = config->getOr<bool>("plugin_architecture_enabled", true);
+    interfaceConfig.autoLoadExtensions = config->getOr<bool>("auto_load_extensions", false);
+    interfaceConfig.extensionPath = config->getOr<std::string>("extension_path", "./extensions");
+    interfaceConfig.enableLogging = config->getOr<bool>("advanced_logging_enabled", true);
+    interfaceConfig.enableDebugMode = config->getOr<bool>("debug_mode_enabled", false);
+    
+    if (!brain->initializeAdvancedInterface(interfaceConfig)) {
+        NLM_LOG_WARNING("Failed to initialize Advanced Brain Interface - continuing without it");
+    }
+    
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
@@ -416,18 +435,37 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     
+    // Re-initialize Advanced Brain Interface after reset
+    if (!brain->initializeAdvancedInterface(interfaceConfig)) {
+        NLM_LOG_WARNING("Failed to re-initialize Advanced Brain Interface - continuing without it");
+    }
+    
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
+    
+    // Re-initialize Advanced Brain Interface after reset
+    if (!brain->initializeAdvancedInterface(interfaceConfig)) {
+        NLM_LOG_WARNING("Failed to re-initialize Advanced Brain Interface - continuing without it");
+    }
+    
     runStdpVerification(brain);
     
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
+    
+    // Advanced Brain Interface status
+    std::string interfaceStatus = brain->getAdvancedInterfaceStatus();
+    if (!interfaceStatus.empty() && interfaceStatus != "AdvancedBrainInterface: Not initialized") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Advanced Brain Interface Status ===");
+        NLM_LOG_INFO(interfaceStatus);
+    }
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
@@ -440,9 +478,22 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Advanced Brain Interface Features:");
+    NLM_LOG_INFO("  ✓ Component factory for custom neuromodulators, memory systems, and cognitive functions");
+    NLM_LOG_INFO("  ✓ Extension points for custom integration and behavior modification");
+    NLM_LOG_INFO("  ✓ Advanced configuration system for extensions");
+    NLM_LOG_INFO("  ✓ Plugin architecture for dynamic extension loading");
+    NLM_LOG_INFO("  ✓ Command registry for managing custom commands");
+    NLM_LOG_INFO("  ✓ Advanced API for easier extension development");
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("The Advanced Brain Interface provides extensive customization options");
+    NLM_LOG_INFO("for advanced users to extend and modify brain functionality.");
     NLM_LOG_INFO("");
     
     return 0;

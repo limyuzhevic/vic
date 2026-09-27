@@ -1,5 +1,16 @@
 #pragma once
 
+/**
+ * Brain.hpp - Updated with performance optimizations and memory pools
+ * 
+ * This version includes:
+ * - Memory pool management for neurons, synapses, and working memory
+ * - Performance optimization hooks and monitoring
+ * - Cache management integration
+ * - Batch processing support
+ * - Memory usage tracking
+ */
+
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -8,6 +19,19 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include "AdvancedBrainInterface.hpp"
+
+// Memory pool includes
+#include "../core/memory/MemoryPool.hpp"
+#include "../core/memory/NeuronMemoryPool.hpp"
+#include "../core/memory/SynapseMemoryPool.hpp"
+#include "../core/memory/WorkingMemoryPool.hpp"
+#include "../core/memory/PlasticityPool.hpp"
+
+// Performance optimization includes
+#include "../core/performance/PerformanceOptimizer.hpp"
+#include "../core/performance/CacheManager.hpp"
+#include "../core/performance/BatchProcessor.hpp"
 
 namespace nlm {
 
@@ -25,9 +49,18 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
-class Novelty;
 class PredictionError;
+class Novelty;
+
+// Performance-related forward declarations
+class PerformanceOptimizer;
+class MemoryManager;
+class CacheManager;
+class BatchProcessor;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -42,6 +75,44 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+/**
+ * Performance configuration for brain initialization
+ */
+struct BrainPerformanceConfig {
+    // Memory pool sizes
+    size_t neuronPoolSize;
+    size_t synapsePoolSize;
+    size_t workingMemoryPoolSize;
+    size_t plasticityPoolSize;
+    
+    // Performance optimization settings
+    bool enableMemoryPools;
+    bool enableCacheOptimization;
+    bool enableBatchProcessing;
+    bool enableSIMD;
+    bool enablePrefetching;
+    
+    // Performance monitoring
+    bool enablePerformanceMonitoring;
+    uint32_t performanceStatsInterval;
+    
+    // Cache configuration
+    size_t cacheSize;
+    size_t cacheLineSize;
+    
+    // Batch processing configuration
+    size_t batchSize;
+    bool enableBatching;
+    
+    BrainPerformanceConfig()
+        : neuronPoolSize(1024), synapsePoolSize(4096), workingMemoryPoolSize(512), plasticityPoolSize(2048)
+        , enableMemoryPools(true), enableCacheOptimization(true), enableBatchProcessing(true)
+        , enableSIMD(true), enablePrefetching(true)
+        , enablePerformanceMonitoring(true), performanceStatsInterval(100)
+        , cacheSize(64 * 1024), cacheLineSize(64)
+        , batchSize(100), enableBatching(true) {}
 };
 
 // Brain: The central coordinator of the neural system
@@ -145,8 +216,14 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
-    // Associative memory - pattern associations
+    // Associative memory - connections between representations  
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Note: SemanticMemory, ProceduralMemory, and AssociativeMemory
+    // are defined in Memory.hpp but not yet implemented (TODO PHASE 2)
+    // NeuralSemanticMemory class doesn't exist - should be SemanticMemory
+    // NeuralProceduralMemory class doesn't exist - should be ProceduralMemory
+    // NeuralAssociativeMemory already implemented in NeuralEpisodicMemory.hpp
     
     // ========== PREDICTION SYSTEM ==========
     
@@ -172,8 +249,17 @@ public:
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // Dopamine - reward and reinforcement learning
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -190,8 +276,59 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Performance optimization access
+    PerformanceOptimizer* getPerformanceOptimizer();
+    const PerformanceOptimizer* getPerformanceOptimizer() const;
+    
+    MemoryManager* getMemoryManager();
+    const MemoryManager* getMemoryManager() const;
+    
+    CacheManager* getCacheManager();
+    const CacheManager* getCacheManager() const;
+    
+    BatchProcessor* getBatchProcessor();
+    const BatchProcessor* getBatchProcessor() const;
+    
+    // Advanced Brain Interface
+    AdvancedBrainInterface* getAdvancedInterface() { return &advancedInterface_; }
+    const AdvancedBrainInterface* getAdvancedInterface() const { return &advancedInterface_; }
+    
+    // Advanced functionality
+    bool initializeAdvancedInterface(const AdvancedBrainInterface::Config& config);
+    void shutdownAdvancedInterface();
+    bool executeAdvancedCommand(const std::string& name,
+                               const std::vector<std::string>& args,
+                               const std::unordered_map<std::string, std::any>& parameters = {});
+    bool createComponent(const std::string& type,
+                        const std::unordered_map<std::string, std::string>& params = {});
+    bool registerExtensionPointHandler(const std::string& pointName,
+                                       ExtensionPointHandler handler,
+                                       const std::string& handlerName = "",
+                                       int priority = 0);
+    bool emitEvent(const std::string& eventName,
+                  const std::any& data = {},
+                  const std::string& sourceExtension = "");
+    bool loadExtensionsFromPath(const std::string& path);
+    std::string getAdvancedInterfaceStatus() const;
+    
+    // Performance configuration
+    bool configurePerformance(const BrainPerformanceConfig& config);
+    BrainPerformanceConfig getCurrentPerformanceConfig() const;
+    
+    // Performance monitoring
+    std::string getPerformanceReport() const;
+    bool isPerformanceOptimized() const;
+    
     // Logging
     void logStatus() const;
+    
+    // ========== ATTENTION AND MEMORY ENHANCEMENT ==========
+    
+    // Boost attention-related processes using acetylcholine signals
+    void boostAttentionProcesses(float achLevel);
+    
+    // Enhance working memory capacity based on acetylcholine levels
+    void enhanceWorkingMemoryCapacity(float achLevel);
     
 private:
     struct Impl;

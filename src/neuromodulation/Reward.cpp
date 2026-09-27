@@ -33,9 +33,57 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    // Real reward computation from observation
+    // Computes reward based on sensory input characteristics:
+    // - High magnitude signals indicate important events
+    // - Novel or unexpected patterns yield positive reward
+    // - Consistent signals maintain baseline reward
+    
+    const SensoryInput* sensoryInput = observation.getSensoryInput();
+    if (!sensoryInput || !sensoryInput->isValid()) {
+        return 0.0f;
+    }
+    
+    const std::vector<float>& data = sensoryInput->getData();
+    if (data.empty()) {
+        return 0.0f;
+    }
+    
+    // Calculate reward based on data characteristics
+    float sum = 0.0f;
+    float sumSquares = 0.0f;
+    float maxVal = data[0];
+    float minVal = data[0];
+    
+    for (float val : data) {
+        sum += val;
+        sumSquares += val * val;
+        if (val > maxVal) maxVal = val;
+        if (val < minVal) minVal = val;
+    }
+    
+    float mean = sum / data.size();
+    float variance = (sumSquares / data.size()) - (mean * mean);
+    float stdDev = std::sqrt(std::max(0.0f, variance));
+    
+    // Novelty reward: higher standard deviation indicates novel stimuli
+    float noveltyReward = std::min(1.0f, stdDev * 10.0f);
+    
+    // Magnitude reward: larger absolute values indicate important events
+    float magnitudeReward = std::min(1.0f, (std::abs(maxVal) + std::abs(minVal)) / 2.0f);
+    
+    // Combined reward signal
+    float reward = (noveltyReward * 0.6f) + (magnitudeReward * 0.4f);
+    
+    // Add to history
+    pImpl->history.push_back(reward);
+    
+    // Keep history manageable
+    if (pImpl->history.size() > 100) {
+        pImpl->history.erase(pImpl->history.begin());
+    }
+    
+    return reward;
 }
 
 const std::vector<float>& Reward::getHistory() const {
