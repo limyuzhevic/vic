@@ -28,6 +28,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuralDynamics;
+class NeuralDynamics;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -184,14 +186,11 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get NeuralDynamics implementation
+    NeuralDynamics* getNeuralDynamics();
+    const NeuralDynamics* getNeuralDynamics() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    // NeuralDynamics is configured and managed internally
     
 private:
     struct Impl;

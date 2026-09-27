@@ -13,7 +13,7 @@ class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
-    // Update neuron state for one step
+    // Update neuron state for one step with timestep parameter
     // TODO PHASE 2: Implement real dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     

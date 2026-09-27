@@ -56,6 +56,9 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // ========== NEURAL DYNAMICS ==========
+    std::unique_ptr<NeuralDynamics> neuralDynamicsPtr;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -142,15 +145,22 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
+        // Create and configure neural dynamics system
+        auto neuralDynamics = std::make_unique<IntegrateAndFireDynamics>();
+        
+        // Configure neural dynamics parameters from config
+        float membraneTimeConstant = config->getOr<float>("membrane_time_constant", 20.0f);
+        neuralDynamics->setMembraneTimeConstant(membraneTimeConstant);
+        
+        // Move ownership to pImpl
+        neuralDynamicsPtr = std::move(neuralDynamics);
+        
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -336,7 +346,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                neuron->stepLIF(currentTime, pImpl->timestep);
+                // Use NeuralDynamics if available, otherwise fall back to stepLIF
+                if (auto* dynamics = neuron->getDynamics()) {
+                    // NeuralDynamics.updateNeuron() is called with timestep
+                    // Note: This assumes NeuralDynamics is configured with the correct timestep
+                    dynamics->updateNeuron(neuron, pImpl->timestep);
+                } else {
+                    neuron->stepLIF(currentTime, pImpl->timestep);
+                }
             }
         }
     }
@@ -1067,6 +1084,14 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+NeuralDynamics* Brain::getNeuralDynamics() {
+    return pImpl->neuralDynamicsPtr.get();
+}
+
+const NeuralDynamics* Brain::getNeuralDynamics() const {
+    return pImpl->neuralDynamicsPtr.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {

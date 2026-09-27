@@ -137,6 +137,13 @@ public:
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
+    // Get NeuralDynamics implementation
+    NeuralDynamics* getDynamics();
+    const NeuralDynamics* getDynamics() const;
+    
+    // Set NeuralDynamics implementation
+    void setDynamics(NeuralDynamics* dynamics);
+    
     // Reset to initial state
     void reset();
     

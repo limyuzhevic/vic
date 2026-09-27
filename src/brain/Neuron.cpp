@@ -18,13 +18,16 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
+    // Neural dynamics implementation
+    NeuralDynamics* dynamics;
+    
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), dynamics(nullptr) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -166,12 +169,16 @@ void Neuron::addOutgoingSynapse(SynapseHandle handle) {
     pImpl->outgoingSynapses.push_back(handle);
 }
 
-NeuronState& Neuron::getState() {
-    return pImpl->state;
+NeuralDynamics* Neuron::getDynamics() {
+    return pImpl->dynamics;
 }
 
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
+const NeuralDynamics* Neuron::getDynamics() const {
+    return pImpl->dynamics;
+}
+
+void Neuron::setDynamics(NeuralDynamics* dynamics) {
+    pImpl->dynamics = dynamics;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
@@ -260,9 +267,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    if (pImpl->dynamics) {
+        // Use NeuralDynamics implementation (uses configured timestep)
+        // Note: The actual timestep will be passed by Brain::step()
+        // This is a simplified interface - NeuralDynamics takes dt as parameter
+        pImpl->dynamics->updateNeuron(this, 0.001);  // Default timestep, will be overridden by Brain
+    } else {
+        // Fallback to stepLIF with default timestep (1ms)
+        TimestepDuration dt = 0.001;  // 1ms default
+        stepLIF(currentTime, dt);
+    }
 }
 
 void Neuron::reset() {
