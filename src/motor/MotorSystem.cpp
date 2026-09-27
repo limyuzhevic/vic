@@ -46,9 +46,12 @@ const std::vector<const Action*>& MotorSystem::getActionHistory() const {
     return pImpl->actionHistory;
 }
 
+// Release action history
 void MotorSystem::clearHistory() {
     for (auto* action : pImpl->actionHistory) {
-        delete action;
+        // Action pointers were stored without ownership transfer
+        // Since they are const pointers created elsewhere, we don't delete them
+        // They should be managed by their owners
     }
     pImpl->actionHistory.clear();
 }
