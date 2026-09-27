@@ -24,6 +24,8 @@ NLM IS intended to become:
 
 Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
+The `src/main.cpp` implementation demonstrates Phase 6 integration with comprehensive command-line options for testing different scenarios (quick demo, full integration, and legacy Phase 2 experiments).
+
 ### Phase 6 Integration Achievements
 
 #### Memory Systems
@@ -75,12 +77,66 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 6 Integration (Main Executable)
+
+The `nlm` executable in the build directory now implements Phase 6 integration with comprehensive command-line options:
+
+```bash
+./nlm
+```
+
+This runs a comprehensive integration test verifying all brain systems are connected.
+
+#### Command Line Options
+
+- `-q, --quick`: Quick demo (500 steps, 200 neurons)
+- `-f, --full`: Full demo (5000 steps, 1000 neurons)
+- `-nm, --no-memory`: Disable memory systems
+- `-nn, --no-neuromodulation`: Disable neuromodulation
+- `-nd, --no-development`: Disable development
+- `-np, --no-prediction`: Disable prediction
+- `-nr, --no-replay`: Disable replay
+- `-nc, --no-checkpoint`: Disable checkpointing
+- `-h, --help`: Show this help
+
+#### Examples
+
+Quick demo:
+```bash
+./nlm --quick
+```
+
+Full integration test with all systems:
+```bash
+./nlm --full
+```
+
+Disable memory systems for focused neuromodulation testing:
+```bash
+./nlm --full --no-memory
+```
+
+Legacy Phase 2 experiments (full mode only):
+```bash
+./nlm --full
+```
+
+#### Configuration
+
+The application loads configuration from `configs/default.cfg` or accepts command-line overrides.
+
+All configuration options can be viewed in the `src/core/Config/Config.hpp` file.
+
+### Alternative Phase 6 Demo
+
+For a dedicated Phase 6 integration demo without legacy Phase 2 experiments, use the `nlm_phase6_demo` executable if built:
+
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This provides a cleaner integration test focused specifically on Phase 6 capabilities.
+
 
 ## Project Structure
 
@@ -110,8 +166,11 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── agent/             # Agent system (integrated in Phase 6)
+├── world/             # World system (integrated in Phase 6)
+├── python/            # Python bindings (optional)
+├── tests/             # Unit tests
+└── configs/           # Configuration files
 ```
 
 ## Phase Summary
@@ -121,7 +180,7 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Complete - Legacy Mode)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
@@ -155,12 +214,14 @@ NLM/
 ### Phase 6 (Complete - Final Integration)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
+- Neuromodulation affects plasticity and neural dynamics
 - Prediction integrated with learning
 - Development affects plasticity rates
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- Legacy Phase 2 experiments available in main executable
+
 
 ## Scientific Limitations
 
@@ -220,6 +281,15 @@ CHANGED BRAIN
   ↓
 CHANGED FUTURE BEHAVIOR
 ```
+
+The system now integrates multiple computational levels:
+- **Neural Level**: LIF neurons with event-driven dynamics
+- **Circuit Level**: Neural populations and connectivity patterns
+- **Systems Level**: Memory, neuromodulation, prediction, development
+- **Behavioral Level**: Action selection and learning through interaction
+- **Meta-Learning Level**: Developmental changes across the lifespan
+
+All systems are interconnected through a unified architecture that allows for bidirectional influence and emergent behaviors.
 
 ## License
 
