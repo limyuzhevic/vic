@@ -22,6 +22,113 @@ That's it! NLM simulates all of this.
 
 ---
 
+## Advanced Usage Patterns (NEW)
+
+### Pattern 4: Running Advanced Learning Experiments
+
+```python
+import pynlm
+
+# Create complete system with advanced features
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+world.reset()
+agent.initialize(world)
+
+# Enable all learning subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run adaptive learning simulation
+results = pynlm.runCompleteSimulation(brain, agent, world, 2000, 0.05)
+
+print(f"Simulation completed!")
+print(f"Total reward: {results['total_reward']:.2f}")
+print(f"Final position: ({results['final_x']:.1f}, {results['final_y']:.1f})")
+print(f"Neurons created: {results['brain_neuron_count']}")
+print(f"Spikes generated: {results['brain_spike_count']}")
+```
+
+### Pattern 5: Creating Custom Brain Configurations
+
+```python
+import pynlm
+
+# Custom configuration for specific experiments
+config = pynlm.createDefaultConfig()
+
+# Brain configuration
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.05)
+config.set("region_count", 4)
+
+# Plasticity configuration
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+
+# Neuromodulation configuration
+config.set("neuromod.dopamine.scale", 1.0)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+
+# Create and configure brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Use convenience configuration methods
+brain.configureForExperiment("complex")
+
+print(f"Brain configured with {brain.getTotalNeuronCount()} neurons")
+print(f"Developmental stage: {brain.getDevelopmentalStage()}")
+```
+
+### Pattern 6: Real-time Monitoring and Debugging
+
+```python
+import pynlm
+import time
+
+# Create brain with monitoring
+brain = pynlm.createAndInitializeBrain(pynlm.createDefaultConfig())
+
+# Monitoring function for step-by-step tracking
+step_count = 0
+start_time = time.time()
+
+for i in range(500):
+    step_start = time.time()
+    
+    # Get current metrics before step
+    metrics_before = brain.getLearningMetrics()
+    
+    # Execute simulation step
+    brain.step(i)
+    
+    step_end = time.time()
+    step_time = step_end - step_start
+    
+    # Print performance every 50 steps
+    if i % 50 == 0:
+        print(f"Step {i}: {step_time*1000:.2f}ms, "
+              f"Firing: {metrics_before['firing_neurons']}, "
+              f"Spikes: {metrics_before['total_spikes']}")
+
+# Final metrics
+metrics = brain.getLearningMetrics()
+print(f"\nSimulation complete!")
+print(f"Total time: {time.time() - start_time:.2f}s")
+print(f"Average step time: {metrics.get('avg_step_time', 0):.4f}s")
+```
+
+---
+
 ## Quick Start (Copy & Paste)
 
 ### Example 1: Simplest Brain

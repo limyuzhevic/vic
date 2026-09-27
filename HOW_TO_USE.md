@@ -158,6 +158,193 @@ for step in range(1000):
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
 ```
 
+### Advanced Usage (New)
+
+#### Convenience Factory Functions
+
+```python
+import pynlm
+
+# Simple brain creation and initialization in one call
+brain = pynlm.createAndInitializeBrain(pynlm.createDefaultConfig())
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+
+# Create complete agent system (brain, agent, world) in one call
+brain, agent, world = pynlm.createFullAgentSystem(pynlm.createDefaultConfig())
+print(f"Created system with {brain.getTotalNeuronCount()} neurons")
+
+# Run complete simulation with automatic world integration
+config = pynlm.createDefaultConfig()
+brain, agent, world = pynlm.createFullAgentSystem(config)
+world.configure(20, 20, 8, 8)
+world.reset()
+
+# Run 500 steps of complete simulation
+results = pynlm.runCompleteSimulation(brain, agent, world, 500, 0.1)
+print(f"Simulation complete! Energy: {results['final_energy']:.2f}")
+```
+
+#### Advanced Learning Patterns
+
+```python
+import pynlm
+
+# Create brain with advanced learning configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("plasticity.structural.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Configure for complex experiments
+brain.configureForExperiment("complex")
+print(f"Brain configured for complex experiment with {brain.getTotalNeuronCount()} neurons")
+
+# Get comprehensive learning metrics
+metrics = brain.getLearningMetrics()
+print(f"Learning metrics: {metrics}")
+```
+
+#### Real-time Monitoring
+
+```python
+import pynlm
+import time
+
+# Create brain with monitoring enabled
+brain = pynlm.createAndInitializeBrain(pynlm.createDefaultConfig())
+
+print("Starting real-time monitoring...")
+step_times = []
+
+for step in range(100):
+    start_time = time.time()
+    
+    # Run simulation step
+    brain.step(step)
+    
+    end_time = time.time()
+    step_time = end_time - start_time
+    step_times.append(step_time)
+    
+    # Monitor every 10 steps
+    if step % 10 == 0:
+        avg_time = sum(step_times) / len(step_times)
+        print(f"Step {step}: {step_time*1000:.2f}ms avg: {avg_time*1000:.2f}ms")
+        
+        # Get current learning metrics
+        metrics = brain.getLearningMetrics()
+        print(f"  E/I Ratio: {metrics['e_i_ratio']:.3f}, "
+              f"Firing Rate: {metrics['average_firing_rate']:.3f}")
+
+# Final analysis
+total_time = sum(step_times)
+avg_step_time = total_time / len(step_times)
+print(f"\nSimulation complete!")
+print(f"Average step time: {avg_step_time*1000:.2f}ms")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+#### Episode-based Learning with Statistics
+
+```python
+import pynlm
+
+# Create complete agent system
+brain, agent, world = pynlm.createFullAgentSystem(pynlm.createDefaultConfig())
+world.configure(30, 30, 12, 12)
+world.reset()
+
+# Enable all learning subsystems
+agent.enableAllLearning()
+
+# Run adaptive episode and collect statistics
+episode_stats = pynlm.runAdaptiveEpisode(agent, world, 200, 0.05)
+
+print("Episode Statistics:")
+for key, value in episode_stats.items():
+    if isinstance(value, float):
+        print(f"  {key}: {value:.4f}")
+    else:
+        print(f"  {key}: {value}")
+
+# Check learning subsystem status
+learning_status = agent.isLearningEnabled()
+print(f"\nLearning subsystems enabled:")
+for subsystem, enabled in learning_status.items():
+    print(f"  {subsystem}: {'✓' if enabled else '✗'}")
+```
+
+#### Monitoring Learning Progress
+
+```python
+import pynlm
+import matplotlib.pyplot as plt
+
+# Create brain and agent
+brain, agent, world = pynlm.createFullAgentSystem(pynlm.createDefaultConfig())
+world.configure(20, 20, 8, 8)
+world.reset()
+
+# Enable learning
+agent.enableAllLearning()
+
+# Track learning metrics over time
+steps = 200
+timestamps = []
+curiosity_levels = []
+novelty_levels = []
+prediction_errors = []
+firing_rates = []
+
+for step in range(steps):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    agent.decodeMotorCommand()
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    
+    # Record metrics
+    timestamps.append(step * 0.1)
+    curiosity_levels.append(agent.getCuriosityLevel())
+    novelty_levels.append(agent.getNoveltyLevel())
+    prediction_errors.append(agent.getPredictionError())
+    firing_rates.append(brain.getAverageFiringRate())
+
+# Create plots
+plt.figure(figsize=(15, 10))
+
+plt.subplot(2, 2, 1)
+plt.plot(timestamps, curiosity_levels, 'r-', label='Curiosity')
+plt.plot(timestamps, novelty_levels, 'b-', label='Novelty')
+plt.xlabel('Time (steps)')
+plt.ylabel('Level')
+plt.title('Motivation Systems')
+plt.legend()
+plt.grid(True)
+
+plt.subplot(2, 2, 2)
+plt.plot(timestamps, prediction_errors, 'g-')
+plt.xlabel('Time (steps)')
+plt.ylabel('Prediction Error')
+plt.title('Prediction Error')
+plt.grid(True)
+
+plt.subplot(2, 2, 3)
+plt.plot(timestamps, firing_rates, 'm-')
+plt.xlabel('Time (steps)')
+plt.ylabel('Average Firing Rate')
+plt.title('Neural Activity')
+plt.grid(True)
+
+plt.tight_layout()
+plt.savefig('learning_progress.png')
+print("Learning progress plot saved as 'learning_progress.png'")
+```
+
 #### Creating a Simple World
 
 ```python
