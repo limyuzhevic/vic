@@ -19,6 +19,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -56,6 +59,9 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -79,6 +85,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +95,18 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -94,6 +114,9 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -110,11 +133,17 @@ std::optional<T> Config::get(const std::string& key) const {
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -143,11 +172,17 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -156,6 +191,9 @@ void Config::remove(const std::string& key) {
 }
 
 std::vector<std::string> Config::getKeys() const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
     for (const auto& entry : pImpl->entries) {
@@ -165,10 +203,24 @@ std::vector<std::string> Config::getKeys() const {
 }
 
 void Config::clear() {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
+    // Remove all configuration entries
+    // This resets the configuration to its initial empty state
+    // Use when you want to start with a clean configuration
     pImpl->entries.clear();
 }
 
 std::string Config::summary() const {
+    if (!pImpl) {
+        throw std::runtime_error("Config not properly initialized - null implementation pointer");
+    }
+    // Generate human-readable configuration summary
+    // This is useful for debugging, logging, and displaying current configuration
+    // The summary includes all configuration keys, their values, and their source
+    // Returns a formatted string showing configuration parameters
+    
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
