@@ -31,6 +31,8 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
@@ -39,6 +41,10 @@ struct Brain::Impl {
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
     std::unique_ptr<AttentionalSelection> attention;
     
     // ========== DEVELOPMENT SYSTEM ==========
@@ -74,6 +80,9 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    
+    // Last planned action from neural planner
+    ActionType lastPlannedAction;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -111,6 +120,8 @@ struct Brain::Impl {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
@@ -119,6 +130,10 @@ struct Brain::Impl {
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
         attention = std::make_unique<AttentionalSelection>();
         
         // Initialize development system
@@ -129,6 +144,10 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        
+        // Configure neuromodulation systems
+        acetylcholine->setLevel(0.1f);  // Start with low baseline ACh
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -231,16 +250,21 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize memory systems
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
-    // Initialize associative memory
+    pImpl->semanticMemory->initialize(this);
+    pImpl->semanticMemory->setCapacity(10000);
+    
+    pImpl->proceduralMemory->initialize(this);
+    pImpl->proceduralMemory->setMaxSkills(1000);
+    
     pImpl->associativeMemory->initialize(this);
+    pImpl->associativeMemory->setMaxAssociations(10000);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -250,20 +274,52 @@ bool Brain::initialize() {
     pImpl->planner->setPlanningDepth(5);
     
     pImpl->conceptFormation->initialize(this);
+    pImpl->conceptFormation->setConceptThreshold(0.7f);
+    
+    pImpl->selfModel->initialize(this);
+    pImpl->selfModel->setConfidenceThreshold(0.8f);
+    
+    pImpl->socialLearning->initialize(this);
+    pImpl->socialLearning->setImitationThreshold(0.6f);
+    
+    pImpl->spatialRepresentation->initialize(this);
+    pImpl->spatialRepresentation->setResolution(10);
+    
+    pImpl->temporalRelation->initialize(this);
+    pImpl->temporalRelation->setTemporalWindow(100);
     
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    pImpl->dopamine->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->novelty->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Update working memory with spikes
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->storeToNeuron(event.neuron_id, 1.0f);
+        }
+        
+        // Store in episodic memory for interesting spikes
+        if (event.is_excitatory && pImpl->episodicMemory) {
+            EpisodicMemoryItem episode;
+            episode.timestamp = pImpl->currentStep;
+            episode.activeNeurons.push_back(event.neuron_id);
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            pImpl->episodicMemory->storeEpisode(episode);
+        }
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -509,10 +565,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 7.5: CONNECT SENSORY TO WORKING MEMORY ==========
+    // Store sensory input in working memory for immediate processing
+    if (pImpl->workingMemory) {
+        // This will be called from receiveSensoryInput when sensory data is available
+        // Working memory receives sensory patterns for immediate storage
+    }
+    
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Prediction system uses sensory state to predict next state
+        // For now, we'll implement basic prediction integration
+        // In the future, this should use AgentBrain::getCurrentState()
+        
+        // Update prediction based on current sensory observations
+        // This requires connection to AgentBrain which we'll need to add
+        
+        // Simple prediction: use working memory content to predict action outcomes
+        if (pImpl->workingMemory) {
+            std::vector<float> workingMemoryContent = pImpl->workingMemory->retrieve();
+            if (!workingMemoryContent.empty()) {
+                // Store prediction based on working memory patterns
+                // This is a placeholder for future prediction implementation
+            }
+        }
+        
+        // Update prediction error based on actual vs predicted outcomes
+        // Prediction error drives learning through dopamine system
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +603,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Connect attention to neuromodulation (ACh effects on attention)
+        if (pImpl->acetylcholine) {
+            float attentionGain = pImpl->acetylcholine->getAttentionFactor();
+            // Update attention parameters based on ACh level
+            // Higher ACh increases attentional focus and reduces competition
+            pImpl->attention->setInhibitionStrength(0.5f / attentionGain);
+            pImpl->attention->setExcitationStrength(1.5f * attentionGain);
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes current neural activity to form abstract concepts
+        // It integrates with episodic memory to extract patterns
+        
+        // Get current state from episodic memory for concept learning
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Get recent episodes for concept learning
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            if (!recentEpisodes.empty()) {
+                // Extract concept patterns from episodic memory
+                // This is a placeholder for future concept formation implementation
+            }
+        }
+        
+        // Connect concept formation to attention
+        // Concepts guide attention to relevant information
+    }
+    
+    // ========== STEP 10.5: CONNECT NEURAL PLANNER TO ACTION SELECTION ==========
+    // The neural planner uses predictions and concepts to plan actions
+    if (pImpl->planner && pImpl->dopamine) {
+        // Get current state for planning
+        std::vector<float> currentState;
+        
+        // Simple planning: use working memory to plan action sequences
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        // If we have a state and dopamine (reward signal), plan action
+        if (!currentState.empty()) {
+            float reward = pImpl->dopamine->getLevel();
+            ActionType plannedAction = pImpl->planner->planAction(currentState, reward);
+            
+            // Store planned action for motor system
+            // TODO: Connect planned action to motor system output
+            // For now, this is stored in the brain for demonstration
+            pImpl->lastPlannedAction = plannedAction;
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1013,6 +1137,14 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
+
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
@@ -1031,6 +1163,22 @@ NeuralPlanner* Brain::getPlanner() {
 
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
+}
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
+SpatialRepresentation* Brain::getSpatialRepresentation() {
+    return pImpl->spatialRepresentation.get();
+}
+
+TemporalRelation* Brain::getTemporalRelation() {
+    return pImpl->temporalRelation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
@@ -1055,6 +1203,10 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
 Curiosity* Brain::getCuriosity() {

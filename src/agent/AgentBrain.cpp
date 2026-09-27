@@ -277,6 +277,48 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // ========== ADD: Dopamine effects on memory consolidation ==========
+    
+    // If we have access to the brain, affect episodic memory consolidation
+    if (brain_) {
+        auto* episodicMemory = brain_->getEpisodicMemory();
+        auto* workingMemory = brain_->getWorkingMemory();
+        
+        if (episodicMemory && dopamineLevel_ > 0) {
+            // Positive dopamine (reward prediction error > 0) 
+            // increases consolidation of recent experiences
+            float consolidationStrength = std::max(0.0f, dopamineLevel_) * 0.3f + 0.2f;  // 0.2 to 0.5 range
+            
+            // Get recent episodes and increase their consolidation priority
+            auto recentEpisodes = episodicMemory->getRecentEpisodes(10);
+            for (size_t i = 0; i < std::min<size_t>(recentEpisodes.size(), 3); ++i) {
+                // Higher consolidation strength for more recent episodes
+                float episodeConsolidation = consolidationStrength * (1.0f - (i / 3.0f));
+                episodicMemory->increaseConsolidationPriority(i, episodeConsolidation);
+            }
+        }
+        
+        // Dopamine affects working memory maintenance
+        if (workingMemory && dopamineLevel_ > 0) {
+            // Positive dopamine strengthens working memory traces
+            float memoryBoost = std::min(1.0f, dopamineLevel_ * 0.5f + 0.3f);  // 0.3 to 0.8 range
+            workingMemory->strengthenMemory(memoryBoost);
+        }
+        
+        // Negative dopamine (prediction error < 0) may trigger forgetting
+        if (dopamineLevel_ < 0) {
+            // Strong negative prediction error reduces memory retention
+            float forgetStrength = std::min(0.5f, -dopamineLevel_ * 0.3f);  // 0 to 0.3 range
+            if (workingMemory && forgetStrength > 0.1f) {
+                // Weaken weak working memory traces
+                workingMemory->decayWeakTraces(forgetStrength);
+            }
+        }
+    }
+    
+    // Store current state for prediction system
+    updatePredictionState();
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
@@ -334,6 +376,75 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+// ========== NEW: Get current brain state for prediction system ==========
+std::vector<float> AgentBrain::getCurrentState() const {
+    std::vector<float> state;
+    
+    if (!brain_) {
+        return state;
+    }
+    
+    // Get working memory content for prediction system
+    auto* workingMemory = brain_->getWorkingMemory();
+    if (workingMemory) {
+        state = workingMemory->retrieve();
+    }
+    
+    // Add neuromodulation levels to state
+    state.push_back(dopamineLevel_);
+    state.push_back(curiosityLevel_);
+    state.push_back(noveltyLevel_);
+    state.push_back(predictionError_);
+    
+    // Add developmental stage to state
+    state.push_back(static_cast<float>(getDevelopmentalStage()));
+    
+    // Ensure state has reasonable size for prediction system
+    if (state.size() < 20) {
+        state.resize(20, 0.0f);  // Pad with zeros if needed
+    }
+    
+    return state;
+}
+
+// ========== NEW: Update prediction state based on current observations ==========
+void AgentBrain::updatePredictionState() {
+    // Store current state for prediction system
+    currentState_ = getCurrentState();
+    
+    // Predict action based on current state using neural planner
+    if (brain_ && !currentState_.empty()) {
+        // Use neural planner if available
+        auto* planner = brain_->getPlanner();
+        if (planner) {
+            // Get prediction based on current state
+            float reward = dopamineLevel_;  // Use dopamine as reward signal
+            ActionType plannedAction = planner->planAction(currentState_, reward);
+            predictedAction_ = plannedAction;
+            predictionConfidence_ = planner->getPlanningConfidence();
+        } else {
+            // Fallback: use curiosity to select predicted action
+            predictionConfidence_ = 0.0f;
+            if (curiosityLevel_ > 0.5f) {
+                predictedAction_ = selectWithCuriosity(MotorCommand::Wait);
+            } else {
+                // Default prediction based on current motor activity
+                predictedAction_ = decodeFromMotorNeurons();
+                predictionConfidence_ = 0.3f;  // Low confidence for default prediction
+            }
+        }
+    } else {
+        // No brain or no state available
+        predictionConfidence_ = 0.0f;
+        predictedAction_ = MotorCommand::Wait;
+    }
+}
+
+// ========== NEW: Get predicted action for current state ==========
+MotorCommand AgentBrain::getPredictedAction() const {
+    return predictedAction_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -345,6 +456,11 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Clear prediction state
+    currentState_.clear();
+    predictedAction_ = MotorCommand::Wait;
+    predictionConfidence_ = 0.0f;
 }
 
 } // namespace nlm

@@ -52,6 +52,16 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get current brain state for prediction system
+    // Returns a vector representing the current neural activity state
+    std::vector<float> getCurrentState() const;
+    
+    // Update prediction state based on current observations
+    void updatePredictionState();
+    
+    // Get predicted action for current state
+    MotorCommand getPredictedAction() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -112,6 +122,11 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Prediction state for prediction system
+    std::vector<float> currentState_;
+    MotorCommand predictedAction_;
+    float predictionConfidence_;
 };
 
 } // namespace nlm

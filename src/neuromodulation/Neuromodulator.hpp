@@ -54,14 +54,27 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
     const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention modulation
+    void signalAttentionBoost(float boost);
+    float getAttentionFactor() const;
+    
+    // Memory consolidation
+    void signalMemoryEncoding(float encodingStrength);
+    float getMemoryConsolidationFactor() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    float attentionFactor_;
+    float memoryConsolidationFactor_;
 };
 
 // Norepinephrine: Arousal and vigilance
