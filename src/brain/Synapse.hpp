@@ -1,19 +1,25 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../performance/MemoryPool.hpp"
+#include <vector>
 
 namespace nlm {
 
 // Forward declaration
 class Neuron;
+class RandomGenerator;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
 
 class Synapse {
 public:
-    // Create synapse with IDs
-    Synapse(SynapseId id, NeuronId source, NeuronId destination);
+    // Create synapse using memory pool
+    static Synapse* createSynapse(SynapseId id, NeuronId source, NeuronId destination);
+    
+    // Destroy synapse
+    static void destroySynapse(Synapse* synapse);
     
     ~Synapse();
     
@@ -78,11 +84,80 @@ public:
     void reset();
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(RandomGenerator& rng);
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Friend class for memory management
+    friend class SynapsePoolManager;
+};
+
+/**
+ * Synapse memory pool manager
+ */
+class SynapsePoolManager {
+public:
+    static SynapsePoolManager& getInstance() {
+        static SynapsePoolManager instance;
+        return instance;
+    }
+    
+    Synapse* createSynapse(SynapseId id, NeuronId source, NeuronId destination) {
+        Synapse* synapse = pool_.allocate();
+        if (synapse) {
+            // Initialize synapse state
+            new (&synapse->pImpl) Synapse::Impl();
+            // Set initial values
+            synapse->pImpl->id = id;
+            synapse->pImpl->sourceNeuron = source;
+            synapse->pImpl->destinationNeuron = destination;
+            synapse->pImpl->weight = 0.0f;
+            synapse->pImpl->delay = 1;
+            synapse->pImpl->type = SynapseType::Excitatory;
+            synapse->pImpl->eligibilityTrace = 0.0f;
+            synapse->pImpl->efficacy = 1.0f;
+            synapse->pImpl->shortTermDepression = 1.0f;
+            synapse->pImpl->shortTermFacilitation = 0.0f;
+            synapse->pImpl->lastPreSpikeTime = -1.0f;
+            synapse->pImpl->lastPostSpikeTime = -1.0f;
+        }
+        return synapse;
+    }
+    
+    void destroySynapse(Synapse* synapse) {
+        if (synapse) {
+            synapse->~Synapse();
+            pool_.deallocate(synapse);
+        }
+    }
+    
+    void reserveSynapses(size_t count) {
+        pool_.reserve(count);
+    }
+    
+    size_t getAllocatedCount() const {
+        return pool_.allocatedCount();
+    }
+    
+    size_t getAvailableCount() const {
+        return pool_.availableCount();
+    }
+    
+    size_t getMemoryUsage() const {
+        return pool_.memoryUsage();
+    }
+
+private:
+    SynapsePoolManager() = default;
+    ~SynapsePoolManager() = default;
+    
+    // Disable copying
+    SynapsePoolManager(const SynapsePoolManager&) = delete;
+    SynapsePoolManager& operator=(const SynapsePoolManager&) = delete;
+    
+    MemoryPool<Synapse> pool_;
 };
 
 } // namespace nlm

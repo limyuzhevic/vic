@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include "NeuralPopulation.hpp"
 #include "Synapse.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <vector>
 #include <memory>
 #include <unordered_map>
@@ -14,11 +15,14 @@ namespace nlm {
 
 class NeuralRegion {
 public:
-    // Create region with ID
-    explicit NeuralRegion(RegionId id);
+    // Create region with ID using memory pool
+    static NeuralRegion* createRegion(RegionId id);
     
-    // Create region with ID and name
-    NeuralRegion(RegionId id, const std::string& name);
+    // Create region with ID and name using memory pool
+    static NeuralRegion* createRegion(RegionId id, const std::string& name);
+    
+    // Destroy region
+    static void destroyRegion(NeuralRegion* region);
     
     ~NeuralRegion();
     
@@ -79,9 +83,94 @@ public:
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
     
+    /**
+     * Reserve memory for region
+     */
+    void reserveMemory(size_t neuronCount, size_t synapseCount) {
+        neuronPoolManager_.reserveNeurons(neuronCount);
+        synapsePoolManager_.reserveSynapses(synapseCount);
+    }
+    
+    /**
+     * Get memory statistics
+     */
+    size_t getMemoryUsage() const {
+        return neuronPoolManager_.getAllocatedCount() * sizeof(Neuron) +
+               synapsePoolManager_.getAllocatedCount() * sizeof(Synapse);
+    }
+
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Friend class for memory management
+    friend class NeuralRegionMemoryPool;
+};
+
+/**
+ * NeuralRegion memory pool manager
+ */
+class NeuralRegionMemoryPool {
+public:
+    static NeuralRegionMemoryPool& getInstance() {
+        static NeuralRegionMemoryPool instance;
+        return instance;
+    }
+    
+    NeuralRegion* createRegion(RegionId id, const std::string& name = "") {
+        NeuralRegion* region = pool_.allocate();
+        if (region) {
+            // Initialize region state
+            new (&region->pImpl) NeuralRegion::Impl();
+            region->pImpl->id = id;
+            region->pImpl->name = name;
+        }
+        return region;
+    }
+    
+    void destroyRegion(NeuralRegion* region) {
+        if (region) {
+            region->~NeuralRegion();
+            pool_.deallocate(region);
+        }
+    }
+    
+    void reserveRegions(size_t count) {
+        pool_.reserve(count);
+    }
+    
+    size_t getAllocatedCount() const {
+        return pool_.allocatedCount();
+    }
+    
+    size_t getAvailableCount() const {
+        return pool_.availableCount();
+    }
+    
+    size_t getMemoryUsage() const {
+        return pool_.memoryUsage();
+    }
+    
+    // Get specialized pool managers
+    NeuronPoolManager& getNeuronPoolManager() {
+        return neuronPoolManager_;
+    }
+    
+    SynapsePoolManager& getSynapsePoolManager() {
+        return synapsePoolManager_;
+    }
+
+private:
+    NeuralRegionMemoryPool() = default;
+    ~NeuralRegionMemoryPool() = default;
+    
+    // Disable copying
+    NeuralRegionMemoryPool(const NeuralRegionMemoryPool&) = delete;
+    NeuralRegionMemoryPool& operator=(const NeuralRegionMemoryPool&) = delete;
+    
+    MemoryPool<NeuralRegion> pool_;
+    NeuronPoolManager neuronPoolManager_;
+    SynapsePoolManager synapsePoolManager_;
 };
 
 } // namespace nlm

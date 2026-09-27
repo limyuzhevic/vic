@@ -1,4 +1,8 @@
 #include "NeuralRegion.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "brain/NeuralPopulation.hpp"
+#include "core/Random/Random.hpp"
 #include <algorithm>
 #include <stdexcept>
 
@@ -15,6 +19,20 @@ struct NeuralRegion::Impl {
     
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
+
+NeuralRegion* NeuralRegion::createRegion(RegionId id) {
+    return NeuralRegionMemoryPool::getInstance().createRegion(id);
+}
+
+NeuralRegion* NeuralRegion::createRegion(RegionId id, const std::string& name) {
+    return NeuralRegionMemoryPool::getInstance().createRegion(id, name);
+}
+
+void NeuralRegion::destroyRegion(NeuralRegion* region) {
+    if (region) {
+        NeuralRegionMemoryPool::getInstance().destroyRegion(region);
+    }
+}
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
 
@@ -91,15 +109,18 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
 SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
                                    SynapticWeight weight, Delay delay) {
     SynapseId synId(pImpl->nextSynapseId++);
-    auto synapse = std::make_unique<Synapse>(synId, source, destination);
-    synapse->setWeight(weight);
-    synapse->setDelay(delay);
-    
-    pImpl->outgoingSynapses[source].push_back(synId);
-    pImpl->incomingSynapses[destination].push_back(synId);
-    
-    pImpl->synapses.push_back(std::move(synapse));
-    return synId;
+    Synapse* synapse = SynapsePoolManager::getInstance().createSynapse(synId, source, destination);
+    if (synapse) {
+        synapse->setWeight(weight);
+        synapse->setDelay(delay);
+        
+        pImpl->outgoingSynapses[source].push_back(synId);
+        pImpl->incomingSynapses[destination].push_back(synId);
+        
+        pImpl->synapses.push_back(std::unique_ptr<Synapse>(synapse));
+        return synId;
+    }
+    return SynapseId();
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
@@ -112,7 +133,7 @@ Synapse* NeuralRegion::getSynapse(SynapseId id) {
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
+    for (const auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
             return syn.get();
         }

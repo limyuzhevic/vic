@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+#cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
 # C++20 standard
@@ -71,8 +71,8 @@ add_library(nlm_core STATIC
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
     # Prediction
-    src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
+    src/prediction/PredictionSystem.cpp
     # Motor
     src/motor/MotorSystem.cpp
     # Environment
@@ -85,6 +85,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance (Memory Pool)
+    src/performance/MemoryPool.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -141,6 +143,12 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 
 # Testing
 enable_testing()
+
+# Memory pool test
+add_executable(test_memory_pool tests/test_memory_pool.cpp)
+target_link_libraries(test_memory_pool PUBLIC nlm_core)
+add_test(NAME test_memory_pool COMMAND test_memory_pool)
+
 add_subdirectory(tests)
 
 # Install targets (future)

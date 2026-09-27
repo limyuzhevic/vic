@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../performance/MemoryPool.hpp"
 #include <vector>
 #include <array>
 
@@ -44,8 +45,11 @@ struct NeuronState {
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
 class Neuron {
 public:
-    // Create neuron with ID
-    explicit Neuron(NeuronId id);
+    // Create neuron using memory pool
+    static Neuron* createNeuron(NeuronId id);
+    
+    // Destroy neuron
+    static void destroyNeuron(Neuron* neuron);
     
     ~Neuron();
     
@@ -146,6 +150,67 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Friend class for memory management
+    friend class NeuronPoolManager;
+};
+
+/**
+ * Neuron memory pool manager
+ */
+class NeuronPoolManager {
+public:
+    static NeuronPoolManager& getInstance() {
+        static NeuronPoolManager instance;
+        return instance;
+    }
+    
+    Neuron* createNeuron(NeuronId id) {
+        Neuron* neuron = pool_.allocate();
+        if (neuron) {
+            // Initialize neuron state
+            new (&neuron->pImpl) Neuron::Impl();
+            // Set initial values
+            neuron->pImpl->id = id;
+            neuron->pImpl->type = NeuronType::Internal;
+            neuron->pImpl->regionId = INVALID_REGION_ID;
+            neuron->pImpl->populationId = INVALID_POPULATION_ID;
+        }
+        return neuron;
+    }
+    
+    void destroyNeuron(Neuron* neuron) {
+        if (neuron) {
+            neuron->~Neuron();
+            pool_.deallocate(neuron);
+        }
+    }
+    
+    void reserveNeurons(size_t count) {
+        pool_.reserve(count);
+    }
+    
+    size_t getAllocatedCount() const {
+        return pool_.allocatedCount();
+    }
+    
+    size_t getAvailableCount() const {
+        return pool_.availableCount();
+    }
+    
+    size_t getMemoryUsage() const {
+        return pool_.memoryUsage();
+    }
+    
+private:
+    NeuronPoolManager() = default;
+    ~NeuronPoolManager() = default;
+    
+    // Disable copying
+    NeuronPoolManager(const NeuronPoolManager&) = delete;
+    NeuronPoolManager& operator=(const NeuronPoolManager&) = delete;
+    
+    MemoryPool<Neuron> pool_;
 };
 
 } // namespace nlm
