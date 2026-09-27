@@ -108,9 +108,9 @@ LifetimeExperimentResult Phase5IntegratedExperiment::run(
         currentStep = phaseEnd;
     }
     
-    // Phase 2: Sensory Development
+    // Phase 6: Sensory Development (integrated with prediction)
     {
-        NLM_LOG_INFO("Phase 2: Sensory Development");
+        NLM_LOG_INFO("Phase 6: Sensory Development");
         uint64_t phaseEnd = currentStep + config.sensoryDevelopmentSteps;
         auto phaseResult = runPhase(
             brain.get(), "Sensory Development", currentStep, phaseEnd,
