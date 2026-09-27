@@ -2,191 +2,149 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <optional>
+#include <variant>
+#include <string_view>
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
+// Strong type aliases with tag dispatching for better type safety
+struct NeuronTag {};
+struct SynapseTag {};
+struct RegionTag {};
+struct PopulationTag {};
 
-// Neuron identifier
-struct NeuronId {
-    uint64_t value;
-    
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+// Base strongly-typed identifier template
+template<typename Tag, typename T = uint64_t>
+class StrongId {
+    T value;
+public:
+    constexpr StrongId() : value(0) {}
+    explicit constexpr StrongId(T v) : value(v) {}
+    constexpr T get() const { return value; }
+    constexpr explicit operator T() const { return value; }
+    constexpr bool operator==(const StrongId& other) const = default;
+    constexpr bool operator!=(const StrongId& other) const = default;
+    constexpr bool operator<(const StrongId& other) const { return value < other.value; }
+    constexpr T index() const { return value; }
 };
 
-// Synapse identifier
-struct SynapseId {
-    uint64_t value;
-    
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+// Convenient type definitions
+using NeuronId = StrongId<NeuronTag>;
+using SynapseId = StrongId<SynapseTag>;
+using RegionId = StrongId<RegionTag>;
+using PopulationId = StrongId<PopulationTag>;
+
+// Simulation time types with unit safety
+struct Timestamp {
+    double value;  // seconds
+    constexpr explicit Timestamp(double v = 0.0) : value(v) {}
+    constexpr double seconds() const { return value; }
+    constexpr operator double() const { return value; }
+    constexpr bool operator==(const Timestamp& other) const = default;
+    constexpr bool operator!=(const Timestamp& other) const = default;
+    constexpr bool operator<(const Timestamp& other) const { return value < other.value; }
 };
 
-// Region identifier
-struct RegionId {
-    uint64_t value;
-    
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+struct TimestepDuration {
+    double value;  // seconds
+    constexpr explicit TimestepDuration(double v = 0.0) : value(v) {}
+    constexpr double seconds() const { return value; }
+    constexpr operator double() const { return value; }
 };
 
-// Population identifier
-struct PopulationId {
-    uint64_t value;
+// Memory efficiency with bit packing where appropriate
+struct PlasticityFlags {
+    union {
+        struct {
+            uint8_t hebbian : 1;
+            uint8_t stdp : 1;
+            uint8_t reward_modulated : 1;
+            uint8_t structural : 1;
+            uint8_t eligible : 1;
+            uint8_t : 0;  // padding
+        } bits;
+        uint8_t packed;
+    };
     
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+    constexpr PlasticityFlags() : packed(0) {}
+    constexpr PlasticityFlags(uint8_t packed_value) : packed(packed_value) {}
+    constexpr explicit operator uint8_t() const { return packed; }
+    constexpr operator bool() const { return packed != 0; }
 };
 
-// Simulation step counter
-using SimulationStep = uint64_t;
+// Type-safe enumeration with underlying type
+enum class NeuronType : uint8_t {
+    Excitatory = 1 << 0,
+    Inhibitory = 1 << 1,
+    Modulatory = 1 << 2,
+    Sensory = 1 << 3,
+    Motor = 1 << 4,
+    Internal = 1 << 5
+};
 
-// Simulation time in seconds (floating point)
-using Timestamp = double;
+inline constexpr NeuronType operator|(NeuronType a, NeuronType b) {
+    return static_cast<NeuronType>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
 
-// Timestep duration in seconds
-using TimestepDuration = double;
+inline constexpr bool operator&(NeuronType a, NeuronType b) {
+    return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
+}
 
-// Index types for arrays
-using NeuronIndex = uint64_t;
-using SynapseIndex = uint64_t;
-using PopulationIndex = uint64_t;
-using RegionIndex = uint64_t;
-
-// Synaptic weight type
+// Binary algebraic types using std::variant
 using SynapticWeight = float;
 
-// Membrane potential type
-using MembranePotential = float;
+// Use std::variant for multi-type values
+using ConfigValue = std::variant<
+    int,
+    int64_t,
+    double,
+    bool,
+    std::string,
+    std::vector<int>,
+    std::vector<double>,
+    std::vector<std::string>
+>;
 
-// Neuron firing rate type
-using FiringRate = float;
-
-// Connection delay in simulation steps
-using Delay = uint32_t;
-
-// Typed enums for neuron types
-enum class NeuronType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Sensory,
-    Motor,
-    Internal
+// Error handling with std::expected
+struct NeuronError {
+    std::string message;
+    int code;
 };
 
-// Typed enums for synapse types
-enum class SynapseType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Electrical,
-    GapJunction
-};
+using NeuronResult = std::expected<NeuronId, NeuronError>;
 
-// Synaptic plasticity state flags
-struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
+// Invalid ID sentinel using constexpr inline variable
+inline constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
+inline constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
+inline constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
+inline constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+
+// Compile-time type traits for type safety
+namespace type_traits {
+    template<typename T>
+    struct is_neuron_id : std::false_type {};
     
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
-                                  reward_modulated(false), structural(false), 
-                                  eligible(false) {}
-};
-
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
-};
-
-// Spike event for event-driven computation
-struct SpikeEvent {
-    NeuronId source_neuron;
-    Timestamp timestamp;
-    SimulationStep step;
+    template<>
+    struct is_neuron_id<NeuronId> : std::true_type {};
     
-    SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
-    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
-        : source_neuron(nid), timestamp(ts), step(s) {}
+    template<typename T>
+    constexpr bool is_neuron_id_v = is_neuron_id<T>::value;
+}
+
+// Compile-time validation functions
+namespace compile_time {
+    template<typename T>
+    constexpr bool is_valid_neuron_id() {
+        return type_traits::is_neuron_id_v<T>;
+    }
+}
+
+// Visitor pattern support for event processing
+struct EventVisitor {
+    virtual ~EventVisitor() = default;
+    virtual void visit(const NeuronId& neuron) = 0;
+    virtual void visit(const SynapseId& synapse) = 0;
 };
-
-// Delayed spike event for synaptic transmission with delay
-struct DelayedSpikeEvent {
-    NeuronId source_neuron;
-    NeuronId destination_neuron;
-    SynapseId synapse_id;
-    SynapticWeight weight;  // Weight at time of spike (frozen)
-    SynapseType synapse_type;
-    Timestamp timestamp;      // When spike occurs
-    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
-    SimulationStep step;      // Current simulation step
-    SimulationStep delivery_step;  // Step when spike should be delivered
-    bool is_excitatory;  // Cached for quick lookup
-    
-    DelayedSpikeEvent()
-        : source_neuron(), destination_neuron(), synapse_id()
-        , weight(0.0f), synapse_type(SynapseType::Excitatory)
-        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
-        , is_excitatory(true) {}
-    
-    DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,
-                      SynapticWeight w, SynapseType type,
-                      Timestamp ts, Timestamp delivery, SimulationStep s, SimulationStep deliveryS)
-        : source_neuron(src), destination_neuron(dst), synapse_id(syn)
-        , weight(w), synapse_type(type)
-        , timestamp(ts), delivery_time(delivery)
-        , step(s), delivery_step(deliveryS)
-        , is_excitatory(type == SynapseType::Excitatory) {}
-};
-
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
-};
-
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
-
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm

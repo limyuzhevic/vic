@@ -1,24 +1,33 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../performance/PerformanceProfiler.hpp"
+#include "../performance/PerformanceOptimizer.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/CacheSystem.hpp"
+#include "../performance/ParallelProcessor.hpp"
+#include "../performance/AlgorithmAnalyzer.hpp"
+
+#include "../spike_processing/OptimizedSpikeSystem.hpp"
+#include "../spike_processing/SynapticIndex.hpp"
+#include "../spike_processing/ConnectionGraph.hpp"
+
+#include "../plasticity/OptimizedPlasticitySystem.hpp"
+#include "../plasticity/InactiveSynapseTracker.hpp"
+#include "../plasticity/WeightNormalizer.hpp"
+
+#include "../memory/OptimizedWorkingMemory.hpp"
+#include "../memory/OptimizedEpisodicMemory.hpp"
+#include "../memory/MemoryCache.hpp"
+
+#include "../config/OptimizedConfig.hpp"
+#include "../config/ConfigCache.hpp"
+
+#include "../monitoring/PerformanceMonitor.hpp"
+#include "../monitoring/BenchmarkSuite.hpp"
+#include "../monitoring/RegressionDetector.hpp"
+
+#include "../profiling/CallProfiler.hpp"
+#include "../profiling/MemoryProfiler.hpp"
+#include "../profiling/CPProfiler.hpp"
+#include "../profiling/ProfileExporter.hpp"
 
 namespace nlm {
 
@@ -93,64 +102,42 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Performance optimization infrastructure
+    std::unique_ptr<PerformanceProfiler> performanceProfiler;
+    std::unique_ptr<PerformanceOptimizer> performanceOptimizer;
+    std::unique_ptr<MemoryPool<int>> memoryPool;
+    std::unique_ptr<CacheSystem> cacheSystem;
+    std::unique_ptr<ParallelProcessor> parallelProcessor;
+    std::unique_ptr<AlgorithmAnalyzer> algorithmAnalyzer;
+    
+    // Optimized spike processing
+    std::unique_ptr<OptimizedSpikeSystem> optimizedSpikeSystem;
+    std::unique_ptr<SynapticIndex> synapticIndex;
+    std::unique_ptr<ConnectionGraph> connectionGraph;
+    
+    // Optimized plasticity
+    std::unique_ptr<OptimizedPlasticitySystem> optimizedPlasticitySystem;
+    std::unique_ptr<InactiveSynapseTracker> inactiveSynapseTracker;
+    std::unique_ptr<WeightNormalizer> weightNormalizer;
+    
+    // Optimized memory
+    std::unique_ptr<OptimizedWorkingMemory> optimizedWorkingMemory;
+    std::unique_ptr<OptimizedEpisodicMemory> optimizedEpisodicMemory;
+    std::unique_ptr<MemoryCache> memoryCache;
+    
+    // Optimized configuration
+    std::unique_ptr<OptimizedConfig> optimizedConfig;
+    std::unique_ptr<ConfigCache> configCache;
+    
+    // Performance monitoring
+    std::unique_ptr<PerformanceMonitor> performanceMonitor;
+    std::unique_ptr<BenchmarkSuite> benchmarkSuite;
+    
+    // Profiling
+    std::unique_ptr<CallProfiler> callProfiler;
+    std::unique_ptr<MemoryProfiler> memoryProfiler;
+    std::unique_ptr<CPProfiler> cpProfiler;
+    std::unique_ptr<ProfileExporter> profileExporter;
     }
     
     DevelopmentalStage developmentalStage;
@@ -289,6 +276,57 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Initialize performance optimization infrastructure
+    pImpl->performanceProfiler = std::make_unique<PerformanceProfiler>();
+    pImpl->performanceOptimizer = std::make_unique<PerformanceOptimizer>();
+    pImpl->memoryPool = std::make_unique<MemoryPool<int>>(1024); // 1KB blocks
+    pImpl->cacheSystem = std::make_unique<CacheSystem>();
+    pImpl->parallelProcessor = std::make_unique<ParallelProcessor>(std::thread::hardware_concurrency());
+    pImpl->algorithmAnalyzer = std::make_unique<AlgorithmAnalyzer>();
+    
+    // Initialize optimized spike processing
+    pImpl->optimizedSpikeSystem = std::make_unique<OptimizedSpikeSystem>();
+    pImpl->synapticIndex = std::make_unique<SynapticIndex>();
+    pImpl->connectionGraph = std::make_unique<ConnectionGraph>();
+    pImpl->optimizedSpikeSystem->setSynapticIndex(pImpl->synapticIndex.get());
+    pImpl->optimizedSpikeSystem->setConnectionGraph(pImpl->connectionGraph.get());
+    
+    // Initialize optimized plasticity
+    pImpl->optimizedPlasticitySystem = std::make_unique<OptimizedPlasticitySystem>();
+    pImpl->inactiveSynapseTracker = std::make_unique<InactiveSynapseTracker>();
+    pImpl->weightNormalizer = std::make_unique<WeightNormalizer>();
+    pImpl->optimizedPlasticitySystem->setSTDPSystem(pImpl->stdp.get());
+    pImpl->optimizedPlasticitySystem->setHebbianSystem(pImpl->hebbian.get());
+    pImpl->optimizedPlasticitySystem->setStructuralPlasticity(pImpl->structuralPlasticity.get());
+    pImpl->optimizedPlasticitySystem->setInactiveSynapseTracker(pImpl->inactiveSynapseTracker.get());
+    pImpl->optimizedPlasticitySystem->setWeightNormalizer(pImpl->weightNormalizer.get());
+    
+    // Initialize optimized memory
+    pImpl->optimizedWorkingMemory = std::make_unique<OptimizedWorkingMemory>();
+    pImpl->optimizedEpisodicMemory = std::make_unique<OptimizedEpisodicMemory>();
+    pImpl->memoryCache = std::make_unique<MemoryCache>();
+    pImpl->optimizedWorkingMemory->setCapacity(pImpl->config->getOr<size_t>("working_memory_capacity", 1000));
+    pImpl->optimizedEpisodicMemory->setMaxEpisodes(pImpl->config->getOr<size_t>("max_episodes", 1000));
+    
+    // Initialize optimized configuration
+    pImpl->optimizedConfig = std::make_unique<OptimizedConfig>();
+    pImpl->configCache = std::make_unique<ConfigCache>();
+    
+    // Initialize performance monitoring
+    pImpl->performanceMonitor = std::make_unique<PerformanceMonitor>();
+    pImpl->benchmarkSuite = std::make_unique<BenchmarkSuite>();
+    pImpl->performanceMonitor->setBrain(this);
+    pImpl->performanceMonitor->setSpikeSystem(pImpl->spikeSystem.get());
+    
+    // Initialize profiling
+    pImpl->callProfiler = std::make_unique<CallProfiler>();
+    pImpl->memoryProfiler = std::make_unique<MemoryProfiler>();
+    pImpl->cpProfiler = std::make_unique<CPProfiler>();
+    pImpl->profileExporter = std::make_unique<ProfileExporter>();
+    pImpl->callProfiler->setBrain(this);
+    pImpl->memoryProfiler->setBrain(this);
+    pImpl->cpProfiler->setBrain(this);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

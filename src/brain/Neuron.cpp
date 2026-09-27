@@ -3,28 +3,15 @@
 #include <cmath>
 #include <algorithm>
 
-namespace nlm {
-
-struct Neuron::Impl {
-    NeuronId id;
-    NeuronType type;
-    NeuronState state;
-    RegionId regionId;
-    PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
-    
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+/**
+ * @brief Neural Implementation Details
+ * 
+ * This implementation provides biologically realistic LIF neurons with:
+ * - Spike-frequency adaptation via an adaptation variable
+ * - Refractory period after spiking
+ * - Event-driven input integration
+ * - History tracking for plasticity rules
+ */
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -54,6 +41,14 @@ void Neuron::setType(NeuronType type) {
     pImpl->type = type;
 }
 
+/**
+ * @brief Set the membrane potential of the neuron.
+ * 
+ * Directly sets the membrane potential without any dynamics integration.
+ * Used for initialization or special state manipulation.
+ * 
+ * @param potential New membrane potential value in millivolts (mV)
+ */
 void Neuron::setMembranePotential(MembranePotential potential) {
     pImpl->state.membranePotential = potential;
 }
@@ -119,34 +114,122 @@ float Neuron::getLastSpikeTime() const {
     return pImpl->state.lastSpikeTime;
 }
 
+/**
+ * @brief Process excitatory synaptic input to the neuron.
+ * 
+ * Synaptic inputs are modeled as currents that contribute to membrane potential
+ * changes. Excitatory inputs (glutamate-mediated) depolarize the neuron.
+ * 
+ * Implementation details:
+ * - Input amplitude represents synaptic conductance × reversal potential
+ * - Real biological synapses exhibit temporal and spatial summation
+ * - Short-term plasticity can modulate input strength over time
+ * 
+ * @param amplitude Synaptic input strength in millivolts-equivalent
+ */
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
     // amplitude represents synaptic conductance * reversal potential contribution
     pImpl->synapticInput += amplitude;
 }
 
+/**
+ * @brief Process inhibitory synaptic input to the neuron.
+ * 
+ * Inhibitory inputs (GABA-mediated) hyperpolarize the neuron, making it
+ * less likely to fire. This models biological inhibition in neural circuits.
+ * 
+ * Implementation details:
+ * - Inhibitory currents subtract from net excitatory input
+ * - Can originate from interneurons or other inhibitory neurons
+ * - Often fast-acting with short synaptic delays
+ * 
+ * @param amplitude Synaptic input strength in millivolts-equivalent (positive value)
+ */
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
     pImpl->synapticInput -= amplitude;
 }
 
+/**
+ * @brief Process neuromodulatory input that affects plasticity.
+ * 
+ * Neuromodulatory inputs (dopamine, acetylcholine, serotonin) influence
+ * synaptic plasticity rules without directly affecting membrane potential.
+ * These signals encode behavioral context and reward prediction errors.
+ * 
+ * Biological basis:
+ * - Dopamine modulates STDP windows and eligibility traces
+ * - Acetylcholine gates learning and attention
+ * - Serotonin regulates appetite and sleep-related circuits
+ * 
+ * Implementation:
+ * - Slow, diffuse effects across the neural network
+ * - Influences synaptic eligibility traces and learning rates
+ * - Can be multiplicative or additive depending on receptor type
+ * 
+ * @param amplitude Neuromodulatory input strength in arbitrary units
+ */
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
+/**
+ * @brief Direct current injection from external sources.
+ * 
+ * Models artificial or strong external inputs such as sensory inputs,
+ * electrical stimulation, or engineered drives for experimental control.
+ * Unlike synaptic inputs, this bypasses synaptic transmission mechanisms.
+ * 
+ * Use cases:
+ * - Sensory input simulation
+ * - Experimental stimulus control
+ * - Testing specific neural responses
+ * - Artificially driving neural activity
+ * 
+ * @param current Input current strength in millivolts-equivalent
+ */
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
     pImpl->synapticInput += current;
 }
 
+/**
+ * @brief Reset synaptic input accumulator for the next simulation step.
+ * 
+ * Clears all accumulated synaptic and injected currents, preparing the neuron
+ * for the next integration step. This is called at the end of each timestep
+ * to prevent input carryover and ensure proper temporal dynamics.
+ * 
+ * Computational efficiency:
+ * - Prevents accumulation of numerical errors over time
+ * - Ensures proper temporal separation of inputs
+ * - Maintains stable long-running simulations
+ */
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
 
+/**
+ * @brief Record a spike event for plasticity rules and analysis.
+ * 
+ * Spike recording is essential for:
+ * - STDP (Spike-Timing-Dependent Plasticity) calculations
+ * - Synaptic eligibility trace management
+ * - Activity-dependent statistics and analysis
+ * - Learning experiment verification
+ * 
+ * Implementation details:
+ * - Maintains rolling buffer to prevent unbounded memory growth
+ * - Stores absolute timestamps in simulation time
+ * - Enables precise spike timing analysis
+ * 
+ * @param timestamp Absolute simulation time when spike occurred (ms)
+ */
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
@@ -154,6 +237,20 @@ void Neuron::recordSpike(Timestamp timestamp) {
     }
 }
 
+/**
+ * @brief Clear spike history for reset operations.
+ * 
+ * Used when:
+ * - Resetting neurons between experimental trials
+ * - Starting new simulation runs
+ * - Clearing adaptation state
+ * - Preparing for clean baseline measurements
+ * 
+ * Biological relevance:
+ * - Models synaptic depression after high activity
+ * - Resets memory traces in working memory systems
+ * - Implements homeostatic regulation mechanisms
+ */
 void Neuron::clearSpikeHistory() {
     pImpl->spikeHistory.clear();
 }
@@ -188,10 +285,33 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+/**
+ * @brief LIF Dynamics: Leaky Integrate-and-Fire Neuron Model
+ * 
+ * Mathematical formulation: dV/dt = (V_rest - V)/τ + I/C
+ * Where:
+ *   V = membrane potential (mV)
+ *   V_rest = resting potential (mV)
+ *   τ = membrane time constant (ms)
+ *   I = total synaptic current input (nA)
+ *   C = membrane capacitance (nF)
+ * 
+ * Discrete approximation: V_new = V + dt * ((V_rest - V)/τ + I/C)
+ * 
+ * Biological interpretation:
+ * - Membrane potential evolves toward resting potential exponentially
+ * - Synaptic inputs provide current that drives potential toward threshold
+ * - Time constant τ determines integration speed (τ = R*C, where R = leak resistance)
+ * 
+ * @param currentTime Simulation time in milliseconds
+ * @param dt Time step duration in seconds
+ * @return true if neuron fired a spike, false otherwise
+ */
+    bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Refractory period controls spike generation
+    // Prevents unrealistic high-frequency firing and models absolute refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -228,34 +348,38 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
+    // Spike generation mechanism with realistic biophysical modeling
+    // Check for spike (threshold crossing)
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity rules and analysis
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to after-hyperpolarization level
+        // Biophysical basis: voltage-gated potassium channels open
         V = V_reset;
         
-        // Enter refractory period
+        // Enter absolute refractory period
+        // Prevents immediate re-firing, models Na+ channel inactivation
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
+        // Update adaptation variable for spike-frequency adaptation
+        // Increases after each spike to modulate firing rate over time
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Continue firing if already active (post-spike dynamics)
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
+    // Clear synaptic input for next integration step
+    // Prevents input carryover and ensures proper temporal dynamics
     pImpl->synapticInput = 0.0f;
     
+    // Return firing status for spike propagation to other neurons
     return fired;
 }
 

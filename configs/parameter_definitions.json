@@ -1,0 +1,347 @@
+{
+  "name": "NLM Configuration Parameter Definitions",
+  "version": "2.0.0",
+  "description": "Detailed documentation for all NLM configuration parameters with examples and usage notes",
+  "parameters": [
+    {
+      "name": "random_seed",
+      "type": "integer",
+      "default": 42,
+      "range": "[0, 2147483647]",
+      "description": "Random seed for reproducible experiments. Use a fixed value for deterministic behavior across runs.",
+      "example": 123,
+      "units": "none",
+      "category": "simulation",
+      "validation": {
+        "min": 0,
+        "max": 2147483647,
+        "required": false
+      }
+    },
+    {
+      "name": "simulation_timestep",
+      "type": "number",
+      "default": 0.001,
+      "range": "[1e-9, 1.0]",
+      "description": "Simulation timestep in seconds. Smaller values provide better accuracy but increase computation time.",
+      "example": 0.0001,
+      "units": "seconds",
+      "category": "simulation",
+      "validation": {
+        "min": 1e-9,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "neuron_count",
+      "type": "integer",
+      "default": 1000,
+      "range": "[1, 1000000]",
+      "description": "Number of neurons in the brain. Adjust based on model complexity and available memory.",
+      "example": 5000,
+      "units": "neurons",
+      "category": "neurons",
+      "validation": {
+        "min": 1,
+        "max": 1000000,
+        "required": false
+      }
+    },
+    {
+      "name": "region_count",
+      "type": "integer",
+      "default": 2,
+      "range": "[1, 1000]",
+      "description": "Number of brain regions. Regions can represent different functional areas or processing modules.",
+      "example": 4,
+      "units": "regions",
+      "category": "neurons",
+      "validation": {
+        "min": 1,
+        "max": 1000,
+        "required": false
+      }
+    },
+    {
+      "name": "connection_probability",
+      "type": "number",
+      "default": 0.1,
+      "range": "[0.0, 1.0]",
+      "description": "Probability of connection formation between neurons. Higher values create denser connectivity.",
+      "example": 0.3,
+      "units": "probability",
+      "category": "neurons",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "plasticity_learning_rate",
+      "type": "number",
+      "default": 0.01,
+      "range": "[0.0, 1.0]",
+      "description": "Base learning rate for plasticity mechanisms. Controls the speed of synaptic weight changes.",
+      "example": 0.05,
+      "units": "learning_rate",
+      "category": "plasticity",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "stdp_ltp_weight",
+      "type": "number",
+      "default": 0.01,
+      "range": "[0.0, 1.0]",
+      "description": "Spike-timing dependent plasticity long-term potentiation weight. Strength of LTP when presynaptic spike precedes postsynaptic spike.",
+      "example": 0.02,
+      "units": "weight",
+      "category": "plasticity",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "stdp_ltd_weight",
+      "type": "number",
+      "default": 0.012,
+      "range": "[0.0, 1.0]",
+      "description": "Spike-timing dependent plasticity long-term depression weight. Strength of LTD when postsynaptic spike precedes presynaptic spike.",
+      "example": 0.015,
+      "units": "weight",
+      "category": "plasticity",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "stdp_time_constant",
+      "type": "number",
+      "default": 20.0,
+      "range": "[0.1, 1000.0]",
+      "description": "Time constant for STDP decay. Controls how quickly the STDP effect decays over time.",
+      "example": 50.0,
+      "units": "milliseconds",
+      "category": "plasticity",
+      "validation": {
+        "min": 0.1,
+        "max": 1000.0,
+        "required": false
+      }
+    },
+    {
+      "name": "development_synaptogenesis_rate",
+      "type": "number",
+      "default": 0.001,
+      "range": "[0.0, 1.0]",
+      "description": "Rate of synaptogenesis during development. Controls the formation of new synapses during neural maturation.",
+      "example": 0.01,
+      "units": "per_step",
+      "category": "development",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "development_pruning_rate",
+      "type": "number",
+      "default": 0.0001,
+      "range": "[0.0, 1.0]",
+      "description": "Rate of neural pruning during development. Controls the elimination of weak synapses during maturation.",
+      "example": 0.001,
+      "units": "per_step",
+      "category": "development",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "dopamine_baseline",
+      "type": "number",
+      "default": 0.1,
+      "range": "[0.0, 10.0]",
+      "description": "Baseline dopamine level for neuromodulation. Sets the background dopamine concentration affecting learning and motivation.",
+      "example": 0.5,
+      "units": "concentration",
+      "category": "neuromodulation",
+      "validation": {
+        "min": 0.0,
+        "max": 10.0,
+        "required": false
+      }
+    },
+    {
+      "name": "reward_discount_factor",
+      "type": "number",
+      "default": 0.99,
+      "range": "[0.0, 1.0]",
+      "description": "Discount factor for reward signals. Controls how future rewards are valued relative to immediate rewards.",
+      "example": 0.95,
+      "units": "discount_factor",
+      "category": "neuromodulation",
+      "validation": {
+        "min": 0.0,
+        "max": 1.0,
+        "required": false
+      }
+    },
+    {
+      "name": "environment_name",
+      "type": "string",
+      "default": "GridWorld",
+      "range": "[1, 100]",
+      "description": "Name of the simulated environment. Used for logging and identification.",
+      "example": "NavigationMaze",
+      "units": "name",
+      "category": "environment",
+      "validation": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+        "maxLength": 100,
+        "required": false
+      }
+    },
+    {
+      "name": "environment_width",
+      "type": "integer",
+      "default": 10,
+      "range": "[1, 10000]",
+      "description": "Width of the simulation environment in grid cells or units.",
+      "example": 20,
+      "units": "cells",
+      "category": "environment",
+      "validation": {
+        "min": 1,
+        "max": 10000,
+        "required": false
+      }
+    },
+    {
+      "name": "environment_height",
+      "type": "integer",
+      "default": 10,
+      "range": "[1, 10000]",
+      "description": "Height of the simulation environment in grid cells or units.",
+      "example": 20,
+      "units": "cells",
+      "category": "environment",
+      "validation": {
+        "min": 1,
+        "max": 10000,
+        "required": false
+      }
+    },
+    {
+      "name": "log_level",
+      "type": "string",
+      "default": "INFO",
+      "range": "[4 values]",
+      "description": "Logging verbosity level. Controls the amount of detail in log output.",
+      "example": "DEBUG",
+      "units": "log_level",
+      "category": "logging",
+      "validation": {
+        "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+        "required": false
+      }
+    },
+    {
+      "name": "log_to_file",
+      "type": "boolean",
+      "default": false,
+      "range": "[0, 1]",
+      "description": "Enable/disable file logging. Set to true to write logs to file instead of only console.",
+      "example": true,
+      "units": "boolean",
+      "category": "logging",
+      "validation": {
+        "required": false
+      }
+    },
+    {
+      "name": "log_filename",
+      "type": "string",
+      "default": "nlm.log",
+      "range": "[1, 255]",
+      "description": "Filename for log output. Used when log_to_file is enabled.",
+      "example": "simulation.log",
+      "units": "filename",
+      "category": "logging",
+      "validation": {
+        "pattern": "^[a-zA-Z0-9_\\-\\.]+$",
+        "maxLength": 255,
+        "required": false
+      }
+    },
+    {
+      "name": "max_simulation_steps",
+      "type": "integer",
+      "default": 10000,
+      "range": "[1, 10000000]",
+      "description": "Maximum number of simulation steps before automatic termination.",
+      "example": 50000,
+      "units": "steps",
+      "category": "simulation",
+      "validation": {
+        "min": 1,
+        "max": 10000000,
+        "required": false
+      }
+    },
+    {
+      "name": "simulation_time_limit",
+      "type": "number",
+      "default": 0.0,
+      "range": "[0.0, 1e6]",
+      "description": "Absolute time limit for simulation in seconds. If zero, unlimited by time (only step limit).",
+      "example": 3600.0,
+      "units": "seconds",
+      "category": "simulation",
+      "validation": {
+        "min": 0.0,
+        "max": 1e6,
+        "required": false
+      }
+    },
+    {
+      "name": "visualization_enabled",
+      "type": "boolean",
+      "default": false,
+      "range": "[0, 1]",
+      "description": "Enable/disable visualization features. Provides real-time visualization of neural activity.",
+      "example": true,
+      "units": "boolean",
+      "category": "visualization",
+      "validation": {
+        "required": false
+      }
+    },
+    {
+      "name": "visualization_update_rate",
+      "type": "number",
+      "default": 30.0,
+      "range": "[1.0, 1000.0]",
+      "description": "Frame rate for visualization updates in Hz. Controls how frequently the visualization refreshes.",
+      "example": 60.0,
+      "units": "Hz",
+      "category": "visualization",
+      "validation": {
+        "min": 1.0,
+        "max": 1000.0,
+        "required": false
+      }
+    }
+  ]
+}

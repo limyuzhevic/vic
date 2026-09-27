@@ -29,6 +29,44 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Performance optimization components
+class PerformanceProfiler;
+class PerformanceOptimizer;
+class MemoryPool;
+class CacheSystem;
+class ParallelProcessor;
+class AlgorithmAnalyzer;
+
+// Optimized spike processing
+class OptimizedSpikeSystem;
+class SynapticIndex;
+class ConnectionGraph;
+
+// Optimized plasticity
+class OptimizedPlasticitySystem;
+class InactiveSynapseTracker;
+class WeightNormalizer;
+
+// Optimized memory
+class OptimizedWorkingMemory;
+class OptimizedEpisodicMemory;
+class MemoryCache;
+
+// Optimized configuration
+class OptimizedConfig;
+class ConfigCache;
+
+// Performance monitoring
+class PerformanceMonitor;
+class BenchmarkSuite;
+class RegressionDetector;
+
+// Profiling
+class CallProfiler;
+class MemoryProfiler;
+class CPProfiler;
+class ProfileExporter;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -93,6 +131,40 @@ public:
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
+    
+    // Performance optimization access
+    PerformanceProfiler* getPerformanceProfiler();
+    const PerformanceProfiler* getPerformanceProfiler() const;
+    PerformanceOptimizer* getPerformanceOptimizer();
+    const PerformanceOptimizer* getPerformanceOptimizer() const;
+    PerformanceMonitor* getPerformanceMonitor();
+    const PerformanceMonitor* getPerformanceMonitor() const;
+    
+    // Optimized systems access
+    OptimizedSpikeSystem* getOptimizedSpikeSystem();
+    const OptimizedSpikeSystem* getOptimizedSpikeSystem() const;
+    OptimizedPlasticitySystem* getOptimizedPlasticitySystem();
+    const OptimizedPlasticitySystem* getOptimizedPlasticitySystem() const;
+    
+    // Memory optimization access
+    OptimizedWorkingMemory* getOptimizedWorkingMemory();
+    const OptimizedWorkingMemory* getOptimizedWorkingMemory() const;
+    OptimizedEpisodicMemory* getOptimizedEpisodicMemory();
+    const OptimizedEpisodicMemory* getOptimizedEpisodicMemory() const;
+    
+    // Configuration optimization access
+    OptimizedConfig* getOptimizedConfig();
+    const OptimizedConfig* getOptimizedConfig() const;
+    
+    // Profiling access
+    CallProfiler* getCallProfiler();
+    const CallProfiler* getCallProfiler() const;
+    MemoryProfiler* getMemoryProfiler();
+    const MemoryProfiler* getMemoryProfiler() const;
+    CPProfiler* getCPProfiler();
+    const CPProfiler* getCPProfiler() const;
+    ProfileExporter* getProfileExporter();
+    const ProfileExporter* getProfileExporter() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();

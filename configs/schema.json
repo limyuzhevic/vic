@@ -1,0 +1,252 @@
+{
+  "name": "NLM Configuration Schema",
+  "version": "2.0.0",
+  "description": "Complete configuration schema for the Neural Learning Machine (NLM) with validation rules, type definitions, and documentation",
+  
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "random_seed": {
+        "type": "integer",
+        "description": "Random seed for reproducible experiments",
+        "min": 0,
+        "max": 2147483647,
+        "required": false,
+        "default": 42
+      },
+      "simulation_timestep": {
+        "type": "number",
+        "description": "Simulation timestep in seconds",
+        "min": 1e-9,
+        "max": 1.0,
+        "required": false,
+        "default": 0.001
+      },
+      "neuron_count": {
+        "type": "integer",
+        "description": "Number of neurons in the brain",
+        "min": 1,
+        "max": 1000000,
+        "required": false,
+        "default": 1000
+      },
+      "region_count": {
+        "type": "integer",
+        "description": "Number of brain regions",
+        "min": 1,
+        "max": 1000,
+        "required": false,
+        "default": 2
+      },
+      "connection_probability": {
+        "type": "number",
+        "description": "Connection probability for random connectivity",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.1
+      },
+      "plasticity_learning_rate": {
+        "type": "number",
+        "description": "Base learning rate for plasticity mechanisms",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.01
+      },
+      "stdp_ltp_weight": {
+        "type": "number",
+        "description": "Spike-timing dependent plasticity long-term potentiation weight",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.01
+      },
+      "stdp_ltd_weight": {
+        "type": "number",
+        "description": "Spike-timing dependent plasticity long-term depression weight",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.012
+      },
+      "stdp_time_constant": {
+        "type": "number",
+        "description": "Time constant for STDP decay",
+        "min": 0.1,
+        "max": 1000.0,
+        "required": false,
+        "default": 20.0
+      },
+      "development_synaptogenesis_rate": {
+        "type": "number",
+        "description": "Rate of synaptogenesis during development",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.001
+      },
+      "development_pruning_rate": {
+        "type": "number",
+        "description": "Rate of neural pruning during development",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.0001
+      },
+      "dopamine_baseline": {
+        "type": "number",
+        "description": "Baseline dopamine level for neuromodulation",
+        "min": 0.0,
+        "max": 10.0,
+        "required": false,
+        "default": 0.1
+      },
+      "reward_discount_factor": {
+        "type": "number",
+        "description": "Discount factor for reward signals",
+        "min": 0.0,
+        "max": 1.0,
+        "required": false,
+        "default": 0.99
+      },
+      "environment_name": {
+        "type": "string",
+        "description": "Name of the simulated environment",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+        "maxLength": 100,
+        "required": false,
+        "default": "GridWorld"
+      },
+      "environment_width": {
+        "type": "integer",
+        "description": "Width of the simulation environment",
+        "min": 1,
+        "max": 10000,
+        "required": false,
+        "default": 10
+      },
+      "environment_height": {
+        "type": "integer",
+        "description": "Height of the simulation environment",
+        "min": 1,
+        "max": 10000,
+        "required": false,
+        "default": 10
+      },
+      "log_level": {
+        "type": "string",
+        "description": "Logging verbosity level",
+        "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+        "required": false,
+        "default": "INFO"
+      },
+      "log_to_file": {
+        "type": "boolean",
+        "description": "Enable/disable file logging",
+        "required": false,
+        "default": false
+      },
+      "log_filename": {
+        "type": "string",
+        "description": "Filename for log output",
+        "pattern": "^[a-zA-Z0-9_\\-\\.]+$",
+        "maxLength": 255,
+        "required": false,
+        "default": "nlm.log"
+      },
+      "max_simulation_steps": {
+        "type": "integer",
+        "description": "Maximum number of simulation steps",
+        "min": 1,
+        "max": 10000000,
+        "required": false,
+        "default": 10000
+      },
+      "simulation_time_limit": {
+        "type": "number",
+        "description": "Absolute time limit for simulation in seconds",
+        "min": 0.0,
+        "max": 1e6,
+        "required": false,
+        "default": 0.0
+      },
+      "visualization_enabled": {
+        "type": "boolean",
+        "description": "Enable/disable visualization features",
+        "required": false,
+        "default": false
+      },
+      "visualization_update_rate": {
+        "type": "number",
+        "description": "Frame rate for visualization updates in Hz",
+        "min": 1.0,
+        "max": 1000.0,
+        "required": false,
+        "default": 30.0
+      }
+    }
+  },
+  
+  "parameterGroups": {
+    "simulation": {
+      "description": "Core simulation parameters",
+      "parameters": ["random_seed", "simulation_timestep", "max_simulation_steps", "simulation_time_limit"]
+    },
+    "neurons": {
+      "description": "Neural network architecture parameters",
+      "parameters": ["neuron_count", "region_count", "connection_probability"]
+    },
+    "plasticity": {
+      "description": "Synaptic plasticity mechanisms",
+      "parameters": ["plasticity_learning_rate", "stdp_ltp_weight", "stdp_ltd_weight", "stdp_time_constant"]
+    },
+    "development": {
+      "description": "Neural development processes",
+      "parameters": ["development_synaptogenesis_rate", "development_pruning_rate"]
+    },
+    "neuromodulation": {
+      "description": "Neuromodulation and reward systems",
+      "parameters": ["dopamine_baseline", "reward_discount_factor"]
+    },
+    "environment": {
+      "description": "Simulation environment settings",
+      "parameters": ["environment_name", "environment_width", "environment_height"]
+    },
+    "logging": {
+      "description": "Logging and output settings",
+      "parameters": ["log_level", "log_to_file", "log_filename"]
+    },
+    "visualization": {
+      "description": "Visualization and display settings",
+      "parameters": ["visualization_enabled", "visualization_update_rate"]
+    }
+  },
+  
+  "defaultValues": {
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "plasticity_learning_rate": 0.01,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_time_constant": 20.0,
+    "development_synaptogenesis_rate": 0.001,
+    "development_pruning_rate": 0.0001,
+    "dopamine_baseline": 0.1,
+    "reward_discount_factor": 0.99,
+    "environment_name": "GridWorld",
+    "environment_width": 10,
+    "environment_height": 10,
+    "log_level": "INFO",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0,
+    "visualization_enabled": false,
+    "visualization_update_rate": 30.0
+  }
+}

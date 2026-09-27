@@ -1,0 +1,78 @@
+DOXYGEN
+# Doxyfile configuration for NLM documentation
+
+PROJECT_NAME           = "NLM"
+PROJECT_NUMBER         = 0.1.0
+PROJECT_BRIEF          = "Neural Learning Machine Framework"
+PROJECT_LOGO           = "docs/logo.png"
+
+INPUT                  = src/core/include src/neural/include src/plasticity/include src/memory/include src/neuromodulation/include src/development/include src/cognition/include src/sensory/include src/prediction/include src/motor/include src/environment/include src/experiment/include src/agent/include src/application/include
+
+OUTPUT_DIRECTORY       = docs/api
+
+GENERATE_LATEX         = NO
+GENERATE_MAN          = NO
+GENERATE_RTF          = NO
+GENERATE_HTML         = YES
+GENERATE_XML          = YES
+GENERATE_CHI          = NO
+
+HTML_OUTPUT           = html
+HTML_COLORSTYLE       = MONO
+HTML_EXTRA_STYLESHEET = "style.css"
+
+HTML_INDEX            = index.html
+
+HIDE_UNDOCUMENTED_MEMBERS = NO
+HIDE_UNDOCUMENTED_CLASSES = NO
+HIDE_TRAILING_WHITESPACE = YES
+
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH   = YES
+GROUP_GRAPHS          = YES
+UML_LOOK              = YES
+TEMPLATE_RELATIONS   = YES
+INCLUDE_GRAPH         = YES
+INCLUDED_BY_GRAPH     = YES
+CALL_GRAPH           = YES
+CALLED_BY_GRAPH      = YES
+GRAPHICAL_HIERARCHY  = YES
+
+ENUM_VALUES_SECTION_ORDER = YES
+
+ALLEXTERNALS          = NO
+EXTERNAL_GROUPS       = YES
+PERL_PATH            = "/usr/bin/perl"
+
+EXCLUDE_PATTERNS      = *.test.cpp
+
+MAX_INITIALIZER_LINES = 30
+SHOW_USED_FILES      = YES
+
+GENERATE_TODOLIST    = YES
+GENERATE_TESTLIST    = YES
+GENERATE_BUGLIST     = YES
+GENERATE_DEPRECATEDLIST = YES
+
+HIGHLIGHT_NAMING_POLICY = CamelCase
+
+SHOW_INCLUDE_FILES    = YES
+
+GENERATE_HTML_HELP     = NO
+GENERATE_QHP          = NO
+GENERATE_ECLIPSEHELP   = NO
+GENERATE_DOCSET       = NO
+GENERATE_XMLDOCSET    = YES
+GENERATE_DOCBOOK      = NO
+GENERATE_LATEX       = YES
+GENERATE_MAN         = YES
+GENERATE_RTF        = YES
+GENERATE_SQL         = NO
+GENERATE_TECHREPORT  = YES
+GENERATE_WORD_DOCS   = YES
+GENERATE_XML_DOCS   = YES
+
+GENERATE_UNDOCUMENTED_PARAM = YES
+
+EXTERNAL_GROUPS     = YES
+ALLEXTERNALS        = NO
