@@ -1,10 +1,12 @@
-#pragma once
+#ifndef CONFIG_HPP
+#define CONFIG_HPP
 
 #include <string>
 #include <memory>
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -23,7 +25,7 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
+// Configuration source enum
 enum class ConfigSource {
     Default,
     File,
@@ -61,7 +63,7 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +102,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON serialization/deserialization helpers
+    static ConfigValue fromJson(const nlohmann::json& j);
+    static nlohmann::json toJson(const ConfigValue& value);
+    
+    // Configuration validation
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const ConfigValue& value);
 };
 
 } // namespace nlm
+
+#endif // CONFIG_HPP
