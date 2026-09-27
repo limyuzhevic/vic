@@ -3,11 +3,17 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <mutex>
+#include <chrono>
+#include <thread>
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+class SpikeEvent;
+
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -33,16 +39,22 @@ public:
     double getUpdateRate() const;
     
     // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    void visualizeNetwork(const Brain& brain);
     
     // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    void visualizeActivity(const Brain& brain);
     
     // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    void visualizeSpikes(const std::vector<SpikeEvent>& spikes);
     
     // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    void visualizeWeights(const Brain& brain);
+    
+    // Get visualization data
+    std::string getNetworkInfo(const Brain& brain) const;
+    std::string getActivityInfo(const Brain& brain) const;
+    std::string getSpikeInfo(const std::vector<SpikeEvent>& spikes) const;
+    std::string getWeightInfo(const Brain& brain) const;
     
 private:
     struct Impl;

@@ -36,7 +36,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
+        NLM_LOG_ERROR("Failed to initialize brain: Configuration validation failed or neural setup incomplete.");
+        NLM_LOG_ERROR("  Check that all required configuration parameters are set correctly.");
+        NLM_LOG_ERROR("  Required parameters: neuron_count, region_count, connection_probability");
         result.endTime = time(nullptr);
         return result;
     }

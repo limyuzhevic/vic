@@ -3,20 +3,44 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iostream>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Configuration validation rules
+    struct ValidationRule {
+        std::string keyPattern;
+        std::string valueType;
+        bool required;
+        std::string description;
+        std::string errorMessage;
+    };
+    
+    std::vector<ValidationRule> validationRules;
+    
+    // Validation errors
+    std::vector<std::string> validationErrors;
+    
+    // Index for O(1) key lookup (key -> index in entries vector)
+    std::unordered_map<std::string, size_t> keyIndex;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(new Impl) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -35,94 +59,48 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos && pos > 0) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Parse value based on type (simplified)
+            ConfigValue configValue;
+            if (value == "true" || value == "false") {
+                configValue = (value == "true");
+            } else if (isNumber(value)) {
+                if (value.find('.') != std::string::npos) {
+                    configValue = std::stod(value);
+                } else {
+                    configValue = std::stoll(value);
+                }
+            } else {
+                configValue = value;
             }
             
-            set(key, value, ConfigSource::File);
+            // Use the new set method with index
+            set(key, configValue, ConfigSource::File);
         }
     }
     
     return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Check if key already exists in index
+    auto it = pImpl->keyIndex.find(key);
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    if (it != pImpl->keyIndex.end()) {
+        // Update existing entry
+        size_t index = it->second;
+        if (index < pImpl->entries.size()) {
+            pImpl->entries[index].value = value;
+            pImpl->entries[index].source = source;
+        }
     } else {
+        // Add new entry
         pImpl->entries.emplace_back(key, value, source);
+        pImpl->keyIndex[key] = pImpl->entries.size() - 1;
     }
 }
 
@@ -143,73 +121,234 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Use index for O(1) lookup
+    return pImpl->keyIndex.find(key) != pImpl->keyIndex.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+    auto it = pImpl->keyIndex.find(key);
+    if (it != pImpl->keyIndex.end()) {
+        size_t index = it->second;
+        if (index < pImpl->entries.size()) {
+            // Remove from entries vector
+            pImpl->entries.erase(pImpl->entries.begin() + index);
+            
+            // Update index for all entries after the removed one
+            for (auto& pair : pImpl->keyIndex) {
+                if (pair.second > index) {
+                    pair.second--;
+                }
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+            
+            // Remove from index
+            pImpl->keyIndex.erase(it);
+        }
     }
-    return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = pImpl->keyIndex.find(key);
+    if (it == pImpl->keyIndex.end()) {
+        return std::nullopt;
+    }
+    
+    size_t index = it->second;
+    if (index >= pImpl->entries.size()) {
+        return std::nullopt;
+    }
+    
+    try {
+        return std::get<T>(pImpl->entries[index].value);
+    } catch (const std::bad_variant_access&) {
+        return std::nullopt;
+    }
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Validate configuration against rules
+bool Config::validate() const {
+    std::vector<std::string> errors;
+    
+    // Check required parameters
+    for (const auto& rule : pImpl->validationRules) {
+        if (rule.required) {
+            bool found = false;
+            for (const auto& entry : pImpl->entries) {
+                if (matchesPattern(entry.key, rule.keyPattern)) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                errors.push_back("Missing required configuration parameter matching pattern: " + rule.keyPattern);
+                if (!rule.errorMessage.empty()) {
+                    errors.push_back("  " + rule.errorMessage);
+                }
+            }
+        }
+    }
+    
+    // Check value types
+    for (const auto& entry : pImpl->entries) {
+        bool matched = false;
+        for (const auto& rule : pImpl->validationRules) {
+            if (matchesPattern(entry.key, rule.keyPattern)) {
+                matched = true;
+                if (!validateValueType(entry.value, rule.valueType)) {
+                    errors.push_back("Invalid value type for configuration parameter: " + entry.key);
+                    errors.push_back("  Expected type: " + rule.valueType);
+                    errors.push_back("  Actual value: " + getValueString(entry.value));
+                }
+                break;
+            }
+        }
+        
+        if (!matched) {
+            errors.push_back("Unexpected configuration parameter: " + entry.key);
+        }
+    }
+    
+    // Store validation errors
+    if (!errors.empty()) {
+        pImpl->validationErrors = errors;
+        return false;
+    }
+    
+    pImpl->validationErrors.clear();
+    return true;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+std::vector<std::string> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
+
+// Add validation rule
+void Config::addValidationRule(const std::string& keyPattern, const std::string& valueType, 
+                               bool required, const std::string& description, 
+                               const std::string& errorMessage) {
+    ValidationRule rule;
+    rule.keyPattern = keyPattern;
+    rule.valueType = valueType;
+    rule.required = required;
+    rule.description = description;
+    rule.errorMessage = errorMessage;
+    
+    pImpl->validationRules.push_back(rule);
+}
+
+// Clear all validation rules
+void Config::clearValidationRules() {
+    pImpl->validationRules.clear();
+    pImpl->validationErrors.clear();
+}
+
+// Helper function for trimming strings
+static std::string trim(const std::string& str) {
+    size_t first = str.find_first_not_of(' ');
+    if (first == std::string::npos) return str;
+    size_t last = str.find_last_not_of(' ');
+    return str.substr(first, (last - first + 1));
+}
+
+// Helper function for checking if a string is a number
+static bool isNumber(const std::string& str) {
+    return !str.empty() && std::find_if(str.begin(), str.end(), [](char c) { return !std::isdigit(c) && c != '.'; }) == str.end();
+}
+
+// Helper function to match key patterns (simple wildcard matching)
+static bool matchesPattern(const std::string& key, const std::string& pattern) {
+    // Simple wildcard matching: * matches any sequence, ? matches single character
+    size_t keyPos = 0;
+    size_t patternPos = 0;
+    
+    while (keyPos < key.size() && patternPos < pattern.size()) {
+        if (pattern[patternPos] == '*') {
+            // Skip consecutive asterisks
+            while (patternPos + 1 < pattern.size() && pattern[patternPos + 1] == '*') {
+                patternPos++;
+            }
+            
+            if (patternPos + 1 >= pattern.size()) {
+                // Trailing asterisk matches rest of key
+                return true;
+            }
+            
+            // Find next pattern character in key
+            char nextChar = pattern[patternPos + 1];
+            size_t nextKeyPos = key.find(nextChar, keyPos);
+            if (nextKeyPos == std::string::npos) {
+                return false;
+            }
+            
+            keyPos = nextKeyPos;
+            patternPos++;
+        } else if (pattern[patternPos] == '?') {
+            keyPos++;
+            patternPos++;
+        } else {
+            if (key[keyPos] != pattern[patternPos]) {
+                return false;
+            }
+            keyPos++;
+            patternPos++;
+        }
+    }
+    
+    // Skip trailing asterisks in pattern
+    while (patternPos < pattern.size() && pattern[patternPos] == '*') {
+        patternPos++;
+    }
+    
+    return keyPos == key.size() && patternPos == pattern.size();
+}
+
+// Helper function to validate value type
+static bool validateValueType(const ConfigValue& value, const std::string& type) {
+    if (type == "int" || type == "integer") {
+        return std::holds_alternative<int>(value) || std::holds_alternative<int64_t>(value);
+    } else if (type == "float" || type == "double") {
+        return std::holds_alternative<double>(value) || std::holds_alternative<float>(value);
+    } else if (type == "string") {
+        return std::holds_alternative<std::string>(value);
+    } else if (type == "bool" || type == "boolean") {
+        return std::holds_alternative<bool>(value);
+    } else if (type == "list") {
+        return std::holds_alternative<std::vector<int>>(value) ||
+               std::holds_alternative<std::vector<double>>(value) ||
+               std::holds_alternative<std::vector<std::string>>(value);
+    }
+    
+    return false; // Unknown type
+}
+
+// Helper function to get string representation of a ConfigValue
+static std::string getValueString(const ConfigValue& value) {
+    if (std::holds_alternative<int>(value)) {
+        return std::to_string(std::get<int>(value));
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return std::to_string(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return std::to_string(std::get<double>(value));
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value) ? "true" : "false";
+    } else if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    } else if (std::holds_alternative<std::vector<int>>(value)) {
+        return "[int list]";
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
+        return "[float list]";
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+        return "[string list]";
+    }
+    
+    return "unknown";
+}
 
 } // namespace nlm

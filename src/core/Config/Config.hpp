@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -43,6 +44,29 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Batch configuration result
+struct BatchLoadResult {
+    std::vector<std::string> loadedFiles;
+    std::vector<std::string> failedFiles;
+    std::vector<std::string> errors;
+    size_t totalEntriesLoaded;
+    
+    BatchLoadResult() : totalEntriesLoaded(0) {}
+    
+    bool success() const {
+        return failedFiles.empty();
+    }
+    
+    std::string summary() const {
+        std::stringstream ss;
+        ss << "Batch Load Summary:" << std::endl;
+        ss << "  Loaded files: " << loadedFiles.size() << std::endl;
+        ss << "  Failed files: " << failedFiles.size() << std::endl;
+        ss << "  Total entries: " << totalEntriesLoaded << std::endl;
+        return ss.str();
+    }
+};
+
 // Main configuration class
 class Config {
 public:
@@ -60,6 +84,12 @@ public:
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
+    
+    // Load from multiple files (batch loading)
+    BatchLoadResult loadBatch(const std::vector<std::string>& filepaths);
+    
+    // Load from directory recursively
+    BatchLoadResult loadFromDirectory(const std::string& directoryPath);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,6 +123,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Batch operations
+    void batchSet(const std::vector<std::pair<std::string, ConfigValue>>& settings);
+    void batchRemove(const std::vector<std::string>& keys);
+    
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Get file list from directory
+    static std::vector<std::string> getConfigFilesFromDirectory(const std::string& directoryPath);
+    
+    // Get configuration file extensions
+    static std::vector<std::string> getSupportedConfigExtensions();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +144,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isConfigFile(const std::string& filename);
+    
+    // Validation helpers
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
 };
 
 } // namespace nlm

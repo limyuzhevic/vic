@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Real implementation provides biological neuromodulation effects
 
 class Neuromodulator {
 public:
@@ -21,7 +21,6 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -31,8 +30,16 @@ protected:
     Neuromodulator() = default;
 };
 
+// Forward declarations for neuromodulators
+class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Novelty;
+class PredictionError;
+class Curiosity;
+
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -54,36 +61,102 @@ private:
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention and memory functions
+    void signalAttention(float attention);
+    void signalRewardPredictionError(float error);
+    
+    // Query/modification methods
+    float getAttentionLevel() const;
+    void setMemoryConsolidationRate(float rate);
+    float getMemoryConsolidationRate() const;
+    void setAttentionWeight(float weight);
+    float getAttentionWeight() const;
+    float getTotalAttentionBoost() const;
+    uint64_t getAttentionUpdates() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal and vigilance functions
+    void signalStress(float stress);
+    void signalNovelty(float novelty);
+    void signalSleep(float sleepQuality);
+    
+    // Query/modification methods
+    float getArousalLevel() const;
+    void setArousalThreshold(float threshold);
+    float getArousalThreshold() const;
+    float getVigilanceLevel() const;
+    void setVigilanceLevel(float level);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Mood and social functions
+    void signalReward(float reward);
+    void signalPunishment(float punishment);
+    void signalSocialInteraction(float interactionValue);
+    
+    // Query/modification methods
+    float getMood() const;
+    void setMood(float mood);
+    float getImpulsivity() const;
+    void setImpulsivity(float impulsivity);
+    float getRewardSensitivity() const;
+    void setRewardSensitivity(float sensitivity);
+    float getPunishmentSensitivity() const;
+    void setPunishmentSensitivity(float sensitivity);
+    float getSocialBonding() const;
+    void setSocialBonding(float bonding);
+    float getLearningRate() const;
+    void setLearningRate(float rate);
+    float getApproachWithdrawal() const;
+    void setApproachWithdrawal(float tendency);
+    float getTotalRewards() const;
+    float getTotalPunishments() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

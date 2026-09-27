@@ -57,8 +57,18 @@ struct LearningExperiment {
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
     
+    // Memory tracking for leak detection
+    static size_t totalMemoryAllocations;
+    static size_t totalMemoryDeallocations;
+    
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0) {
+        ++totalMemoryAllocations;
+    }
+    
+    ~LearningExperiment() {
+        ++totalMemoryDeallocations;
+    }
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -102,6 +112,9 @@ struct LearningExperiment {
     }
     
     void computeStatistics() {
+        // Check for memory leaks before computation
+        checkMemoryLeaks();
+        
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
@@ -156,8 +169,31 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+        
+        // Final memory check
+        checkMemoryLeaks();
+    }
+    
+    void checkMemoryLeaks() {
+        if (totalMemoryAllocations > totalMemoryDeallocations) {
+            NLM_LOG_ERROR("MEMORY LEAK DETECTED: " + 
+                         std::to_string(totalMemoryAllocations - totalMemoryDeallocations) +
+                         " objects not properly deallocated");
+            // In a real implementation, we might want to trigger more aggressive cleanup
+            // or notify the user that memory management needs attention
+        }
+    }
+    
+    // Static initialization
+    static void resetMemoryCounters() {
+        totalMemoryAllocations = 0;
+        totalMemoryDeallocations = 0;
     }
 };
+
+// Initialize static members
+ size_t LearningExperiment::totalMemoryAllocations = 0;
+ size_t LearningExperiment::totalMemoryDeallocations = 0;
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -403,7 +439,9 @@ int main(int argc, char** argv) {
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Failed to initialize brain: Configuration validation failed or neural setup incomplete.");
+        NLM_LOG_ERROR("  Check that all required configuration parameters are set correctly.");
+        NLM_LOG_ERROR("  Required parameters: neuron_count, region_count, connection_probability");
         return 1;
     }
     

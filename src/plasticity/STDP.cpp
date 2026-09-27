@@ -59,37 +59,45 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Apply real STDP formula: for each pre-post spike pair, calculate exponential weight change
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            float delta_t = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+            if (delta_t > 0) {
+                // Pre before post: LONG-TERM POTENTIATION (LTP)
+                // More recent pre-before-post results in stronger potentiation
+                float delta = pImpl->ltpWeight * std::exp(-delta_t / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+            } else if (delta_t < 0) {
+                // Post before pre: LONG-TERM DEPRESSION (LTD)
+                // More recent post-before-pre results in stronger depression
+                float delta = pImpl->ltdWeight * std::exp(delta_t / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // delta_t == 0: simultaneous spikes produce no net change
         }
     }
     
-    // Apply weight change with bounds
+    // Apply weight change with bounds and biological constraints
     if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
+        // Scale by synaptic efficacy - stronger synapses modulate more strongly
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
+        // Ensure weight change doesn't exceed bounds
+        float currentWeight = synapse->getWeight();
+        float potentialWeight = currentWeight + totalDelta;
         
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        if (potentialWeight >= pImpl->minWeight && potentialWeight <= pImpl->maxWeight) {
+            // Apply weight change
+            synapse->addToWeight(totalDelta);
+            
+            // Update eligibility trace for reward-modulated learning
+            // This enables R-STDP by storing weight changes for neuromodulator application
+            float currentTrace = synapse->getEligibilityTrace();
+            synapse->setEligibilityTrace(currentTrace + totalDelta);
+        }
     }
 }
 

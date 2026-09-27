@@ -11,7 +11,7 @@
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations - only truly necessary for complex dependencies
 class Config;
 class RandomGenerator;
 class SimulationClock;

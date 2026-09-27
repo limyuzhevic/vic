@@ -60,7 +60,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
     if (!brain->initialize()) {
-        std::cerr << "Failed to initialize brain!\n";
+        std::cerr << "Failed to initialize brain: Configuration validation failed or neural setup incomplete.\n";
+        std::cerr << "  Check that all required configuration parameters are set correctly.\n";
+        std::cerr << "  Required parameters: neuron_count, region_count, connection_probability\n";
         return 1;
     }
     
