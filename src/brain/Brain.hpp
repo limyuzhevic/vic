@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -28,6 +29,14 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class MemoryManager;
+class PlasticityManager;
+class DevelopmentManager;
+class NeuromodulationManager;
+class CognitionManager;
+class PredictionManager;
+class StatisticsManager;
+class ConfigurationManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -45,13 +54,22 @@ struct InterRegionConnection {
 };
 
 // Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Now refactored as a simple coordinator that delegates to specialized manager classes
+// This follows the Single Responsibility Principle with improved separation of concerns
 
 class Brain {
 public:
-    // Create brain with configuration
-    explicit Brain(std::shared_ptr<Config> config);
+    // Create brain with configuration and all required managers
+    // Dependency injection enables testability and extensibility
+    Brain(std::shared_ptr<Config> config,
+          std::unique_ptr<MemoryManager> memoryManager,
+          std::unique_ptr<PlasticityManager> plasticityManager,
+          std::unique_ptr<DevelopmentManager> developmentManager,
+          std::unique_ptr<NeuromodulationManager> neuromodulationManager,
+          std::unique_ptr<CognitionManager> cognitionManager,
+          std::unique_ptr<PredictionManager> predictionManager,
+          std::unique_ptr<StatisticsManager> statisticsManager,
+          std::unique_ptr<ConfigurationManager> configurationManager);
     
     ~Brain();
     
@@ -193,9 +211,42 @@ public:
     // Logging
     void logStatus() const;
     
+    // Manager access for testing and monitoring
+    MemoryManager* getMemoryManager() { return memoryManager.get(); }
+    PlasticityManager* getPlasticityManager() { return plasticityManager.get(); }
+    DevelopmentManager* getDevelopmentManager() { return developmentManager.get(); }
+    NeuromodulationManager* getNeuromodulationManager() { return neuromodulationManager.get(); }
+    CognitionManager* getCognitionManager() { return cognitionManager.get(); }
+    PredictionManager* getPredictionManager() { return predictionManager.get(); }
+    StatisticsManager* getStatisticsManager() { return statisticsManager.get(); }
+    ConfigurationManager* getConfigurationManager() { return configurationManager.get(); }
+    
 private:
+    // Core components
+    std::shared_ptr<Config> config;
+    std::unique_ptr<RandomGenerator> randomGenerator;
+    std::unique_ptr<SimulationClock> simulationClock;
+    std::unique_ptr<Logger> logger;
+    
+    // All specialized managers (dependency injection)
+    std::unique_ptr<MemoryManager> memoryManager;
+    std::unique_ptr<PlasticityManager> plasticityManager;
+    std::unique_ptr<DevelopmentManager> developmentManager;
+    std::unique_ptr<NeuromodulationManager> neuromodulationManager;
+    std::unique_ptr<CognitionManager> cognitionManager;
+    std::unique_ptr<PredictionManager> predictionManager;
+    std::unique_ptr<StatisticsManager> statisticsManager;
+    std::unique_ptr<ConfigurationManager> configurationManager;
+    
+    // Phase 2: Real neural computation components
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Brain state
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
