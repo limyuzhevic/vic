@@ -13,18 +13,30 @@ class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
     
-    // Get modulator name
+    /**
+     * @brief Get modulator name
+     * @return Human-readable name of the neuromodulator
+     */
     virtual const char* getName() const = 0;
     
-    // Get current concentration/level
+    /**
+     * @brief Get current concentration/level
+     * @return Current level normalized to [0, 1] range
+     */
     virtual float getLevel() const = 0;
     virtual void setLevel(float level) = 0;
     
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    /**
+     * @brief Get plasticity modulation factor
+     * @return Factor that multiplies plasticity learning rates
+     * @note Higher values increase learning speed, lower values decrease it
+     */
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    /**
+     * @brief Update neuromodulator state
+     * @param dt Timestep duration in milliseconds
+     */
     virtual void update(TimestepDuration dt) = 0;
     
 protected:
@@ -44,8 +56,16 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
+    /**
+     * @brief Signal reward reception
+     * @param reward Reward value (typically positive)
+     */
     void signalReward(float reward);
+    
+    /**
+     * @brief Signal reward prediction error
+     * @param error Prediction error (positive = reward higher than expected)
+     */
     void signalRewardPredictionError(float error);
     
 private:
@@ -53,7 +73,7 @@ private:
     Impl* pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
+// Acetylcholine: Attention and memory consolidation neuromodulator
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
@@ -64,7 +84,7 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
-// Norepinephrine: Arousal and vigilance
+// Norepinephrine: Arousal and vigilance neuromodulator
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
@@ -75,7 +95,7 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
-// Serotonin: Mood, impulsivity, and social behavior
+// Serotonin: Mood, impulsivity, and social behavior neuromodulator
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
