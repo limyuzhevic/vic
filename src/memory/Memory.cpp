@@ -16,16 +16,32 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Real implementation with capacity management and trace decay
+    // Check if neuron already exists
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // Handle capacity limits
+    if (pImpl->items.size() >= pImpl->capacity) {
+        // Remove weakest trace to make room (eviction policy)
+        size_t weakestIndex = 0;
+        float weakestValue = pImpl->items[0].second;
+        
+        for (size_t i = 1; i < pImpl->items.size(); ++i) {
+            if (pImpl->items[i].second < weakestValue) {
+                weakestValue = pImpl->items[i].second;
+                weakestIndex = i;
+            }
+        }
+        
+        pImpl->items.erase(pImpl->items.begin() + weakestIndex);
     }
+    
+    pImpl->items.emplace_back(neuron, value);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
@@ -108,7 +124,62 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Real episodic memory consolidation
+    // Calculate relevance scores for each episode based on neural activation patterns
+    std::vector<std::pair<size_t, float>> relevanceScores;
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        
+        // Calculate relevance based on:
+        // 1. Pattern strength (mean neural activation)
+        // 2. Recentness (recency weight)
+        // 3. Coherence (correlation between neural patterns)
+        float patternStrength = 0.0f;
+        for (const auto& neuron : episode.neuralPattern) {
+            patternStrength += neuron.activationStrength;
+        }
+        patternStrength /= episode.neuralPattern.size();
+        
+        // Recency factor (more recent episodes have higher relevance)
+        float recencyFactor = 1.0f - (static_cast<float>(i) / pImpl->episodes.size());
+        
+        // Calculate coherence by checking consistency with recent episodes
+        float coherence = 1.0f; // Start with perfect coherence
+        if (i > 0 && i < pImpl->episodes.size() - 1) {
+            const auto& prevEpisode = pImpl->episodes[i - 1];
+            const auto& nextEpisode = pImpl->episodes[i + 1];
+            
+            // Simple coherence check based on pattern similarity
+            float similarity = 0.0f;
+            for (size_t j = 0; j < std::min(episode.neuralPattern.size(), prevEpisode.neuralPattern.size()); ++j) {
+                similarity += std::abs(episode.neuralPattern[j].activationStrength - 
+                                     prevEpisode.neuralPattern[j].activationStrength);
+            }
+            similarity /= std::min(episode.neuralPattern.size(), prevEpisode.neuralPattern.size());
+            coherence = 1.0f - similarity;
+        }
+        
+        // Final relevance score
+        float relevance = patternStrength * 0.5f + recencyFactor * 0.3f + coherence * 0.2f;
+        relevanceScores.emplace_back(i, relevance);
+    }
+    
+    // Sort episodes by relevance (descending)
+    std::sort(relevanceScores.begin(), relevanceScores.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Remove low-relevance episodes to maintain capacity
+    if (pImpl->episodes.size() > pImpl->maxEpisodes * 0.8f) {
+        size_t keepCount = static_cast<size_t>(pImpl->maxEpisodes * 0.8f);
+        std::vector<EpisodicMemoryItem> newEpisodes;
+        
+        for (size_t i = 0; i < keepCount && i < relevanceScores.size(); ++i) {
+            newEpisodes.push_back(pImpl->episodes[relevanceScores[i].first]);
+        }
+        
+        pImpl->episodes = newEpisodes;
+    }
 }
 
 // Semantic Memory Implementation

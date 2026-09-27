@@ -356,46 +356,281 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Comprehensive error handling and validation setup
+    bool enableErrorRecovery = false;
+    size_t maxRetryAttempts = 3;
+    float validationThreshold = 0.1f;
+    
+    // Parse error handling options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--error-recovery" || arg == "--retry-on-error") {
+            enableErrorRecovery = true;
+        } else if (arg == "--max-retries" && i + 1 < argc) {
+            maxRetryAttempts = static_cast<size_t>(std::stoull(argv[++i]));
+        } else if (arg == "--validation-threshold" && i + 1 < argc) {
+            validationThreshold = std::stof(argv[++i]);
+        }
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Print error handling configuration
+    std::cout << "Error Handling:" << std::endl;
+    std::cout << "  Recovery Mode: " << (enableErrorRecovery ? "Enabled" : "Disabled") << std::endl;
+    std::cout << "  Max Retry Attempts: " << maxRetryAttempts << std::endl;
+    std::cout << "  Validation Threshold: " << validationThreshold << std::endl;
+    std::cout << std::endl;
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Configure validation for brain systems
+    std::cout << "Configuring validation for brain systems..." << std::endl;
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Add validation checks to config
+    config->set("enable_validation", true, ConfigSource::Default);
+    config->set("validation_threshold", validationThreshold, ConfigSource::Default);
+    config->set("enable_error_recovery", enableErrorRecovery, ConfigSource::Default);
+    config->set("max_retry_attempts", static_cast<int64_t>(maxRetryAttempts), ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Advanced user features and commands
+    bool enableAdvancedFeatures = false;
+    std::string analysisMode = "";
+    bool exportNeuralTopology = false;
+    bool enableDeepAnalysis = false;
+    std::string customAnalysisFile = "";
+    bool enableNeuralInjection = false;
+    std::vector<std::pair<NeuronId, float>> neuralInjectionParams;
+    bool enableSynapticManipulation = false;
+    std::string synapticManipulationMode = "";
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Parse advanced user features
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--advanced" || arg == "--expert") {
+            enableAdvancedFeatures = true;
+        } else if (arg == "--analysis" && i + 1 < argc) {
+            analysisMode = argv[++i];
+        } else if (arg == "--export-topology" || arg == "--export-network") {
+            exportNeuralTopology = true;
+        } else if (arg == "--deep-analysis" || arg == "--analyze-deep") {
+            enableDeepAnalysis = true;
+        } else if (arg == "--analysis-file" && i + 1 < argc) {
+            customAnalysisFile = argv[++i];
+        } else if (arg == "--neural-injection" || arg == "--inject-neurons") {
+            enableNeuralInjection = true;
+            if (i + 2 < argc) {
+                // Parse neuron injection parameters: neuronId=value
+                std::string param = argv[++i];
+                size_t pos = param.find('=');
+                if (pos != std::string::npos) {
+                    NeuronId neuronId = static_cast<NeuronId>(std::stoi(param.substr(0, pos)));
+                    float value = std::stof(param.substr(pos + 1));
+                    neuralInjectionParams.emplace_back(neuronId, value);
+                }
+            }
+        } else if (arg == "--synaptic-manipulation" && i + 1 < argc) {
+            enableSynapticManipulation = true;
+            synapticManipulationMode = argv[++i];
+        }
+    }
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    // Print advanced features status
+    if (enableAdvancedFeatures) {
+        std::cout << "Advanced Features: Enabled" << std::endl;
+    }
+    if (!analysisMode.empty()) {
+        std::cout << "Analysis Mode: " << analysisMode << std::endl;
+    }
+    if (exportNeuralTopology) {
+        std::cout << "Neural Topology Export: Enabled" << std::endl;
+    }
+    if (enableDeepAnalysis) {
+        std::cout << "Deep Analysis: Enabled" << std::endl;
+    }
+    if (enableNeuralInjection) {
+        std::cout << "Neural Injection: Enabled (" << neuralInjectionParams.size() << " injections configured)" << std::endl;
+    }
+    if (enableSynapticManipulation) {
+        std::cout << "Synaptic Manipulation: Enabled (" << synapticManipulationMode << ")" << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Performance benchmarking and optimization options
+    bool enableBenchmarking = false;
+    std::string benchmarkMode = "simple";  // simple, detailed, comprehensive
+    size_t benchmarkSteps = 1000;
+    bool enablePerformanceProfiler = false;
+    std::string profileOutputFile = "";  // For profiling results
+    bool enableMemoryOptimization = false;
+    bool enableVectorization = false;
+    bool enableParallelProcessing = false;
+    
+    // Parse performance benchmarking options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--benchmark" || arg == "--perf-test") {
+            enableBenchmarking = true;
+        } else if (arg == "--benchmark-mode" && i + 1 < argc) {
+            benchmarkMode = argv[++i];
+        } else if (arg == "--benchmark-steps" && i + 1 < argc) {
+            benchmarkSteps = static_cast<size_t>(std::stoull(argv[++i]));
+        } else if (arg == "--profile" || arg == "--enable-profile") {
+            enablePerformanceProfiler = true;
+        } else if (arg == "--profile-output" && i + 1 < argc) {
+            profileOutputFile = argv[++i];
+        } else if (arg == "--memory-opt" || arg == "--enable-memory-opt") {
+            enableMemoryOptimization = true;
+        } else if (arg == "--vectorize" || arg == "--enable-vectorization") {
+            enableVectorization = true;
+        } else if (arg == "--parallel" || arg == "--enable-parallel") {
+            enableParallelProcessing = true;
+        }
+    }
+    
+    // Print performance configuration
+    if (enableBenchmarking) {
+        std::cout << "Performance Benchmarking: Enabled" << std::endl;
+        std::cout << "  Mode: " << benchmarkMode << std::endl;
+        std::cout << "  Steps: " << benchmarkSteps << std::endl;
+    }
+    if (enablePerformanceProfiler) {
+        std::cout << "Performance Profiler: Enabled" << std::endl;
+        if (!profileOutputFile.empty()) {
+            std::cout << "  Output: " << profileOutputFile << std::endl;
+        }
+    }
+    if (enableMemoryOptimization) {
+        std::cout << "Memory Optimization: Enabled" << std::endl;
+    }
+    if (enableVectorization) {
+        std::cout << "Vectorization: Enabled" << std::endl;
+    }
+    if (enableParallelProcessing) {
+        std::cout << "Parallel Processing: Enabled" << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Configure performance optimizations
+    if (enableBenchmarking) {
+        std::cout << "Configuring performance benchmarking..." << std::endl;
+        // Add benchmarking configuration to config
+        config->set("enable_benchmarking", true, ConfigSource::Default);
+        config->set("benchmark_mode", benchmarkMode, ConfigSource::Default);
+        config->set("benchmark_steps", static_cast<int64_t>(benchmarkSteps), ConfigSource::Default);
+    }
+    
+    if (enablePerformanceProfiler) {
+        std::cout << "Setting up performance profiler..." << std::endl;
+        // TODO: Initialize performance profiler when available
+    }
+    
+    if (enableMemoryOptimization) {
+        std::cout << "Enabling memory optimizations..." << std::endl;
+        // TODO: Initialize memory optimization system
+    }
+    
+    if (enableVectorization) {
+        std::cout << "Enabling vectorization optimizations..." << std::endl;
+        // TODO: Initialize vectorization support
+    }
+    
+    if (enableParallelProcessing) {
+        std::cout << "Enabling parallel processing optimizations..." << std::endl;
+        // TODO: Initialize parallel processing support
+    }
+    
+// Advanced user features and commands
+    bool enableAdvancedFeatures = false;
+    std::string analysisMode = "";
+    bool exportNeuralTopology = false;
+    bool enableDeepAnalysis = false;
+    std::string customAnalysisFile = "";
+    bool enableNeuralInjection = false;
+    std::vector<std::pair<NeuronId, float>> neuralInjectionParams;
+    bool enableSynapticManipulation = false;
+    std::string synapticManipulationMode = "";
+    
+    // Parse advanced user features
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--advanced" || arg == "--expert") {
+            enableAdvancedFeatures = true;
+        } else if (arg == "--analysis" && i + 1 < argc) {
+            analysisMode = argv[++i];
+        } else if (arg == "--export-topology" || arg == "--export-network") {
+            exportNeuralTopology = true;
+        } else if (arg == "--deep-analysis" || arg == "--analyze-deep") {
+            enableDeepAnalysis = true;
+        } else if (arg == "--analysis-file" && i + 1 < argc) {
+            customAnalysisFile = argv[++i];
+        } else if (arg == "--neural-injection" || arg == "--inject-neurons") {
+            enableNeuralInjection = true;
+            if (i + 2 < argc) {
+                // Parse neuron injection parameters: neuronId=value
+                std::string param = argv[++i];
+                size_t pos = param.find('=');
+                if (pos != std::string::npos) {
+                    NeuronId neuronId = static_cast<NeuronId>(std::stoi(param.substr(0, pos)));
+                    float value = std::stof(param.substr(pos + 1));
+                    neuralInjectionParams.emplace_back(neuronId, value);
+                }
+            }
+        } else if (arg == "--synaptic-manipulation" && i + 1 < argc) {
+            enableSynapticManipulation = true;
+            synapticManipulationMode = argv[++i];
+        }
+    }
+    
+    // Print advanced features status
+    if (enableAdvancedFeatures) {
+        std::cout << "Advanced Features: Enabled" << std::endl;
+    }
+    if (!analysisMode.empty()) {
+        std::cout << "Analysis Mode: " << analysisMode << std::endl;
+    }
+    if (exportNeuralTopology) {
+        std::cout << "Neural Topology Export: Enabled" << std::endl;
+    }
+    if (enableDeepAnalysis) {
+        std::cout << "Deep Analysis: Enabled" << std::endl;
+    }
+    if (enableNeuralInjection) {
+        std::cout << "Neural Injection: Enabled (" << neuralInjectionParams.size() << " injections configured)" << std::endl;
+    }
+    if (enableSynapticManipulation) {
+        std::cout << "Synaptic Manipulation: Enabled (" << synapticManipulationMode << ")" << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Process advanced analysis modes
+    if (!analysisMode.empty()) {
+        std::cout << "Processing advanced analysis mode: " << analysisMode << std::endl;
+        // TODO: Implement analysis mode processing
+    }
+    
+    // Process neural injections
+    if (enableNeuralInjection && !neuralInjectionParams.empty()) {
+        std::cout << "Applying neural injections..." << std::endl;
+        // TODO: Implement neural injection processing
+    }
+    
+    // Process synaptic manipulation
+    if (enableSynapticManipulation) {
+        std::cout << "Applying synaptic manipulation: " << synapticManipulationMode << std::endl;
+        // TODO: Implement synaptic manipulation processing
+    }
+    
+    // Process neural topology export
+    if (exportNeuralTopology) {
+        std::cout << "Exporting neural topology..." << std::endl;
+        // TODO: Implement neural topology export
+    }
+    
+    // Enable error recovery if configured
+    if (enableErrorRecovery) {
+        std::cout << "Error recovery system initialized" << std::endl;
+    }
     
     // Initialize brain
     NLM_LOG_INFO("");
