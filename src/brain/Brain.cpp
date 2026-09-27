@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +132,11 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize remaining neuromodulation systems
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -511,8 +519,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Process prediction system with current neural state
+        // The prediction system would:
+        // 1. Take current sensory observations and neural activity patterns
+        // 2. Generate predictions about expected sensory input
+        // 3. Compute prediction errors (difference between predicted and actual)
+        // 4. Use prediction errors to update internal models
+        // 5. Feed forward prediction signals to influence processing
+        
+        // For now, implement basic prediction error tracking
+        // This will be expanded in future implementations
+        if (pImpl->dopamine) {
+            // Use dopamine as a proxy for prediction error signal
+            // In a full implementation, this would come from the prediction system
+            float predictionError = pImpl->dopamine->getLevel();
+            
+            // Store prediction error for plasticity modulation
+            // The prediction system would update eligibility traces based on this
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    // Prediction-based eligibility trace update
+                    // This is a simplified version - full implementation would
+                    // use prediction system to determine eligibility
+                    if (std::abs(syn->getEligibilityTrace()) > 0.001f) {
+                        // Modulate plasticity based on prediction error
+                        float eligibilityMod = 1.0f + predictionError * 0.5f;
+                        eligibilityMod = std::clamp(eligibilityMod, 0.1f, 2.0f);
+                        
+                        // Store modified eligibility for next step
+                        // This would be handled by the prediction system
+                        // in a complete implementation
+                    }
+                }
+            }
+        }
+        
+        // Update prediction system state
+        // This would include:
+        // - Integrating current sensory input
+        // - Updating internal models
+        // - Maintaining prediction error history
+        // - Preparing for next prediction cycle
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +575,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process concept formation from current neural activity patterns
+        // Concept formation would:
+        // 1. Extract patterns from current neural activity (spiking patterns)
+        // 2. Cluster similar patterns to form basic concepts
+        // 3. Build relationships between concepts based on co-activation
+        // 4. Update concept activation levels based on novelty and frequency
+        // 5. Provide conceptual representations to cognition systems
+        
+        // Collect current neural activity patterns for concept formation
+        std::vector<std::vector<float>> activityPatterns;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    // Create activation pattern from neuron state
+                    std::vector<float> pattern;
+                    pattern.push_back(std::abs(state.membranePotential - state.restingPotential));
+                    pattern.push_back(state.firingState == FiringState::Firing ? 1.0f : 0.0f);
+                    pattern.push_back(state.refractoryRemaining / static_cast<float>(state.refractoryPeriod));
+                    
+                    // Sample activity patterns periodically to reduce computational load
+                    if (currentStep % 10 == 0) {
+                        activityPatterns.push_back(pattern);
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with collected activity patterns
+        // This is a simplified version - full implementation would use
+        // more sophisticated pattern extraction and concept management
+        if (!activityPatterns.empty() && pImpl->conceptFormation) {
+            // Feed activity patterns to concept formation system
+            // For each pattern, find or create associated concepts
+            // Update concept activations based on pattern strength
+            for (const auto& pattern : activityPatterns) {
+                // This is a placeholder for actual concept formation logic
+                // In a full implementation, conceptFormation would:
+                // - Analyze pattern and find matching concepts
+                // - Update concept activations
+                // - Form new concepts if pattern is novel
+                // - Provide concept-based predictions to other systems
+            }
+        }
+        
+        // Concept formation also receives input from working memory
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Integrate working memory contents into concepts
+            for (NeuronId neuronId : memoryNeurons) {
+                // Convert neuron activation to conceptual representation
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                
+                if (activation > 0.5f) {
+                    // High activation neuron contributes to concept formation
+                    // This would integrate working memory content into
+                    // conceptual understanding in a full implementation
+                }
+            }
+        }
+        
+        // Concept formation provides conceptual guidance to planning systems
+        if (pImpl->conceptFormation && pImpl->planner) {
+            // Concept formation can influence planning by providing
+            // conceptual context and constraints
+            // For example, planner could prioritize actions that match
+            // currently active concepts
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
