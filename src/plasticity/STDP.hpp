@@ -10,7 +10,10 @@ namespace nlm {
 class STDP : public PlasticityRule {
 public:
     STDP();
+    STDP(STDP&&) noexcept;
     ~STDP() override;
+    
+    STDP& operator=(STDP&&) noexcept;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,

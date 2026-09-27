@@ -10,7 +10,7 @@ struct StructuralPlasticity::Impl {
     float synaptogenesisRate;     // Probability of new synapse per step
     float pruningRate;            // Probability of pruning per step
     float minWeightThreshold;      // Below this weight, synapse is weak
-    float activityThreshold;      // Below this activity, synapse is unused
+    float activityThreshold;       // Below this activity, synapse is unused
     size_t maxSynapsesPerNeuron;   // Maximum outgoing synapses per neuron
     size_t maxTotalSynapses;       // Global maximum synapses
     bool useActivityDependency;    // Whether to use activity for pruning
@@ -28,7 +28,22 @@ struct StructuralPlasticity::Impl {
 
 StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 
-StructuralPlasticity::~StructuralPlasticity() = default;
+StructuralPlasticity::StructuralPlasticity(StructuralPlasticity&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+StructuralPlasticity& StructuralPlasticity::operator=(StructuralPlasticity&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
+
+StructuralPlasticity::~StructuralPlasticity() {
+    delete pImpl;
+}
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {

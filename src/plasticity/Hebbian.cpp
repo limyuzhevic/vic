@@ -16,7 +16,22 @@ struct Hebbian::Impl {
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+Hebbian::Hebbian(Hebbian&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+Hebbian& Hebbian::operator=(Hebbian&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
+
+Hebbian::~Hebbian() {
+    delete pImpl;
+}
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
@@ -101,6 +116,18 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::configure(float learningRate, float maxWeight, float minWeight) {
+    if (learningRate < 0.0f || maxWeight < minWeight) {
+        NLM_LOG_WARNING("Invalid Hebbian parameters: learningRate=%f, maxWeight=%f, minWeight=%f", 
+                        learningRate, maxWeight, minWeight);
+        return;
+    }
+    
+    setLearningRate(learningRate);
+    setMaxWeight(maxWeight);
+    pImpl->minWeight = std::clamp(minWeight, -10.0f, 0.0f);
 }
 
 } // namespace nlm

@@ -28,6 +28,10 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize NeuralWorkingMemory with null brain pointer");
+        return;
+    }
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");

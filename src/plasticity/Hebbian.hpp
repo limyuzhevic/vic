@@ -8,7 +8,10 @@ namespace nlm {
 class Hebbian : public PlasticityRule {
 public:
     Hebbian();
+    Hebbian(Hebbian&&) noexcept;
     ~Hebbian() override;
+    
+    Hebbian& operator=(Hebbian&&) noexcept;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
@@ -20,8 +23,8 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
-    void setMaxWeight(float maxWeight);
-    float getMaxWeight() const;
+    // Configure Hebbian parameters
+    void configure(float learningRate, float maxWeight, float minWeight);
     
 private:
     struct Impl;

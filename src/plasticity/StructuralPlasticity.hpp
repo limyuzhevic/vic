@@ -11,7 +11,10 @@ namespace nlm {
 class StructuralPlasticity {
 public:
     StructuralPlasticity();
+    StructuralPlasticity(StructuralPlasticity&&) noexcept;
     ~StructuralPlasticity();
+    
+    StructuralPlasticity& operator=(StructuralPlasticity&&) noexcept;
     
     // Create new synapse
     // TODO PHASE 2: Implement real synapse creation

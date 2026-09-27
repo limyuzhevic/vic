@@ -593,13 +593,24 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // This is a simple mapping - sensory encoding
     
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_WARNING("Sensory input data is empty");
+        return;
+    }
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_WARNING("No sensory neurons available");
+        return;
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
+        if (!pImpl->sensoryNeurons[i]) {
+            NLM_LOG_WARNING("Null sensory neuron at index %zu", i);
+            continue;
+        }
+        
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
@@ -617,22 +628,43 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    if (!neuron.isValid()) {
+        NLM_LOG_WARNING("Invalid neuron ID for current injection");
+        return;
+    }
+    
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            continue;
+        }
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
+            if (!n) {
+                continue;
+            }
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }
         }
     }
+    NLM_LOG_DEBUG("No neuron found with ID %d", static_cast<int>(neuron.value));
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            continue;
+        }
         for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                continue;
+            }
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
+                    if (!neuron) {
+                        continue;
+                    }
                     neuron->injectCurrent(current);
                 }
             }

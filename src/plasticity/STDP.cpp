@@ -18,7 +18,22 @@ struct STDP::Impl {
 
 STDP::STDP() : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+STDP::STDP(STDP&& other) noexcept : pImpl(other.pImpl) {
+    other.pImpl = nullptr;
+}
+
+STDP& STDP::operator=(STDP&& other) noexcept {
+    if (this != &other) {
+        delete pImpl;
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
+    return *this;
+}
+
+STDP::~STDP() {
+    delete pImpl;
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
@@ -131,6 +146,12 @@ float STDP::getTimeConstant() const {
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
+    if (ltpWeight < 0.0f || ltdWeight < 0.0f || tau <= 0.0f) {
+        NLM_LOG_WARNING("Invalid STDP parameters: ltpWeight=%f, ltdWeight=%f, tau=%f", 
+                        ltpWeight, ltdWeight, tau);
+        return;
+    }
+    
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
