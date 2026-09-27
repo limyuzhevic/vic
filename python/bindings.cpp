@@ -22,7 +22,7 @@ namespace nlm {
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        -----------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
@@ -158,6 +158,55 @@ PYBIND11_MODULE(pynlm, m) {
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (integer)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (boolean)")
+        .def("set", [](Config& self, const std::string& key, const ConfigValue& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (any type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            if (self.has(key)) {
+                return std::string("Value exists for key: ") + key;
+            }
+            return std::string();
+        }, py::arg("key"),
+             "Get configuration value (returns string description for demo)")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto val = self.getOr<std::string>(key, defaultValue);
+            return val;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value or default (string)")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            auto val = self.getOr<int>(key, defaultValue);
+            return val;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value or default (integer)")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            auto val = self.getOr<double>(key, defaultValue);
+            return val;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value or default (double)")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto val = self.getOr<bool>(key, defaultValue);
+            return val;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value or default (boolean)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
@@ -300,8 +349,7 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
+             py::arg("input"), "Inject sensory input into the brain")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
              "Inject current into a specific neuron")
@@ -323,35 +371,32 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a region by ID")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+       766:     .def("getRegionIds", &Brain::getRegionIds,
+767:              "Get all region IDs")
+768:         .def("getRegions", &Brain::getRegions,
+769:              py::return_value_policy::reference_internal,
+770:              "Get all regions")
+771:         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+772:              "Get total neuron count across all regions")
+773:         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+774:              "Get total synapse count across all regions")
+775:         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+776:              "Get count of active neurons")
+777:         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+778:              "Get count of currently firing neurons")
+779:         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+780:              "Get average firing rate across all neurons")
+781:         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+782:              "Get excitation/inhibition balance ratio")
+783:         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+784:              "Get total spike count")
+785:         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+786:              "Get current developmental stage")
+787:         .def("getConfig", &Brain::getConfig,
+788:              py::return_value_policy::reference_internal,
+789:              "Get the configuration")
+790:         .def("logStatus", &Brain::logStatus,
+791:              "Log brain status");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -362,16 +407,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             py::arg("percept"), "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+             py::arg("timestep"), "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
