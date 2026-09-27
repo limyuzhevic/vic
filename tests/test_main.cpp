@@ -1,130 +1,38 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
-
+// Main test runner for all configuration tests
 #include <iostream>
-#include <cassert>
+#include "test_config.cpp"
+#include "test_configuration_manager.cpp"
+#include "test_nested_configuration.cpp"
+#include "test_schema.cpp"
 
-// Forward declarations of test functions
-namespace test_types {
-    void runAll();
-}
-
-namespace test_config {
-    void runAll();
-}
-
-namespace test_random {
-    void runAll();
-}
-
-namespace test_clock {
-    void runAll();
-}
-
-namespace test_neuron {
-    void runAll();
-}
-
-namespace test_synapse {
-    void runAll();
-}
-
-namespace test_stdp {
-    void runAll();
-}
-
-namespace test_brain {
-    void runAll();
+void runAllTests() {
+    std::cout << "Running all configuration tests..." << std::endl << std::endl;
+    
+    std::cout << "=== Configuration Tests ===" << std::endl;
+    test_config::runAll();
+    
+    std::cout << std::endl << "=== Configuration Manager Tests ===" << std::endl;
+    test_configuration_manager::runAll();
+    
+    std::cout << std::endl << "=== Nested Configuration Tests ===" << std::endl;
+    test_nested_configuration::runAll();
+    
+    std::cout << std::endl << "=== Schema Tests ===" << std::endl;
+    test_schema::runAll();
+    
+    std::cout << std::endl << "=== All tests completed ===" << std::endl;
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
-    std::cout << std::endl;
-    
-    bool allPassed = true;
-    
-    std::cout << "Running Types tests..." << std::endl;
     try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        runAllTests();
+        std::cout << "\nAll configuration tests completed successfully!" << std::endl;
         return 0;
-    } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "\nTest failed with exception: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "\nTest failed with unknown exception." << std::endl;
         return 1;
     }
 }
