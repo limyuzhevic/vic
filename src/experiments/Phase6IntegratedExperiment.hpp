@@ -85,6 +85,15 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Advanced configuration options for enhanced demos
+    bool verboseLogging;
+    bool quietMode;
+    bool benchmarkMode;
+    bool showProgress;
+    bool exportResults;
+    std::string resultsFile;
+    double simulationSpeed;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +102,14 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , verboseLogging(false)
+        , quietMode(false)
+        , benchmarkMode(false)
+        , showProgress(false)
+        , exportResults(false)
+        , resultsFile("./phase6_results.json")
+        , simulationSpeed(1.0) {}
 };
 
 /**
@@ -133,6 +149,60 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    // Logging
+    void logStatus() const;
+    
+    /**
+     * Generate JSON output for results
+     */
+    std::string toJSON() const {
+        std::ostringstream oss;
+        oss << "{\n";
+        oss << "  \"memoryWorkingMemoryIntegrated\": " << (memoryWorkingMemoryIntegrated ? "true" : "false") << ",\n";
+        oss << "  \"memoryEpisodicMemoryIntegrated\": " << (memoryEpisodicMemoryIntegrated ? "true" : "false") << ",\n";
+        oss << "  \"neuromodulationIntegrated\": " << (neuromodulationIntegrated ? "true" : "false") << ",\n";
+        oss << "  \"predictionIntegrated\": " << (predictionIntegrated ? "true" : "false") << ",\n";
+        oss << "  \"developmentIntegrated\": " << (developmentIntegrated ? "true" : "false") << ",\n";
+        oss << "  \"checkpointingWorks\": " << (checkpointingWorks ? "true" : "false") << ",\n";
+        oss << "  \"replayWorks\": " << (replayWorks ? "true" : "false") << ",\n";
+        oss << "  \"totalReward\": " << totalReward << ",\n";
+        oss << "  \"avgFiringRate\": " << avgFiringRate << ",\n";
+        oss << "  \"avgSynapticWeight\": " << avgSynapticWeight << ",\n";
+        oss << "  \"memoryEpisodesStored\": " << memoryEpisodesStored << ",\n";
+        oss << "  \"noveltyLevel\": " << noveltyLevel << ",\n";
+        oss << "  \"curiosityLevel\": " << curiosityLevel << ",\n";
+        oss << "  \"dopamineLevel\": " << dopamineLevel << ",\n";
+        oss << "  \"totalWallClockTime\": " << totalWallClockTime << "\n";
+        oss << "}\n";
+        return oss.str();
+    }
+    
+    /**
+     * Generate human-readable summary
+     */
+    std::string summary() const {
+        std::ostringstream oss;
+        oss << "=== NLM Phase 6 Integration Results ===\n";
+        oss << "System Integration:\n";
+        oss << "  Working Memory: " << (memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+        oss << "  Episodic Memory: " << (memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+        oss << "  Neuromodulation: " << (neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+        oss << "  Prediction: " << (predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+        oss << "  Development: " << (developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << "\n";
+        oss << "  Checkpointing: " << (checkpointingWorks ? "WORKING" : "NOT WORKING") << "\n";
+        oss << "  Replay: " << (replayWorks ? "WORKING" : "NOT WORKING") << "\n";
+        oss << "\nPerformance Metrics:\n";
+        oss << "  Total Reward: " << totalReward << "\n";
+        oss << "  Average Firing Rate: " << avgFiringRate << "\n";
+        oss << "  Average Synaptic Weight: " << avgSynapticWeight << "\n";
+        oss << "  Memory Episodes Stored: " << memoryEpisodesStored << "\n";
+        oss << "  Novelty Level: " << noveltyLevel << "\n";
+        oss << "  Curiosity Level: " << curiosityLevel << "\n";
+        oss << "  Dopamine Level: " << dopamineLevel << "\n";
+        oss << "\nTiming:\n";
+        oss << "  Wall Clock Time: " << totalWallClockTime << "s\n";
+        oss << "=== End Results ===\n";
+        return oss.str();
+    }
 };
-
-} // namespace nlm

@@ -103,27 +103,22 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    float stepCount = static_cast<float>(config.maxSteps);
+    float safeDivision(float numerator) {
+        return (stepCount > 0.0f) ? (numerator / stepCount) : 0.0f;
+    }
+    
+    result.totalReward = safeDivision(totalReward);
+    result.avgFiringRate = safeDivision(totalFiringRate);
+    
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
-    
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    // Set end time for result
+    result.endTime = time(nullptr);
     
     // Test checkpointing
     if (config.enableCheckpointing) {
@@ -131,15 +126,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         if (brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+            try {
+                // Create new brain and load
+                auto brain2 = std::make_shared<Brain>(cfg);
+                brain2->initialize();
+                
+                if (brain2->load(config.checkpointPath)) {
+                    NLM_LOG_INFO("Checkpoint loaded successfully");
+                    result.checkpointingWorks = true;
+                } else {
+                    NLM_LOG_ERROR("Failed to load checkpoint");
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Exception during checkpoint loading: " + std::string(e.what()));
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
