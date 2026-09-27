@@ -1,0 +1,73 @@
+        // ========== STEP 8: Update prediction system ==========
+        if (pImpl->predictionSystem) {
+            // Update prediction system with current neural activity patterns
+            // Generate prediction based on current state and train with actual observations
+            
+            // Create current sensory state from active sensory neurons
+            std::vector<float> currentSensoryState;
+            if (!pImpl->sensoryNeurons.empty()) {
+                // Normalize sensory neuron activations to [0, 1] range for prediction input
+                currentSensoryState.reserve(pImpl->sensoryNeurons.size());
+                for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < 20; ++i) {
+                    auto* neuron = pImpl->sensoryNeurons[i];
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                              neuron->getState().restingPotential);
+                    float normalized = std::min(1.0f, activation / 20.0f);
+                    currentSensoryState.push_back(normalized);
+                }
+            }
+            
+            // If we have sensory state data, update prediction system
+            if (!currentSensoryState.empty()) {
+                // Use the NeuralPrediction system for more sophisticated prediction
+                // Get the prediction system from the agent
+                NeuralPrediction* neuralPredictor = dynamic_cast<NeuralPrediction*>(pImpl->predictionSystem.get());
+                if (neuralPredictor) {
+                    // Record current state for prediction
+                    neuralPredictor->recordSensoryState(currentSensoryState, currentStep);
+                    
+                    // Generate prediction for next state
+                    std::vector<float> predictedState = neuralPredictor->generatePrediction(currentStep);
+                    
+                    if (!predictedState.empty()) {
+                        // Update prediction with actual observation and compute error
+                        float predictionError = neuralPredictor->updateWithObservation(currentSensoryState, currentStep);
+                        
+                        // Pass prediction error to prediction error neuromodulator
+                        if (pImpl->predictionError) {
+                            pImpl->predictionError->setPredictionError(predictionError);
+                            pImpl->predictionError->update(pImpl->timestep);
+                        }
+                    }
+                } else {
+                    // Fallback to basic prediction system
+                    // Create a simple SensoryInput from current state
+                    class SimpleSensoryInput : public SensoryInput {
+                    public:
+                        SimpleSensoryInput(const std::vector<float>& data) : data_(data) {}
+                        const std::vector<float>& getData() const override { return data_; }
+                        std::vector<float> data_;
+                    };
+                    
+                    SimpleSensoryInput sensoryObservation(currentSensoryState);
+                    
+                    // Train the prediction model with this observation
+                    pImpl->predictionSystem->train(sensoryObservation);
+                    
+                    // Make prediction for next state based on current state
+                    auto prediction = pImpl->predictionSystem->predictNextState(sensoryObservation);
+                    
+                    // Update predictions if we have both predicted and actual
+                    if (prediction) {
+                        pImpl->predictionSystem->updatePredictions(*prediction, sensoryObservation);
+                    }
+                    
+                    // Get prediction error and update neuromodulator
+                    float predictionError = pImpl->predictionSystem->getPredictionError();
+                    if (pImpl->predictionError) {
+                        pImpl->predictionError->setPredictionError(predictionError);
+                        pImpl->predictionError->update(pImpl->timestep);
+                    }
+                }
+            }
+        }

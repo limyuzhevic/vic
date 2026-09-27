@@ -87,6 +87,11 @@ public:
                             const std::vector<float>& features,
                             float reward,
                             SimulationStep currentTime);
+n    // Process a pattern from working memory for concept formation
+    void processPattern(const std::vector<float>& pattern) {
+        presentExperience(pattern, pattern, 0.0f, 0);
+    }
+
 
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,

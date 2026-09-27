@@ -55,9 +55,9 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
+    src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralWorkingMemory.cpp
     src/memory/ProceduralMemory.cpp
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp

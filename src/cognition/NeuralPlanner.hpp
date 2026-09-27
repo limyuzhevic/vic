@@ -74,6 +74,9 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Set planning context from working memory
+    void setPlanningContext(float context) { planningContext_ = context; }
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -96,6 +99,9 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Working memory context for planning
+    float planningContext_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

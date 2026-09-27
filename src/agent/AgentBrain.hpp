@@ -52,6 +52,9 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get curiosity threshold
+    float getCuriosityThreshold() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -98,6 +101,7 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    float curiosityThreshold_;
     
     // Development state
     double developmentalAge_;
@@ -112,6 +116,11 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
-};
+    
+    // Prediction training state
+    std::vector<float> predictedSensoryState_;
+    float predictionConfidence_;
+    std::deque<float> predictionErrorHistory_;
+    SimulationStep lastPredictionStep_;
 
 } // namespace nlm
