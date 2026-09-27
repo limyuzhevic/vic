@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nlm {
-
 struct Novelty::Impl {
     class Brain* brain;
     float level;

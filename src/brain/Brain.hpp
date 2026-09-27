@@ -6,6 +6,11 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/ParallelProcessing.hpp"
 #include <memory>
 #include <string>
 
@@ -23,6 +28,8 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SelfModel;
+class SocialLearning;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -161,8 +168,11 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Self-model for representing agent's own capabilities and body schema
+    SelfModel* getSelfModel();
+
+    // Social learning for learning from observing others
+    SocialLearning* getSocialLearning();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

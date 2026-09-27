@@ -159,24 +159,126 @@ struct NeuronCheckpointData {
 };
 
 /**
- * Synapse state for checkpointing
+ * Memory checkpoint data for episodic memory
  */
-struct SynapseCheckpointData {
-    std::vector<uint64_t> sourceNeuron;
-    std::vector<uint64_t> destinationNeuron;
-    std::vector<float> weight;
-    std::vector<uint32_t> delay;
-    std::vector<uint8_t> synapseType;
-    std::vector<uint8_t> plasticityFlags;
-    std::vector<float> eligibilityTrace;
-    std::vector<float> efficacy;
-    std::vector<float> shortTermDepression;
-    std::vector<float> shortTermFacilitation;
+struct EpisodicMemoryCheckpointData {
+    std::vector<SimulationStep> timestamps;
+    std::vector<float> rewards;
+    std::vector<float> energies;
+    std::vector<float> novelties;
+    std::vector<float> resultingRewards;
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
+    std::vector<SimulationStep> ages;
+    std::vector<ActionType> actions;
+    std::vector<std::vector<float>> sensoryStates;
+    std::vector<std::vector<float>> resultingSensoryStates;
 };
 
 /**
- * Checkpoint reader
+ * Memory checkpoint data for associative memory
  */
+struct AssociativeMemoryCheckpointData {
+    std::vector<NeuronId> patternNeurons;
+    std::vector<std::vector<float>> patterns;
+    std::vector<std::pair<NeuronId, NeuronId>> associations;
+    std::vector<float> strengths;
+};
+
+/**
+ * Prediction system checkpoint data
+ */
+struct PredictionSystemCheckpointData {
+    std::vector<float> predictionErrors;
+    std::vector<float> confidences;
+    std::vector<std::vector<float>> predictionHistory;
+};
+
+namespace nlm {
+
+// Forward declarations for complex types
+struct ConceptInstance;
+struct DiscoveredConcept;
+struct ActionEffect;
+struct ObservedEffect;
+
+/**
+ * Cognitive system checkpoint data
+ */
+struct CognitiveSystemCheckpointData {
+    // Neural Planner
+    std::vector<float> actionQualities;
+    std::vector<float> planningDepths;
+    std::vector<float> planningConfidences;
+    std::vector<float> currentGoals;
+    std::vector<std::deque<bool>> recentPlanSuccesses;
+    
+    // Concept Formation
+    std::vector<DiscoveredConcept> concepts;
+    std::vector<size_t> nextConceptIds;
+    
+    // Self Model
+    std::vector<float> capabilityLevels;
+    std::vector<std::vector<ActionEffect>> actionEffects;
+    
+    // Social Learning
+    std::vector<size_t> observationCounts;
+    std::vector<std::vector<std::pair<ActionType, ObservedEffect>>> observedActions;
+    std::vector<std::vector<float>> signalPatterns;
+    std::vector<float> signalMeanings;
+    
+    // Attentional Selection
+    std::vector<float> attentionLevels;
+    std::vector<float> attentionThresholds;
+    std::vector<float> inhibitionStrengths;
+    std::vector<float> excitationStrengths;
+    std::vector<std::vector<NeuronId>> winners;
+    std::vector<float> neuronSalience;
+};
+
+/**
+ * Neuromodulation checkpoint data
+ */
+struct NeuromodulationCheckpointData {
+    std::vector<float> dopamineLevels;
+    std::vector<float> curiosityLevels;
+    std::vector<float> noveltyLevels;
+    std::vector<float> predictionErrorMagnitudes;
+};
+
+/**
+ * Development system checkpoint data
+ */
+struct DevelopmentCheckpointData {
+    double developmentalAge;
+    uint32_t developmentalStage;
+    float plasticityModifier;
+    bool isCriticalPeriod;
+    float criticalPeriodProgress;
+};
+
+/**
+ * Simulation state checkpoint data
+ */
+struct SimulationCheckpointData {
+    uint64_t currentStep;
+    double currentTime;
+    float timestep;
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    bool isResting;
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+};
+
+/**
+ * Random generator checkpoint data
+ */
+struct RandomGeneratorCheckpointData {
+    std::vector<uint32_t> state;
+    uint64_t seed;
+};
 class CheckpointReader {
 public:
     CheckpointReader();

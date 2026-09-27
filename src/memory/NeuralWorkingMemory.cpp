@@ -31,6 +31,10 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    
+    // Store brain reference in implementation for use in methods that use pImpl->brain
+    // pImpl->brain is used in updateRecurrentConnections which is a private method
+    // but references pImpl->brain instead of brain_
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {

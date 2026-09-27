@@ -8,8 +8,10 @@ namespace nlm {
 
 struct ConceptFormation::Impl {
     Brain* brain;
+    NeuralWorkingMemory* workingMemory;
+    NeuralEpisodicMemory* episodicMemory;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr), workingMemory(nullptr), episodicMemory(nullptr) {}
 };
 
 ConceptFormation::ConceptFormation()
@@ -19,6 +21,8 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , episodicMemory_(nullptr)
+    , workingMemory_(nullptr)
 {
 }
 
@@ -27,6 +31,12 @@ ConceptFormation::~ConceptFormation() = default;
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Store references to memory systems
+    episodicMemory_ = brain->getEpisodicMemory();
+    workingMemory_ = brain->getWorkingMemory();
+    // Note: Using episodic memory for concept formation, not associative memory
+    
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
@@ -35,6 +45,47 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
                                           float reward,
                                           SimulationStep currentTime) {
     if (pattern.empty()) return 0;
+    
+    // If episodic memory is available, also process recent episodes
+    if (episodicMemory_) {
+        // Get recent episodes to learn concepts from
+        auto recentEpisodes = episodicMemory_->getRecentEpisodes(10);
+        
+        for (const auto* episode : recentEpisodes) {
+            // Convert episode to feature vector and pattern
+            std::vector<float> episodeFeatures;
+            
+            // Extract features from the episode
+            episodeFeatures.push_back(episode->reward);
+            episodeFeatures.push_back(episode->novelty);
+            episodeFeatures.push_back(static_cast<float>(episode->activeNeurons.size()) / 100.0f);
+            episodeFeatures.push_back(episode->energy);
+            episodeFeatures.push_back(episode->resultingReward - episode->reward);
+            
+            // Scale neuron activations to pattern range (0-1)
+            std::vector<float> episodePattern = episode->neuronActivations;
+            if (!episodePattern.empty()) {
+                // Normalize to [0,1] range
+                float maxVal = *std::max_element(episodePattern.begin(), episodePattern.end());
+                if (maxVal > 0.0f) {
+                    for (auto& val : episodePattern) {
+                        val /= maxVal;
+                    }
+                }
+            }
+            
+            // Check for matching concept using episodic memory pattern
+            size_t conceptId = findConceptForPattern(episodePattern);
+            if (conceptId > 0) {
+                updateConcept(conceptId, episodePattern, episodeFeatures, episode->reward);
+            } else {
+                // Create new concept from this episode
+                if (isNovel(episodePattern, formationThreshold_)) {
+                    createConcept(episodePattern, episodeFeatures, episode->reward);
+                }
+            }
+        }
+    }
     
     // Check if this pattern matches any existing concept
     size_t matchingConcept = findConceptForPattern(pattern);
@@ -58,9 +109,10 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
 }
 
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
-                                       const std::vector<float>& features,
-                                       float reward) {
-    DiscoveredConcept concept;
+                                        const std::vector<float>& features,
+                                        float reward) {
+    DiscoveredConceptStruct concept{};
+    
     concept.id = nextConceptId_++;
     concept.prototype = pattern;
     concept.totalObservations = 1;

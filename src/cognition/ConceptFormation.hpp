@@ -2,6 +2,9 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -35,7 +38,7 @@ struct ConceptInstance {
 
 // DiscoveredConcept: A concept that emerged from repeated experience
 // NOT a predefined label - created through Hebbian clustering
-struct DiscoveredConcept {
+struct DiscoveredConceptStruct {
     // Unique identifier
     size_t id;
     
@@ -156,6 +159,10 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
+    
+    // Memory system references
+    NeuralWorkingMemory* workingMemory_;
+    NeuralEpisodicMemory* episodicMemory_;
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
