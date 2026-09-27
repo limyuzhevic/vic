@@ -1,11 +1,7 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/CheckpointSystem.hpp"
+#include "../persistence/PersistenceManager.hpp"
 #include <memory>
 #include <string>
 
@@ -28,6 +24,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Norepinephrine;
+class AcetylCholine;
+class Serotonin;
+class NeuromodulatorManager;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -106,14 +106,65 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
-    void reset();
-    
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
     
     // Load brain state from file
     bool load(const std::string& filepath);
+    
+    // ========== PERSISTENCE SYSTEM ==========
+    
+    // Save complete brain state for persistence
+    bool saveBrainState(const std::string& filename, bool useBinary = true,
+                       CheckpointSystem::CompressionLevel compression = CheckpointSystem::CompressionLevel::Balanced,
+                       bool incremental = true);
+    
+    // Load brain state from persistence file
+    bool loadBrainState(const std::string& filename, bool useBinary = true);
+    
+    // Check if persistent state is available
+    bool isPersistentStateAvailable(const std::string& filename) const;
+    
+    // Get persistent state information/metadata
+    PersistentBrainStateInfo getPersistentStateInfo(const std::string& filename,
+                                                  bool useBinary = true) const;
+    
+    // Create automatic backup
+    bool createBackup(const std::string& prefix = "auto_backup");
+    
+    // Restore from backup
+    bool restoreFromBackup(const std::string& backupName);
+    
+    // List available brain states
+    std::vector<std::string> listBrainStates() const;
+    
+    // Get persistence manager
+    PersistenceManager* getPersistenceManager() { return pImpl->persistenceManager.get(); }
+    const PersistenceManager* getPersistenceManager() const { return pImpl->persistenceManager.get(); }
+    
+    // Integration with checkpoint system
+    void setCheckpointManager(CheckpointManager* manager);
+    
+    // Get current simulation state for persistence
+    PersistentBrainState extractPersistentState() const;
+    
+    // Apply persistent state to brain
+    bool applyPersistentState(const PersistentBrainState& state);
+    
+    // List available checkpoints
+    std::vector<CheckpointManager::CheckpointInfo> listCheckpoints() const;
+    
+    // Save checkpoint with persistence manager
+    bool saveCheckpoint(const std::string& name = "");
+    
+    // Load checkpoint with persistence manager
+    bool loadCheckpoint(const std::string& name);
+    
+    // Prune old checkpoints
+    void pruneOldCheckpoints(size_t keepCount);
+    
+    // Check if checkpoint should be saved
+    bool shouldSaveCheckpoint() const;
     
     // Region management
     RegionId addRegion(const std::string& name = "");

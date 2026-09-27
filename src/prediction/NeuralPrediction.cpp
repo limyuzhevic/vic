@@ -1,5 +1,7 @@
 #include "NeuralPrediction.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../brain/Brain.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -24,7 +26,38 @@ struct NeuralPrediction::Impl {
     std::vector<std::pair<std::vector<float>, std::vector<float>>> actionConsequences;
     std::vector<float> actionRewards;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr) 
+    // Get current sensory input from brain
+    std::vector<float> getSensoryInput() {
+        if (!brain) return std::vector<float>();
+        // Collect sensory data from sensory neurons
+        std::vector<float> sensoryData;
+        for (auto* neuron : sensoryNeurons) {
+            float activation = neuron->getState().membranePotential;
+            // Normalize activation to [0, 1] range
+            float normalized = (activation + 10.0f) / 20.0f;
+            sensoryData.push_back(normalized);
+        }
+        return sensoryData;
+    }
+    
+    // Get current neural features for concept formation
+    std::vector<float> getCurrentNeuralFeatures() {
+        if (!brain) return std::vector<float>();
+        std::vector<float> features;
+        for (auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    features.push_back(state.membranePotential);
+                    features.push_back(state.firingState == FiringState::Refractory ? 1.0f : 0.0f);
+                    features.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        return features;
+    }
+ {}
 };
 
 NeuralPrediction::NeuralPrediction()
@@ -318,7 +351,38 @@ struct ActionConsequencePredictor::Impl {
     // Average reward per action
     std::vector<std::pair<ActionType, float>> actionQuality;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr) 
+    // Get current sensory input from brain
+    std::vector<float> getSensoryInput() {
+        if (!brain) return std::vector<float>();
+        // Collect sensory data from sensory neurons
+        std::vector<float> sensoryData;
+        for (auto* neuron : sensoryNeurons) {
+            float activation = neuron->getState().membranePotential;
+            // Normalize activation to [0, 1] range
+            float normalized = (activation + 10.0f) / 20.0f;
+            sensoryData.push_back(normalized);
+        }
+        return sensoryData;
+    }
+    
+    // Get current neural features for concept formation
+    std::vector<float> getCurrentNeuralFeatures() {
+        if (!brain) return std::vector<float>();
+        std::vector<float> features;
+        for (auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    features.push_back(state.membranePotential);
+                    features.push_back(state.firingState == FiringState::Refractory ? 1.0f : 0.0f);
+                    features.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        return features;
+    }
+ {}
 };
 
 ActionConsequencePredictor::ActionConsequencePredictor()

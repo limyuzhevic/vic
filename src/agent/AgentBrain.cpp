@@ -7,9 +7,6 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
-    , dopamineLevel_(0.0f)
-    , noveltyLevel_(0.0f)
-    , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
     , expectedReward_(0.0f)
     , developmentalAge_(0.0)
@@ -19,6 +16,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , norepinephrineLevel_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
+    , attentionEnhancement_(1.0f)
+    , workingMemoryEnhancement_(1.0f)
+    , learningEnhancement_(1.0f)
+    , decisionStability_(1.0f)
+    , explorationDrive_(0.5f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -68,10 +73,17 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Initialize enhanced neuromodulators
+    norepinephrineLevel_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
+    attentionEnhancement_ = 1.0f;
+    workingMemoryEnhancement_ = 1.0f;
+    learningEnhancement_ = 1.0f;
+    decisionStability_ = 1.0f;
+    explorationDrive_ = 0.5f;
+    
+    NLM_LOG_INFO("AgentBrain initialized with enhanced neuromodulation");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -124,29 +136,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
-    
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Update enhanced neuromodulators based on current state
+    updateEnhancedNeuromodulators(vision, touch, intern, vision.size(), dt);
+}
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -174,22 +172,92 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    // Compute novelty (difference from previous vision)
+    if (!vision.empty()) {
+        float totalDiff = 0.0f;
+        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+            float diff = std::abs(vision[i] - previousVision_[i]);
+            totalDiff += diff;
+        }
+        
+        // Normalize
+        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        
+        // Decay and update
+        noveltyLevel_ *= sensoryNoveltyDecay_;
+        
+        // Store for next time
+        previousVision_ = vision;
+    }
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
+    // Update curiosity based on novelty
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update enhanced neuromodulators based on current state
+    updateEnhancedNeuromodulators(vision, touch, intern, vision.size(), dt);
+}
+
+void AgentBrain::updateEnhancedNeuromodulators(const std::vector<float>& vision,
+                                            const std::vector<float>& touch,
+                                            const std::vector<float>& intern,
+                                            size_t visionSize,
+                                            double dt) {
+    float dtFloat = static_cast<float>(dt);
+    
+    // Update Norepinephrine based on novelty and prediction error
+    float noveltySensitivity = 0.7f;
+    float predictionErrorSensitivity = 0.3f;
+    
+    // NE responds to novel and surprising events (arousal)
+    float noveltyResponse = noveltyLevel_ * noveltySensitivity;
+    float predictionErrorResponse = std::abs(predictionError_) * predictionErrorSensitivity;
+    
+    norepinephrineLevel_ = std::min(1.0f, norepinephrineLevel_ + 
+                                   (std::max(noveltyResponse, predictionErrorResponse) - norepinephrineLevel_) * 0.1f * dtFloat);
+    
+    // NE also responds to sustained attention (focus)
+    if (visionSize > 0) {
+        float avgVision = 0.0f;
+        for (float v : vision) avgVision += v;
+        avgVision /= visionSize;
+        
+        if (avgVision > 0.5f) {
+            norepinephrineLevel_ = std::min(1.0f, norepinephrineLevel_ + 0.05f * dtFloat);
+        }
+    }
+    
+    // Update Acetylcholine based on working memory load and novelty
+    float workingMemoryLoad = std::min(1.0f, static_cast<float>(vision.size()) / 100.0f);
+    float achMemoryResponse = workingMemoryLoad * 0.4f;
+    float achNoveltyResponse = noveltyLevel_ * 0.3f;
+    
+    acetylcholineLevel_ = std::min(1.0f, acetylcholineLevel_ + 
+                                  (achMemoryResponse + achNoveltyResponse - acetylcholineLevel_) * 0.08f * dtFloat);
+    
+    // Update Serotonin based on prediction error and reward signals
+    float serotoninPredictionErrorResponse = std::abs(predictionError_) * 0.5f;
+    float serotoninRewardResponse = (predictionError_ > 0.0f) ? predictionError_ * 0.3f : 0.0f;
+    
+    serotoninLevel_ = std::max(0.0f, serotoninLevel_ + 
+                              (serotoninPredictionErrorResponse + serotoninRewardResponse - serotoninLevel_) * 0.06f * dtFloat);
+    
+    // Compute integrated neuromodulatory effects
+    attentionEnhancement_ = (1.0f + norepinephrineLevel_ * 1.5f) * (1.0f + acetylcholineLevel_ * 0.7f);
+    workingMemoryEnhancement_ = (1.0f + acetylcholineLevel_ * 1.5f);
+    learningEnhancement_ = (1.0f + serotoninLevel_ * 1.2f);
+    decisionStability_ = (1.0f + serotoninLevel_ * 0.8f);
+    explorationDrive_ = norepinephrineLevel_ * 0.6f + curiosityLevel_ * 0.4f;
+    
+    // Log significant neuromodulatory changes
+    if (norepinephrineLevel_ > 0.3f || acetylcholineLevel_ > 0.3f || serotoninLevel_ > 0.3f) {
+        NLM_LOG_INFO("Enhanced neuromodulation: NE=" + std::to_string(norepinephrineLevel_) + 
+                     ", ACh=" + std::to_string(acetylcholineLevel_) + 
+                     ", 5-HT=" + std::to_string(serotoninLevel_));
+    }
+}
     
     MotorCommand best = MotorCommand::Wait;
     float bestActivity = waitAct;  // Default to wait if nothing stronger
@@ -345,6 +413,295 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+// Update curiosity based on novelty and prediction error
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update enhanced neuromodulators based on current state
+    updateEnhancedNeuromodulators(vision, touch, intern, vision.size(), dt);
+}
+
+// ========== PERSISTENCE SYSTEM ==========
+
+void AgentBrain::enablePersistence(const std::string& directory) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot enable persistence: Brain not available");
+        return;
+    }
+    
+    // Get persistence manager from brain
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot enable persistence: Persistence manager not available");
+        return;
+    }
+    
+    // Set the persistence directory
+    persistenceManager->setBaseDirectory(directory);
+    NLM_LOG_INFO("Persistence enabled with directory: " + directory);
+}
+
+bool AgentBrain::saveBrainState(const std::string& filename) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot save brain state: Brain not available");
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot save brain state: Persistence manager not available");
+        return false;
+    }
+    
+    // Save in binary format for efficiency
+    bool success = persistenceManager->saveBrainState(filename, true,
+                                                      CheckpointSystem::CompressionLevel::Balanced,
+                                                      true);
+    
+    if (success) {
+        NLM_LOG_INFO("Brain state saved: " + filename);
+    }
+    
+    return success;
+}
+
+bool AgentBrain::loadBrainState(const std::string& filename) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot load brain state: Brain not available");
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot load brain state: Persistence manager not available");
+        return false;
+    }
+    
+    // Load from binary format
+    bool success = persistenceManager->loadBrainState(filename, true);
+    
+    if (success) {
+        NLM_LOG_INFO("Brain state loaded: " + filename);
+    }
+    
+    return success;
+}
+
+bool AgentBrain::isPersistentStateAvailable(const std::string& filename) const {
+    if (!brain_) {
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        return false;
+    }
+    
+    return persistenceManager->isPersistentStateAvailable(filename);
+}
+
+PersistentBrainStateInfo AgentBrain::getPersistentStateInfo(const std::string& filename) const {
+    PersistentBrainStateInfo info;
+    
+    if (!brain_) {
+        return info;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        return info;
+    }
+    
+    return persistenceManager->getPersistentStateInfo(filename, true);
+}
+
+std::string AgentBrain::createBackup() {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot create backup: Brain not available");
+        return "";
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot create backup: Persistence manager not available");
+        return "";
+    }
+    
+    // Create backup with timestamp
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << "backup_" << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S") << ".bml";
+    std::string backupName = ss.str();
+    
+    if (persistenceManager->createBackup(backupName)) {
+        NLM_LOG_INFO("Backup created: " + backupName);
+        return backupName;
+    }
+    
+    return "";
+}
+
+bool AgentBrain::restoreFromBackup(const std::string& backupName) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot restore from backup: Brain not available");
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot restore from backup: Persistence manager not available");
+        return false;
+    }
+    
+    bool success = persistenceManager->restoreFromBackup(backupName);
+    
+    if (success) {
+        NLM_LOG_INFO("Restored from backup: " + backupName);
+    }
+    
+    return success;
+}
+
+std::vector<std::string> AgentBrain::listBrainStates() const {
+    if (!brain_) {
+        return std::vector<std::string>();
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        return std::vector<std::string>();
+    }
+    
+    return persistenceManager->listBrainStates();
+}
+
+bool AgentBrain::isPersistenceAvailable() const {
+    if (!brain_) {
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    return persistenceManager != nullptr;
+}
+
+std::vector<CheckpointManager::CheckpointInfo> AgentBrain::listCheckpoints() const {
+    std::vector<CheckpointManager::CheckpointInfo> checkpoints;
+    
+    if (!brain_) {
+        return checkpoints;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        return checkpoints;
+    }
+    
+    auto* checkpointManager = persistenceManager->getCheckpointManager();
+    if (!checkpointManager) {
+        return checkpoints;
+    }
+    
+    return checkpointManager->listCheckpoints();
+}
+
+bool AgentBrain::saveCheckpoint(const std::string& name) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot save checkpoint: Brain not available");
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot save checkpoint: Persistence manager not available");
+        return false;
+    }
+    
+    auto* checkpointManager = persistenceManager->getCheckpointManager();
+    if (!checkpointManager) {
+        NLM_LOG_ERROR("Cannot save checkpoint: Checkpoint manager not available");
+        return false;
+    }
+    
+    bool success = checkpointManager->saveImmediately(name);
+    
+    if (success) {
+        NLM_LOG_INFO("Checkpoint saved: " + (name.empty() ? "default" : name));
+    }
+    
+    return success;
+}
+
+bool AgentBrain::loadCheckpoint(const std::string& name) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot load checkpoint: Brain not available");
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot load checkpoint: Persistence manager not available");
+        return false;
+    }
+    
+    auto* checkpointManager = persistenceManager->getCheckpointManager();
+    if (!checkpointManager) {
+        NLM_LOG_ERROR("Cannot load checkpoint: Checkpoint manager not available");
+        return false;
+    }
+    
+    bool success = checkpointManager->load(name);
+    
+    if (success) {
+        NLM_LOG_INFO("Checkpoint loaded: " + (name.empty() ? "default" : name));
+    }
+    
+    return success;
+}
+
+void AgentBrain::pruneOldCheckpoints(size_t keepCount) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot prune checkpoints: Brain not available");
+        return;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        NLM_LOG_ERROR("Cannot prune checkpoints: Persistence manager not available");
+        return;
+    }
+    
+    auto* checkpointManager = persistenceManager->getCheckpointManager();
+    if (!checkpointManager) {
+        NLM_LOG_ERROR("Cannot prune checkpoints: Checkpoint manager not available");
+        return;
+    }
+    
+    checkpointManager->pruneOldCheckpoints(keepCount);
+    NLM_LOG_INFO("Pruned checkpoints, keeping: " + std::to_string(keepCount));
+}
+
+bool AgentBrain::shouldSaveCheckpoint() const {
+    if (!brain_) {
+        return false;
+    }
+    
+    auto* persistenceManager = brain_->getPersistenceManager();
+    if (!persistenceManager) {
+        return false;
+    }
+    
+    auto* checkpointManager = persistenceManager->getCheckpointManager();
+    if (!checkpointManager) {
+        return false;
+    }
+    
+    uint64_t currentStep = brain_->getConfig()->getOr<uint64_t>("current_step", 0);
+    double currentTime = 0.0; // TODO: Get actual simulation time
+    
+    return checkpointManager->shouldSave(currentStep);
 }
 
 } // namespace nlm

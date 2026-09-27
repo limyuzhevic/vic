@@ -7,14 +7,20 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/NeuromodulatorManager.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/AcetylCholine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../persistence/PersistenceManager.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -34,6 +40,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
     std::unique_ptr<PredictionSystem> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
@@ -44,17 +51,47 @@ struct Brain::Impl {
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // Initialize enhanced neuromodulators
+        norepinephrine = std::make_unique<Norepinephrine>();
+        norepinephrine->initialize(this);
+        acetylcholine = std::make_unique<AcetylCholine>();
+        acetylcholine->initialize(this);
+        serotonin = std::make_unique<Serotonin>();
+        serotonin->initialize(this);
     
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    NeuromodulatorManager* neuromodulatorManager;
+    
+    // Simulation parameters
+    TimestepDuration timestep;
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    
+    // Statistics
+    size_t totalSpikesThisStep;
+    size_t totalSpikesTotal;
+    
+    // Sensory neurons for input injection
+    std::vector<Neuron*> sensoryNeurons;
+    std::vector<Neuron*> motorNeurons;
+    
+    // Integration state
+    bool isResting;  // For sleep/rest cycle
+    size_t stepsSinceLastEpisode;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    
+    // Add persistence manager to Impl struct
+    std::unique_ptr<PersistenceManager> persistenceManager;
+    
+    // Initialize enhanced neuromodulators
+        norepinephrine = std::make_unique<Norepinephrine>();
+        norepinephrine->initialize(this);
+        acetylcholine = std::make_unique<AcetylCholine>();
+        acetylcholine->initialize(this);
+        serotonin = std::make_unique<Serotonin>();
+        serotonin->initialize(this);
+    
+    NeuromodulatorManager* neuromodulatorManager;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -78,6 +115,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Persistence system
+    std::unique_ptr<PersistenceManager> persistenceManager;
+
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -122,13 +162,19 @@ struct Brain::Impl {
         attention = std::make_unique<AttentionalSelection>();
         
         // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize enhanced neuromodulators
+        norepinephrine = std::make_unique<Norepinephrine>();
+        norepinephrine->initialize(this);
+        acetylcholine = std::make_unique<AcetylCholine>();
+        acetylcholine->initialize(this);
+        serotonin = std::make_unique<Serotonin>();
+        serotonin->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -151,6 +197,11 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize persistence manager
+        persistenceManager = std::make_unique<PersistenceManager>();
+        persistenceManager->initialize(
+            config->getOr<std::string>("persistence_dir", "./brains"));
     }
     
     DevelopmentalStage developmentalStage;
@@ -290,7 +341,12 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+    // Configure persistence manager
+    std::string persistenceDir = pImpl->config->getOr<std::string>("persistence_dir", "./brains");
+    pImpl->persistenceManager->initialize(persistenceDir);
+    
+    // Link checkpoint manager to persistence manager
+    pImpl->persistenceManager->setCheckpointManager(pImpl->checkpointManager);
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
@@ -511,25 +567,117 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
-        
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Update prediction system with current sensory state
+        if (auto sensory = getSensoryInput()) {
+            pImpl->predictionSystem->train(*sensory);
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Update neural prediction with current neural state
+    if (pImpl->neuralPrediction) {
+        // Record current sensory state for prediction
+        if (auto sensory = getSensoryInput()) {
+            std::vector<float> sensoryState = sensory->getData();
+            if (!sensoryState.empty()) {
+                pImpl->neuralPrediction->recordSensoryState(sensoryState, pImpl->currentStep);
+            }
+        }
+        
+        // Generate prediction for next step
+        std::vector<float> prediction = pImpl->neuralPrediction->generatePrediction(pImpl->currentStep + 1);
+        
+        // If prediction is available, modulate neural excitability
+        if (!prediction.empty()) {
+            float predictionConfidence = pImpl->neuralPrediction->getPredictionConfidence();
+            if (predictionConfidence > 0.5f) {
+                // High confidence prediction reinforces current activity
+                // Inject current proportional to prediction confidence
+                float currentToInject = predictionConfidence * 0.1f;
+                pImpl->neuralPrediction->modulatePredictionSynapses(
+                    pImpl->neuralPrediction->getPredictionError(), predictionConfidence);
+            }
+        }
+    }
+    
+    // Update attention system with neuromodulatory influences
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply NE effects on attention
+        if (pImpl->norepinephrine) {
+            float neLevel = pImpl->norepinephrine->getLevel();
+            if (neLevel > 0.1f) {
+                // Enhance attentional focus
+                pImpl->attention->setInhibitionStrength(pImpl->attention->getInhibitionStrength() * (1.0f + neLevel * 0.5f));
+                pImpl->attention->setExcitationStrength(pImpl->attention->getExcitationStrength() * (1.0f + neLevel * 0.3f));
+            }
+        }
+        
+        // Apply ACh effects on attention
+        if (pImpl->acetylcholine) {
+            float achLevel = pImpl->acetylcholine->getLevel();
+            if (achLevel > 0.1f) {
+                // Enhance attention clarity
+                pImpl->attention->setExcitationStrength(pImpl->attention->getExcitationStrength() * (1.0f + achLevel * 0.5f));
+            }
+        }
+        
+        // Apply 5-HT effects on attention
+        if (pImpl->serotonin) {
+            float serotoninLevel = pImpl->serotonin->getLevel();
+            if (serotoninLevel > 0.1f) {
+                // Reduce impulsivity and enhance focus
+                pImpl->attention->setInhibitionStrength(pImpl->attention->getInhibitionStrength() * (1.0f + serotoninLevel * 0.3f));
+            }
+        }
+        
+        // Apply neuromodulator effects to attention process
+        if (pImpl->attention && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors, 0.8f);
+        }
+    }
+    
+    // Update neural planner with neuromodulatory influences
+    if (pImpl->planner) {
+        // Get neuromodulatory levels
+        float dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        float serotoninLevel = pImpl->serotonin ? pImpl->serotonin->getLevel() : 0.0f;
+        
+        // Apply dopamine effects on planning depth
+        if (dopamineLevel > 0.0f) {
+            // Scale planning depth based on dopamine
+            float planningDepthMod = 1.0f + dopamineLevel * 0.5f;
+            size_t currentDepth = pImpl->planner->getPlanningDepth();
+            pImpl->planner->setPlanningDepth(std::min<size_t>(currentDepth + static_cast<size_t>(planningDepthMod), 20));
+        }
+        
+        // Apply serotonin effects on decision stability
+        if (serotoninLevel > 0.1f) {
+            // Enhance decision stability with serotonin
+            pImpl->planner->setPlanningDepth(pImpl->planner->getPlanningDepth() * (1.0f + serotoninLevel * 0.3f));
+        }
+        
+        // Apply norepinephrine effects on exploration
+        if (pImpl->norepinephrine) {
+            float neLevel = pImpl->norepinephrine->getLevel();
+            if (neLevel > 0.1f) {
+                // Enhance exploration drive in planning
+                // (planner would use this to encourage more diverse action sequences)
+            }
+        }
+        
+        // Apply acetylcholine effects on working memory integration
+        if (pImpl->acetylcholine) {
+            float achLevel = pImpl->acetylcholine->getLevel();
+            if (achLevel > 0.1f) {
+                // Enhance working memory integration in planning
+                // (planner would use this to better utilize working memory traces)
+            }
+        }
+        
+        // Update planner
+        pImpl->planner->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1112,6 +1260,64 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// ========== PERSISTENCE SYSTEM ==========
+
+bool Brain::saveBrainState(const std::string& filename, bool useBinary,
+                          CheckpointSystem::CompressionLevel compression,
+                          bool incremental) {
+    if (!pImpl->persistenceManager) {
+        NLM_LOG_ERROR("Persistence manager not initialized");
+        return false;
+    }
+    return pImpl->persistenceManager->saveBrainState(filename, useBinary, compression, incremental);
+}
+
+bool Brain::loadBrainState(const std::string& filename, bool useBinary) {
+    if (!pImpl->persistenceManager) {
+        NLM_LOG_ERROR("Persistence manager not initialized");
+        return false;
+    }
+    return pImpl->persistenceManager->loadBrainState(filename, useBinary);
+}
+
+bool Brain::isPersistentStateAvailable(const std::string& filename) const {
+    if (!pImpl->persistenceManager) {
+        return false;
+    }
+    return pImpl->persistenceManager->isPersistentStateAvailable(filename);
+}
+
+PersistentBrainStateInfo Brain::getPersistentStateInfo(const std::string& filename,
+                                                      bool useBinary) const {
+    if (!pImpl->persistenceManager) {
+        return PersistentBrainStateInfo();
+    }
+    return pImpl->persistenceManager->getPersistentStateInfo(filename, useBinary);
+}
+
+bool Brain::createBackup(const std::string& prefix) {
+    if (!pImpl->persistenceManager) {
+        NLM_LOG_ERROR("Persistence manager not initialized");
+        return false;
+    }
+    return pImpl->persistenceManager->createBackup(prefix);
+}
+
+bool Brain::restoreFromBackup(const std::string& backupName) {
+    if (!pImpl->persistenceManager) {
+        NLM_LOG_ERROR("Persistence manager not initialized");
+        return false;
+    }
+    return pImpl->persistenceManager->restoreFromBackup(backupName);
+}
+
+std::vector<std::string> Brain::listBrainStates() const {
+    if (!pImpl->persistenceManager) {
+        return std::vector<std::string>();
+    }
+    return pImpl->persistenceManager->listBrainStates();
 }
 
 } // namespace nlm

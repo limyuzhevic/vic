@@ -1,5 +1,6 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -9,7 +10,25 @@ namespace nlm {
 struct ConceptFormation::Impl {
     Brain* brain;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr) 
+    // Get current neural activity patterns for concept formation
+    std::vector<float> getCurrentNeuralActivityPatterns() {
+        if (!brain) return std::vector<float>();
+        std::vector<float> activityPatterns;
+        for (auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    // Capture membrane potential and firing state
+                    activityPatterns.push_back(state.membranePotential);
+                    activityPatterns.push_back(static_cast<float>(state.firingState));
+                    activityPatterns.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        return activityPatterns;
+    }
+ {}
 };
 
 ConceptFormation::ConceptFormation()
@@ -300,7 +319,25 @@ void ConceptFormation::clear() {
 struct SpatialRepresentation::Impl {
     Brain* brain;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr) 
+    // Get current neural activity patterns for concept formation
+    std::vector<float> getCurrentNeuralActivityPatterns() {
+        if (!brain) return std::vector<float>();
+        std::vector<float> activityPatterns;
+        for (auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    // Capture membrane potential and firing state
+                    activityPatterns.push_back(state.membranePotential);
+                    activityPatterns.push_back(static_cast<float>(state.firingState));
+                    activityPatterns.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        return activityPatterns;
+    }
+ {}
 };
 
 SpatialRepresentation::SpatialRepresentation()
@@ -403,7 +440,25 @@ void SpatialRepresentation::clear() {
 struct TemporalRelation::Impl {
     Brain* brain;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr) 
+    // Get current neural activity patterns for concept formation
+    std::vector<float> getCurrentNeuralActivityPatterns() {
+        if (!brain) return std::vector<float>();
+        std::vector<float> activityPatterns;
+        for (auto& region : brain->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    // Capture membrane potential and firing state
+                    activityPatterns.push_back(state.membranePotential);
+                    activityPatterns.push_back(static_cast<float>(state.firingState));
+                    activityPatterns.push_back(std::abs(state.membranePotential - state.restingPotential));
+                }
+            }
+        }
+        return activityPatterns;
+    }
+ {}
 };
 
 TemporalRelation::TemporalRelation()

@@ -395,6 +395,114 @@ public:
      */
     bool shouldSave(uint64_t currentStep) const;
     
+/**
+     * Integration with PersistenceManager
+     */
+    
+    /**
+     * Set persistence manager for integrated persistence
+     */
+    void setPersistenceManager(PersistenceManager* manager) {
+        persistenceManager_ = manager;
+    }
+    
+    /**
+     * Enable integrated persistence mode
+     */
+    void enablePersistenceMode(bool enable) {
+        persistenceMode_ = enable;
+    }
+    
+    /**
+     * Check if persistence mode is enabled
+     */
+    bool isPersistenceMode() const { return persistenceMode_; }
+    
+    /**
+     * Save checkpoint with persistence manager
+     * @param filename Output filename
+     * @param compression Compression level
+     * @param incremental Whether to create incremental checkpoint
+     * @return true if successful
+     */
+    bool saveWithPersistence(const std::string& filename,
+                            CompressionLevel compression = CompressionLevel::Balanced,
+                            bool incremental = true);
+    
+    /**
+     * Load checkpoint with persistence manager
+     * @param filename Input filename
+     * @return true if successful
+     */
+    bool loadWithPersistence(const std::string& filename);
+    
+    /**
+     * Create brain state backup
+     * @param prefix Backup prefix
+     * @return true if successful
+     */
+    bool createBrainStateBackup(const std::string& prefix = "auto_backup");
+    
+    /**
+     * Restore from brain state backup
+     * @param backupName Backup name
+     * @return true if successful
+     */
+    bool restoreFromBrainStateBackup(const std::string& backupName);
+    
+    /**
+     * List all available brain states
+     * @return Vector of file paths
+     */
+    std::vector<std::string> listBrainStates() const;
+    
+    /**
+     * Delete brain state file
+     * @param filename File to delete
+     * @return true if successful
+     */
+    bool deleteBrainState(const std::string& filename);
+    
+    /**
+     * Get persistent state information
+     * @param filename File to analyze
+     * @return State information
+     */
+    PersistentBrainStateInfo getPersistentStateInfo(const std::string& filename) const;
+    
+    /**
+     * Check if persistent state is available
+     * @param filename File to check
+     * @return true if available
+     */
+    bool isPersistentStateAvailable(const std::string& filename) const;
+    
+    /**
+     * Extract brain state from checkpoint for persistence
+     * @param state Output brain state
+     * @return true if successful
+     */
+    bool extractBrainStateForPersistence(PersistentBrainState& state) const;
+    
+    /**
+     * Apply brain state from persistence to checkpoint
+     * @param state Brain state to apply
+     * @return true if successful
+     */
+    bool applyBrainStateFromPersistence(const PersistentBrainState& state);
+    
+    /**
+     * Get persistence manager
+     */
+    PersistenceManager* getPersistenceManager() { return persistenceManager_; }
+    const PersistenceManager* getPersistenceManager() const { return persistenceManager_; }
+    
+    /**
+     * Update with brain state metadata for persistence
+     */
+    void updateBrainStateMetadata(uint64_t step, double time, 
+                                 const PersistentBrainState& state);
+
 private:
     std::string checkpointDir_;
     uint64_t saveIntervalSteps_;
@@ -405,7 +513,13 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    
+    // Persistence integration
+    bool persistenceMode_;
+    PersistenceManager* persistenceManager_;
 };
+
+// Checksum implementation
 
 // Checksum implementation
 

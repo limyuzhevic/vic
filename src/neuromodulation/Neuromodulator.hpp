@@ -1,13 +1,17 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Enhanced for attention and planning support
 
 class Neuromodulator {
 public:
@@ -21,7 +25,6 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -29,6 +32,73 @@ public:
     
 protected:
     Neuromodulator() = default;
+};
+
+// NeuromodulatorManager: Manages all neuromodulators and their integration
+class NeuromodulatorManager {
+public:
+    NeuromodulatorManager();
+    ~NeuromodulatorManager();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Update all neuromodulators
+    void updateAll(float novelty, float predictionError, float reward,
+                   float workingMemoryLoad, TimestepDuration dt);
+    
+    // Get neuromodulator by type
+    Dopamine* getDopamine() { return dopamine_.get(); }
+    Curiosity* getCuriosity() { return curiosity_.get(); }
+    Novelty* getNovelty() { return novelty_.get(); }
+    PredictionError* getPredictionError() { return predictionError_.get(); }
+    Norepinephrine* getNorepinephrine() { return norepinephrine_.get(); }
+    AcetylCholine* getAcetylcholine() { return acetylcholine_.get(); }
+    Serotonin* getSerotonin() { return serotonin_.get(); }
+    
+    // Get integrated modulation factors
+    float getAttentionEnhancement() const { return attentionEnhancement_; }
+    float getWorkingMemoryEnhancement() const { return workingMemoryEnhancement_; }
+    float getLearningEnhancement() const { return learningEnhancement_; }
+    float getDecisionStability() const { return decisionStability_; }
+    float getExplorationDrive() const { return explorationDrive_; }
+    
+    // Connect neuromodulators to cognitive systems
+    void connectToAttention(AttentionalSelection* attention);
+    void connectToNeuralPlanner(NeuralPlanner* planner);
+    
+    // Reset all neuromodulators
+    void reset();
+    
+    // Get total neuromodulatory load
+    float getTotalModulation() const { return totalModulation_; }
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    Brain* brain_;
+    
+    // Individual neuromodulators
+    std::unique_ptr<Dopamine> dopamine_;
+    std::unique_ptr<Curiosity> curiosity_;
+    std::unique_ptr<Novelty> novelty_;
+    std::unique_ptr<PredictionError> predictionError_;
+    std::unique_ptr<Norepinephrine> norepinephrine_;
+    std::unique_ptr<AcetylCholine> acetylcholine_;
+    std::unique_ptr<Serotonin> serotonin_;
+    
+    // Integrated modulation factors
+    float attentionEnhancement_;
+    float workingMemoryEnhancement_;
+    float learningEnhancement_;
+    float decisionStability_;
+    float explorationDrive_;
+    float totalModulation_;
+    
+    // Cognitive system references
+    AttentionalSelection* attention_;
+    NeuralPlanner* planner_;
 };
 
 // Dopamine: Reward and reinforcement learning signal
@@ -53,9 +123,9 @@ private:
     Impl* pImpl;
 };
 
-// Acetylcholine: Attention and memory consolidation
+// AcetylCholine: Attention and memory consolidation
 // PLACEHOLDER - Phase 2
-class Acetylcholine : public Neuromodulator {
+class AcetylCholine : public Neuromodulator {
 public:
     const char* getName() const override { return "ACh"; }
     float getLevel() const override { return 0.0f; }
