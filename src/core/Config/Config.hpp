@@ -5,6 +5,17 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
+#include <filesystem>
+
+// JSON and YAML support (optional)
+#ifdef NLM_WITH_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef NLM_WITH_YAML
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -31,6 +42,14 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration format
+enum class ConfigFormat {
+    Simple,      // simple key=value format
+    JSON,        // JSON format (.json)
+    YAML,        // YAML format (.yaml, .yml)
+    Unknown
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -55,14 +74,32 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file with auto-detected format
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from specific format
+#ifdef NLM_WITH_JSON
+    bool loadFromJSON(const std::string& filepath);
+#endif
+#ifdef NLM_WITH_YAML
+    bool loadFromYAML(const std::string& filepath);
+#endif
+    bool loadFromSimple(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (auto-detects format from extension)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to file with specific format
+#ifdef NLM_WITH_JSON
+    bool saveToJSON(const std::string& filepath) const;
+#endif
+#ifdef NLM_WITH_YAML
+    bool saveToYAML(const std::string& filepath) const;
+#endif
+    bool saveToSimple(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,6 +130,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Format detection
+    static ConfigFormat detectFormat(const std::string& filepath);
+    
+    // Validation
+    static bool validateConfig(const Config& config, std::vector<std::string>& errors);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +143,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static ConfigValue parseValue(const std::string& str);
 };
 
 } // namespace nlm

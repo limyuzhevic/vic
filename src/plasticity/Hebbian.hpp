@@ -23,6 +23,10 @@ public:
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
     
+    // Neuromodulation integration
+    void integrateNeuromodulation(const Neuromodulator& neuromodulator);
+    float getNeuromodulationModulator() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

@@ -18,6 +18,31 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find JSON library (nlohmann/json)
+find_package(nlohmann_json 3.11.0 QUIET)
+if(NOT nlohmann_json_FOUND)
+    # Try to find it via FetchContent (recommended approach)
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+# Find YAML library (yaml-cpp)
+find_package(yaml-cpp 0.7.0 QUIET)
+if(NOT yaml-cpp_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG v0.8.0
+    )
+    FetchContent_MakeAvailable(yaml-cpp)
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -124,8 +149,15 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/cli/CLIParser.cpp
+    src/cli/ConfigCommands.cpp
+    src/cli/RunCommand.cpp
+    src/cli/InfoCommand.cpp
+    src/cli/BenchmarkCommand.cpp
+    src/cli/CheckpointCommand.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+target_include_directories(nlm PUBLIC src)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo

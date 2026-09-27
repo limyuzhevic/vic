@@ -30,6 +30,10 @@ public:
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
+    // Neuromodulation integration
+    void integrateNeuromodulation(const Neuromodulator& neuromodulator);
+    float getNeuromodulationModulator() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

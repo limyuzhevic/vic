@@ -1,5 +1,6 @@
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../neuromodulation/Neuromodulator.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -134,6 +135,36 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+void STDP::integrateNeuromodulation(const Neuromodulator& neuromodulator) {
+    // Apply neuromodulatory modulation to STDP parameters
+    // This is a simplified implementation - in reality, different neuromodulators
+    // would have different effects on different types of plasticity
+    
+    float neuromodulationLevel = neuromodulator.getLevel();
+    float plasticityFactor = neuromodulator.getPlasticityFactor();
+    float learningRateModifier = neuromodulator.getLearningRateModifier();
+    
+    // Scale STDP weights by neuromodulatory influence
+    // Higher neuromodulation enhances plasticity
+    float neuromodulationStrength = neuromodulationLevel * 0.5f * learningRateModifier;
+    
+    // Apply neuromodulatory scaling to LTP weight
+    pImpl->ltpWeight *= (1.0f + neuromodulationStrength * (plasticityFactor - 1.0f));
+    
+    // Apply neuromodulatory scaling to LTD weight
+    pImpl->ltdWeight *= (1.0f + neuromodulationStrength * (plasticityFactor - 1.0f));
+    
+    // Clamp weights to valid range
+    pImpl->ltpWeight = std::clamp(pImpl->ltpWeight, 0.0f, 1.0f);
+    pImpl->ltdWeight = std::clamp(pImpl->ltdWeight, 0.0f, 1.0f);
+}
+
+float STDP::getNeuromodulationModulator() const {
+    // This would be computed based on the current neuromodulatory state
+    // and would depend on the specific neuromodulators that affect this STDP instance
+    return pImpl->ltpWeight * 0.5f + pImpl->ltdWeight * 0.5f;
 }
 
 } // namespace nlm

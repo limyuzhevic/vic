@@ -1,5 +1,6 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../neuromodulation/Neuromodulator.hpp"
 #include <algorithm>
 
 namespace nlm {
@@ -101,6 +102,29 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::integrateNeuromodulation(const Neuromodulator& neuromodulator) {
+    // Apply neuromodulatory modulation to Hebbian learning rate
+    // Neuromodulators can enhance or suppress Hebbian plasticity
+    
+    float neuromodulationLevel = neuromodulator.getLevel();
+    float plasticityFactor = neuromodulator.getPlasticityFactor();
+    float learningRateModifier = neuromodulator.getLearningRateModifier();
+    
+    // Scale learning rate by neuromodulatory influence
+    float neuromodulationStrength = neuromodulationLevel * learningRateModifier;
+    
+    // Apply neuromodulatory scaling to learning rate
+    pImpl->learningRate *= (1.0f + neuromodulationStrength * (plasticityFactor - 1.0f));
+    
+    // Clamp learning rate to valid range
+    pImpl->learningRate = std::clamp(pImpl->learningRate, 0.0f, 1.0f);
+}
+
+float Hebbian::getNeuromodulationModulator() const {
+    // Return the current neuromodulatory influence on Hebbian plasticity
+    return pImpl->learningRate * 0.5f;
 }
 
 } // namespace nlm

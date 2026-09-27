@@ -184,6 +184,29 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // ========== NEUROMODULATION SYSTEMS ==========
+
+    // Dopamine - reward and reinforcement
+    Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Curiosity - exploration motivation
+    Curiosity* getCuriosity();
+    
+    // Novelty - novelty detection
+    Novelty* getNovelty();
+    
+    // Prediction error signal
+    PredictionError* getPredictionErrorSignal();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
