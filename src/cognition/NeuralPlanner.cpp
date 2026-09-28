@@ -16,6 +16,8 @@ NeuralPlanner::NeuralPlanner()
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , plannedAction_(ActionType::Wait)
+    , goalReached_(false)
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
@@ -250,6 +252,51 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
     }
     
     return successCount > recentPlanSuccess_.size() / 2;
+}
+
+bool NeuralPlanner::integrateConceptFormation(const std::vector<float>& workingMemoryState,
+                                            std::vector<size_t>& relevantConceptIds) {
+    if (!brain_ || !brain_->getConceptFormation()) return false;
+    
+    // Get relevant concepts from concept formation system
+    brain_->getConceptFormation()->getRelevantConceptsForGoals(relevantConceptIds);
+    
+    if (relevantConceptIds.empty()) {
+        // No concepts found, fall back to default planning
+        return false;
+    }
+    
+    // Here we could use concepts to influence planning
+    // For now, just return that concepts were integrated
+    return true;
+}
+
+bool NeuralPlanner::planForGoal(const std::vector<float>& currentState,
+                               const std::vector<float>& goalState,
+                               ActionType& selectedAction) {
+    if (currentState.size() != goalState.size() || goalState.empty()) {
+        return false;
+    }
+    
+    // Calculate similarity between current and goal states
+    float goalProgress = 0.0f;
+    for (size_t i = 0; i < currentState.size(); ++i) {
+        goalProgress += currentState[i] * goalState[i];
+    }
+    
+    // Simple goal-based planning: select action that moves toward goal
+    // This is a placeholder - real implementation would use experience
+    if (goalProgress > 0.8f) {
+        // Goal nearly reached
+        selectedAction = ActionType::Wait;
+        return true;  // Goal reached
+    }
+    
+    // Otherwise, select an action (would normally plan sequence)
+    selectedAction = ActionType::MoveForward;
+    
+    // If we're already close, consider goal reached
+    return goalProgress > 0.9f;
 }
 
 // SelfModel Implementation

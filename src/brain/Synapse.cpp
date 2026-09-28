@@ -183,12 +183,20 @@ void Synapse::decayEligibilityTrace(float decayRate) {
     }
 }
 
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
 }
 
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+void Synapse::setShortTermDepression(float depression) {
+    pImpl->shortTermDepression = depression;
+}
+
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::setShortTermFacilitation(float facilitation) {
+    pImpl->shortTermFacilitation = facilitation;
 }
 
 void Synapse::step(Timestamp currentTime) {

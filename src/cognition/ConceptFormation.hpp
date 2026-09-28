@@ -6,6 +6,10 @@
 #include <memory>
 #include <functional>
 #include <string>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -41,6 +45,9 @@ struct DiscoveredConcept {
     
     // Central prototype pattern
     std::vector<float> prototype;
+    
+    // Feature prototype
+    std::vector<float> featurePrototype;
     
     // Instances that belong to this concept
     std::vector<ConceptInstance> instances;
@@ -134,24 +141,102 @@ public:
     // Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
+    // Process neural activity patterns from working memory to form concepts
+    // Returns true if concepts were updated/formed, false otherwise
+    bool processExperience(const std::vector<float>& sensoryPattern);
+
+    // Get concepts that are relevant for goal-directed behavior
+    void getRelevantConceptsForGoals(std::vector<size_t>& conceptIds) const;
+
+    // Enhanced feature extraction and concept formation
+
+    // Extract statistical features from a sensory pattern
+    std::vector<float> extractFeatures(const std::vector<float>& pattern) const;
+
+    // Compute feature distance between two patterns
+    float computeFeatureDistance(const std::vector<float>& featuresA,
+                                const std::vector<float>& featuresB) const;
+
+    // Find similar concepts based on feature space
+    size_t findSimilarConceptByFeatures(
+        const std::vector<float>& features,
+        float similarityThreshold = 0.7f) const;
+
+    // Update concept stability based on feature consistency
+    void updateConceptFeatureStability(size_t conceptId);
+
+    // Get concept relevance to prediction system goals
+    float getConceptRelevanceToGoals(size_t conceptId) const;
+
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Feature extraction parameters
+    void setFeatureVectorSize(size_t s) { featureVectorSize_ = s; }
+    void setTemporalPatternHistory(size_t h) { temporalPatternHistory_ = h; }
+    void setFeatureSimilarityThreshold(float t) { featureSimilarityThreshold_ = t; }
+    void setTemporalPatternThreshold(float t) { temporalPatternThreshold_ = t; }
+    void setConceptFeatureStabilityWeight(float w) { conceptFeatureStabilityWeight_ = w; }
+
 private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
+    // Feature extraction and temporal analysis
+    std::vector<float> extractStatisticalFeatures(const std::vector<float>& pattern) const;
+    std::vector<float> extractPeakFeatures(const std::vector<float>& pattern) const;
+    std::vector<float> extractSpatialFeatures(const std::vector<float>& pattern) const;
+    std::vector<float> extractTemporalFeatures(
+        const std::vector<std::vector<float>>& patternHistory,
+        size_t lookbackWindow = 10) const;
 
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
+    // Feature matching and concept formation
+    float computeFeatureSimilarity(
+        const std::vector<float>& featuresA,
+        const std::vector<float>& featuresB) const;
+    
+    // Feature-based concept updates
+    void updateConceptWithFeatures(size_t conceptId,
+                                  const std::vector<float>& newPattern,
+                                  const std::vector<float>& newFeatures,
+                                  float reward,
+                                  float predictionError);
+    void updateConceptFeaturePrototype(size_t conceptId,
+                                     const std::vector<float>& newFeatures);
+    void updateConceptFeatureStability(size_t conceptId);
 
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
+    // Enhanced relevance filtering
+    float getConceptRelevanceToGoals(size_t conceptId) const;
+    bool isConceptFresh(size_t conceptId, SimulationStep currentTime) const;
+    bool meetsGoalRelevanceCriteria(size_t conceptId) const;
 
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Temporal pattern storage and analysis
+    struct TemporalPattern {
+        std::vector<std::vector<float>> patternHistory;
+        std::vector<float> featureHistory;
+        SimulationStep firstObserved;
+        SimulationStep lastObserved;
+        float avgPredictionError;
+        float stability;
+    };
+    
+    std::unordered_map<size_t, TemporalPattern> temporalPatterns_;
+
+    // Feature-based concept matching
+    struct FeatureVector {
+        std::vector<float> features;
+        size_t conceptId;
+        SimulationStep lastObserved;
+        float predictionError;
+        float relevanceScore;
+    };
+    
+    std::vector<FeatureVector> featureSpace_;
+
+    // Parameters
+    size_t featureVectorSize_;           // Number of features to extract
+    size_t temporalPatternHistory_;      // How many past patterns to analyze
+    float featureSimilarityThreshold_;   // Feature similarity threshold
+    float temporalPatternThreshold_;     // Threshold for temporal pattern detection
+    float conceptFeatureStabilityWeight_; // Weight for feature stability in concept stability
 
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
@@ -161,111 +246,6 @@ private:
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
-};
-
-// SpatialRepresentation: Learns spatial relationships from experience
-// NOT a map with coordinates - encodes spatial relationships in neural patterns
-//
-// Key mechanisms:
-// - Place neurons form through spatial exploration
-// - Spatial relationships encoded in synaptic connectivity
-// - Path integration through dead reckoning
-// - Landmark associations
-
-class SpatialRepresentation {
-public:
-    SpatialRepresentation();
-    ~SpatialRepresentation();
-
-    void initialize(Brain* brain);
-
-    // Record current position experience
-    void recordPosition(float x, float y, const std::vector<float>& sensoryCues);
-
-    // Get predicted position based on path integration
-    std::pair<float, float> getPredictedPosition() const;
-
-    // Update position estimate based on movement
-    void integrateMovement(float dx, float dy);
-
-    // Get position neuron activation for a given position
-    float getPositionActivation(float x, float y) const;
-
-    // Find place neurons near a position
-    std::vector<NeuronId> getPlaceNeuronsNear(float x, float y, float radius) const;
-
-    // Get grid spacing (if grid cells have formed)
-    float getGridSpacing() const { return gridSpacing_; }
-
-    // Clear spatial representations
-    void clear();
-
-    // Have place cells formed?
-    bool hasPlaceCells() const { return !placeCells_.empty(); }
-
-private:
-    struct PlaceCell {
-        NeuronId neuron;
-        float x;
-        float y;
-        float fieldRadius;
-        float activation;
-    };
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<PlaceCell> placeCells_;
-    float currentX_;
-    float currentY_;
-    float gridSpacing_;
-    std::vector<float> lastSensoryCue_;
-};
-
-// TemporalRelation: Learns temporal relationships (before, after, sequence)
-// NOT symbolic timestamps - encodes temporal order in neural activity
-
-class TemporalRelation {
-public:
-    TemporalRelation();
-    ~TemporalRelation();
-
-    void initialize(Brain* brain);
-
-    // Record that event A was followed by event B
-    void recordSequence(const std::vector<float>& eventA,
-                      const std::vector<float>& eventB,
-                      float reward);
-
-    // Given event A, predict what comes next
-    std::vector<float> predictNext(const std::vector<float>& eventA) const;
-
-    // Given event B, predict what came before
-    std::vector<float> predictPrevious(const std::vector<float>& eventB) const;
-
-    // Get confidence in prediction
-    float getPredictionConfidence(const std::vector<float>& event) const;
-
-    // Get sequence length
-    size_t getSequenceLength() const { return sequences_.size(); }
-
-    // Clear sequences
-    void clear();
-
-private:
-    struct SequenceLink {
-        std::vector<float> fromEvent;
-        std::vector<float> toEvent;
-        float strength;
-        size_t observationCount;
-    };
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<SequenceLink> sequences_;
 };
 
 } // namespace nlm

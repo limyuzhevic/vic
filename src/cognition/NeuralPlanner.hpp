@@ -51,13 +51,23 @@ public:
     size_t getPlanningDepth() const { return planningDepth_; }
     void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
 
+    // Get number of steps to look ahead
+    size_t getPlanningDepth() const { return planningDepth_; }
+    void setPlanningDepth(size_t depth) { planningDepth_ = depth; }
+
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
 
+    // Get current planned action
+    ActionType getPlannedAction() const { return plannedAction_; }
+
+    // Get goal reached status
+    bool getGoalReached() const { return goalReached_; }
+
     // Update plans based on actual outcome
     void updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                          const std::vector<ActionType>& actualActions,
-                          float actualReward);
+                         const std::vector<ActionType>& actualActions,
+                         float actualReward);
 
     // Clear planning cache
     void clearCache();
@@ -71,8 +81,27 @@ public:
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
 
+    // Get current planned action
+    ActionType getPlannedAction() const { return plannedAction_; }
+    void setPlannedAction(ActionType action) { plannedAction_ = action; }
+
+    // Get goal reached status
+    bool getGoalReached() const { return goalReached_; }
+    void setGoalReached(bool reached) { goalReached_ = reached; }
+
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
+
+    // Integrate concept formation into planning
+    // Returns concept IDs that are relevant to planning
+    bool integrateConceptFormation(const std::vector<float>& workingMemoryState,
+                                  std::vector<size_t>& relevantConceptIds);
+
+    // Use prediction system for goal-directed planning
+    // Returns true if goal was reached in this step
+    bool planForGoal(const std::vector<float>& currentState,
+                    const std::vector<float>& goalState,
+                    ActionType& selectedAction);
 
 private:
     // Generate possible action sequences
@@ -87,13 +116,13 @@ private:
     Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
-    
+
     // Current goal state
     std::vector<float> currentGoal_;
-    
+
     // Action quality from experience
     std::vector<float> actionQuality_;
-    
+
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
 };

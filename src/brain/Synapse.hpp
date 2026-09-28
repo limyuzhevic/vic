@@ -70,6 +70,13 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    void setShortTermDepression(float depression);
+    
+    float getShortTermFacilitation() const;
+    void setShortTermFacilitation(float facilitation);
+    
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
