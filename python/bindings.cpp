@@ -164,26 +164,22 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
-    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
-        .def("getType", &SensoryInput::getType, "Get the type of sensory input")
-        .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
-        .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
-        .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+    py::class_<StructuralPlasticity>(m, "StructuralPlasticity", R"pbdoc(Structural plasticity for synapse and neuron creation/removal)pbdoc")
+        .def(py::init<>())
+        .def("setSynaptogenesisRate", &StructuralPlasticity::setSynaptogenesisRate, py::arg("rate"), "Set synaptogenesis rate")
+        .def("getPruningRate", &StructuralPlasticity::getPruningRate, "Get pruning rate");
+
+    py::class_<STDP>(m, "STDP", R"pbdoc(Spike-Timing-Dependent Plasticity rule)pbdoc")
+        .def(py::init<>())
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"), "Set LTP weight")
+        .def("getLTPWeight", &STDP::getLTPWeight, "Get LTP weight")
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"), "Set LTD weight")
+        .def("getLTDWeight", &STDP::getLTDWeight, "Get LTD weight")
+        .def("setTimeConstant", &STDP::setTimeConstant, py::arg("tau"), "Set time constant")
+        .def("getTimeConstant", &STDP::getTimeConstant, "Get time constant")
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"), "Configure STDP parameters");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
-        .def(py::init<>())
-        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
-        .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
-
-    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
@@ -391,7 +387,7 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
              py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+.def("enableDevelopment", &AgentBrain::enableDevelopment,
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
