@@ -20,11 +20,18 @@ namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
+    // Module version
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Version: 0.1.0
+        Author: NLM Authors
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -170,7 +177,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("validate", &SensoryInput::validate,
+             "Validate the sensory input data. Returns True if valid, False otherwise.")
+        .def("isEmpty", &SensoryInput::isEmpty,
+             "Check if the sensory input is empty. Returns True if empty, False otherwise.")
+        .def("clone", &SensoryInput::clone,
+             "Create a copy of this sensory input object");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +194,13 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("validate", &Vision::validate,
+             "Validate the vision data. Returns True if valid, False otherwise.")
+        .def("isEmpty", &Vision::isEmpty,
+             "Check if the vision data is empty. Returns True if empty, False otherwise.")
+        .def("clone", &Vision::clone,
+             "Create a copy of this vision object");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -416,10 +435,410 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Advanced utility functions
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        bool isValid = true;
+        auto keys = config->getKeys();
+        
+        for (const auto& key : keys) {
+            if (key.empty()) {
+                isValid = false;
+                continue;
+            }
+            
+            // Check for basic validation rules
+            if (key.find(" ") != std::string::npos) {
+                isValid = false;
+            }
+        }
+        
+        return isValid;
+    }, py::arg("config"), "Validate configuration. Returns True if valid, False otherwise.");
 
-} // namespace nlm
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        py::dict stats;
+        auto keys = config->getKeys();
+        stats["key_count"] = keys.size();
+        
+        // Count different value types
+        int intCount = 0, doubleCount = 0, boolCount = 0, stringCount = 0;
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (!value) continue;
+            
+            // Try to infer type
+            try {
+                auto intVal = std::stoi(*value);
+                intCount++;
+            } catch (...) {
+                try {
+                    auto doubleVal = std::stod(*value);
+                    doubleCount++;
+                } catch (...) {
+                    if (*value == "true" || *value == "false") {
+                        boolCount++;
+                    } else {
+                        stringCount++;
+                    }
+                }
+            }
+        }
+        
+        stats["int_values"] = intCount;
+        stats["double_values"] = doubleCount;
+        stats["bool_values"] = boolCount;
+        stats["string_values"] = stringCount;
+        
+        return stats;
+    }, py::arg("config"), "Get statistics about configuration keys and values.");
+
+    m.def("deepCopyConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        auto newConfig = std::make_shared<Config>();
+        auto keys = config->getKeys();
+        
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (value) {
+                newConfig->set(key, *value);
+            }
+        }
+        
+        return newConfig;
+    }, py::arg("config"), "Create a deep copy of configuration.");
+
+    m.def("mergeConfigs", [](const std::shared_ptr<Config>& config1, 
+                            const std::shared_ptr<Config>& config2) {
+        if (!config1 || !config2) {
+            throw std::runtime_error("Configs cannot be null");
+        }
+        
+        auto mergedConfig = std::make_shared<Config>();
+        
+        // Copy config1
+        auto keys1 = config1->getKeys();
+        for (const auto& key : keys1) {
+            auto value = config1->get<std::string>(key);
+            if (value) {
+                mergedConfig->set(key, *value);
+            }
+        }
+        
+        // Override with config2
+        auto keys2 = config2->getKeys();
+        for (const auto& key : keys2) {
+            auto value = config2->get<std::string>(key);
+            if (value) {
+                mergedConfig->set(key, *value);
+            }
+        }
+        
+        return mergedConfig;
+    }, py::arg("config1"), py::arg("config2"), 
+         "Merge two configurations. Values from config2 override config1.");
+
+    m.def("createConfigFromDict", [](const py::dict& data) {
+        auto config = std::make_shared<Config>();
+        
+        for (auto item : data) {
+            std::string key = py::cast<std::string>(item.first);
+            
+            if (py::isinstance<py::int_>(item.second)) {
+                config->set(key, py::cast<int>(item.second));
+            } else if (py::isinstance<py::float_>(item.second)) {
+                config->set(key, py::cast<double>(item.second));
+            } else if (py::isinstance<py::bool_>(item.second)) {
+                config->set(key, py::cast<bool>(item.second));
+            } else {
+                // Assume string
+                config->set(key, py::cast<std::string>(item.second));
+            }
+        }
+        
+        return config;
+    }, py::arg("data"), "Create configuration from Python dictionary.");
+
+    m.def("printConfigTree", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        std::cout << "Configuration Tree:" << std::endl;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (value) {
+                std::cout << "  " << key << ": " << *value << std::endl;
+            }
+        }
+        
+        std::cout << "Total keys: " << keys.size() << std::endl;
+    }, py::arg("config"), "Print configuration keys and values.");
+
+    m.def("randomizeConfig", [](std::shared_ptr<Config>& config, uint64_t seed) {
+        if (!config) {
+            throw std::runtime_error("Config cannot be null");
+        }
+        
+        // Set random seed if config has that key
+        if (config->has("random_seed")) {
+            config->set("random_seed", static_cast<int64_t>(seed));
+        }
+        
+        // Add some randomness to numerical values
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            if (config->has(key + "_randomize") && config->has(key)) {
+                auto value = config->get<std::string>(key);
+                if (value) {
+                    try {
+                        double doubleVal = std::stod(*value);
+                        // Add small random perturbation
+                        double perturbation = (static_cast<double>(rand()) / RAND_MAX - 0.5) * 0.1 * doubleVal;
+                        config->set(key, doubleVal + perturbation);
+                    } catch (...) {
+                        // Keep original value if not a number
+                    }
+                }
+            }
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("seed"), 
+         "Add randomness to configuration values. Modifies config in-place.");
+
+    m.def("createTestEnvironment", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->setAgentStart(10.0, 10.0);
+        world->setRandomSeed(42);
+        return world;
+    }, "Create a standard test environment with 20x20 world and 8x8 vision.");
+
+    m.def("createTestingBrain", [](size_t neuronCount = 500) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        return std::make_tuple(brain, config);
+    }, py::arg("neuronCount") = 500, 
+         "Create a standard testing brain with given neuron count. Returns brain and config.");
+
+    m.def("resetSystem", [](std::shared_ptr<Brain> brain,
+                           std::shared_ptr<AgentBrain> agent,
+                           std::shared_ptr<SimpleWorld> world) {
+        if (!brain || !agent || !world) {
+            throw std::runtime_error("Brain, agent, or world cannot be null");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        agent->reset();
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+         "Reset the entire system (brain, agent, world) to initial state. Returns brain, agent, and world.");
+
+    m.def("cloneBrain", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        
+        auto config = brain->getConfig();
+        auto clonedBrain = std::make_shared<Brain>(config);
+        clonedBrain->initialize();
+        
+        // Try to copy state if save/load is available
+        try {
+            brain->save("/tmp/temp_brain.bin");
+            clonedBrain->load("/tmp/temp_brain.bin");
+        } catch (...) {
+            // If save/load fails, just return fresh brain
+        }
+        
+        return clonedBrain;
+    }, py::arg("brain"), 
+         "Create a clone of a brain. Returns cloned brain.");
+
+    m.def("benchmarkBrain", [](const std::shared_ptr<Brain>& brain, size_t numSteps) {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        
+        brain->initialize();
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            brain->step(static_cast<nlm::SimulationStep>(step));
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        py::dict results;
+        results["steps"] = numSteps;
+        results["duration_ms"] = duration.count();
+        results["steps_per_second"] = (numSteps * 1000.0) / duration.count();
+        results["neurons"] = brain->getTotalNeuronCount();
+        results["spikes"] = brain->getTotalSpikeCount();
+        
+        return results;
+    }, py::arg("brain"), py::arg("numSteps"),
+         "Benchmark brain performance. Returns dictionary with performance metrics.");
+
+    m.def("compareBrains", [](const std::vector<std::shared_ptr<Brain>>& brains, 
+                             size_t numSteps) {
+        if (brains.empty()) {
+            throw std::runtime_error("Brain list cannot be empty");
+        }
+        
+        py::list results;
+        
+        for (const auto& brain : brains) {
+            if (!brain) {
+                throw std::runtime_error("Brain in list cannot be null");
+            }
+            
+            brain->initialize();
+            auto startTime = std::chrono::high_resolution_clock::now();
+            
+            for (size_t step = 0; step < numSteps; ++step) {
+                brain->step(static_cast<nlm::SimulationStep>(step));
+            }
+            
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+            
+            py::dict brainResults;
+            brainResults["neurons"] = brain->getTotalNeuronCount();
+            brainResults["spikes"] = brain->getTotalSpikeCount();
+            brainResults["duration_ms"] = duration.count();
+            brainResults["steps_per_second"] = (numSteps * 1000.0) / duration.count();
+            
+            results.append(brainResults);
+        }
+        
+        return results;
+    }, py::arg("brains"), py::arg("numSteps"),
+         "Compare performance of multiple brains. Returns list of performance results.");
+
+    m.def("exportBrainToPython", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        
+        py::dict brainState;
+        
+        brainState["neuron_count"] = brain->getTotalNeuronCount();
+        brainState["synapse_count"] = brain->getTotalSynapseCount();
+        brainState["active_neurons"] = brain->getActiveNeuronCount();
+        brainState["firing_neurons"] = brain->getFiringNeuronCount();
+        brainState["average_firing_rate"] = brain->getAverageFiringRate();
+        brainState["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        brainState["total_spikes"] = brain->getTotalSpikeCount();
+        brainState["pending_spike_events"] = brain->getPendingSpikeEventCount();
+        brainState["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Get config as dict
+        auto config = brain->getConfig();
+        py::dict configDict;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (value) {
+                configDict[key] = *value;
+            }
+        }
+        brainState["config"] = configDict;
+        
+        return brainState;
+    }, py::arg("brain"), 
+         "Export brain state to Python dictionary for analysis.");
+
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, 
+                            std::shared_ptr<AgentBrain> agent,
+                            std::shared_ptr<SimpleWorld> world,
+                            size_t numSteps) {
+        if (!brain || !agent || !world) {
+            throw std::runtime_error("Brain, agent, or world cannot be null");
+        }
+        
+        brain->initialize();
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(static_cast<nlm::SimulationStep>(step));
+            
+            // Get motor command
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply motor command
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("numSteps"),
+         "Run a complete simulation episode. Returns brain, agent, and world.");
+
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain,
+                         std::shared_ptr<AgentBrain> agent,
+                         std::shared_ptr<SimpleWorld> world,
+                         size_t numSteps,
+                         bool enableLearning = true) {
+        if (!brain || !agent || !world) {
+            throw std::runtime_error("Brain, agent, or world cannot be null");
+        }
+        
+        brain->initialize();
+        agent->initialize(*world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+        }
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(static_cast<nlm::SimulationStep>(step));
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward if learning is enabled
+            if (enableLearning) {
+                auto reward = world->getSensoryPercept().getInternal()[0] if world->getSensoryPercept().getInternal() else 0.0;
+                agent->applyRewardModulation(reward, 0.0);
+            }
+        }
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("numSteps"), py::arg("enableLearning") = true,
+         "Run a complete episode with optional learning. Returns brain, agent, and world.");

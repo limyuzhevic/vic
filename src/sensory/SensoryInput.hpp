@@ -25,6 +25,25 @@ public:
     double getTimestamp() const;
     void setTimestamp(double timestamp);
     
+    // Validate sensory input
+    virtual bool validate() const;
+    
+    // Check if empty
+    virtual bool isEmpty() const;
+    
+    // Clone
+    virtual std::unique_ptr<SensoryInput> clone() const = 0;
+    
+protected:
+    double timestamp_;
+};
+
+    // Validate sensory input
+    virtual bool validate() const;
+    
+    // Check if empty
+    virtual bool isEmpty() const;
+    
     // Clone
     virtual std::unique_ptr<SensoryInput> clone() const = 0;
     
@@ -53,6 +72,10 @@ public:
     size_t getHeight() const;
     size_t getChannels() const;
     
+    // Validation
+    bool validate() const override;
+    bool isEmpty() const override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -77,6 +100,10 @@ public:
     size_t getSampleRate() const;
     size_t getNumSamples() const;
     
+    // Validation
+    bool validate() const override;
+    bool isEmpty() const override;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -96,6 +123,10 @@ public:
     // Add signal
     void addSignal(float value);
     void clearSignals();
+    
+    // Validation
+    bool validate() const override;
+    bool isEmpty() const override;
     
 private:
     struct Impl;

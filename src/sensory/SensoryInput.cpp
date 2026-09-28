@@ -12,6 +12,24 @@ void SensoryInput::setTimestamp(double timestamp) {
     timestamp_ = timestamp;
 }
 
+bool SensoryInput::validate() const {
+    return !isEmpty() && getDimensions() > 0;
+}
+
+bool SensoryInput::isEmpty() const {
+    return getDimensions() == 0;
+}
+
+} // namespace nlm
+
+bool SensoryInput::validate() const {
+    return !isEmpty() && getDimensions() > 0;
+}
+
+bool SensoryInput::isEmpty() const {
+    return getDimensions() == 0;
+}
+
 struct Vision::Impl {
     size_t width;
     size_t height;
@@ -62,6 +80,15 @@ size_t Vision::getWidth() const { return pImpl->width; }
 size_t Vision::getHeight() const { return pImpl->height; }
 size_t Vision::getChannels() const { return pImpl->channels; }
 
+bool Vision::validate() const {
+    return !isEmpty() && getDimensions() > 0 && 
+           pImpl->width > 0 && pImpl->height > 0 && pImpl->channels > 0;
+}
+
+bool Vision::isEmpty() const {
+    return getDimensions() == 0 || pImpl->width == 0 || pImpl->height == 0;
+}
+
 struct Audio::Impl {
     size_t sampleRate;
     size_t numSamples;
@@ -108,6 +135,15 @@ void Audio::setSampleRate(size_t rate) {
 size_t Audio::getSampleRate() const { return pImpl->sampleRate; }
 size_t Audio::getNumSamples() const { return pImpl->numSamples; }
 
+bool Audio::validate() const {
+    return !isEmpty() && getDimensions() > 0 && 
+           pImpl->numSamples > 0 && pImpl->sampleRate > 0;
+}
+
+bool Audio::isEmpty() const {
+    return getDimensions() == 0 || pImpl->numSamples == 0;
+}
+
 struct InternalSignals::Impl {
     std::vector<float> signals;
     
@@ -144,6 +180,15 @@ void InternalSignals::addSignal(float value) {
 
 void InternalSignals::clearSignals() {
     pImpl->signals.clear();
+}
+
+bool InternalSignals::validate() const {
+    // Internal signals are always valid if they exist
+    return getDimensions() >= 0;
+}
+
+bool InternalSignals::isEmpty() const {
+    return getDimensions() == 0;
 }
 
 } // namespace nlm
