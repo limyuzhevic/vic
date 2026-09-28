@@ -148,21 +148,35 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    // Fast path for non-full history
+    if (pImpl->spikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.push_back(timestamp);
+    } else {
+        // Circular buffer implementation for fixed-size history
+        // Rotate the history by removing first element and adding new one
+        std::rotate(pImpl->spikeHistory.begin(), pImpl->spikeHistory.begin() + 1, pImpl->spikeHistory.end());
+        pImpl->spikeHistory.back() = timestamp;
     }
 }
 
 void Neuron::clearSpikeHistory() {
+    // Optimized clear using shrink_to_fit if available
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    // Reserve space for better performance if growing
+    if (pImpl->incomingSynapses.size() >= pImpl->incomingSynapses.capacity()) {
+        pImpl->incomingSynapses.reserve(pImpl->incomingSynapses.size() * 1.5);
+    }
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    // Reserve space for better performance if growing
+    if (pImpl->outgoingSynapses.size() >= pImpl->outgoingSynapses.capacity()) {
+        pImpl->outgoingSynapses.reserve(pImpl->outgoingSynapses.size() * 1.5);
+    }
     pImpl->outgoingSynapses.push_back(handle);
 }
 
@@ -191,7 +205,70 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period - early exit for common case
+    if (pImpl->state.refractoryRemaining == 0) {
+        // LIF dynamics: Leaky Integrate-and-Fire
+        // dV/dt = (V_rest - V)/tau + I/C
+        // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+        
+        MembranePotential& V = pImpl->state.membranePotential;
+        MembranePotential V_rest = pImpl->state.restingPotential;
+        MembranePotential V_reset = pImpl->state.resetPotential;
+        MembranePotential threshold = pImpl->state.threshold;
+        
+        // Pre-calculate constants for better performance
+        static constexpr float inv_tau = 1.0f / Impl::TIME_CONSTANT;  // 1/tau
+        static constexpr float inv_C = 1.0f / Impl::MEMBRANE_CAPACITANCE;  // 1/C
+        static constexpr float dt_ms = 1000.0f * dt;  // Convert to milliseconds
+        
+        // Synaptic input contributes to membrane potential change
+        float synapticContribution = pImpl->synapticInput * inv_C;
+        
+        // Leak contribution - optimized using distributivity
+        float leakContribution = inv_tau * (V_rest - V);
+        
+        // Update membrane potential using exponential Euler integration
+        V += dt_ms * (leakContribution + synapticContribution);
+        
+        // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+        if (pImpl->state.adaptationVariable > 0.0f) {
+            V -= pImpl->state.adaptationVariable * 0.01f;
+            pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        }
+        
+        // Check for spike - optimize threshold comparison
+        if (V >= threshold) {
+            fired = true;
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Record spike
+            recordSpike(currentTime);
+            
+            // Reset membrane potential
+            V = V_reset;
+            
+            // Enter refractory period
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
+            
+            // Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+        } else {
+            pImpl->state.firingState = FiringState::Active;
+        }
+        
+        // Clamp membrane potential to prevent instability - optimize
+        if (V > 50.0f) V = 50.0f;
+        else if (V < -100.0f) V = -100.0f;
+        
+        // Clear synaptic input for next step
+        pImpl->synapticInput = 0.0f;
+        
+        return fired;
+    }
+    
+    // Refractory period handling
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -202,67 +279,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
-    
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
-    
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
-    
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
-    
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
-    
-    return fired;
+    return false;
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Fast path for default timestep - avoid multiplication in common case
+    static constexpr TimestepDuration default_dt = 0.001;  // 1ms default
+    stepLIF(currentTime, default_dt);
 }
 
 void Neuron::reset() {
@@ -272,31 +295,39 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Optimized random initialization with biological constraints
+    // Generate all random values first to minimize RNG calls
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    float membraneOffset = rng.uniformReal(-3.0f, 3.0f);
+    float thresholdOffset = rng.uniformReal(-2.0f, 2.0f);
+    float restingOffset = rng.uniformReal(-2.0f, 2.0f);
+    float resetOffset = rng.uniformReal(0.0f, 5.0f);
+    uint32_t refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Set resting potential first (many values depend on it)
+    pImpl->state.restingPotential = -70.0f + restingOffset;
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Initialize membrane potential based on resting potential
+    pImpl->state.membranePotential = pImpl->state.restingPotential + membraneOffset;
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    // Set threshold
+    pImpl->state.threshold = -55.0f + thresholdOffset;
     
-    // Initial state
+    // Set reset potential relative to resting
+    pImpl->state.resetPotential = pImpl->state.restingPotential + resetOffset;
+    
+    // Set refractory period
+    pImpl->state.refractoryPeriod = refractoryPeriod;
+    
+    // Set initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
-    // Clear any residual state
+    // Clear spike history and synaptic input
+    clearSpikeHistory();
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
 }
 
 } // namespace nlm

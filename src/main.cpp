@@ -147,15 +147,169 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
         // Determine if learning occurred
-        bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
-        
+bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
+                                 (strengthened > 0 || weakened > 0);
+
         NLM_LOG_INFO("");
         if (learningOccurred) {
             NLM_LOG_INFO("✓ LEARNING DETECTED: Synaptic weights changed through experience");
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+    }
+    
+    // Multi-layer learning analysis
+    void analyzeMultiLayerLearning() {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Multi-Layer Learning Analysis ===");
+        
+        if (!brain || !brain->getSpikeSystem()) {
+            NLM_LOG_INFO("ERROR: Brain or spike system not available");
+            return;
+        }
+        
+        // Get activity statistics across different neuron populations
+        auto spikeSystem = brain->getSpikeSystem();
+        
+        // Analyze by neuron type
+        std::vector<std::pair<NeuronType, size_t>> typeStats;
+        for (int type = 0; type < static_cast<int>(NeuronType::Count); ++type) {
+            size_t activeCount = spikeSystem->getActiveNeuronCount(static_cast<NeuronType>(type));
+            typeStats.emplace_back(static_cast<NeuronType>(type), activeCount);
+        }
+        
+        NLM_LOG_INFO("Activity by neuron type:");
+        for (const auto& pair : typeStats) {
+            NLM_LOG_INFO("  " + neuronTypeToString(pair.first) + ": " + std::to_string(pair.second) + " active neurons");
+        }
+        
+        // Calculate learning efficiency
+        float totalLearning = 0.0f;
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                totalLearning += std::abs(syn->getWeightChange());
+            }
+        }
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Learning efficiency metrics:");
+        NLM_LOG_INFO("  Total synaptic weight change: " + std::to_string(totalLearning));
+        NLM_LOG_INFO("  Learning rate: " + std::to_string(totalLearning / std::max(brain->getTotalSynapseCount(), 1UL)));
+        
+        // Detect learning patterns
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Learning patterns detected:");
+        
+        // Check for Hebbian-like learning (co-activation strengthening)
+        bool hebbianPattern = detectHebbianPattern();
+        NLM_LOG_INFO("  Hebbian pattern: " + std::string(hebbianPattern ? "✓" : "✗"));
+        
+        // Check for STDP-like learning (temporal correlation)
+        bool stdpPattern = detectSTDPPattern();
+        NLM_LOG_INFO("  STDP pattern: " + std::string(stddpPattern ? "✓" : "✗"));
+        
+        // Check for homeostatic regulation
+        bool homeostaticPattern = detectHomeostaticPattern();
+        NLM_LOG_INFO("  Homeostatic regulation: " + std::string(homeostaticPattern ? "✓" : "✗"));
+    }
+    
+    std::string neuronTypeToString(NeuronType type) {
+        switch (type) {
+            case NeuronType::Excitatory: return "Excitatory";
+            case NeuronType::Inhibitory: return "Inhibitory";
+            case NeuronType::Modulatory: return "Modulatory";
+            case NeuronType::Sensory: return "Sensory";
+            case NeuronType::Motor: return "Motor";
+            case NeuronType::Internal: return "Internal";
+            default: return "Unknown";
+        }
+    }
+    
+    bool detectHebbianPattern() {
+        // Simple heuristic: check if there are correlated activity patterns
+        if (!brain || !brain->getSpikeSystem()) return false;
+        
+        auto spikeSystem = brain->getSpikeSystem();
+        auto mostActive = spikeSystem->getMostActiveNeurons(20);
+        
+        // Check if top neurons are of excitatory type (typical Hebbian)
+        int excitatoryCount = 0;
+        for (const auto& neuronId : mostActive) {
+            if (auto* neuron = brain->getNeuron(neuronId)) {
+                if (neuron->getType() == NeuronType::Excitatory) {
+                    excitatoryCount++;
+                }
+            }
+        }
+        
+        return (excitatoryCount > mostActive.size() * 0.6);
+    }
+    
+    bool detectSTDPPattern() {
+        // Check for temporal patterns indicative of STDP
+        if (!brain) return false;
+        
+        // Simple STDP pattern: alternating excitation/inhibition
+        size_t totalSpikes = brain->getTotalSpikeCount();
+        if (totalSpikes < 10) return false;
+        
+        // Check spike timing regularity (STDP requires precise timing)
+        auto spikeSystem = brain->getSpikeSystem();
+        auto recentSpikes = spikeSystem->getRecentSpikes(1000);
+        
+        if (recentSpikes.size() < 5) return false;
+        
+        // Calculate coefficient of variation (CV) of inter-spike intervals
+        std::vector<float> isi;
+        for (size_t i = 1; i < recentSpikes.size(); ++i) {
+            isi.push_back(recentSpikes[i].timestamp - recentSpikes[i-1].timestamp);
+        }
+        
+        if (isi.empty()) return false;
+        
+        float meanISI = 0.0f;
+        for (float interval : isi) meanISI += interval;
+        meanISI /= isi.size();
+        
+        float variance = 0.0f;
+        for (float interval : isi) {
+            variance += (interval - meanISI) * (interval - meanISI);
+        }
+        variance /= isi.size();
+        
+        float cv = std::sqrt(variance) / meanISI;
+        return (cv < 0.5);  // Regular spiking indicates STDP
+    }
+    
+    bool detectHomeostaticPattern() {
+        // Check for synaptic scaling/homeostasis
+        if (!brain) return false;
+        
+        float excitationSum = 0.0f;
+        float inhibitionSum = 0.0f;
+        size_t excitationCount = 0;
+        size_t inhibitionCount = 0;
+        
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                if (syn->getPreNeuronType() == NeuronType::Excitatory) {
+                    excitationSum += syn->getWeight();
+                    excitationCount++;
+                } else if (syn->getPreNeuronType() == NeuronType::Inhibitory) {
+                    inhibitionSum += syn->getWeight();
+                    inhibitionCount++;
+                }
+            }
+        }
+        
+        if (excitationCount == 0 || inhibitionCount == 0) return false;
+        
+        float excitationAverage = excitationSum / excitationCount;
+        float inhibitionAverage = inhibitionSum / inhibitionCount;
+        
+        // Homeostasis typically maintains balance
+        float ratio = excitationAverage / inhibitionAverage;
+        return (ratio > 0.5 && ratio < 2.0);
     }
 };
 

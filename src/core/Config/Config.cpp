@@ -24,11 +24,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t successfulParses = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,11 +53,27 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+                successfulParses++;
+            } catch (const std::exception& e) {
+                NLM_LOG_WARN("Failed to parse configuration line " + std::to_string(lineNumber) + 
+                           " in " + filepath + ": " + std::string(e.what()));
+            }
+        } else {
+            NLM_LOG_WARN("Invalid configuration format at line " + std::to_string(lineNumber) + 
+                        " in " + filepath + ": missing '='");
         }
     }
     
-    return true;
+    if (lineNumber == 0) {
+        NLM_LOG_WARN("Configuration file is empty: " + filepath);
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from " + filepath + ": " + 
+                std::to_string(successfulParses) + " entries parsed");
+    
+    return successfulParses > 0;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,14 +102,38 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to save configuration to file: " + filepath);
         return false;
+    }
+    
+    // Check if we have any entries to save
+    if (pImpl->entries.empty()) {
+        NLM_LOG_WARN("Attempting to save empty configuration to file: " + filepath);
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n";
     }
     
+    // Flush to ensure data is written
+    file.flush();
+    
+    if (file.fail()) {
+        NLM_LOG_ERROR("Failed to write configuration to file: " + filepath);
+        return false;
+    }
+    
+    NLM_LOG_INFO("Saved configuration to file: " + filepath);
     return true;
 }
 
