@@ -6,85 +6,119 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Build type and configuration options
+set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type (Debug, Release, RelWithDebInfo, MinSizeRel)")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Enable position independent code (for static libraries)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Enable warnings
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Platform-specific optimizations
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-march=native -fopenmp)
+    add_link_options(-march=native -fopenmp)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Advanced learning and extended modules
+option(NLM_ENABLE_ADVANCED_LEARNING "Build advanced learning algorithms" ON)
+option(NLM_ENABLE_PYTHON_EXPERIMENTAL "Build experimental Python extensions" OFF)
+option(NLM_ENABLE_CUDA_ACCELERATION "Enable CUDA acceleration" OFF)
+option(NLM_ENABLE_MPI_PARALLEL "Enable MPI parallelization" OFF)
+
+# Collect advanced source files
+if(NLM_ENABLE_ADVANCED_LEARNING)
+    file(GLOB_RECURSE ADVANCED_SOURCES "src/advanced/*.cpp")
+endif()
+
+# Performance optimization flags
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(-O3 -DNDEBUG)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-O0 -g -D_DEBUG)
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    add_compile_options(-O2 -g -DNDEBUG)
+endif()
+
+# Code coverage configuration
+if(NLM_ENABLE_COVERAGE)
+    if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(--coverage)
+        add_link_options(--coverage)
+    endif()
+endif()
+
+# Sanitizer configuration
+if(NLM_ENABLE_SANITIZERS)
+    if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(-fsanitize=address,undefined)
+        add_link_options(-fsanitize=address,undefined)
+    endif()
+endif()
+
+# Add version and compile definitions
+add_compile_definitions(NLM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR})
+add_compile_definitions(NLM_VERSION_MINOR=${PROJECT_VERSION_MINOR})
+add_compile_definitions(NLM_VERSION_PATCH=${PROJECT_VERSION_PATCH})
+
+# Add script directory for custom build scripts
+include(${CMAKE_CURRENT_SOURCE_DIR}/scripts/CMakeHelpers.cmake OPTIONAL)
+
+# Collect source files using glob patterns for better maintainability
+file(GLOB_RECURSE CORE_SOURCES src/core/*.cpp)
+file(GLOB_RECURSE BRAIN_SOURCES src/brain/*.cpp)
+file(GLOB_RECURSE DYNAMICS_SOURCES src/dynamics/*.cpp)
+file(GLOB_RECURSE PLASTICITY_SOURCES src/plasticity/*.cpp)
+file(GLOB_RECURSE DEVELOPMENT_SOURCES src/development/*.cpp)
+file(GLOB_RECURSE NEUROMODULATION_SOURCES src/neuromodulation/*.cpp)
+file(GLOB_RECURSE MEMORY_SOURCES src/memory/*.cpp)
+file(GLOB_RECURSE COGNITION_SOURCES src/cognition/*.cpp)
+file(GLOB_RECURSE SENSORY_SOURCES src/sensory/*.cpp)
+file(GLOB_RECURSE PREDICTION_SOURCES src/prediction/*.cpp)
+file(GLOB_RECURSE MOTOR_SOURCES src/motor/*.cpp)
+file(GLOB_RECURSE ENVIRONMENT_SOURCES src/environment/*.cpp)
+file(GLOB_RECURSE EXPERIMENT_SOURCES src/experiments/*.cpp)
+file(GLOB_RECURSE VISUALIZATION_SOURCES src/visualization/*.cpp)
+
+# Core library with all components
 add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    ${CORE_SOURCES}
+    ${BRAIN_SOURCES}
+    ${DYNAMICS_SOURCES}
+    ${PLASTICITY_SOURCES}
+    ${DEVELOPMENT_SOURCES}
+    ${NEUROMODULATION_SOURCES}
+    ${MEMORY_SOURCES}
+    ${COGNITION_SOURCES}
+    ${SENSORY_SOURCES}
+    ${PREDICTION_SOURCES}
+    ${MOTOR_SOURCES}
+    ${ENVIRONMENT_SOURCES}
+    ${EXPERIMENT_SOURCES}
+    ${VISUALIZATION_SOURCES}
+    $<$<BOOL:${NLM_ENABLE_ADVANCED_LEARNING}>:${ADVANCED_SOURCES}>
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Configuration for core library
+set_target_properties(nlm_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    DEBUG_POSTFIX "_debug"
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
 )
 
 target_include_directories(nlm_core PUBLIC

@@ -18,44 +18,66 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// TODO PHASE 2: Replace with proper JSON/YAML parser (e.g., nlohmann/json, yaml-cpp)
+// Current implementation uses a simple key=value format with limited error handling
+// Phase 2 should implement proper parsing with error recovery and type validation
+    
+    // Check if file exists before attempting to open
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_WARN("Config file does not exist: " + filepath);
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with better error handling
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARN("Skipping invalid config line " + std::to_string(lineNumber) + ": " + line);
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key is not empty
+        if (key.empty()) {
+            NLM_LOG_WARN("Skipping config line " + std::to_string(lineNumber) + ": empty key");
+            continue;
+        }
+        
+        // Remove quotes if present (more robust handling)
+        if (!value.empty() && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
+        NLM_LOG_DEBUG("Loaded config: " + key + " = " + value);
     }
     
+    NLM_LOG_INFO("Loaded configuration from: " + filepath + " (" + std::to_string(lineNumber) + " lines)");
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Parse command line arguments with better error handling
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +88,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_DEBUG("Loaded from args: " + key + " = " + value);
+            } else {
+                NLM_LOG_WARN("Invalid argument format (no =): " + arg);
             }
         }
         // Handle -key value format
@@ -73,20 +98,82 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_DEBUG("Loaded from args: " + key + " = " + value);
         }
+        else {
+            NLM_LOG_WARN("Unknown argument format: " + arg);
+        }
+    }
+    
+    if (argc > 1) {
+        NLM_LOG_INFO("Loaded configuration from command line arguments");
     }
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Save configuration to file with better error handling and validation
+    
+    // Check if we can write to the directory
+    std::filesystem::path filepath_path(filepath);
+    if (std::filesystem::exists(filepath_path)) {
+        // Check if file is writable
+        std::ifstream test_file(filepath);
+        if (!test_file.good()) {
+            NLM_LOG_ERROR("Config file exists and is not writable: " + filepath);
+            return false;
+        }
+    } else {
+        // Check if parent directory exists and is writable
+        std::filesystem::path parent_dir = filepath_path.parent_path();
+        if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
+            NLM_LOG_ERROR("Config directory does not exist: " + parent_dir.string());
+            return false;
+        }
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Neural Simulation Framework\n";
+    file << "# DO NOT EDIT MANUALLY - Use programmatic interfaces\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Convert value to string with proper formatting
+        std::string value_str;
+        try {
+            std::visit([&](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    value_str = "\"" + arg + "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    value_str = arg ? "true" : "false";
+                } else {
+                    value_str = std::to_string(arg);
+                }
+            }, entry.value);
+        } catch (...) {
+            NLM_LOG_WARN("Failed to convert config value for key: " + entry.key);
+            value_str = "UNKNOWN_VALUE";
+        }
+        
+        file << entry.key << " = " << value_str << "\n";
+    }
+    
+    file << "\n# End of configuration\n";
+    
+    if (pImpl->entries.size() > 0) {
+        NLM_LOG_INFO("Saved configuration to: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
+    } else {
+        NLM_LOG_WARN("Saving empty configuration to: " + filepath);
     }
     
     return true;
@@ -98,12 +185,16 @@ std::optional<T> Config::get(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        NLM_LOG_DEBUG("Config key not found: " + key);
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        T value = std::get<T>(it->value);
+        NLM_LOG_DEBUG("Retrieved config " + key + " = " + std::to_string(value));
+        return value;
     } catch (const std::bad_variant_access&) {
+        NLM_LOG_WARN("Config key " + key + " has wrong type (expected " + typeid(T).name() + ")");
         return std::nullopt;
     }
 }
@@ -111,7 +202,13 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        NLM_LOG_DEBUG("Config " + key + " = " + std::to_string(val.value()));
+        return val.value();
+    } else {
+        NLM_LOG_DEBUG("Config key " + key + " not found, using default");
+        return defaultValue;
+    }
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

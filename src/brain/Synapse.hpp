@@ -8,7 +8,9 @@ namespace nlm {
 class Neuron;
 
 // Synapse representing a connection between neurons
-// Implements real synaptic transmission with delays and short-term plasticity
+// Implements real synaptic transmission with delays, short-term plasticity,
+// and activity-dependent weight changes through multiple plasticity mechanisms.
+// TODO PHASE 2: Implement real synaptic dynamics
 
 class Synapse {
 public:

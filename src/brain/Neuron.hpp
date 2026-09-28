@@ -41,7 +41,9 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with comprehensive
+// membrane potential dynamics, synaptic integration, and plasticity mechanisms.
+// TODO PHASE 2: Implement real integrate-and-fire dynamics
 class Neuron {
 public:
     // Create neuron with ID
