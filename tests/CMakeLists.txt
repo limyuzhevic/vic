@@ -15,10 +15,17 @@ add_executable(nlm_test
     test_stdp.cpp
     test_brain.cpp
 )
-
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
+
+# Add integration tests as a separate test target
+add_executable(nlm_integration_tests
+    ../../src/integration_tests.cpp
+)
+target_link_libraries(nlm_integration_tests PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_compile_features(nlm_integration_tests PRIVATE cxx_std_20)
 
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_integration_tests COMMAND nlm_integration_tests)
