@@ -3,6 +3,9 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -63,11 +66,28 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enableNeuralPlanner(bool enable) { neuralPlannerEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isNeuralPlannerEnabled() const { return neuralPlannerEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    
+    // Get current goal for planning
+    std::vector<float> getCurrentGoal() const { return currentGoal_; }
+    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+    
+    // Get planning confidence
+    float getPlanningConfidence() const;
+    
+    // Get concept formation statistics
+    size_t getConceptCount() const;
+    
+    // Get attention winners
+    const std::vector<NeuronId>& getAttentionWinners() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -77,6 +97,11 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Integrated cognitive systems
+    NeuralPlanner* neuralPlanner_;
+    ConceptFormation* conceptFormation_;
+    AttentionalSelection* attention_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -108,10 +133,22 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool neuralPlannerEnabled_;
+    bool conceptFormationEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Planning state
+    size_t planningDepth_;
+    float planningConfidence_;
+    std::vector<float> currentGoal_;
+    
+    // Current experience for concept formation
+    std::vector<float> currentSensoryPattern_;
+    std::vector<float> currentFeatures_;
+    SimulationStep lastExperienceStep_;
 };
 
 } // namespace nlm
