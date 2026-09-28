@@ -49,6 +49,9 @@ public:
     // Get novelty level
     float getNoveltyLevel() const;
     
+// Get novelty level
+    float getNoveltyLevel() const;
+    
     // Get prediction error
     float getPredictionError() const;
     
@@ -69,49 +72,52 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== ADVANCED AGENT CONTROL ==========
+    
+    // Fine-tune agent behavior parameters
+    void setActionThreshold(float threshold);
+    void setExplorationRate(float rate);
+    void setLearningRate(float rate);
+    void setRewardScale(float scale);
+    void setMemoryCapacity(size_t capacity);
+    
+    // Configuration presets
+    void configureForSpeed();
+    void configureForExploration();
+    void configureForLearning();
+    void configureForPerformance();
+    
+    // Development and learning helpers
+    void resetDevelopmentalProgress();
+    std::tuple<float, float, float> getDevelopmentStats() const;
+    
+    // Memory system helpers (if available)
+    std::tuple<size_t, float, float> getMemoryStats() const;
+    
+    // ========== CONVENIENCE METHODS ==========
+    
+    // Run a complete episode with optional learning
+    void runEpisode(const SimpleWorld& world, size_t numSteps, bool enableLearning = true);
+    
+    // Helper function to run a complete simulation with agent
+    static AgentBrain runSimulation(const SimpleWorld& world, 
+                                    const std::shared_ptr<Brain>& brain,
+                                    size_t numSteps);
+    
+    // Sensory processing convenience methods
+    std::tuple<float, size_t, size_t> computeSensoryStats(const SensoryPercept& percept) const;
+    void normalizeSensoryInput(const std::vector<float>& targetRange);
+    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    // Internal parameters
+    float actionThreshold_;
+    float explorationRate_;
+    float learningRate_;
+    float rewardScale_;
+    size_t memoryCapacity_;
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
-    
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
+    // Development reset helper
+    void resetDevelopmentalHelper();
 };
 
 } // namespace nlm

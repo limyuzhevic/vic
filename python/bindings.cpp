@@ -398,7 +398,123 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced agent control methods
+        .def("setActionThreshold", &AgentBrain::setActionThreshold,
+             py::arg("threshold"),
+             "Set action threshold for motor command activation")
+        .def("setExplorationRate", &AgentBrain::setExplorationRate,
+             py::arg("rate"),
+             "Set exploration rate for curiosity-driven behavior")
+        .def("setLearningRate", &AgentBrain::setLearningRate,
+             py::arg("rate"),
+             "Set global learning rate for plasticity")
+        .def("setRewardScale", &AgentBrain::setRewardScale,
+             py::arg("scale"),
+             "Set reward scaling factor")
+        .def("setMemoryCapacity", &AgentBrain::setMemoryCapacity,
+             py::arg("capacity"),
+             "Set memory system capacity (working/episodic memory)")
+        
+        // Convenience methods for common agent behaviors
+        .def("runEpisode", [](AgentBrain& self, const SimpleWorld& world, 
+                              size_t numSteps, bool enableLearning = true) {
+            for (size_t step = 0; step < numSteps; ++step) {
+                world.update(0.1);
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                auto action = self.decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+                if (enableLearning) {
+                    // Simple reward based on agent survival/energy
+                    float reward = world.getAgentBody().energy / 100.0f;
+                    self.applyRewardModulation(reward, 0.0f);
+                }
+            }
+        }, py::arg("world"), py::arg("numSteps"), py::arg("enableLearning" = true),
+             "Run a complete episode with optional learning")
+        .def("runSimulation", [](const SimpleWorld& world, 
+                                  const std::shared_ptr<Brain>& brain,
+                                  size_t numSteps) {
+            AgentBrain agent(brain);
+            agent.initialize(world);
+            
+            for (size_t step = 0; step < numSteps; ++step) {
+                world.update(0.1);
+                auto percept = world.getSensoryPercept();
+                agent.processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent.decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+                agent.updateDevelopment(0.1);
+            }
+            return agent;
+        }, py::arg("world"), py::arg("brain"), py::arg("numSteps"),
+             "Helper function to run a complete simulation with agent")
+        
+        // Sensory processing convenience methods
+        .def("computeSensoryStats", [](const AgentBrain& self, 
+                                       const SensoryPercept& percept) {
+            auto vision = percept.getVision();
+            float avgBrightness = 0.0f;
+            if (!vision.empty()) {
+                float sum = std::accumulate(vision.begin(), vision.end(), 0.0f);
+                avgBrightness = sum / vision.size();
+            }
+            return std::make_tuple(avgBrightness, percept.getTouch().size(), 
+                                  percept.getInternal().size());
+        }, py::arg("percept"),
+             "Compute basic statistics from sensory input (brightness, touch count, internal count)")
+        .def("normalizeSensoryInput", [](SensoryPercept& self, 
+                                          const std::vector<float>& targetRange) {
+            auto vision = self.getVision();
+            if (!vision.empty() && targetRange.size() >= 2) {
+                float minVal = *std::min_element(vision.begin(), vision.end());
+                float maxVal = *std::max_element(vision.begin(), vision.end());
+                if (maxVal > minVal) {
+                    float scale = targetRange[1] - targetRange[0];
+                    for (auto& v : vision) {
+                        v = targetRange[0] + (v - minVal) * scale / (maxVal - minVal);
+                    }
+                    self.setVision(vision);
+                }
+            }
+        }, py::arg("targetRange"),
+             "Normalize sensory input values to target range [min, max]")
+        
+        // Development and learning helpers
+        .def("getDevelopmentStats", [](const AgentBrain& self) {
+            auto stage = self.getDevelopmentalStage();
+            std::string stageStr;
+            switch (stage) {
+                case DevelopmentalStage::Initial: stageStr = "Initial"; break;
+                case DevelopmentalStage::CriticalPeriod: stageStr = "Critical Period"; break;
+                case DevelopmentalStage::Maturation: stageStr = "Maturation"; break;
+                case DevelopmentalStage::Adult: stageStr = "Adult"; break;
+                case DevelopmentalStage::Aging: stageStr = "Aging"; break;
+            }
+            return std::make_tuple(stageStr, self.getNeuromodulationLevel(),
+                                   self.getCuriosityLevel(), self.getNoveltyLevel());
+        }, "Get development statistics (stage, neuromodulation, curiosity, novelty)")
+        .def("resetDevelopmentalProgress", &AgentBrain::resetDevelopmentalProgress,
+             "Reset developmental progress while keeping brain structure")
+        
+        // Memory system helpers (if available)
+        .def("getMemoryStats", [](const AgentBrain& self) {
+            // This would be implemented if memory system is exposed
+            return std::make_tuple(0, 0.0f, 0.0f); // placeholder: working, episodic, associative memory stats
+        }, "Get memory system statistics (working, episodic, associative memory counts)")
+        
+        // Configuration presets
+        .def("configureForSpeed", &AgentBrain::configureForSpeed,
+             "Configure agent for fast, reactive behavior (low exploration, high threshold)")
+        .def("configureForExploration", &AgentBrain::configureForExploration,
+             "Configure agent for exploratory behavior (high curiosity, low thresholds)")
+        .def("configureForLearning", &AgentBrain::configureForLearning,
+             "Configure agent for intensive learning (high plasticity, moderate exploration)")
+        .def("configureForPerformance", &AgentBrain::configureForPerformance,
+             "Configure agent for optimal performance (balanced exploration/exploitation)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
