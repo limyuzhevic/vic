@@ -279,23 +279,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 ```cpp
 // In experiment/demos:
 while (running) {
-    // 1. Get observation from world ✅
-    SensoryPercept percept = world.observe(agent);
+    // 1. Get sensory percept from world ✅
+    const SensoryPercept& percept = world.getSensoryPercept();
     
     // 2. Process sensory input ✅
     agentBrain.processSensoryInput(percept);
     
     // 3. Brain step ✅
-    brain.step(step);
+    brain.step(step, step * 0.001);
     
     // 4. Decode motor command ✅
     MotorCommand cmd = agentBrain.decodeMotorCommand();
     
-    // 5. Apply action to world ✅
-    world.applyAction(agent, cmd);
+    // 5. Apply motor command to world and get result ✅
+    ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
     
-    // 6. Compute reward ✅
-    float reward = world.computeReward(agent);
+    // 6. Use reward from action result ✅
+    float reward = actionResult.reward;
     
     // 7. Apply reward modulation ✅
     agentBrain.applyRewardModulation(reward, predictedReward);
