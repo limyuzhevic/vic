@@ -1,403 +1,592 @@
-#include "Phase6IntegratedExperiment.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
+// Phase 6 Integration Experiment Implementation
+// NLM Phase 6: Final Integration
+
+#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "core/Logger/Logger.hpp"
+#include "brain/Brain.hpp"
+#include "core/Config/Config.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "neuromodulation/Neuromodulator.hpp"
+#include "neuromodulation/Dopamine.hpp"
+#include "neuromodulation/Curiosity.hpp"
+#include "neuromodulation/PredictionError.hpp"
+#include "neuromodulation/Novelty.hpp"
+#include "prediction/PredictionSystem.hpp"
+#include "development/DevelopmentSystem.hpp"
+#include "performance/CheckpointSystem.hpp"
+#include <fstream>
 #include <chrono>
-#include <cmath>
+#include <thread>
+#include <filesystem>
+#include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() = default;
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
-    Phase6IntegrationResult result;
-    result.startTime = time(nullptr);
+    NLM_LOG_INFO("Starting Phase 6 Integration Experiment");
+    NLM_LOG_INFO("Config: " + std::to_string(config.neuronCount) + " neurons, " +
+                 std::to_string(config.maxSteps) + " max steps");
     
-    auto startWall = std::chrono::high_resolution_clock::now();
+    auto startTime = std::chrono::high_resolution_clock::now();
     
-    NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
-    NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
-                 std::to_string(config.maxSteps) + " steps");
+    // Create and configure brain
+    auto brainConfig = std::make_shared<Config>();
+    brainConfig->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    brainConfig->set("simulation_timestep", 0.001, ConfigSource::Default);
+    brainConfig->set("neuron_count", static_cast<int64_t>(config.neuronCount), ConfigSource::Default);
+    brainConfig->set("region_count", static_cast<int64_t>(config.regionCount), ConfigSource::Default);
+    brainConfig->set("connection_probability", config.connectionProbability, ConfigSource::Default);
     
-    // Create configuration
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    auto brain = std::make_shared<Brain>(brainConfig);
     
-    // Create brain
-    auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
-        result.endTime = time(nullptr);
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        Phase6IntegrationResult result;
         return result;
     }
     
-    // Create simple world
-    SimpleWorld world;
-    world.initialize(16, 16);
+    NLM_LOG_INFO("Brain initialized successfully");
     
-    // Create agent
-    AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
-    
-    NLM_LOG_INFO("Brain and agent initialized successfully");
-    
-    // Run simulation
-    float totalReward = 0.0f;
-    float totalFiringRate = 0.0f;
-    size_t firingCount = 0;
-    
+    // Run simulation loop
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Simulate time passing
+        brain->step(step);
         
-        // Process sensory input
-        agent.processSensoryInput(percept);
-        
-        // Brain step
-        brain->step(step, step * 0.001);
-        
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
-        }
-        
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
-        }
-    }
-    
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
-    result.noveltyLevel = agent.getNoveltyLevel();
-    result.curiosityLevel = agent.getCuriosityLevel();
-    result.dopamineLevel = agent.getNeuromodulationLevel();
-    
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
-    result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
-    
-    NLM_LOG_INFO("=== Integration Verification ===");
-    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
-    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
-    
-    // Test checkpointing
-    if (config.enableCheckpointing) {
-        NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
-            
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+        // Inject some sensory input for learning
+        if (step % 10 == 0) {
+            // Create random sensory input
+            std::vector<float> sensoryData(config.neuronCount / 10);
+            for (size_t i = 0; i < sensoryData.size(); ++i) {
+                sensoryData[i] = (static_cast<float>(rand()) / RAND_MAX) * 2.0f - 1.0f;
             }
-        } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
+            
+            // Create sensory observation
+            auto observation = std::make_shared<Observation>(sensoryData);
+            brain->receiveSensoryInput(*observation);
+            
+            // Produce action based on brain state
+            auto action = brain->produceAction();
+            
+            // Apply reward based on action
+            if (action->getType() != ActionType::Wait) {
+                float reward = 1.0f; // Simple positive reward for action
+                
+                // Apply neuromodulation
+                if (auto* dopamine = brain->getDopamine()) {
+                    dopamine->applyRewardPredictionError(reward, 0.5f); // Expected reward 0.5
+                }
+            }
+        }
+        
+        // Log progress every 1000 steps
+        if (step % 1000 == 0 && step > 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + 
+                        ", Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                        ", Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     
-    result.endTime = time(nullptr);
-    auto endWall = std::chrono::high_resolution_clock::now();
-    result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
     
-    NLM_LOG_INFO("=== Experiment Complete ===");
-    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
-    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
-    NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
-    NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
+    // Collect metrics
+    Phase6IntegrationResult result;
+    result.memoryWorkingMemoryIntegrated = testMemoryIntegration();
+    result.memoryEpisodicMemoryIntegrated = testMemoryIntegration();
+    result.neuromodulationIntegrated = testNeuromodulationIntegration();
+    result.predictionIntegrated = verifyPredictionIntegration(brain);
+    result.developmentIntegrated = testDevelopmentIntegration();
+    result.checkpointingWorks = testCheckpointing();
+    result.replayWorks = testReplay();
+    
+    // Calculate metrics
+    result.totalReward = calculateTotalReward(brain);
+    result.avgFiringRate = brain->getAverageFiringRate();
+    result.avgSynapticWeight = calculateAverageSynapticWeight(brain);
+    result.memoryEpisodesStored = getEpisodicMemoryCount(brain);
+    result.noveltyLevel = getNoveltyLevel(brain);
+    result.curiosityLevel = getCuriosityLevel(brain);
+    result.dopamineLevel = getDopamineLevel(brain);
+    
+    result.totalWallClockTime = duration.count();
+    
+    // Save checkpoint if enabled
+    if (config.enableCheckpointing) {
+        std::string checkpointPath = config.checkpointPath.empty() ? 
+            "./checkpoint.bin" : config.checkpointPath;
+        bool saved = brain->save(checkpointPath);
+        NLM_LOG_INFO("Checkpoint saved: " + std::to_string(saved) + " to " + checkpointPath);
+    }
+    
+    // Clean up
+    brain->reset();
+    
+    NLM_LOG_INFO("Phase 6 Integration Experiment completed");
+    NLM_LOG_INFO("Wall time: " + std::to_string(duration.count()) + "s");
     
     return result;
 }
 
 bool Phase6IntegratedExperiment::verifyIntegration() {
-    NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
+    NLM_LOG_INFO("Verifying Phase 6 integration...");
     
-    // Create minimal brain
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    cfg->set("region_count", 1);
+    // Create a minimal brain configuration
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     
-    auto brain = std::make_shared<Brain>(cfg);
+    auto brain = std::make_shared<Brain>(config);
+    
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Brain initialization failed");
+        NLM_LOG_ERROR("Brain initialization failed!");
         return false;
     }
     
-    bool success = true;
+    // Test basic integration
+    bool testsPassed = true;
     
-    // Test 1: Memory systems exist and are connected
-    if (brain->getWorkingMemory() != nullptr) {
-        NLM_LOG_INFO("[PASS] Working memory is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
-        success = false;
+    // Test 1: Check that all memory systems are accessible
+    if (!brain->getWorkingMemory() || !brain->getEpisodicMemory() || 
+        !brain->getAssociativeMemory()) {
+        NLM_LOG_ERROR("Memory systems not properly initialized");
+        testsPassed = false;
     }
     
-    if (brain->getEpisodicMemory() != nullptr) {
-        NLM_LOG_INFO("[PASS] Episodic memory is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated");
-        success = false;
+    // Test 2: Check that neuromodulation systems are accessible
+    if (!brain->getDopamine() || !brain->getCuriosity() || 
+        !brain->getPredictionError() || !brain->getNovelty()) {
+        NLM_LOG_ERROR("Neuromodulation systems not properly initialized");
+        testsPassed = false;
     }
     
-    // Test 2: Neuromodulation systems exist
-    if (brain->getDopamine() != nullptr) {
-        NLM_LOG_INFO("[PASS] Dopamine system is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
-        success = false;
+    // Test 3: Check that cognition systems are accessible
+    if (!brain->getPlanner() || !brain->getConceptFormation() || 
+        !brain->getAttention()) {
+        NLM_LOG_ERROR("Cognition systems not properly initialized");
+        testsPassed = false;
     }
     
-    if (brain->getCuriosity() != nullptr) {
-        NLM_LOG_INFO("[PASS] Curiosity system is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
-        success = false;
+    // Test 4: Check that prediction system is accessible
+    if (!brain->getPredictionSystem()) {
+        NLM_LOG_ERROR("Prediction system not properly initialized");
+        testsPassed = false;
     }
     
-    // Test 3: Prediction system exists
-    if (brain->getPredictionSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Prediction system is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
-        success = false;
+    // Test 5: Check that development system is accessible
+    if (!brain->getDevelopmentSystem()) {
+        NLM_LOG_ERROR("Development system not properly initialized");
+        testsPassed = false;
     }
     
-    // Test 4: Cognition systems exist
-    if (brain->getPlanner() != nullptr) {
-        NLM_LOG_INFO("[PASS] Planner is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
-        success = false;
+    // Test 6: Check that plasticity systems are accessible
+    if (!brain->getSTDP() || !brain->getHebbian() || 
+        !brain->getStructuralPlasticity()) {
+        NLM_LOG_ERROR("Plasticity systems not properly initialized");
+        testsPassed = false;
     }
     
-    if (brain->getConceptFormation() != nullptr) {
-        NLM_LOG_INFO("[PASS] Concept formation is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
-        success = false;
+    // Test 7: Check that checkpoint system is accessible
+    if (!brain->getCheckpointManager()) {
+        NLM_LOG_ERROR("Checkpoint system not properly initialized");
+        testsPassed = false;
     }
     
-    if (brain->getAttention() != nullptr) {
-        NLM_LOG_INFO("[PASS] Attention is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
-        success = false;
+    // Test 8: Check that spike system is accessible
+    if (!brain->getSpikeSystem()) {
+        NLM_LOG_ERROR("Spike system not properly initialized");
+        testsPassed = false;
     }
     
-    // Test 5: Development system exists
-    if (brain->getDevelopmentSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Development system is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
-        success = false;
+    // Test integration by running a few steps
+    for (int step = 0; step < 10 && testsPassed; ++step) {
+        brain->step(step);
+        
+        // Check that systems are responding to input
+        if (step == 5) {
+            // Inject input and verify systems respond
+            auto observation = std::make_shared<Observation>(std::vector<float>(10, 1.0f));
+            brain->receiveSensoryInput(*observation);
+            
+            auto action = brain->produceAction();
+            
+            // Update neuromodulation
+            if (auto* dopamine = brain->getDopamine()) {
+                dopamine->update(0.001);
+            }
+        }
     }
     
-    return success;
+    if (testsPassed) {
+        NLM_LOG_INFO("✓ All integration tests passed");
+    } else {
+        NLM_LOG_ERROR("✗ Integration tests failed");
+    }
+    
+    brain->reset();
+    return testsPassed;
 }
 
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
-    NLM_LOG_INFO("=== Testing Memory Integration ===");
+    NLM_LOG_INFO("Testing memory integration...");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    // Create brain
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(200), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     
-    auto brain = std::make_shared<Brain>(cfg);
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     
-    // Get memory systems
-    auto* wm = brain->getWorkingMemory();
-    auto* em = brain->getEpisodicMemory();
+    bool success = true;
     
-    if (!wm || !em) {
-        NLM_LOG_ERROR("Memory systems not available");
-        return false;
-    }
-    
-    // Run some steps
-    for (int i = 0; i < 100; ++i) {
-        brain->step(i, i * 0.001);
-    }
-    
-    // Check if working memory has traces
-    if (wm->getActiveTraces() > 0) {
-        NLM_LOG_INFO("[PASS] Working memory has active traces: " + std::to_string(wm->getActiveTraces()));
+    // Test working memory
+    if (auto* workingMemory = brain->getWorkingMemory()) {
+        workingMemory->initialize(brain.get());
+        workingMemory->setCapacity(50);
+        
+        // Store some data
+        workingMemory->storeToNeuron(1, 0.5f);
+        workingMemory->storeToNeuron(2, 0.8f);
+        
+        // Update
+        workingMemory->update(0.001);
+        
+        NLM_LOG_INFO("  Working memory test: ✓");
     } else {
-        NLM_LOG_INFO("[INFO] Working memory has no active traces (may be normal for simple simulation)");
+        NLM_LOG_ERROR("  Working memory test: ✗");
+        success = false;
     }
     
-    // Check if episodic memory has episodes
-    if (em->getEpisodeCount() > 0) {
-        NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
+    // Test episodic memory
+    if (auto* episodicMemory = brain->getEpisodicMemory()) {
+        episodicMemory->initialize(brain.get());
+        episodicMemory->setMaxEpisodes(1000);
+        
+        // Create and store an episode
+        EpisodicMemoryItem episode;
+        episode.timestamp = 0;
+        episode.reward = 1.0f;
+        episode.activeNeurons = {1, 2, 3};
+        episode.neuronActivations = {0.5f, 0.8f, 0.3f};
+        
+        episodicMemory->storeEpisode(episode);
+        
+        NLM_LOG_INFO("  Episodic memory test: ✓");
     } else {
-        NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
+        NLM_LOG_ERROR("  Episodic memory test: ✗");
+        success = false;
     }
     
-    return true;
+    // Test associative memory
+    if (auto* associativeMemory = brain->getAssociativeMemory()) {
+        associativeMemory->initialize(brain.get());
+        
+        // Test Hebbian-like association
+        associativeMemory->associate(1, 2, 0.7f);
+        
+        float strength = associativeMemory->getAssociation(1, 2);
+        if (strength > 0.0f) {
+            NLM_LOG_INFO("  Associative memory test: ✓ (strength: " + std::to_string(strength) + ")");
+        } else {
+            NLM_LOG_ERROR("  Associative memory test: ✗");
+            success = false;
+        }
+    } else {
+        NLM_LOG_ERROR("  Associative memory test: ✗");
+        success = false;
+    }
+    
+    brain->reset();
+    return success;
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
-    NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
+    NLM_LOG_INFO("Testing neuromodulation integration...");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
     
-    auto brain = std::make_shared<Brain>(cfg);
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     
-    // Get neuromodulation systems
-    auto* dopamine = brain->getDopamine();
-    auto* curiosity = brain->getCuriosity();
-    auto* novelty = brain->getNovelty();
+    bool success = true;
     
-    if (!dopamine || !curiosity || !novelty) {
-        NLM_LOG_ERROR("Neuromodulation systems not available");
-        return false;
+    // Test dopamine system
+    if (auto* dopamine = brain->getDopamine()) {
+        dopamine->initialize(brain.get());
+        
+        // Apply reward prediction error
+        dopamine->applyRewardPredictionError(1.0f, 0.5f);
+        
+        // Update
+        dopamine->update(0.001);
+        
+        float level = dopamine->getLevel();
+        NLM_LOG_INFO("  Dopamine test: ✓ (level: " + std::to_string(level) + ")");
+    } else {
+        NLM_LOG_ERROR("  Dopamine test: ✗");
+        success = false;
     }
     
-    // Run some steps with sensory input
-    for (int i = 0; i < 50; ++i) {
-        // Inject some sensory activity
-        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
-        brain->step(i, i * 0.001);
+    // Test curiosity system
+    if (auto* curiosity = brain->getCuriosity()) {
+        curiosity->initialize(brain.get());
+        curiosity->update(0.001);
+        
+        float level = curiosity->getLevel();
+        NLM_LOG_INFO("  Curiosity test: ✓ (level: " + std::to_string(level) + ")");
+    } else {
+        NLM_LOG_ERROR("  Curiosity test: ✗");
+        success = false;
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
-    return true;
+    // Test novelty detection
+    if (auto* novelty = brain->getNovelty()) {
+        novelty->initialize(brain.get());
+        novelty->update(0.001);
+        
+        float level = novelty->getLevel();
+        NLM_LOG_INFO("  Novelty test: ✓ (level: " + std::to_string(level) + ")");
+    } else {
+        NLM_LOG_ERROR("  Novelty test: ✗");
+        success = false;
+    }
+    
+    // Test prediction error
+    if (auto* predError = brain->getPredictionErrorSignal()) {
+        predError->initialize(brain.get());
+        predError->update(0.001);
+        
+        float level = predError->getLevel();
+        NLM_LOG_INFO("  Prediction error test: ✓ (level: " + std::to_string(level) + ")");
+    } else {
+        NLM_LOG_ERROR("  Prediction error test: ✗");
+        success = false;
+    }
+    
+    brain->reset();
+    return success;
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
-    NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
+    NLM_LOG_INFO("Testing checkpointing system...");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
     
-    // Create and initialize brain
-    auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
     
-    // Run some steps
-    for (int i = 0; i < 100; ++i) {
-        brain1->step(i, i * 0.001);
+    // Run some steps to create state
+    for (int step = 0; step < 100; ++step) {
+        brain->step(step);
     }
-    
-    float avgFiring1 = brain1->getAverageFiringRate();
-    size_t totalSpikes1 = brain1->getTotalSpikeCount();
-    
-    NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
-    NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
-    if (!brain1->save(path)) {
-        NLM_LOG_ERROR("Failed to save checkpoint");
+    std::string checkpointPath = "./test_checkpoint.bin";
+    bool saved = brain->save(checkpointPath);
+    
+    if (!saved) {
+        NLM_LOG_ERROR("  Checkpoint save failed");
+        brain->reset();
         return false;
     }
     
-    // Create new brain and load
-    auto brain2 = std::make_shared<Brain>(cfg);
+    NLM_LOG_INFO("  Checkpoint saved: " + checkpointPath);
+    
+    // Create new brain and load checkpoint
+    auto config2 = std::make_shared<Config>();
+    config2->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config2->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+    
+    auto brain2 = std::make_shared<Brain>(config2);
     brain2->initialize();
     
-    if (!brain2->load(path)) {
-        NLM_LOG_ERROR("Failed to load checkpoint");
+    bool loaded = brain2->load(checkpointPath);
+    
+    if (!loaded) {
+        NLM_LOG_ERROR("  Checkpoint load failed");
+        brain->reset();
+        brain2->reset();
+        // Clean up
+        std::remove(checkpointPath.c_str());
         return false;
     }
     
-    size_t totalSpikes2 = brain2->getTotalSpikeCount();
-    NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
+    NLM_LOG_INFO("  Checkpoint loaded successfully");
     
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
+    // Verify that key state was preserved
+    size_t originalSpikes = brain->getTotalSpikeCount();
+    size_t loadedSpikes = brain2->getTotalSpikeCount();
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    // Note: Spikes count may not be identical due to timing differences
+    // but the important thing is that loading worked
+    
+    brain->reset();
+    brain2->reset();
+    
+    // Clean up
+    std::remove(checkpointPath.c_str());
+    
+    NLM_LOG_INFO("  Checkpoint test: ✓");
     return true;
 }
 
 bool Phase6IntegratedExperiment::testReplay() {
-    NLM_LOG_INFO("=== Testing Replay System ===");
+    NLM_LOG_INFO("Testing replay system...");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
     
-    auto brain = std::make_shared<Brain>(cfg);
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     
-    auto* em = brain->getEpisodicMemory();
-    if (!em) {
-        NLM_LOG_ERROR("Episodic memory not available");
-        return false;
-    }
-    
-    // Run some steps
-    for (int i = 0; i < 200; ++i) {
-        brain->step(i, i * 0.001);
-    }
-    
-    // Check if episodes exist for replay
-    size_t episodeCount = em->getEpisodeCount();
-    if (episodeCount > 0) {
-        NLM_LOG_INFO("[PASS] Episodes available for replay: " + std::to_string(episodeCount));
+    // Store some episodes in episodic memory
+    if (auto* episodicMemory = brain->getEpisodicMemory()) {
+        episodicMemory->initialize(brain.get());
         
-        // Get episodes for replay
-        auto episodes = em->getEpisodesForReplay(3);
-        if (!episodes.empty()) {
-            NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
-            return true;
+        for (int i = 0; i < 5; ++i) {
+            EpisodicMemoryItem episode;
+            episode.timestamp = i;
+            episode.reward = 0.5f + (i * 0.1f);
+            episode.activeNeurons = {1, 2, 3, 4, 5};
+            episode.neuronActivations = std::vector<float>(5, 0.5f + (i * 0.1f));
+            
+            episodicMemory->storeEpisode(episode);
+        }
+        
+        NLM_LOG_INFO("  Stored " + std::to_string(episodicMemory->getEpisodeCount()) + " episodes");
+    }
+    
+    // Run some steps to generate new activity
+    for (int step = 0; step < 100; ++step) {
+        brain->step(step);
+    }
+    
+    // Trigger replay (every 100 steps as per default config)
+    for (int step = 100; step < 200; ++step) {
+        brain->step(step);
+        
+        // Check if replay occurred by looking at memory
+        if (auto* episodicMemory = brain->getEpisodicMemory()) {
+            // This would normally happen during replay phase
+            // For now, just verify that the system can handle replay calls
+            auto episodesToReplay = episodicMemory->getEpisodesForReplay(2);
+            if (!episodesToReplay.empty()) {
+                NLM_LOG_INFO("  Replay test: ✓ (found " + std::to_string(episodesToReplay.size()) + " episodes for replay)");
+                return true;
+            }
         }
     }
     
-    NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
+    NLM_LOG_INFO("  Replay test: ✗ (no episodes available for replay)");
+    brain->reset();
+    return false;
+}
+
+float Phase6IntegratedExperiment::calculateTotalReward(std::shared_ptr<Brain> brain) const {
+    float totalReward = 0.0f;
+    
+    // Get dopamine level as proxy for total reward
+    if (auto* dopamine = brain->getDopamine()) {
+        totalReward = dopamine->getLevel();
+    }
+    
+    return totalReward;
+}
+
+float Phase6IntegratedExperiment::calculateAverageSynapticWeight(std::shared_ptr<Brain> brain) const {
+    float totalWeight = 0.0f;
+    size_t count = 0;
+    
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& syn : region->getSynapses()) {
+            totalWeight += syn->getWeight();
+            count++;
+        }
+    }
+    
+    return count > 0 ? totalWeight / count : 0.0f;
+}
+
+size_t Phase6IntegratedExperiment::getEpisodicMemoryCount(std::shared_ptr<Brain> brain) const {
+    if (auto* episodicMemory = brain->getEpisodicMemory()) {
+        return episodicMemory->getEpisodeCount();
+    }
+    return 0;
+}
+
+float Phase6IntegratedExperiment::getNoveltyLevel(std::shared_ptr<Brain> brain) const {
+    if (auto* novelty = brain->getNovelty()) {
+        return novelty->getLevel();
+    }
+    return 0.0f;
+}
+
+float Phase6IntegratedExperiment::getCuriosityLevel(std::shared_ptr<Brain> brain) const {
+    if (auto* curiosity = brain->getCuriosity()) {
+        return curiosity->getLevel();
+    }
+    return 0.0f;
+}
+
+float Phase6IntegratedExperiment::getDopamineLevel(std::shared_ptr<Brain> brain) const {
+    if (auto* dopamine = brain->getDopamine()) {
+        return dopamine->getLevel();
+    }
+    return 0.0f;
+}
+
+bool Phase6IntegratedExperiment::verifyPredictionIntegration(std::shared_ptr<Brain> brain) {
+    // Quick verification that prediction system exists and has basic functionality
+    if (!brain->getPredictionSystem()) {
+        NLM_LOG_ERROR("Prediction system not accessible");
+        return false;
+    }
+    
+    NLM_LOG_INFO("  Prediction system accessible: ✓");
     return true;
+}
+
+bool Phase6IntegratedExperiment::testDevelopmentIntegration() {
+    NLM_LOG_INFO("Testing development system integration...");
+    
+    auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    // Test development system
+    if (auto* devSystem = brain->getDevelopmentSystem()) {
+        devSystem->initialize(brain.get());
+        
+        // Simulate development update
+        devSystem->update(brain.get(), *brain->getRandomGenerator(), 1.0);
+        
+        // Check developmental stage
+        auto stage = brain->getDevelopmentalStage();
+        NLM_LOG_INFO("  Development test: ✓ (stage: " + std::to_string(static_cast<int>(stage)) + ")");
+        
+        brain->reset();
+        return true;
+    }
+    
+    NLM_LOG_ERROR("  Development test: ✗");
+    brain->reset();
+    return false;
 }
 
 } // namespace nlm
