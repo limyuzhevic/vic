@@ -1,12 +1,12 @@
 # NLM - Easy Usage Guide for Beginners
 
-## What is NLM?
+**A Simple Introduction to Neural Learning Machine**
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
@@ -17,7 +17,7 @@ That's it! NLM simulates all of this.
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
+2. **World** - The environment the brain lives in  
 3. **Agent** - The bridge connecting brain to world
 
 ---
@@ -151,6 +151,9 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# Or enable them all at once:
+agent.enable_all()
 ```
 
 ---
@@ -167,7 +170,7 @@ Starts up the brain. Always call this before using the brain!
 ### `brain.step(step_number)`
 Makes the brain process one moment in time. The brain:
 - Checks each neuron
-- Sends signals between connected neurons
+- Sends signals between connected neurons  
 - Updates connections based on learning rules
 
 ### `world.update(time)`
@@ -290,8 +293,8 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
+1. Read `README.md` for more details
+2. Read `docs/ARCHITECTURE.md` to understand how it all works  
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
