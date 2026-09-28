@@ -65,8 +65,7 @@ AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+    reset();
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -84,69 +83,124 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+// Apply reward-modulated weight change to a specific synapse
+void AgentBrain::applySynapseWeightChange(Synapse* syn, float eligibility, float dopamine, float plasticity) {
+    if (!syn) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
+    float delta = eligibility * dopamine * plasticity;
+    syn->addToWeight(delta);
+    syn->decayEligibilityTrace(0.1f);
+}
+
+// Update STDP parameters based on plasticity factor
+void AgentBrain::updateStdpParameters(float plasticityFactor) {
+    auto* stdp = brain_->getSTDP();
+    if (stdp) {
+        stdp->setLTPWeight(0.01f * plasticityFactor);
+        stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+}
+
+// Count synaptic changes between before and after weight arrays
+void AgentBrain::analyzeSynapticChanges(const std::vector<float>& beforeWeights, 
+                                       const std::vector<float>& afterWeights,
+                                       size_t& strengthened, size_t& weakened, size_t& unchanged) const {
+    strengthened = 0;
+    weakened = 0;
+    unchanged = 0;
+    
+    size_t minSize = std::min(beforeWeights.size(), afterWeights.size());
+    for (size_t i = 0; i < minSize; ++i) {
+        float delta = afterWeights[i] - beforeWeights[i];
+        if (delta > 0.01f) ++strengthened;
+        else if (delta < -0.01f) ++weakened;
+        else ++unchanged;
+    }
+}
+
+// Helper method to compute dopamine signal from prediction error
+void AgentBrain::computeDopamineSignal(float predictionError) {
+    dopamineLevel_ = predictionError;
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+}
+
+// Helper method to update expected reward using exponential moving average
+void AgentBrain::updateExpectedReward(float reward, float decayRate) {
+    expectedReward_ = decayRate * expectedReward_ + (1.0f - decayRate) * reward;
+}
+
+// Helper method to set developmental stage and plasticity based on age
+void AgentBrain::updateDevelopmentalStage(double currentAge) {
+    float plasticity;
+    DevelopmentalStage stage;
+    
+    if (currentAge < 60.0) {
+        plasticity = 1.0f;
+        stage = DevelopmentalStage::Initial;
+    } else if (currentAge < 300.0) {
+        plasticity = 0.8f;
+        stage = DevelopmentalStage::CriticalPeriod;
+    } else if (currentAge < 900.0) {
+        plasticity = 0.5f;
+        stage = DevelopmentalStage::Maturation;
+    } else {
+        plasticity = 0.2f;
+        stage = DevelopmentalStage::Adult;
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    plasticityModifier_ = plasticity;
+    brain_->setDevelopmentalStage(stage);
+    
+    // Update structural plasticity rates
+    if (structuralPlasticityEnabled_) {
+        updateStructuralPlasticityRates();
+    }
+}
+
+// Helper method to configure structural plasticity based on current plasticity modifier
+void AgentBrain::updateStructuralPlasticityRates() {
+    auto* sp = brain_->getStructuralPlasticity();
+    if (!sp) return;
+    
+    float synRate = 0.0001f * plasticityModifier_;
+    float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+    sp->setSynaptogenesisRate(synRate);
+    sp->setPruningRate(pruneRate);
+}
+
+// Helper method to decay all eligibility traces
+void AgentBrain::decayAllEligibilityTraces(float decayRate) {
+    for (const auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            syn->decayEligibilityTrace(decayRate);
         }
     }
+}
+
+// Helper method to select motor command with curiosity
+MotorCommand AgentBrain::selectWithCuriosityHelper(MotorCommand defaultCmd, float curiosityMultiplier) {
+    float adjustedCuriosity = curiosityLevel_ * curiosityMultiplier;
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
+    if (curiosityEnabled_ && adjustedCuriosity > 0.5f) {
+        float exploreChance = adjustedCuriosity * 0.3f;
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        if (r < exploreChance) {
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            switch (choice) {
+                case 0: return MotorCommand::MoveForward;
+                case 1: return MotorCommand::MoveBackward;
+                case 2: return MotorCommand::TurnLeft;
+                case 3: return MotorCommand::TurnRight;
+                case 4: return MotorCommand::LookLeft;
+                case 5: return MotorCommand::LookRight;
+                case 6: return MotorCommand::Interact;
+                default: return MotorCommand::Wait;
+            }
+        }
     }
     
-    // Update curiosity based on novelty
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    return defaultCmd;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {

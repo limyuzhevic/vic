@@ -69,12 +69,36 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
-private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+// Helper methods for sensory injection
+    void injectVisionCurrent(const std::vector<float>& vision);
+    void injectTouchCurrent(const std::vector<float>& touch);
+    void injectInternalCurrent(const std::vector<float>& intern);
+    void injectProprioceptionCurrent(const std::vector<float>& proprio);
     
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Helper methods for novelty and curiosity
+    void updateNoveltyAndCuriosity(const std::vector<float>& vision);
+    
+    // Helper methods for motor decoding
+    float calculateMotorActivity(const std::vector<Neuron*>& neurons);
+    
+    // Helper methods for reward modulation
+    void applySynapseWeightChange(Synapse* syn, float eligibility, float dopamine, float plasticity);
+    void updateStdpParameters(float plasticityFactor);
+    void analyzeSynapticChanges(const std::vector<float>& beforeWeights, 
+                               const std::vector<float>& afterWeights,
+                               size_t& strengthened, size_t& weakened, size_t& unchanged) const;
+    void computeDopamineSignal(float predictionError);
+    void updateExpectedReward(float reward, float decayRate);
+    
+    // Helper methods for development
+    void updateDevelopmentalStage(double currentAge);
+    void updateStructuralPlasticityRates();
+    
+    // Helper method for curiosity-based exploration
+    MotorCommand selectWithCuriosityHelper(MotorCommand defaultCmd, float curiosityMultiplier = 1.0f);
+    
+    // Helper method for eligibility trace decay
+    void decayAllEligibilityTraces(float decayRate = 0.1f);
     
     std::shared_ptr<Brain> brain_;
     
