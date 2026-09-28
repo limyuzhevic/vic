@@ -25,8 +25,34 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <fstream>
 
 using namespace nlm;
+
+// Program version
+const std::string PROGRAM_VERSION = "Phase 2.0";
+
+// Constants for magic numbers
+namespace Constants {
+    constexpr int DEFAULT_BRAIN_STEPS = 1000;
+    constexpr int DEFAULT_STDP_TRIALS = 50;
+    constexpr int DEFAULT_CONNECTIVITY_TEST_STEPS = 50;
+    constexpr int DEFAULT_PLACIDITY_THRESHOLD = 1; // Percentage for weight change detection
+    constexpr float DEFAULT_CURRENT_STRENGTH = 60.0f;
+    constexpr float DEFAULT_SYNAPTIC_THRESHOLD = 0.01f;
+    constexpr float DEFAULT_EXCITATORY_CURRENT = 30.0f;
+    constexpr int MAX_NEURONS_FOR_TESTING = 10;
+    constexpr int MIN_NEURONS_FOR_TESTING = 2;
+}
+
+// Verbosity levels
+enum class VerbosityLevel {
+    Quiet = 0,
+    Normal = 1,
+    Verbose = 2,
+    Debug = 3
+};
 
 void printBanner() {
     std::cout << R"(
@@ -46,6 +72,118 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "===================================" << std::endl << std::endl;
+    std::cout << "Usage: " << programName << " [options]" << std::endl << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+    std::cout << "  --version                 Show program version" << std::endl;
+    std::cout << "  --verbose                 Increase verbosity" << std::endl;
+    std::cout << "  --quiet                   Decrease verbosity" << std::endl;
+    std::cout << "  --config <file>           Load configuration from file" << std::endl;
+    std::cout << "  --output <file>           Write results to file instead of stdout" << std::endl;
+    std::cout << "  --test <test1,test2,test3> Run specific tests (default: all)" << std::endl;
+    std::cout << "                           test1: Basic connectivity test" << std::endl;
+    std::cout << "                           test2: Plasticity learning experiment" << std::endl;
+    std::cout << "                           test3: STDP verification" << std::endl;
+    std::cout << "  --steps <n>               Number of steps for plasticity experiment" << std::endl;
+    std::cout << "  --stdp-steps <n>          Number of STDP trials" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --verbose" << std::endl;
+    std::cout << "  " << programName << " --test test2,test3 --steps 500" << std::endl;
+    std::cout << "  " << programName << " --output results.txt --quiet" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2.0" << std::endl;
+    std::cout << "Built with C++20, Phase 6 integration complete" << std::endl;
+    std::cout << "Experimental artificial developmental brain framework" << std::endl;
+}
+
+void logVerbose(const std::string& message, VerbosityLevel currentVerbosity, VerbosityLevel requiredVerbosity) {
+    if (currentVerbosity >= requiredVerbosity) {
+        NLM_LOG_INFO("[VERBOSE] " + message);
+    }
+}
+
+bool parseCommandLineArgs(int argc, char** argv,
+    std::string& configFile,
+    std::string& outputFile,
+    VerbosityLevel& verbosity,
+    std::vector<std::string>& testsToRun,
+    int& plasticitySteps,
+    int& stdpSteps) {
+    
+    bool helpRequested = false;
+    bool versionRequested = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help") {
+            helpRequested = true;
+        } else if (arg == "--version") {
+            versionRequested = true;
+        } else if (arg == "--verbose" && verbosity < VerbosityLevel::Debug) {
+            verbosity = static_cast<VerbosityLevel>(static_cast<int>(verbosity) + 1);
+        } else if (arg == "--quiet" && verbosity > VerbosityLevel::Quiet) {
+            verbosity = static_cast<VerbosityLevel>(static_cast<int>(verbosity) - 1);
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg.find("--output=") == 0) {
+            outputFile = arg.substr(9);
+        } else if (arg == "--output" && i + 1 < argc) {
+            outputFile = argv[++i];
+        } else if (arg.find("--test=") == 0) {
+            std::string tests = arg.substr(7);
+            size_t pos = 0;
+            while ((pos = tests.find(',')) != std::string::npos) {
+                testsToRun.push_back(tests.substr(0, pos));
+                tests.erase(0, pos + 1);
+            }
+            testsToRun.push_back(tests);
+        } else if (arg == "--test" && i + 1 < argc) {
+            std::string tests = argv[++i];
+            size_t pos = 0;
+            while ((pos = tests.find(',')) != std::string::npos) {
+                testsToRun.push_back(tests.substr(0, pos));
+                tests.erase(0, pos + 1);
+            }
+            testsToRun.push_back(tests);
+        } else if (arg.find("--steps=") == 0) {
+            plasticitySteps = std::stoi(arg.substr(8));
+        } else if (arg == "--steps" && i + 1 < argc) {
+            plasticitySteps = std::stoi(argv[++i]);
+        } else if (arg.find("--stdp-steps=") == 0) {
+            stdpSteps = std::stoi(arg.substr(12));
+        } else if (arg == "--stdp-steps" && i + 1 < argc) {
+            stdpSteps = std::stoi(argv[++i]);
+        } else {
+            // Unknown argument
+            NLM_LOG_WARNING("Unknown argument: " + arg);
+            return false;
+        }
+    }
+    
+    if (helpRequested) {
+        printHelp(argv[0]);
+        return false; // Exit after showing help
+    }
+    
+    if (versionRequested) {
+        printVersion();
+        return false; // Exit after showing version
+    }
+    
+    return true;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -130,8 +268,8 @@ struct LearningExperiment {
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
+            if (delta > Constants::DEFAULT_SYNAPTIC_THRESHOLD) ++strengthened;
+            else if (delta < -Constants::DEFAULT_SYNAPTIC_THRESHOLD) ++weakened;
             else ++unchanged;
         }
         
@@ -178,12 +316,12 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    for (size_t i = 0; i < std::min(size_t(Constants::MAX_NEURONS_FOR_TESTING), neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
     // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
+    for (SimulationStep step = 0; step < Constants::DEFAULT_CONNECTIVITY_TEST_STEPS; ++step) {
         brain->step(step, step * 0.001);
     }
     
@@ -195,14 +333,18 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            } else {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + " is null");
+            }
         }
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runPlasticityExperiment(std::shared_ptr<Brain> brain, int steps = Constants::DEFAULT_BRAIN_STEPS) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -220,12 +362,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying repeated input patterns (" + std::to_string(steps) + " steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < steps; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, Constants::DEFAULT_EXCITATORY_CURRENT);
         }
         
         brain->step(step, step * 0.001);
@@ -245,7 +387,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void runStdpVerification(std::shared_ptr<Brain> brain, int trials = Constants::DEFAULT_STDP_TRIALS) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
@@ -274,24 +416,24 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
     
-    for (int trial = 0; trial < 50; ++trial) {
+    for (int trial = 0; trial < trials; ++trial) {
         // Fire pre-synaptic neuron
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
         
         auto neurons = region->getAllNeurons();
-        if (neurons.size() >= 2) {
+        if (neurons.size() >= Constants::MIN_NEURONS_FOR_TESTING) {
             preNeuron = neurons[0];
             postNeuron = neurons[1];
         }
         
         if (preNeuron && postNeuron) {
             // Pre fires first
-            preNeuron->injectCurrent(60.0f);
+            preNeuron->injectCurrent(Constants::DEFAULT_CURRENT_STRENGTH);
             brain->step(trial * 2, trial * 2 * 0.001);
             
             // Then post fires
-            postNeuron->injectCurrent(60.0f);
+            postNeuron->injectCurrent(Constants::DEFAULT_CURRENT_STRENGTH);
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
         }
     }
@@ -312,9 +454,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
+    if (totalDelta > Constants::DEFAULT_SYNAPTIC_THRESHOLD) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
+    } else if (totalDelta < -Constants::DEFAULT_SYNAPTIC_THRESHOLD) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
@@ -340,23 +482,42 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    std::string outputFile;
+    VerbosityLevel verbosity = VerbosityLevel::Normal;
+    std::vector<std::string> testsToRun;
+    int plasticitySteps = Constants::DEFAULT_BRAIN_STEPS;
+    int stdpSteps = Constants::DEFAULT_STDP_TRIALS;
+    
+    // Open output file if specified
+    std::ofstream outputStream;
+    bool useOutputFile = false;
+    
+    if (!parseCommandLineArgs(argc, argv, configFile, outputFile, verbosity,
+                             testsToRun, plasticitySteps, stdpSteps)) {
+        return 0; // Help or version was printed
+    }
+    
+    // Configure logger based on verbosity
+    if (verbosity >= VerbosityLevel::Debug) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (verbosity == VerbosityLevel::Verbose) {
+        consoleLogger->setLevel(LogLevel::Info);
+    } else {
+        consoleLogger->setLevel(LogLevel::Info);
+    }
+    
+    // Log verbose messages
+    logVerbose("Command line arguments parsed successfully", verbosity);
+    logVerbose("Config file: " + configFile, verbosity);
+    logVerbose("Plasticity steps: " + std::to_string(plasticitySteps), verbosity);
+    logVerbose("STDP trials: " + std::to_string(stdpSteps), verbosity);
+    
     // Load configuration
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
@@ -390,7 +551,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    
+    if (!outputFile.empty()) {
+        NLM_LOG_INFO("Writing results to file: " + outputFile);
+        outputStream.open(outputFile);
+        if (outputStream.is_open()) {
+            useOutputFile = true;
+            std::cout.rdbuf(outputStream.rdbuf());
+        } else {
+            NLM_LOG_ERROR("Failed to open output file: " + outputFile);
+            useOutputFile = false;
+        }
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +581,42 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Determine which tests to run
+    bool runTest1 = (testsToRun.empty() || 
+                     std::find(testsToRun.begin(), testsToRun.end(), "test1") != testsToRun.end());
+    bool runTest2 = (testsToRun.empty() || 
+                     std::find(testsToRun.begin(), testsToRun.end(), "test2") != testsToRun.end());
+    bool runTest3 = (testsToRun.empty() || 
+                     std::find(testsToRun.begin(), testsToRun.end(), "test3") != testsToRun.end());
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Run tests based on user selection
+    if (runTest1) {
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for next test if multiple tests are enabled
+        if (runTest2 || runTest3) {
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (runTest2) {
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        runPlasticityExperiment(brain, plasticitySteps);
+        
+        // Reset brain for next test
+        if (runTest3) {
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (runTest3) {
+        runStdpVerification(brain, stdpSteps);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
