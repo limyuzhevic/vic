@@ -5,7 +5,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 # Create test executable
 add_executable(nlm_test
-    test_main.cpp
+    src/tests/main_test.cpp
     test_types.cpp
     test_config.cpp
     test_random.cpp
@@ -14,6 +14,9 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    src/tests/ConnectivityTest.cpp
+    src/tests/PlasticityTest.cpp
+    src/tests/StdpTest.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

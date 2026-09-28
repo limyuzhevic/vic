@@ -1,4 +1,6 @@
 #include "SimpleWorld.hpp"
+#include "core/Constants.hpp"
+
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -18,16 +20,16 @@ static float urand(uint64_t& state, float min, float max) {
 }
 
 SimpleWorld::SimpleWorld()
-    : width_(20.0f)
-    , height_(20.0f)
-    , visionWidth_(16)
-    , visionHeight_(16)
-    , maxEnergy_(100.0f)
-    , energyDecayRate_(0.01f)
-    , resourceEnergyGain_(30.0f)
+    : width_(nlm::WORLD_WIDTH)
+    , height_(nlm::WORLD_HEIGHT)
+    , visionWidth_(nlm::WORLD_VISION_WIDTH)
+    , visionHeight_(nlm::WORLD_VISION_HEIGHT)
+    , maxEnergy_(nlm::MAX_ENERGY)
+    , energyDecayRate_(nlm::ENERGY_DECAY_RATE)
+    , resourceEnergyGain_(nlm::RESOURCE_ENERGY_GAIN)
     , simTime_(0.0)
-    , rngSeed_(42)
-    , rngState_(42)
+    , rngSeed_(nlm::DEFAULT_RANDOM_SEED)
+    , rngState_(nlm::DEFAULT_RANDOM_SEED)
 {
     agent_.reset();
 }

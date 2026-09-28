@@ -1,4 +1,5 @@
 #include "Neuron.hpp"
+#include "core/Constants.hpp"
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
@@ -19,9 +20,9 @@ struct Neuron::Impl {
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr float MEMBRANE_CAPACITANCE(nlm::MEMBRANE_CAPACITANCE)  // nF
+    static constexpr float TIME_CONSTANT(nlm::TIME_CONSTANT)  // ms
+    static constexpr size_t MAX_SPIKE_HISTORY(nlm::MAX_SPIKE_HISTORY)
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}

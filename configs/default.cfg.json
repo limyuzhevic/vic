@@ -1,0 +1,49 @@
+{
+    "comment": "NLM Configuration File",
+    "description": "This is the default JSON configuration for Phase 1 skeleton",
+    
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    
+    "plasticity_learning_rate": 0.01,
+    "plasticity_stdp_ltp_weight": 0.01,
+    "plasticity_stdp_ltd_weight": 0.012,
+    "plasticity_stdp_time_constant": 20.0,
+    
+    "development_synaptogenesis_rate": 0.001,
+    "development_pruning_rate": 0.0001,
+    
+    "dopamine_baseline": 0.0,
+    "dopamine_modulation": true,
+    "curiosity_weight": 0.5,
+    
+    "reward_discount_factor": 0.99,
+    "reward_immediate_value": 1.0,
+    "reward_sparse_mode": false,
+    
+    "environment_name": "GridWorld",
+    "environment_width": 10,
+    "environment_height": 10,
+    "environment_obstacle_density": 0.1,
+    
+    "logging_level": "INFO",
+    "logging_to_file": false,
+    "logging_filename": "nlm.log",
+    "logging_max_file_size": 10485760,
+    "logging_rotate_daily": true,
+    
+    "simulation_max_steps": 10000,
+    "simulation_time_limit": 0.0,
+    "simulation_checkpoint_interval": 1000,
+    "simulation_enable_rendering": false,
+    
+    "visualization_enabled": false,
+    "visualization_update_rate": 30.0,
+    "visualization_frame_rate": 60.0,
+    "visualization_show_neurons": true,
+    "visualization_show_synapses": true,
+    "visualization_show_plasticity": false
+}

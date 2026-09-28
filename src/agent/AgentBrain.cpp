@@ -1,4 +1,6 @@
 #include "AgentBrain.hpp"
+#include "core/Constants.hpp"
+
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -33,7 +35,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % nlm::MOTOR_ACTION_COUNT) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
@@ -48,7 +50,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
-                        switch (idx % 4) {
+                        switch (idx % nlm::SENSORY_TYPE_COUNT) {
                             case 0: sensoryVision_.push_back(n); break;
                             case 1: sensoryTouch_.push_back(n); break;
                             case 2: sensoryInternal_.push_back(n); break;
@@ -76,7 +78,7 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 
 size_t AgentBrain::getSensoryInputSize() const {
     // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    return nlm::SENSORY_INPUT_COUNT;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
@@ -274,8 +276,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        stdp->setLTPWeight(nlm::STDP_LTP_WEIGHT * plasticityFactor);
+        stdp->setLTDWeight(nlm::STDP_LTD_WEIGHT * plasticityFactor);
     }
 }
 
@@ -286,13 +288,13 @@ void AgentBrain::updateDevelopment(double timestep) {
     
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
+    if (developmentalAge_ < 60.0f) {  // ~1 minute
         plasticityModifier_ = 1.0f;  // High plasticity
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+    } else if (developmentalAge_ < nlm::DEVELOPMENTAL_AGE_MILITARY_SERVICE) {  // ~5 minutes
         plasticityModifier_ = 0.8f;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
+    } else if (developmentalAge_ < nlm::DEVELOPMENTAL_AGE_ADULTHOOD) {  // ~15 minutes
         plasticityModifier_ = 0.5f;
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
     } else {

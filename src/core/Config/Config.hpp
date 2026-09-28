@@ -5,11 +5,31 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <filesystem>
+#include <stdexcept>
+
+// Try to include nlohmann/json, but handle gracefully if not available
+try {
+    #include "nlohmann/json.hpp"
+} catch (...) {
+    // If nlohmann/json is not available, define a minimal stub
+    namespace nlohmann {
+        class json {};
+        class json_exception : public std::exception {
+        public:
+            const char* what() const noexcept override { return "nlohmann/json not available"; }
+        };
+        class json_overloader {};
+        class parse_error : public json_exception {};
+    }
+}
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class JSONConfig;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -28,7 +48,16 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    JSON
+};
+
+// Configuration format detection
+enum class ConfigFormat {
+    KeyValue,
+    JSON,
+    YAML,
+    Unknown
 };
 
 // Configuration entry
@@ -37,10 +66,44 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string typeHint;
+    bool required;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), 
+                    description(), typeHint(), required(false) {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& type = "",
+                bool req = false)
+        : key(k), value(v), source(s), description(desc), typeHint(type), required(req) {}
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::unordered_map<std::string, std::string> types;
+    std::unordered_map<std::string, bool> required;
+    std::unordered_map<std::string, std::string> descriptions;
+    std::unordered_map<std::string, std::string> defaultValues;
+};
+
+// Configuration exception
+class ConfigException : public std::runtime_error {
+public:
+    enum class ErrorCode {
+        FileNotFound,
+        ParseError,
+        TypeError,
+        ValidationError,
+        SchemaError,
+        ConversionError
+    };
+    
+    ConfigException(ErrorCode code, const std::string& message)
+        : std::runtime_error(message), errorCode(code) {}
+    
+    ErrorCode getErrorCode() const { return errorCode; }
+    
+private:
+    ErrorCode errorCode;
 };
 
 // Main configuration class

@@ -1,0 +1,102 @@
+{
+    "comment": "Comprehensive NLM JSON Configuration Example",
+    "description": "Example showing advanced features including arrays, nested objects, and schema validation",
+    
+    "brain": {
+        "neuron_count": 5000,
+        "region_count": 5,
+        "connection_probability": 0.15,
+        "plasticity_enabled": true,
+        "plasticity_learning_rate": 0.02,
+        "plasticity_stdp_ltp_weight": 0.015,
+        "plasticity_stdp_ltd_weight": 0.018,
+        "plasticity_stdp_time_constant": 25.0
+    },
+    
+    "development": {
+        "synaptogenesis_rate": 0.002,
+        "pruning_rate": 0.0002,
+        "maturation_rate": 0.8,
+        "critical_period_end": 100.0
+    },
+    
+    "neuromodulation": {
+        "dopamine_baseline": 0.1,
+        "dopamine_modulation": true,
+        "curiosity_weight": 0.7,
+        "reward_prediction_error": 0.5,
+        "novelty_sensitivity": 0.3
+    },
+    
+    "reward": {
+        "discount_factor": 0.95,
+        "immediate_reward": 1.5,
+        "sparse_reward": true,
+        "max_reward_value": 10.0,
+        "min_reward_value": -10.0
+    },
+    
+    "environment": {
+        "name": "ComplexWorld",
+        "width": 20,
+        "height": 20,
+        "obstacle_density": 0.2,
+        "dynamic_objects": true,
+        "weather_simulation": true
+    },
+    
+    "logging": {
+        "level": "DEBUG",
+        "to_file": true,
+        "filename": "nlm_detailed.log",
+        "max_file_size": 52428800,
+        "rotate_daily": true,
+        "include_timestamps": true,
+        "include_stack_traces": false
+    },
+    
+    "simulation": {
+        "max_steps": 50000,
+        "time_limit": 3600.0,
+        "checkpoint_interval": 5000,
+        "enable_rendering": true,
+        "thread_count": 4,
+        "memory_limit_gb": 16.0
+    },
+    
+    "visualization": {
+        "enabled": true,
+        "update_rate": 60.0,
+        "frame_rate": 120.0,
+        "show_neurons": true,
+        "show_synapses": true,
+        "show_plasticity": true,
+        "show_neuromodulation": true,
+        "show_memory": true,
+        "color_scheme": "default",
+        "animation_speed": 1.0
+    },
+    
+    "advanced": {
+        "array_parameter": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "string_array": ["baseline", "enhanced", "custom", "experimental", "optimized"],
+        "float_array": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+        "int_array": [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        "nested_object": {
+            "inner_value": "complex",
+            "inner_number": 12345,
+            "inner_array": [1, 2, 3, 4, 5],
+            "inner_object": {
+                "deep_value": "nested",
+                "deep_number": 999
+            }
+        }
+    },
+    
+    "experimental": {
+        "enable_new_plasticity": true,
+        "new_plasticity_params": [0.1, 0.2, 0.3, 0.4, 0.5],
+        "experimental_neuromodulators": ["dopamine", "serotonin", "noradrenaline"],
+        "alternative_dynamics": "modified_hebbian"
+    }
+}

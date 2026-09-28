@@ -1,52 +1,24 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../brain/BrainSystemManager.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../brain/InterRegionConnection.hpp"
 #include <memory>
-#include <string>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
-
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
+// Forward declarations for system managers
+class NeuromodulationManager;
+class MemorySystemManager;
+class DevelopmentManager;
+class CheckpointManager;
+class ActionSystem;
+class PlasticitySystem;
 
 // Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Now delegates to BrainSystemManager for all operations
+// Maintains backward compatibility while using the new architecture
 
 class Brain {
 public:
@@ -193,9 +165,17 @@ public:
     // Logging
     void logStatus() const;
     
+    // Get access to BrainSystemManager (new architecture)
+    BrainSystemManager* getBrainSystemManager() { return brainSystemManager_.get(); }
+    const BrainSystemManager* getBrainSystemManager() const { return brainSystemManager_.get(); }
+    
 private:
+    // Legacy pImpl for backward compatibility
     struct Impl;
     Impl* pImpl;
+    
+    // New BrainSystemManager for the new architecture
+    std::unique_ptr<BrainSystemManager> brainSystemManager_;
 };
 
 } // namespace nlm

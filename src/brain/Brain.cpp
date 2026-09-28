@@ -1,4 +1,6 @@
 #include "Brain.hpp"
+#include "core/Constants.hpp"
+
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -83,7 +85,7 @@ struct Brain::Impl {
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(nlm::TIMESTEP_DURATION)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
@@ -91,7 +93,7 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(nlm::CONSOLIDATION_INTERVAL_DEFAULT)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -143,11 +145,11 @@ struct Brain::Impl {
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = config->getOr<double>("simulation_timestep", nlm::SIMULATION_TIMESTEP_DEFAULT);
         
         // Get integration intervals from config
         replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", nlm::CONSOLIDATION_INTERVAL_DEFAULT);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
