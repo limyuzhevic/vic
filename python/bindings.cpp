@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,15 +21,145 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom Python exception types for better error handling
+class NLMConfigError : public std::runtime_error {
+public:
+    explicit NLMConfigError(const std::string& msg) : std::runtime_error("Config Error: " + msg) {}
+};
+
+class NLMBrainError : public std::runtime_error {
+public:
+    explicit NLMBrainError(const std::string& msg) : std::runtime_error("Brain Error: " + msg) {}
+};
+
+class NLMWorldError : public std::runtime_error {
+public:
+    explicit NLMWorldError(const std::string& msg) : std::runtime_error("World Error: " + msg) {}
+};
+
+class NLMArgumentError : public std::runtime_error {
+public:
+    explicit NLMArgumentError(const std::string& msg) : std::runtime_error("Argument Error: " + msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This is a Python interface to the NLM artificial brain simulation system.
+        The system simulates spiking neural networks with learning, memory, and development.
+        
+        For comprehensive documentation, see the HOW_TO_USE.md and easy_usage.md files
+        in the project root.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom Python exceptions for better error handling
+    py::register_exception<NLMConfigError>(m, "NLMConfigError");
+    py::register_exception<NLMBrainError>(m, "NLMBrainError");
+    py::register_exception<NLMWorldError>(m, "NLMWorldError");
+    py::register_exception<NLMArgumentError>(m, "NLMArgumentError");
+
+    // Enhanced createBrain with validation and better error handling
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw NLMConfigError("Configuration cannot be null");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"),
+    "Create a brain with the given configuration\n\n"
+    "Args:\n"
+    "    config: A configuration object for the brain\n\n"
+    "Returns:\n"
+    "    A brain instance ready for simulation\n\n"
+    "Raises:\n"
+    "    NLMConfigError: If the configuration is invalid or null");
+
+    // Enhanced createDefaultConfig with validation
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set some reasonable defaults
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        return config;
+    }, "Create a default configuration with sensible values\n\n"
+    "This function creates a configuration with reasonable defaults for most use cases,\n"
+    "including neuron count, region count, connection probability, and STDP parameters.");
+
+    // Enhanced createSimpleWorld with validation
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        // Configure with reasonable defaults
+        world->configure(20, 20, 8, 8);  // width, height, visionWidth, visionHeight
+        return world;
+    }, "Create a simple world with default configuration\n\n"
+    "Creates a 20x20 world with 8x8 vision for the agent.\n\n"
+    "Returns:\n"
+    "    A configured world instance ready for agent interaction");
+
+    // Enhanced createAgentBrain with validation
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw NLMBrainError("Brain cannot be null");
+        }
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"),
+    "Create an agent brain interface for world interaction\n\n"
+    "Args:\n"
+    "    brain: A brain instance to connect to the world\n\n"
+    "Returns:\n"
+    "    An agent brain instance that can interact with a world\n\n"
+    "Raises:\n"
+    "    NLMBrainError: If the brain is null");
+
+    // Enhanced getSensoryInputSize with validation
+    m.def("getSensoryInputSize", [](const AgentBrain& agent) -> size_t {
+        if (!agent.getBrain()) {
+            throw NLMBrainError("Agent brain does not have an underlying brain");
+        }
+        return agent.getSensoryInputSize();
+    }, py::arg("agent"),
+    "Get the expected sensory input size for an agent\n\n"
+    "Args:\n"
+    "    agent: An agent brain instance\n\n"
+    "Returns:\n"
+    "    The size of sensory input expected by this agent\n\n"
+    "Raises:\n"
+    "    NLMBrainError: If the agent doesn't have a brain");
+
+    // Enhanced getMotorOutputSize with validation
+    m.def("getMotorOutputSize", [](const AgentBrain& agent) -> size_t {
+        if (!agent.getBrain()) {
+            throw NLMBrainError("Agent brain does not have an underlying brain");
+        }
+        return agent.getMotorOutputSize();
+    }, py::arg("agent"),
+    "Get the expected motor output size for an agent\n\n"
+    "Args:\n"
+    "    agent: An agent brain instance\n\n"
+    "Returns:\n"
+    "    The size of motor output expected by this agent\n\n"
+    "Raises:\n"
+    "    NLMBrainError: If the agent doesn't have a brain");
+
+    m.def("validateConfig", &validateConfig,
+          py::arg("config"),
+          "Validate a configuration object",
+          "Returns True if the configuration is valid, False otherwise.");
+
+    m.def("getDefaultConfigValues", &getDefaultConfigValues,
+          "Get a dictionary of default configuration values");
+
+    m.def("getAvailableNeuronTypes", &getAvailableNeuronTypes,
+          "Get list of available neuron types");
+
+    m.def("getAvailableActionTypes", &getAvailableActionTypes,
+          "Get list of available action types");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
