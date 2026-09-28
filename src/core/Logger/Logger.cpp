@@ -181,6 +181,11 @@ Logger& Logger::getGlobal() {
     return globalLogger;
 }
 
+Logger& Logger::getInstance() {
+    // Backward compatibility alias for getGlobal()
+    return getGlobal();
+}
+
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
