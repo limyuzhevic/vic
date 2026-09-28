@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Test configuration
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
 # Create test executable
 add_executable(nlm_test
     test_main.cpp

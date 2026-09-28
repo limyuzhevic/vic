@@ -5,17 +5,18 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "A comprehensive Python interface for NLM neural simulation with advanced features for researchers and developers."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Authors", email = "contact@nlm-project.org"},
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "neuroscience", "artificial intelligence"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,15 +26,44 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20; python_version >= '3.8'",
+    "pandas>=1.3.0; python_version >= '3.8'",
+    "scipy>=1.7.0; python_version >= '3.8'",
+    "matplotlib>=3.5.0; python_version >= '3.8'",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=3.0",
     "numpy>=1.20",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "matplotlib>=3.5.0",
+    "jupyter>=1.0.0",
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "ruff>=0.1.0",
+    "black>=22.0.0",
 ]
+full = [
+    "pynlm[dev]",
+    "scikit-learn>=1.0.0",
+    "tensorflow>=2.8.0; python_version >= '3.8'",
+    "torch>=1.9.0; python_version >= '3.8'",
+]
+
+[project.urls]
+Homepage = "https://github.com/nlm-project/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/nlm-project/nlm.git"
+"Issues" = "https://github.com/nlm-project/nlm/issues"
+"Papers" = "https://github.com/nlm-project/nlm/papers"
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
