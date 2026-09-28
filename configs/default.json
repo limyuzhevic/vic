@@ -1,0 +1,98 @@
+// NLM Configuration File (JSON Format)
+// This is the default configuration for Phase 1 skeleton
+// Supports JSON format with nested structures, arrays, and type validation
+
+{
+    "nlm_version": "0.1.0",
+    "configuration_version": "2.0",
+    
+    // Random seed for reproducible experiments
+    "random_seed": 42,
+    
+    // Simulation timestep in seconds
+    "simulation_timestep": 0.001,
+    
+    // Number of neurons in the brain
+    "neuron_count": 1000,
+    
+    // Number of brain regions
+    "region_count": 2,
+    
+    // Connection probability for random connectivity
+    "connection_probability": 0.1,
+    
+    // Plasticity settings
+    "plasticity_learning_rate": 0.01,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_time_constant": 20.0,
+    
+    // Development settings
+    "development_synaptogenesis_rate": 0.001,
+    "development_pruning_rate": 0.0001,
+    "development_maturation_rate": 0.0005,
+    
+    // Neuromodulation settings
+    "dopamine_baseline": 0.1,
+    "dopamine_sensitivity": 1.0,
+    "curiosity_weight": 0.5,
+    "novelty_threshold": 0.1,
+    
+    // Reward settings
+    "reward_discount_factor": 0.99,
+    "reward_scaling_factor": 1.0,
+    
+    // Environment settings
+    "environment_name": "GridWorld",
+    "environment_width": 10,
+    "environment_height": 10,
+    "environment_max_steps": 1000,
+    
+    // Sensory settings
+    "vision_fov": 90.0,
+    "vision_sensitivity": 1.0,
+    "audio_sensitivity": 0.8,
+    
+    // Motor settings
+    "motor_action_space": ["move_forward", "turn_left", "turn_right", "move_backward"],
+    "motor_action_bounds": [{"move_forward": 1.0}, {"turn_left": 1.57}, {"turn_right": 1.57}, {"move_backward": 1.0}],
+    
+    // Logging settings
+    "log_level": "INFO",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    "log_max_size_mb": 100,
+    "log_backup_count": 5,
+    
+    // Simulation settings
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0,
+    "checkpoint_interval": 1000,
+    "checkpoint_path": "checkpoints/",
+    
+    // Visualization settings
+    "visualization_enabled": false,
+    "visualization_update_rate": 30.0,
+    "visualization_window_size": [800, 600],
+    
+    // Performance settings
+    "parallel_processing": true,
+    "thread_count": 4,
+    "vectorization_enabled": true,
+    
+    // Validation settings
+    "strict_validation": true,
+    "skip_unknown_keys": false,
+    "required_keys": ["random_seed", "neuron_count", "simulation_timestep"],
+    
+    // Advanced features
+    "enable_developmental_phases": true,
+    "developmental_stages": ["initial", "critical_period", "maturation", "adult"],
+    "enable_neuromodulation": true,
+    "enable_memory_systems": true,
+    
+    // Experimental parameters
+    "experiment_repetitions": 5,
+    "experiment_seed_offset": 1000,
+    "data_collection_interval": 10
+}
