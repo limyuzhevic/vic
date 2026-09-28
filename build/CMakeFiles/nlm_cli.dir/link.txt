@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_cli.a CMakeFiles/nlm_cli.dir/src/cli/AdvancedCLI.cpp.o CMakeFiles/nlm_cli.dir/src/cli/CLIMain.cpp.o CMakeFiles/nlm_cli.dir/src/cli/ConfigurationManager.cpp.o CMakeFiles/nlm_cli.dir/src/cli/SimulationController.cpp.o
+/usr/bin/ranlib libnlm_cli.a

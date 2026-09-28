@@ -1,3 +1,4 @@
+// src/main.cpp
 // NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
@@ -18,6 +19,9 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "cli/AdvancedCLI.hpp"
+#include "cli/ConfigurationManager.hpp"
+#include "cli/SimulationController.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +29,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
 
 using namespace nlm;
 
@@ -41,7 +46,7 @@ void printBanner() {
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity                              ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
@@ -339,6 +344,43 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
+    
+    // Try to use AdvancedCLI if available
+    // For now, we'll provide backward compatibility with legacy tests
+    nlm::AdvancedCLI cli;
+    
+    // Check if we should use CLI mode or legacy tests
+    bool useCliMode = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--cli" || arg == "--advanced") {
+            useCliMode = true;
+            break;
+        }
+    }
+    
+    if (useCliMode) {
+        // Use new CLI framework
+        NLM_LOG_INFO("Starting NLM in CLI mode...");
+        auto result = cli.parseArguments(argc, argv);
+        
+        if (result == nlm::CLIStatus::HelpRequested) {
+            cli.displayHelp("nlm");
+            return 0;
+        } else if (result == nlm::CLIStatus::VersionRequested) {
+            cli.displayVersion("nlm");
+            return 0;
+        } else if (result == nlm::CLIStatus::Error) {
+            std::cerr << "Error parsing arguments." << std::endl;
+            cli.displayHelp("nlm");
+            return 1;
+        }
+        
+        return cli.execute() == nlm::CLIStatus::Success ? 0 : 1;
+    }
+    
+    // Legacy mode: Run the original tests (backward compatibility)
+    NLM_LOG_INFO("Starting NLM in legacy test mode (backward compatibility)...");
     
     // Load configuration
     auto config = std::make_shared<Config>();
