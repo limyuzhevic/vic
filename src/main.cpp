@@ -26,7 +26,53 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+// Print usage information to help users
+void printUsage() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine
+Usage: nlm [options]
+
+Basic Options:
+  --config=file.cfg          Load configuration from file (JSON/YAML/INI format)
+  --set=key=value           Set configuration value at runtime
+  -v, --verbose            Enable verbose logging
+
+Advanced Options:
+  --checkpoint              Enable automatic checkpointing
+  --checkpoint-interval=N   Set checkpoint interval in steps
+  --profile                 Enable performance profiling
+  --simulation-steps=N      Set total simulation steps
+  --script=file.py          Load and execute Python script
+  --experiment-mode=MODE    Set experiment mode (plasticity, connectivity, stdp)
+  --neuron-density=VAL      Set neuron density (0.1-1.0)
+  --plasticity-mode=MODE    Set plasticity mode (stdp, hebbian, both, none)
+  --debug-spikes           Enable detailed spike recording
+  --save-results            Save experiment results
+  --results-dir=DIR         Set results directory
+
+Logging Levels:
+  --log-level=LEVEL         Set log level (Debug, Info, Warning, Error)
+
+Configuration Keys:
+  random_seed              Random seed for reproducibility
+  simulation_timestep      Time step in milliseconds
+  neuron_count             Number of neurons
+  region_count             Number of neural regions
+  connection_probability   Connection probability between neurons
+  stdp_ltp_weight          STDP long-term potentiation weight
+  stdp_ltd_weight          STDP long-term depression weight
+  stdp_tau                 STDP time constant (ms)
+  synaptogenesis_rate      Structural plasticity synapse creation rate
+  pruning_rate             Structural plasticity synapse removal rate
+
+Examples:
+  nlm --config=myconfig.json --verbose
+  nlm --set=neuron_count=1000 --simulation-steps=5000 --profile
+  nlm --experiment-mode=plasticity --checkpoint --checkpoint-interval=1000
+
+For more information, visit: https://github.com/neural-learning-machine/nlm
+    )" << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(
@@ -157,6 +203,7 @@ struct LearningExperiment {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
     }
+}
 };
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
@@ -365,22 +412,178 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
+
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+
+    // Advanced command-line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Override configuration values from command line
+        if (arg.substr(0, 7) == "--set=") {
+            std::string setArg = arg.substr(7);
+            size_t eqPos = setArg.find('=');
+            if (eqPos != std::string::npos) {
+                std::string key = setArg.substr(0, eqPos);
+                std::string value = setArg.substr(eqPos + 1);
+                
+                // Try to parse as different types
+                try {
+                    // Try integer
+                    size_t endpos;
+                    int64_t intVal = std::stoll(value, &endpos);
+                    if (endpos == value.size()) {
+                        config->set(key, intVal, ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    // Try double
+                    size_t endpos;
+                    double doubleVal = std::stod(value, &endpos);
+                    if (endpos == value.size()) {
+                        config->set(key, doubleVal, ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    // Try boolean
+                    if (value == "true" || value == "false") {
+                        config->set(key, value == "true", ConfigSource::CommandLine);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                // Default to string
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        
+        // Advanced options
+        else if (arg == "--verbose" || arg == "-v") {
+            consoleLogger->setLevel(LogLevel::Debug);
+            NLM_LOG_INFO("Verbose logging enabled");
+        }
+        
+        else if (arg == "--checkpoint") {
+            config->set("enable_checkpointing", true, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Checkpointing enabled");
+        }
+        
+        else if (arg == "--checkpoint-interval") {
+            if (i + 1 < argc) {
+                try {
+                    int checkpointInterval = std::stoi(argv[++i]);
+                    config->set("checkpoint_interval", static_cast<int64_t>(checkpointInterval), ConfigSource::CommandLine);
+                    NLM_LOG_INFO("Checkpoint interval set to: " + std::to_string(checkpointInterval) + " steps");
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid checkpoint interval value");
+                }
+            }
+        }
+        
+        else if (arg == "--profile") {
+            config->set("enable_profiling", true, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Profiling enabled");
+        }
+        
+        else if (arg == "--simulation-steps") {
+            if (i + 1 < argc) {
+                try {
+                    int steps = std::stoi(argv[++i]);
+                    config->set("simulation_steps", static_cast<int64_t>(steps), ConfigSource::CommandLine);
+                    NLM_LOG_INFO("Simulation steps set to: " + std::to_string(steps));
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid simulation steps value");
+                }
+            }
+        }
+        
+        else if (arg == "--script") {
+            if (i + 1 < argc) {
+                std::string scriptFile = argv[++i];
+                config->set("script_file", scriptFile, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Script file set to: " + scriptFile);
+            }
+        }
+        
+        else if (arg == "--experiment-mode") {
+            if (i + 1 < argc) {
+                std::string mode = argv[++i];
+                config->set("experiment_mode", mode, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Experiment mode set to: " + mode);
+            }
+        }
+        
+        else if (arg == "--neuron-density") {
+            if (i + 1 < argc) {
+                try {
+                    float density = std::stof(argv[++i]);
+                    config->set("neuron_density", density, ConfigSource::CommandLine);
+                    NLM_LOG_INFO("Neuron density set to: " + std::to_string(density));
+                } catch (...) {
+                    NLM_LOG_WARNING("Invalid neuron density value");
+                }
+            }
+        }
+        
+        else if (arg == "--plasticity-mode") {
+            if (i + 1 < argc) {
+                std::string plasticityMode = argv[++i];
+                config->set("plasticity_mode", plasticityMode, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Plasticity mode set to: " + plasticityMode);
+            }
+        }
+        
+        else if (arg == "--debug-spikes") {
+            config->set("debug_spikes", true, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Debug spike recording enabled");
+        }
+        
+        else if (arg == "--save-results") {
+            config->set("save_results", true, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Results saving enabled");
+        }
+        
+        else if (arg == "--results-dir") {
+            if (i + 1 < argc) {
+                std::string resultsDir = argv[++i];
+                config->set("results_directory", resultsDir, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Results directory set to: " + resultsDir);
+            }
+        }
+        
+        else if (arg == "--help") {
+            printUsage();
+            return 0;
+        }
+    }
+
+    // Initialize logger level based on configuration
+    std::string logLevel = config->getOr<std::string>("log_level", "Info");
+    if (logLevel == "Debug") {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (logLevel == "Warning") {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (logLevel == "Error") {
+        consoleLogger->setLevel(LogLevel::Error);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

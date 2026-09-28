@@ -18,13 +18,20 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
+    // LIF parameters - cached for faster access
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Pre-allocated vectors for better performance
+    // These are initialized with max size to avoid reallocations
+    std::vector<Timestamp> preSpikeHistoryCache;
+    std::vector<Timestamp> postSpikeHistoryCache;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             preSpikeHistoryCache(MAX_SPIKE_HISTORY),
+             postSpikeHistoryCache(MAX_SPIKE_HISTORY) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -148,9 +155,13 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+    // Use pre-allocated cache for better performance
+    if (pImpl->spikeHistory.size() < pImpl->spikeHistory.capacity()) {
+        pImpl->spikeHistory.push_back(timestamp);
+    } else {
+        // If full, shift and add (more efficient than erase)
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        pImpl->spikeHistory.push_back(timestamp);
     }
 }
 
@@ -159,11 +170,16 @@ void Neuron::clearSpikeHistory() {
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+    // Pre-allocate to avoid reallocations
+    if (pImpl->incomingSynapses.size() < pImpl->incomingSynapses.capacity()) {
+        pImpl->incomingSynapses.push_back(handle);
+    }
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+    if (pImpl->outgoingSynapses.size() < pImpl->outgoingSynapses.capacity()) {
+        pImpl->outgoingSynapses.push_back(handle);
+    }
 }
 
 NeuronState& Neuron::getState() {

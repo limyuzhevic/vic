@@ -18,41 +18,236 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+// Add helper functions at the end of the file
+
+bool Config::parseYAML(const std::string& yaml) {
+    try {
+        // Simple YAML parser for key-value pairs
+        std::stringstream ss(yaml);
+        std::string line;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        while (std::getline(ss, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line.find("#") == 0 || line.find("%") == 0) {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Skip YAML specific constructs for now
+            if (line.find("-") == 0 && std::isspace(line[1])) {
+                // List item - skip for now
+                continue;
+            }
+            
+            // Parse key: value format
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Remove quotes from value
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to convert to appropriate type
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::File);
+                } else {
+                    try {
+                        // Try integer
+                        size_t endpos;
+                        int64_t intVal = std::stoll(value, &endpos);
+                        if (endpos == value.size()) {
+                            set(key, intVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    try {
+                        // Try double
+                        size_t endpos;
+                        double doubleVal = std::stod(value, &endpos);
+                        if (endpos == value.size()) {
+                            set(key, doubleVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    // Default to string
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+ConfigValue Config::parseJSONValue(const std::string& json, size_t& pos) {
+    while (pos < json.size() && std::isspace(json[pos])) {
+        pos++;
+    }
+    
+    if (pos >= json.size()) {
+        return ConfigValue(); // Empty variant
+    }
+    
+    if (json[pos] == '\"') {
+        // String
+        size_t start = ++pos;
+        while (pos < json.size() && json[pos] != '\"') {
+            if (json[pos] == '\\' && pos + 1 < json.size()) {
+                pos += 2; // Skip escaped character
+            }
+            pos++;
+        }
+        if (pos >= json.size()) {
+            return ConfigValue(); // Empty variant
+        }
+        std::string value = json.substr(start, pos - start);
+        pos++; // Skip closing quote
+        return ConfigValue(value);
+    } else if (json[pos] == 't' || json[pos] == 'f') {
+        // Boolean
+        std::string boolStr;
+        while (pos < json.size() && (json[pos] == 't' || json[pos] == 'f' || 
+                                     json[pos] == 'r' || json[pos] == 'u' || 
+                                     json[pos] == 'e')) {
+            boolStr += json[pos];
+            pos++;
+        }
+        if (boolStr == "true") {
+            return ConfigValue(true);
+        } else if (boolStr == "false") {
+            return ConfigValue(false);
+        }
+    } else if (json[pos] == '-' || std::isdigit(json[pos])) {
+        // Number
+        std::string numStr;
+        bool hasDecimal = false;
+        while (pos < json.size() && (std::isdigit(json[pos]) || 
+                                     json[pos] == '.' || json[pos] == 'e' || 
+                                     json[pos] == 'E' || json[pos] == '+' || 
+                                     json[pos] == '-')) {
+            numStr += json[pos];
+            if (json[pos] == '.') hasDecimal = true;
+            pos++;
+        }
+        if (hasDecimal) {
+            try {
+                return ConfigValue(std::stod(numStr));
+            } catch (...) {
+                return ConfigValue(); // Empty variant
+            }
+        } else {
+            try {
+                // Try to parse as int64_t first, then int if it fits
+                size_t endpos;
+                int64_t val = std::stoll(numStr, &endpos);
+                if (endpos == numStr.size()) {
+                    return ConfigValue(val);
+                }
+                return ConfigValue(static_cast<int>(val));
+            } catch (...) {
+                return ConfigValue(); // Empty variant
+            }
+        }
+    } else if (json[pos] == '[') {
+        // Array
+        pos++; // Skip opening bracket
+        std::vector<ConfigValue> array;
+        while (pos < json.size() && json[pos] != ']') {
+            ConfigValue elem = parseJSONValue(json, pos);
+            if (!elem.has_value()) { // Need to check if variant is not empty
+                break;
+            }
+            array.push_back(elem);
+            
+            while (pos < json.size() && (std::isspace(json[pos]) || json[pos] == ',')) {
+                if (json[pos] == ',') pos++;
+                else pos++;
+            }
+        }
+        if (pos < json.size() && json[pos] == ']') {
+            pos++; // Skip closing bracket
+            return ConfigValue(array);
         }
     }
     
-    return true;
+    return ConfigValue(); // Empty variant
+}
+
+bool Config::parseYAML(const std::string& yaml) {
+    try {
+        // Simple YAML parser for key-value pairs
+        std::stringstream ss(yaml);
+        std::string line;
+        
+        while (std::getline(ss, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line.find("#") == 0 || line.find("%") == 0) {
+                continue;
+            }
+            
+            // Skip YAML specific constructs for now
+            if (line.find("-") == 0 && std::isspace(line[1])) {
+                // List item - skip for now
+                continue;
+            }
+            
+            // Parse key: value format
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string key = trim(line.substr(0, colonPos));
+                std::string value = trim(line.substr(colonPos + 1));
+                
+                // Remove quotes from value
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to convert to appropriate type
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::File);
+                } else {
+                    try {
+                        // Try integer
+                        size_t endpos;
+                        int64_t intVal = std::stoll(value, &endpos);
+                        if (endpos == value.size()) {
+                            set(key, intVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    try {
+                        // Try double
+                        size_t endpos;
+                        double doubleVal = std::stod(value, &endpos);
+                        if (endpos == value.size()) {
+                            set(key, doubleVal, ConfigSource::File);
+                            continue;
+                        }
+                    } catch (...) {}
+                    
+                    // Default to string
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
