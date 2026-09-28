@@ -58,19 +58,6 @@ public:
     // Identity
     NeuronId getId() const;
     
-    // Type
-    NeuronType getType() const;
-    void setType(NeuronType type);
-    
-    // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
-    
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
-    
     // Threshold
     MembranePotential getThreshold() const;
     void setThreshold(MembranePotential threshold);
@@ -134,7 +121,6 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state

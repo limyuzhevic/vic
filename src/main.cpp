@@ -322,9 +322,56 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Advanced command-line help and usage
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-help" || arg == "--h" || arg == "-h") {
+            printBanner();
+            std::cout << R"(
+USAGE:
+    nlm [OPTIONS]
+
+OPTIONS:
+    --config=file.cfg          Load configuration from file (default: configs/default.cfg)
+    --config file.cfg          Alternative format for --config
+    --random_seed=NUMBER       Set random seed for reproducible experiments
+    --simulation_timestep=NUMBER Set simulation timestep in seconds (default: 0.001)
+    --neuron_count=NUMBER      Set number of neurons (default: 500)
+    --region_count=NUMBER      Set number of brain regions (default: 1)
+    --connection_probability=NUMBER Set probability of synaptic connections (default: 0.15)
+    --stdp_ltp_weight=NUMBER    Set STDP LTP weight (default: 0.02)
+    --stdp_ltd_weight=NUMBER    Set STDP LTD weight (default: 0.015)
+    --stdp_tau=NUMBER          Set STDP time constant (default: 20.0)
+    --synaptogenesis_rate=NUMBER   Set synaptogenesis rate (default: 0.0001)
+    --pruning_rate=NUMBER      Set pruning rate (default: 0.00001)
+    --help, -help, -h          Show this help message and exit
+
+EXAMPLES:
+    nlm                                    Run with default configuration
+    nlm --config=myconfig.cfg              Load custom configuration
+    nlm --neuron_count=1000 --simulation_timestep=0.0001   Custom parameters
+
+ABOUT:
+    NLM (熙然) - Neural Learning Machine
+    Phase 2: Real Neural Computation
+    Implements Leaky Integrate-and-Fire (LIF) neuron dynamics,
+    event-driven spike propagation, STDP and Hebbian plasticity,
+    and structural plasticity.
+
+    The system demonstrates:
+    - Basic neural connectivity and spike propagation
+    - Activity-dependent synaptic learning via plasticity
+    - STDP verification (pre-before-post spike timing)
+    - Measurable learning through weight changes
+
+    The brain continuously modifies its synaptic connections
+    through experience, exhibiting artificial neural learning.
+    )" << std::endl;
+            return 0;
+        }
+    }
+
     printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
