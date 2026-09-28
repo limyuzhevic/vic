@@ -26,7 +26,7 @@ class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
-class Novelty;
+class Novelty;  // Neuromodulation novelty system (not to be confused with AgentBrain::noveltyLevel_)
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
