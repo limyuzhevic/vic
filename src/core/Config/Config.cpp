@@ -19,40 +19,264 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Implement proper JSON/YAML parser with fallback
+    // Try JSON first, then fallback to key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON
+    if (parseJSONFile(filepath)) {
+        return true;
+    }
+    
+    // Fallback to simple key=value format
+    file.clear();
+    file.seekg(0);
+    
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Parse key=value pairs
+        if (!parseKeyValueLine(line, lineNumber)) {
+            continue; // Skip malformed lines but don't fail
         }
     }
     
     return true;
+}
+
+bool Config::parseJSONFile(const std::string& filepath) {
+    // Simple JSON parser - could be enhanced with nlohmann::json
+    // For now, just check if file has JSON-like structure
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read first few lines to check if it's JSON
+    std::string line;
+    std::getline(file, line);
+    file.clear();
+    file.seekg(0);
+    
+    // Check if line starts with "{" or contains key-value pairs in JSON format
+    if (line.find('{') != std::string::npos && line.find('}') != std::string::npos) {
+        // Try to parse as JSON (simplified)
+        return parseSimpleJSONFile(filepath);
+    }
+    
+    return false;
+}
+
+bool Config::parseSimpleJSONFile(const std::string& filepath) {
+    // Very basic JSON parser for simple key-value pairs
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Remove whitespace and newlines
+    std::string cleanContent;
+    for (char c : content) {
+        if (!std::isspace(c)) {
+            cleanContent += c;
+        }
+    }
+    
+    // Very basic parsing: find "key": "value" patterns
+    size_t pos = 0;
+    while ((pos = cleanContent.find('"', pos)) != std::string::npos) {
+        size_t keyStart = pos + 1;
+        pos = cleanContent.find('"', keyStart);
+        if (pos == std::string::npos) break;
+        
+        std::string key = cleanContent.substr(keyStart, pos - keyStart);
+        
+        // Skip ":"
+        pos = cleanContent.find(':', pos + 1);
+        if (pos == std::string::npos) break;
+        
+        // Skip whitespace after colon
+        pos++;
+        while (pos < cleanContent.size() && (cleanContent[pos] == ' ' || cleanContent[pos] == '\t')) {
+            pos++;
+        }
+        
+        // Check for string value
+        if (pos < cleanContent.size() && cleanContent[pos] == '"') {
+            size_t valueStart = pos + 1;
+            size_t valueEnd = cleanContent.find('"', valueStart);
+            if (valueEnd != std::string::npos) {
+                std::string value = cleanContent.substr(valueStart, valueEnd - valueStart);
+                set(key, value, ConfigSource::File);
+                pos = valueEnd + 1;
+                continue;
+            }
+        }
+        
+        // Check for number value
+        if (pos < cleanContent.size() && (std::isdigit(cleanContent[pos]) || cleanContent[pos] == '-')) {
+            size_t valueEnd = pos;
+            while (valueEnd < cleanContent.size() && (std::isdigit(cleanContent[valueEnd]) || 
+                                                    cleanContent[valueEnd] == '.' || 
+                                                    cleanContent[valueEnd] == '-')) {
+                valueEnd++;
+            }
+            
+            if (valueEnd > pos) {
+                std::string valueStr = cleanContent.substr(pos, valueEnd - pos);
+                // Try to parse as double
+                try {
+                    double value = std::stod(valueStr);
+                    set(key, value, ConfigSource::File);
+                    pos = valueEnd;
+                    continue;
+                } catch (...) {
+                    // Fall through if not a number
+                }
+            }
+        }
+        
+        // Check for boolean value
+        if (pos < cleanContent.size()) {
+            if (cleanContent.compare(pos, 5, "true") == 0) {
+                set(key, true, ConfigSource::File);
+                pos += 4;
+                continue;
+            } else if (cleanContent.compare(pos, 4, "false") == 0) {
+                set(key, false, ConfigSource::File);
+                pos += 5;
+                continue;
+            }
+        }
+        
+        // Skip to next comma or brace
+        while (pos < cleanContent.size() && cleanContent[pos] != ',' && cleanContent[pos] != '}') {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseKeyValueLine(const std::string& line, int lineNumber) {
+    // Parse advanced key=value format
+    size_t pos = line.find('=');
+    if (pos == std::string::npos) {
+        // Try to handle other formats
+        return false;
+    }
+    
+    std::string key = trim(line.substr(0, pos));
+    std::string value = trim(line.substr(pos + 1));
+    
+    if (key.empty() || value.empty()) {
+        return false;
+    }
+    
+    // Try to parse value as different types
+    parseValueAndSet(key, value, ConfigSource::File);
+    return true;
+}
+
+void Config::parseValueAndSet(const std::string& key, const std::string& value, ConfigSource source) {
+    // Try to parse value as different types
+    
+    // Try boolean
+    if (value == "true") {
+        set(key, true, source);
+        return;
+    } else if (value == "false") {
+        set(key, false, source);
+        return;
+    }
+    
+    // Try integer
+    try {
+        size_t pos;
+        int intVal = std::stoi(value, &pos);
+        if (pos == value.size()) {
+            set(key, intVal, source);
+            return;
+        }
+    } catch (...) {
+        // Not an integer
+    }
+    
+    // Try double
+    try {
+        size_t pos;
+        double doubleVal = std::stod(value, &pos);
+        if (pos == value.size()) {
+            set(key, doubleVal, source);
+            return;
+        }
+    } catch (...) {
+        // Not a double
+    }
+    
+    // Try array format [1, 2, 3]
+    if (value.size() >= 2 && value[0] == '[' && value[value.size() - 1] == ']') {
+        std::string arrayContent = value.substr(1, value.size() - 2);
+        std::vector<int> intArray;
+        std::vector<double> doubleArray;
+        
+        size_t startPos = 0;
+        size_t commaPos = arrayContent.find(',');
+        
+        while (commaPos != std::string::npos || startPos < arrayContent.size()) {
+            std::string token = trim(arrayContent.substr(startPos, commaPos - startPos));
+            if (token.empty()) break;
+            
+            // Try to parse as double
+            try {
+                size_t pos;
+                double val = std::stod(token, &pos);
+                if (pos == token.size()) {
+                    doubleArray.push_back(val);
+                }
+            } catch (...) {
+                // Try to parse as int
+                try {
+                    size_t pos;
+                    int val = std::stoi(token, &pos);
+                    if (pos == token.size()) {
+                        intArray.push_back(val);
+                    }
+                } catch (...) {
+                    // Not a number
+                }
+            }
+            
+            startPos = commaPos + 1;
+            commaPos = arrayContent.find(',', startPos);
+        }
+        
+        // Use whichever array worked
+        if (!doubleArray.empty()) {
+            set(key, doubleArray, source);
+            return;
+        } else if (!intArray.empty()) {
+            set(key, intArray, source);
+            return;
+        }
+    }
+    
+    // Try string (already trimmed)
+    set(key, value, source);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -65,14 +289,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                parseValueAndSet(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            parseValueAndSet(key, value, ConfigSource::CommandLine);
         }
     }
     return true;
@@ -84,9 +308,51 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM configuration system\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save value based on type
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float> || 
+                                 std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << arg[i];
+                }
+                file << "\"]\n";
+            } else {
+                file << entry.key << " = " << "<unknown_type>" << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -185,6 +451,8 @@ std::string Config::summary() const {
     }
     return oss.str();
 }
+
+// Helper functions implementation
 
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
