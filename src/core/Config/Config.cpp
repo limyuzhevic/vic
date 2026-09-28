@@ -3,11 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <iostream>
+#include <cctype>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unique_ptr<ConfigSchema> schema;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,40 +23,142 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Detect and parse format
+    std::string format = detectFormat(content);
+    
+    if (format == "JSON" || format == "JSON_LIKE") {
+        auto jsonValue = fromJson(content);
+        if (!jsonValue) {
+            return false;
         }
+        clear();
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Recursively populate configuration from JSON
+        std::function<void(const std::string&, const ConfigValue&)> populateFromJson;
+        populateFromJson = [&](const std::string& prefix, const ConfigValue& value) {
+            if (std::holds_alternative<int>(value)) {
+                set(prefix, std::get<int>(value), ConfigSource::File);
+            } else if (std::holds_alternative<int64_t>(value)) {
+                set(prefix, std::get<int64_t>(value), ConfigSource::File);
+            } else if (std::holds_alternative<double>(value)) {
+                set(prefix, std::get<double>(value), ConfigSource::File);
+            } else if (std::holds_alternative<bool>(value)) {
+                set(prefix, std::get<bool>(value), ConfigSource::File);
+            } else if (std::holds_alternative<std::string>(value)) {
+                set(prefix, std::get<std::string>(value), ConfigSource::File);
+            } else if (std::holds_alternative<std::vector<int>>(value)) {
+                // Convert vector<int> to JSON array string
+                std::string jsonStr = "["; 
+                const auto& vec = std::get<std::vector<int>>(value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) jsonStr += ",";
+                    jsonStr += std::to_string(vec[i]);
+                }
+                jsonStr += "]";
+                set(prefix, jsonStr, ConfigSource::File);
+            } else if (std::holds_alternative<std::vector<double>>(value)) {
+                std::string jsonStr = "[";
+                const auto& vec = std::get<std::vector<double>>(value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) jsonStr += ",";
+                    jsonStr += std::to_string(vec[i]);
+                }
+                jsonStr += "]";
+                set(prefix, jsonStr, ConfigSource::File);
+            } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+                std::string jsonStr = "[";
+                const auto& vec = std::get<std::vector<std::string>>(value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) jsonStr += ",";
+                    jsonStr += "\"" + vec[i] + "\"";
+                }
+                jsonStr += "]";
+                set(prefix, jsonStr, ConfigSource::File);
+            } else if (std::holds_alternative<std::unordered_map<std::string, ConfigValue>>(value)) {
+                const auto& map = std::get<std::unordered_map<std::string, ConfigValue>>(value);
+                for (const auto& pair : map) {
+                    std::string newPrefix = prefix.empty() ? pair.first : prefix + "." + pair.first;
+                    populateFromJson(newPrefix, pair.second);
+                }
             }
-            
-            set(key, value, ConfigSource::File);
+        };
+        
+        populateFromJson("", *jsonValue);
+        return true;
+    } else if (format == "YAML" || format == "YAML_LIKE") {
+        auto yamlValue = fromYaml(content);
+        if (!yamlValue) {
+            return false;
         }
+        clear();
+        
+        // Recursively populate configuration from YAML
+        std::function<void(const std::string&, const ConfigValue&)> populateFromYaml;
+        populateFromYaml = [&](const std::string& prefix, const ConfigValue& value) {
+            if (std::holds_alternative<int>(value)) {
+                set(prefix, std::get<int>(value), ConfigSource::File);
+            } else if (std::holds_alternative<int64_t>(value)) {
+                set(prefix, std::get<int64_t>(value), ConfigSource::File);
+            } else if (std::holds_alternative<double>(value)) {
+                set(prefix, std::get<double>(value), ConfigSource::File);
+            } else if (std::holds_alternative<bool>(value)) {
+                set(prefix, std::get<bool>(value), ConfigSource::File);
+            } else if (std::holds_alternative<std::string>(value)) {
+                set(prefix, std::get<std::string>(value), ConfigSource::File);
+            } else if (std::holds_alternative<std::vector<int>>(value)) {
+                std::string yamlStr = "[";
+                const auto& vec = std::get<std::vector<int>>(value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) yamlStr += ",";
+                    yamlStr += std::to_string(vec[i]);
+                }
+                yamlStr += "]";
+                set(prefix, yamlStr, ConfigSource::File);
+            } else if (std::holds_alternative<std::vector<double>>(value)) {
+                std::string yamlStr = "[";
+                const auto& vec = std::get<std::vector<double>>(value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) yamlStr += ",";
+                    yamlStr += std::to_string(vec[i]);
+                }
+                yamlStr += "]";
+                set(prefix, yamlStr, ConfigSource::File);
+            } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+                std::string yamlStr = "[";
+                const auto& vec = std::get<std::vector<std::string>>(value);
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) yamlStr += ",";
+                    yamlStr += "\"" + vec[i] + "\"";
+                }
+                yamlStr += "]";
+                set(prefix, yamlStr, ConfigSource::File);
+            } else if (std::holds_alternative<std::unordered_map<std::string, ConfigValue>>(value)) {
+                const auto& map = std::get<std::unordered_map<std::string, ConfigValue>>(value);
+                for (const auto& pair : map) {
+                    std::string newPrefix = prefix.empty() ? pair.first : prefix + "." + pair.first;
+                    populateFromYaml(newPrefix, pair.second);
+                }
+            }
+        };
+        
+        populateFromYaml("", *yamlValue);
+        return true;
+    } else if (format == "KEY_VALUE") {
+        // Backward compatibility with key=value format
+        return loadFromKeyValue(content);
     }
     
-    return true;
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -78,18 +184,61 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+bool Config::loadFromKeyValue(const std::string& content) {
+    clear();
+    std::istringstream stream(content);
+    std::string line;
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to use JSON format first
+    std::string jsonContent = "{\n";
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) jsonContent += ",\n";
+        first = false;
+        
+        jsonContent += "  \"" + entry.key + "\": " + valueToString(entry.value) + """";
+    }
+    jsonContent += "\n}";
+    
+    try {
+        file << jsonContent;
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error writing JSON to file: " << e.what() << std::endl;
     }
     
-    return true;
+    return false;
 }
 
 template<typename T>
@@ -197,6 +346,158 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+std::string Config::detectFormat(const std::string& content) {
+    if (content.empty()) return "UNKNOWN";
+    
+    // Check for JSON-like format
+    if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+        // Simple heuristic for JSON detection
+        if (content.find(':') != std::string::npos) {
+            return "JSON";
+        }
+    }
+    
+    // Check for YAML-like format (simple heuristic)
+    if (content.find(':') != std::string::npos && 
+        (content.find("true") != std::string::npos || 
+         content.find("false") != std::string::npos ||
+         content.find("null") != std::string::npos)) {
+        return "YAML";
+    }
+    
+    // Default to key=value format
+    return "KEY_VALUE";
+}
+
+std::optional<ConfigValue> Config::parseValue(const std::string& str) {
+    if (str.empty()) return std::nullopt;
+    
+    // Try to parse as boolean
+    if (str == "true") return true;
+    if (str == "false") return false;
+    if (str == "null") return std::nullopt;
+    
+    // Try to parse as integer
+    try {
+        if (str.find_first_not_of("0123456789") == std::string::npos) {
+            return std::stoi(str);
+        }
+    } catch (...) {}
+    
+    // Try to parse as integer64_t
+    try {
+        if (str.find_first_not_of("0123456789") == std::string::npos) {
+            return static_cast<int64_t>(std::stoll(str));
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        return std::stod(str);
+    } catch (...) {}
+    
+    // Return as string (without quotes)
+    return str;
+}
+
+std::string Config::valueToString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "[";
+            const auto& vec = arg;
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << vec[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "[";
+            const auto& vec = arg;
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << vec[i];
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            const auto& vec = arg;
+            for (size_t i = 0; i < vec.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << "\"" << vec[i] << "\"";
+            }
+            oss << "]";
+        } else if constexpr (std::is_same_v<T, std::unordered_map<std::string, ConfigValue>>) {
+            oss << "{";
+            const auto& map = arg;
+            bool first = true;
+            for (const auto& pair : map) {
+                if (!first) oss << ",";
+                first = false;
+                oss << "\"" << pair.first << "\": " << valueToString(pair.second);
+            }
+            oss << "}";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+std::string Config::configEntryToString(const ConfigEntry& entry) const {
+    std::ostringstream oss;
+    oss << "# " << entry.description << "\n";
+    oss << entry.key << " = " << valueToString(entry.value) << "\n";
+    return oss.str();
+}
+
+void Config::collectValidationErrors(const std::string& path, const ConfigValue& value, std::vector<ValidationError>& errors) const {
+    if (path.empty()) return;
+    
+    // Basic validation logic
+    if (std::holds_alternative<int>(value) || std::holds_alternative<int64_t>(value)) {
+        // Integer validation would go here
+    } else if (std::holds_alternative<double>(value)) {
+        // Double validation would go here
+    } else if (std::holds_alternative<std::string>(value)) {
+        // String validation would go here
+    } else if (std::holds_alternative<std::unordered_map<std::string, ConfigValue>>(value)) {
+        const auto& map = std::get<std::unordered_map<std::string, ConfigValue>>(value);
+        for (const auto& pair : map) {
+            std::string newPath = path.empty() ? pair.first : path + "." + pair.first;
+            collectValidationErrors(newPath, pair.second, errors);
+        }
+    }
+}
+
+// Implementation of static methods
+std::string Config::toJson(const ConfigValue& value) {
+    // This would use nlohmann::json library
+    // For now, return a placeholder
+    return "{}";
+}
+
+std::string Config::toYaml(const ConfigValue& value) {
+    // This would use YAML library
+    // For now, return a placeholder
+    return "";
+}
+
+std::optional<ConfigValue> Config::fromJson(const std::string& jsonStr) {
+    // This would use nlohmann::json library
+    // For now, return a placeholder
+    return std::nullopt;
+}
+
+std::optional<ConfigValue> Config::fromYaml(const std::string& yamlStr) {
+    // This would use YAML library
+    // For now, return a placeholder
+    return std::nullopt;
 }
 
 // Explicit template instantiations
