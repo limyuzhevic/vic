@@ -4,7 +4,7 @@
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
+#include "../plasticity/PlasticityRule.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
@@ -86,7 +86,7 @@ public:
     
     // Plasticity system access
     STDP* getSTDP();
-    Hebbian* getHebbian();
+    HebbianRule* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
     // Statistics

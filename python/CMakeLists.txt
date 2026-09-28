@@ -28,7 +28,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
-    ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
+    ${NLM_SOURCE_DIR}/plasticity/HebbianRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
     ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
     ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp

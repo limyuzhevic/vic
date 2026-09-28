@@ -18,8 +18,15 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Modern CMake features - use FetchContent for external dependencies
+include(FetchContent)
+
+# Find required packages
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+# Configure tests
+enable_testing()
+add_subdirectory(tests)
 
 # Core library
 add_library(nlm_core STATIC
@@ -40,7 +47,7 @@ add_library(nlm_core STATIC
     src/dynamics/SpikeSystem.cpp
     # Plasticity
     src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
+    src/plasticity/HebbianRule.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
     # Development
@@ -119,7 +126,21 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 5 experiments (comprehensive lifetime learning)
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 experiments (social development and integration)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Main executable
 add_executable(nlm
@@ -139,13 +160,26 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# Configure tests
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Create config file for installation
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/NLMConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/NLMConfig.cmake"
+    COPYONLY
 )

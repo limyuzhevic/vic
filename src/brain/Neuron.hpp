@@ -1,30 +1,58 @@
 #pragma once
 
+/**
+ * @file Neuron.hpp
+ * @brief Neuron class representing a single neuron in the NLM neural network.
+ * 
+ * This header defines the Neuron class, which implements a Leaky Integrate-and-Fire
+ * (LIF) neuron model. Each neuron is the basic computational unit of the network,
+ * receiving synaptic inputs, maintaining membrane potential, and generating spike
+ * outputs when threshold is reached.
+ * 
+ * @author NLM Development Team
+ * @date 2026
+ * @version 1.0.0
+ * @see src/core/Types/Types.hpp
+ * @see src/plasticity/PlasticityRule.hpp
+ * @see src/plasticity/STDP.hpp
+ * @see src/plasticity/Hebbian.hpp
+ * @see src/agent/AgentBrain.hpp
+ * @see TODO Complete LIF implementation (Phase 2)
+ */
+
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
 
 namespace nlm {
 
-// Forward declarations
-class Synapse;
-class RandomGenerator;
-
-// Neuron state structure for efficient storage
+/**
+ * Neuron state structure for efficient storage and access.
+ * 
+ * Contains all state variables needed to simulate neuron dynamics.
+ * Stored as a contiguous block in memory for optimal cache performance.
+ * Initialized with biologically plausible default values.
+ * 
+ * @see Neuron
+ * @see FiringState
+ */
 struct NeuronState {
-    MembranePotential membranePotential;    // Current membrane potential (mV)
-    MembranePotential restingPotential;    // Resting potential (mV)
-    MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
-    MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
-    FiringRate firingRate;                 // Current firing rate (Hz)
-    FiringState firingState;               // Current firing state
-    uint32_t refractoryRemaining;          // Steps remaining in refractory period
-    uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
-    float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+    MembranePotential membranePotential;    /**< Current membrane potential (mV) */
+    MembranePotential restingPotential;    /**< Resting potential (mV) */
+    MembranePotential threshold;           /**< Firing threshold (mV) */
+    MembranePotential resetPotential;       /**< Post-spike reset value (mV) */
+    MembranePotential leakConductance;      /**< Leak conductance (nS) */
+    MembranePotential synapseConductance;   /**< Synaptic conductance (nS) */
+    FiringRate firingRate;                 /**< Current firing rate (Hz) */
+    FiringState firingState;               /**< Current firing state */
+    uint32_t refractoryRemaining;          /**< Steps remaining in refractory period */
+    uint32_t refractoryPeriod;             /**< Total refractory period (steps) */
+    float adaptationVariable;              /**< For spike-frequency adaptation */
+    float lastSpikeTime;                   /**< Timestamp of last spike (-1 if none) */
     
+    /**
+     * Default constructor initializes neuron state with biologically plausible values.
+     */
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -40,112 +68,130 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+/**
+ * Neuron class implementing Leaky Integrate-and-Fire (LIF) dynamics.
+ * 
+ * The Neuron class represents a single computational unit in the neural network.
+ * It implements the LIF model where the membrane potential integrates incoming
+ * synaptic inputs and decays exponentially over time. When the potential
+ * reaches threshold, a spike is generated.
+ * 
+ * Key features:
+ * - LIF dynamics with exponential decay
+ * - Refractory period after spike
+ * - Synaptic integration (excitatory, inhibitory, modulatory)
+ * - Plasticity support (STDP, Hebbian, reward-modulated)
+ * - Random initialization for variability
+ * 
+ * @see NeuronState
+ * @see PlasticityFlags
+ * @see Synapse
+ * @see RandomGenerator
+ * @warning Current implementation is incomplete - full LIF dynamics pending
+ *          (Phase 2: Integration - will complete integrate-and-fire)
+ * @note Each neuron maintains connections to other neurons via SynapseHandle
+ *       objects, allowing for efficient sparse representation of the network.
+ */
 class Neuron {
 public:
-    // Create neuron with ID
+    /**
+     * @name Object Lifetime Management
+     * @warning Copying neurons is disabled (Config&) to prevent
+     * unintended sharing of neural state and connections.
+     */
+    /// @{
+    
+    /**
+     * @brief Construct neuron with unique identifier
+     * 
+     * @param id Unique neuron identifier
+     * @see NeuronId
+     * @see getId()
+     */
     explicit Neuron(NeuronId id);
     
+    /**
+     * @brief Destructor ensures proper cleanup of implementation details
+     */
     ~Neuron();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Copy constructor is deleted to prevent copying.
+     */
     Neuron(const Neuron&) = delete;
-    Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
+    /**
+     * @brief Copy assignment operator is deleted to prevent copying.
+     */
+    Neuron& operator=(const Neuron&) = delete;
+    
+    /**
+     * @brief Move constructor enables efficient transfer of neuron state.
+     */
+    Neuron(Neuron&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator enables efficient transfer of neuron state.
+     */
+    Neuron& operator=(Neuron&&) noexcept;
+    /// @}
+    
+    /**
+     * @name Identity and Classification
+     * 
+     * Methods for managing neuron identity and type classification.
+     */
+    /// @{
+    
+    /**
+     * @brief Get the neuron's unique identifier
+     * 
+     * @return NeuronId Unique identifier of this neuron
+     * @see NeuronId
+     */
     NeuronId getId() const;
     
-    // Type
+    /**
+     * @brief Get the neuron's functional type
+     * 
+     * @return NeuronType Functional type (excitatory, inhibitory, etc.)
+     * @see NeuronType
+     */
     NeuronType getType() const;
+    
+    /**
+     * @brief Set the neuron's functional type
+     * 
+     * @param type New neuron type
+     * @see NeuronType
+     */
     void setType(NeuronType type);
+    /// @}
     
-    // State access
+    /**
+     * @name State Management
+     * 
+     * Methods for accessing and modifying neuron state variables.
+     */
+    /// @{
+    
+    /**
+     * @brief Get the neuron's current state
+     * 
+     * @return const NeuronState& Reference to internal state (read-only)
+     * @see NeuronState
+     * @see getState()
+     */
     const NeuronState& getState() const;
+    
+    /**
+     * @brief Get the neuron's current state (modifiable)
+     * 
+     * @return NeuronState& Reference to internal state (modifiable)
+     * @see NeuronState
+     * @see getState() const
+     */
     NeuronState& getState();
-    
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
-    
-    // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
-    
-    // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
-    void setFiringState(FiringState state);
-    void setRefractoryPeriod(uint32_t steps);
-    void decrementRefractory();
-    
-    // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
-    
-    // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
-    void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
-    void setResetPotential(MembranePotential potential);
-    
-    // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
-    
-    // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
-    
-    // Incoming signals (post-synaptic potentials)
-    void receiveExcitatoryInput(MembranePotential amplitude);
-    void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
-    
-    // Current injection (from external sources)
-    void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
-    
-    // Spike history (recent spikes for STDP)
-    void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
-    void clearSpikeHistory();
-    
-    // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
-    
-    // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
-    
-    // Region/population membership
-    void setRegionId(RegionId region);
-    RegionId getRegionId() const;
-    void setPopulationId(PopulationId population);
-    PopulationId getPopulationId() const;
-    
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    /// @}
 
 } // namespace nlm

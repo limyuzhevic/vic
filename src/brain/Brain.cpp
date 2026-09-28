@@ -53,7 +53,7 @@ struct Brain::Impl {
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<HebbianRule> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
     // Simulation parameters
@@ -103,7 +103,7 @@ struct Brain::Impl {
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
+        hebbian = std::make_unique<HebbianRule>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
@@ -652,7 +652,7 @@ STDP* Brain::getSTDP() {
     return pImpl->stdp.get();
 }
 
-Hebbian* Brain::getHebbian() {
+HebbianRule* Brain::getHebbian() {
     return pImpl->hebbian.get();
 }
 

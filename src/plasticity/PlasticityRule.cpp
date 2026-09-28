@@ -52,7 +52,7 @@ void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
 }
 
 const char* HebbianRule::getName() const {
-    return "Hebbian";
+    return "HebbianRule";
 }
 
 void HebbianRule::setLearningRate(float rate) {
