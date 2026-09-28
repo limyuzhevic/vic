@@ -2,30 +2,19 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 namespace nlm {
 
-struct Neuron::Impl {
-    NeuronId id;
-    NeuronType type;
-    NeuronState state;
-    RegionId regionId;
-    PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
-    
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
-};
+// Constants for LIF neuron dynamics
+static constexpr float DEFAULT_MEMBRANE_CAPACITANCE = 1.0f;  // nF
+static constexpr float DEFAULT_TIME_CONSTANT = 20.0f;  // ms
+static constexpr size_t MAX_SPIKE_HISTORY = 100;
+static constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;  // mV
+static constexpr float DEFAULT_THRESHOLD = -55.0f;  // mV
+static constexpr float DEFAULT_RESET_POTENTIAL = -70.0f;  // mV
+static constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;  // nS
+static constexpr uint32_t DEFAULT_REFECTORY_PERIOD = 5;  // steps
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->id = id;

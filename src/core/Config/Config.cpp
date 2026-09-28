@@ -21,6 +21,8 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // NOTE: Phase 6+ projects should implement proper configuration management
+    // Current implementation supports basic file format with type conversion
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +30,10 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +54,10 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Log parsing error
+            // For now, we'll just skip malformed lines
+            // In production, this should log an error
         }
     }
     

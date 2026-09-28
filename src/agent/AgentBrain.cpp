@@ -1,7 +1,9 @@
 #include "AgentBrain.hpp"
+#include "SensoryPercept.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace nlm {
 
