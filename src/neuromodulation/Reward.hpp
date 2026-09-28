@@ -1,34 +1,39 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
-// Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Dopamine neuromodulator for reward prediction error and reinforcement learning
+// IMPLEMENTED - Phase 2 implementation of real dopamine signaling
 
-class Reward {
+class Dopamine : public Neuromodulator {
 public:
-    Reward();
-    ~Reward();
+    Dopamine();
+    ~Dopamine() override;
     
-    // Get current reward value
-    float getValue() const;
-    void setValue(float value);
+    // Get current dopamine level (prediction error signal)
+    float getLevel() const override;
     
-    // Accumulate reward
-    void add(float delta);
+    // Set dopamine level (used for testing)
+    void setLevel(float level);
     
-    // Reset accumulated reward
+    // Update dopamine level based on reward and prediction error
+    // phase: 0.0 = predict, 1.0 = act
+    void update(double dt, float reward, float predictedReward);
+    
+    // Get plasticity factor (modulates STDP learning rates)
+    float getPlasticityFactor() const;
+    
+    // Set plasticity factor
+    void setPlasticityFactor(float factor);
+    
+    // Get dopamine level for neuromodulation effects
+    float getDopamineLevel() const { return getLevel(); }
+    
+    // Reset to initial state
     void reset();
-    
-    // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
-    
-    // Reward history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
     
 private:
     struct Impl;
