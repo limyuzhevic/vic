@@ -61,8 +61,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Get observation - with validation
+        SensoryPercept percept;
+        auto* brain = agent.getBrain();
+        if (!brain) {
+            NLM_LOG_ERROR("Brain is null in simulation step " + std::to_string(step));
+            break;
+        }
+        if (brain->getRegions().empty()) {
+            NLM_LOG_ERROR("Brain has no regions in simulation step " + std::to_string(step));
+            break;
+        }
+        percept = world.observe(brain->getRegions()[0].get());
         
         // Process sensory input
         agent.processSensoryInput(percept);

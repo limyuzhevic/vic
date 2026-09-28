@@ -133,10 +133,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        float newNovelty = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Apply exponential moving average: decay previous novelty + add new novelty
+        noveltyLevel_ = noveltyLevel_ * sensoryNoveltyDecay_ + newNovelty * (1.0f - sensoryNoveltyDecay_);
         
         // Store for next time
         previousVision_ = vision;

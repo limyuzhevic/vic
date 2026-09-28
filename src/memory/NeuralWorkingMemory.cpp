@@ -40,28 +40,28 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+            NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+            float activation = pattern[i] * strength;
+            
+            // Set neuron activation - with region validation
+            auto* region = brain_->getRegion(neuron.getId() / 1000);
+            if (!region) {
+                NLM_LOG_ERROR("Region not found for neuron " + std::to_string(neuron.getId()));
+                continue;
+            }
+            auto* neurons = region->getAllNeurons();
+            if (!neurons) {
+                NLM_LOG_ERROR("Neurons vector is null for region " + std::to_string(neuron.getId() / 1000));
+                continue;
+            }
+            
+            for (auto* nn : *neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
                 }
             }
         }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
-        }
-    }
     
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {

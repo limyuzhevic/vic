@@ -324,11 +324,124 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    std::vector<std::pair<std::string, std::string>> configKeys;
+    bool verbose = false;
+    bool quiet = false;
+    bool showHelp = false;
+    int timestepsOverride = -1; // -1 means use config
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                // --config=key format not supported by CMake
+                std::cerr << "ERROR: --config= format not supported. Use '--config <file>'" << std::endl;
+                return 1;
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            } else {
+                std::cerr << "ERROR: --config option requires a file argument" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--config-key" || arg == "--set-config") {
+            if (i + 1 < argc) {
+                std::string kvPair = argv[++i];
+                size_t pos = kvPair.find('=');
+                if (pos != std::string::npos && pos > 0) {
+                    std::string key = kvPair.substr(0, pos);
+                    std::string value = kvPair.substr(pos + 1);
+                    configKeys.push_back(std::make_pair(key, value));
+                } else {
+                    std::cerr << "ERROR: --config-key requires 'key=value' format" << std::endl;
+                    return 1;
+                }
+            } else {
+                std::cerr << "ERROR: --config-key option requires a key=value argument" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--timesteps" || arg == "--steps") {
+            if (i + 1 < argc) {
+                timestepsOverride = std::atoi(argv[++i]);
+                if (timestepsOverride < 0) {
+                    std::cerr << "ERROR: --timesteps must be a non-negative integer" << std::endl;
+                    return 1;
+                }
+            } else {
+                std::cerr << "ERROR: --timesteps option requires a number argument" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--neuron-count" || arg == "--neurons") {
+            if (i + 1 < argc) {
+                int neuronCount = std::atoi(argv[++i]);
+                if (neuronCount <= 0) {
+                    std::cerr << "ERROR: --neuron-count must be a positive integer" << std::endl;
+                    return 1;
+                }
+                configKeys.push_back(std::make_pair("neuron_count", std::to_string(neuronCount)));
+            } else {
+                std::cerr << "ERROR: --neuron-count option requires a number argument" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--region-count" || arg == "--regions") {
+            if (i + 1 < argc) {
+                int regionCount = std::atoi(argv[++i]);
+                if (regionCount <= 0) {
+                    std::cerr << "ERROR: --region-count must be a positive integer" << std::endl;
+                    return 1;
+                }
+                configKeys.push_back(std::make_pair("region_count", std::to_string(regionCount)));
+            } else {
+                std::cerr << "ERROR: --region-count option requires a number argument" << std::endl;
+                return 1;
+            }
+        } else if (arg == "--seed" || arg == "--random-seed") {
+            if (i + 1 < argc) {
+                int seed = std::atoi(argv[++i]);
+                configKeys.push_back(std::make_pair("random_seed", std::to_string(seed)));
+            } else {
+                std::cerr << "ERROR: --seed option requires a number argument" << std::endl;
+                return 1;
+            }
+        } else if (arg.substr(0, 2) == "--") {
+            // Unknown option
+            std::cerr << "ERROR: Unknown option: " << arg << std::endl;
+            std::cerr << "Use --help for usage information." << std::endl;
+            return 1;
+        } else if (arg[0] == '-') {
+            // Unknown option
+            std::cerr << "ERROR: Unknown option: " << arg << std::endl;
+            std::cerr << "Use --help for usage information." << std::endl;
+            return 1;
+        }
+    }
+    
+    // Show help if requested
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with appropriate level
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = LogLevel::Info;
+    if (quiet) {
+        logLevel = LogLevel::Error;
+    } else if (verbose) {
+        logLevel = LogLevel::Debug;
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -343,28 +456,39 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+    // Try to load from file
+    NLM_LOG_INFO("Loading configuration from: " + configFile);
+    bool configLoaded = config->loadFromFile(configFile);
+    
+    if (!configLoaded) {
+        NLM_LOG_ERROR("Failed to load configuration file: " + configFile);
+        NLM_LOG_ERROR("Please check that the file exists and has valid format.");
+        NLM_LOG_INFO("Falling back to default configuration.");
+    }
+    
+    // Apply command-line config overrides
+    for (const auto& kv : configKeys) {
+        try {
+            // Try to parse as int first, then float, then string
+            try {
+                int64_t intVal = std::stoll(kv.second);
+                config->set(kv.first, intVal, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Config override: " + kv.first + " = " + kv.second);
+            } catch (const std::exception&) {
+                try {
+                    float floatVal = std::stof(kv.second);
+                    config->set(kv.first, floatVal, ConfigSource::CommandLine);
+                    NLM_LOG_INFO("Config override: " + kv.first + " = " + kv.second);
+                } catch (const std::exception&) {
+                    // Treat as string
+                    config->set(kv.first, kv.second, ConfigSource::CommandLine);
+                    NLM_LOG_INFO("Config override: " + kv.first + " = \"" + kv.second + "\"");
+                }
             }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to apply config override " + kv.first + ": " + std::string(e.what()));
         }
     }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -392,10 +516,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    // Log any config loading warnings
+    if (!configLoaded) {
+        NLM_LOG_WARNING("Configuration file not found or invalid. Using defaults.");
+    }
+    
+    if (configKeys.empty()) {
+        NLM_LOG_INFO("Using default configuration values.");
+    } else {
+        NLM_LOG_INFO("Applied " + std::to_string(configKeys.size()) + " command-line configuration overrides.");
+    }
     
     // Initialize brain
     NLM_LOG_INFO("");
