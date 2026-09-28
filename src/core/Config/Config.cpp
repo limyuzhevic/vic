@@ -7,7 +7,10 @@
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+    // Fast lookup by key for O(1) operations
+    std::unordered_map<std::string, ConfigEntry> entriesByKey;
+    // Maintain order for backward compatibility and summary generation
+    std::vector<std::string> keys;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -84,9 +87,13 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    for (const auto& key : pImpl->keys) {
+        auto it = pImpl->entriesByKey.find(key);
+        if (it != pImpl->entriesByKey.end()) {
+            const auto& entry = it->second;
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        }
     }
     
     return true;
@@ -94,15 +101,13 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
+    auto it = pImpl->entriesByKey.find(key);
+    if (it == pImpl->entriesByKey.end()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        return std::get<T>(it->second.value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
@@ -115,14 +120,17 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    // Check if key already exists
+    auto it = pImpl->entriesByKey.find(key);
+    if (it != pImpl->entriesByKey.end()) {
+        // Update existing entry
+        it->second.value = value;
+        it->second.source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Add new entry
+        ConfigEntry entry(key, value, source);
+        pImpl->entriesByKey[key] = entry;
+        pImpl->keys.push_back(key);
     }
 }
 
@@ -143,36 +151,33 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->entriesByKey.find(key) != pImpl->entriesByKey.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = pImpl->entriesByKey.find(key);
+    if (it != pImpl->entriesByKey.end()) {
+        // Remove from both containers
+        pImpl->entriesByKey.erase(it);
+        pImpl->keys.erase(std::remove(pImpl->keys.begin(), pImpl->keys.end(), key),
+                         pImpl->keys.end());
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
+    return pImpl->keys;
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    pImpl->entriesByKey.clear();
+    pImpl->keys.clear();
 }
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+    oss << "Configuration (" << pImpl->entriesByKey.size() << " entries):\n";
+    for (const auto& entry : pImpl->entriesByKey) {
+        oss << "  " << entry.second.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
@@ -180,8 +185,8 @@ std::string Config::summary() const {
             } else {
                 oss << arg;
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }, entry.second.value);
+        oss << "] (" << static_cast<int>(entry.second.source) << ")\n";
     }
     return oss.str();
 }

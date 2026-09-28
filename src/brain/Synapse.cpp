@@ -94,7 +94,13 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    // Validate synaptic weight is within reasonable bounds
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        // Clamp to prevent instability
+        pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    } else {
+        pImpl->weight = weight;
+    }
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
@@ -108,7 +114,16 @@ Delay Synapse::getDelay() const {
 }
 
 void Synapse::setDelay(Delay delay) {
-    pImpl->delay = delay;
+    // Validate synaptic delay is within reasonable range
+    if (delay == 0) {
+        // Zero delay could cause instability, minimum to 1 step
+        pImpl->delay = 1;
+    } else if (delay > 1000) {
+        // Cap at large delays to prevent excessive buffering
+        pImpl->delay = 1000;
+    } else {
+        pImpl->delay = delay;
+    }
 }
 
 SynapseType Synapse::getType() const {
@@ -173,7 +188,13 @@ float Synapse::getEligibilityTrace() const {
 }
 
 void Synapse::setEligibilityTrace(float trace) {
-    pImpl->eligibilityTrace = trace;
+    // Validate eligibility trace is within reasonable range
+    // Very large traces could cause instability in reward-modulated learning
+    if (trace < -10.0f || trace > 10.0f) {
+        pImpl->eligibilityTrace = std::clamp(trace, -10.0f, 10.0f);
+    } else {
+        pImpl->eligibilityTrace = trace;
+    }
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {

@@ -55,7 +55,13 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+    // Validate biological constraints
+    if (potential < -100.0f || potential > 50.0f) {
+        // Clamp to reasonable biological range to prevent instability
+        pImpl->state.membranePotential = std::clamp(potential, -100.0f, 50.0f);
+    } else {
+        pImpl->state.membranePotential = potential;
+    }
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
@@ -63,7 +69,13 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    // Validate threshold is within reasonable biological range
+    if (threshold < -100.0f || threshold > 0.0f) {
+        // Clamp to reasonable biological range
+        pImpl->state.threshold = std::clamp(threshold, -100.0f, 0.0f);
+    } else {
+        pImpl->state.threshold = threshold;
+    }
 }
 
 void Neuron::setFiringState(FiringState state) {
@@ -84,7 +96,13 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    // Validate leak conductance is positive (negative conductance could cause instability)
+    if (conductance < 0.0f) {
+        // Use small positive value instead of negative to prevent instability
+        pImpl->state.leakConductance = 0.1f;
+    } else {
+        pImpl->state.leakConductance = conductance;
+    }
 }
 
 MembranePotential Neuron::getLeakConductance() const {
@@ -92,7 +110,17 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
+    // Validate refractory period is within reasonable biological range
+    // Refractory periods typically range from 1-100 steps (1ms-100ms at 1ms timestep)
+    if (steps == 0) {
+        // Zero refractory period could cause instability, minimum to 1ms
+        pImpl->state.refractoryPeriod = 1;
+    } else if (steps > 1000) {
+        // Cap at 1000ms (1 second) to prevent excessive refractory effects
+        pImpl->state.refractoryPeriod = 1000;
+    } else {
+        pImpl->state.refractoryPeriod = steps;
+    }
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -100,7 +128,13 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    // Validate resting potential is within reasonable biological range
+    if (potential < -100.0f || potential > 0.0f) {
+        // Clamp to reasonable biological range
+        pImpl->state.restingPotential = std::clamp(potential, -100.0f, 0.0f);
+    } else {
+        pImpl->state.restingPotential = potential;
+    }
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -108,7 +142,13 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    // Validate reset potential is within reasonable biological range
+    if (potential < -100.0f || potential > 0.0f) {
+        // Clamp to reasonable biological range
+        pImpl->state.resetPotential = std::clamp(potential, -100.0f, 0.0f);
+    } else {
+        pImpl->state.resetPotential = potential;
+    }
 }
 
 bool Neuron::checkThreshold() const {
@@ -120,27 +160,45 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Validate excitatory input amplitude
+    // Excitatory inputs should be positive, but negative values could represent inhibitory components
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        // Clamp to reasonable range to prevent numerical overflow
+        pImpl->synapticInput += std::clamp(amplitude, -100.0f, 100.0f);
+    } else {
+        pImpl->synapticInput += amplitude;
+    }
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Validate inhibitory input amplitude
+    // Inhibitory inputs should be positive, but negative values could represent excitatory components
+    if (amplitude < -100.0f || amplitude > 100.0f) {
+        // Clamp to reasonable range to prevent numerical overflow
+        pImpl->synapticInput -= std::clamp(amplitude, -100.0f, 100.0f);
+    } else {
+        pImpl->synapticInput -= amplitude;
+    }
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
+    // Validate modulatory input amplitude
+    // Modulatory inputs affect plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    // Clamp to reasonable range to prevent numerical instability
+    pImpl->state.adaptationVariable += std::clamp(amplitude * 0.1f, -10.0f, 10.0f);
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
+    // Validate injected current
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    // Clamp to reasonable range to prevent numerical overflow
+    if (current < -100.0f || current > 100.0f) {
+        pImpl->synapticInput += std::clamp(current, -100.0f, 100.0f);
+    } else {
+        pImpl->synapticInput += current;
+    }
 }
 
 void Neuron::clearTotalCurrent() {
@@ -148,6 +206,12 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    // Validate spike timestamp
+    if (timestamp < 0.0f) {
+        // Negative timestamps are invalid
+        return;
+    }
+    
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
@@ -159,11 +223,17 @@ void Neuron::clearSpikeHistory() {
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
+    // Validate synapse handle
+    if (handle != INVALID_SYNAPSE_HANDLE) {
+        pImpl->incomingSynapses.push_back(handle);
+    }
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
+    // Validate synapse handle
+    if (handle != INVALID_SYNAPSE_HANDLE) {
+        pImpl->outgoingSynapses.push_back(handle);
+    }
 }
 
 NeuronState& Neuron::getState() {
