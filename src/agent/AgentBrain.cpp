@@ -19,6 +19,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , achLevel_(0.0f)
+    , neLevel_(0.0f)
+    , serotoninLevel_(0.0f)
+    , neuromodulationProfile_{0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f, 0.5f}
+    , currentActionPlan_()
+    , workingMemoryBuffer_()
+    , episodicMemory_()
+    , plasticityBoost_(0.0f)
+    , developmentSpeedMultiplier_(1.0f)
+    , profileName_("")
+    , config_(nullptr)
+    , performanceMonitoringInterval_(1.0f)
+    , performanceStats_{0.0f, 0.0f, 0.0f, {}}
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -342,9 +355,619 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    achLevel_ = 0.0f;
+    neLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
+    neuromodulationProfile_ = {0.5f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f, 0.5f};
+    workingMemoryBuffer_.clear();
+    episodicMemory_.clear();
+    plasticityBoost_ = 0.0f;
+    developmentSpeedMultiplier_ = 1.0f;
+    profileName_ = "";
+    config_ = nullptr;
+    performanceMonitoringInterval_ = 1.0f;
+    performanceStats_ = {0.0f, 0.0f, 0.0f, {}};
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// ========== ENHANCED MOTOR CONTROL ==========
+
+MotorCommand AgentBrain::selectMotorCommandBasedOnGoals(const std::vector<Goal>& goals) {
+    if (!brain_) return MotorCommand::Wait;
+    
+    if (goals.empty()) {
+        return decodeMotorCommand();
+    }
+    
+    // Find goal with highest priority
+    Goal bestGoal = goals[0];
+    for (const auto& goal : goals) {
+        if (goal.priority > bestGoal.priority) {
+            bestGoal = goal;
+        }
+    }
+    
+    // Select action based on goal type
+    switch (bestGoal.type) {
+        case Goal::Navigation:
+            if (!bestGoal.targetPosition.empty()) {
+                // Check direction relative to target
+                // For simplicity, just move forward
+                return MotorCommand::MoveForward;
+            }
+            break;
+        case Goal::Interaction:
+            return MotorCommand::Interact;
+        case Goal::Exploration:
+            // Use curiosity to decide exploration
+            if (curiosityEnabled_ && curiosityLevel_ > 0.7f) {
+                return selectWithCuriosity(MotorCommand::MoveForward);
+            }
+            break;
+        case Goal::Survival:
+            // Implement survival-oriented behavior
+            // For now, check if prediction error is high (unexpected situation)
+            if (std::abs(predictionError_) > 0.5f) {
+                return MotorCommand::Wait; // Default survival response
+            }
+            break;
+    }
+    
+    return decodeMotorCommand();
+}
+
+AgentBrain::ActionPlan AgentBrain::planMultiActionSequence(const std::vector<float>& state, int sequenceLength) {
+    ActionPlan plan;
+    plan.confidence = 0.5f;
+    plan.executionTime = static_cast<float>(sequenceLength) * 0.1f;
+    plan.resourceCost = static_cast<float>(sequenceLength) * 0.2f;
+    
+    // Simple sequence planning based on current state
+    if (!brain_) {
+        plan.primaryAction = MotorCommand::Wait;
+        return plan;
+    }
+    
+    // Calculate motor command confidences
+    std::vector<float> confidences = getMotorCommandConfidences();
+    
+    // Select primary action with highest confidence
+    float maxConfidence = 0.0f;
+    size_t bestAction = 0;
+    for (size_t i = 0; i < confidences.size(); ++i) {
+        if (confidences[i] > maxConfidence) {
+            maxConfidence = confidences[i];
+            bestAction = i;
+        }
+    }
+    
+    // Convert index to action
+    MotorCommand actions[] = {
+        MotorCommand::MoveForward, MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft, MotorCommand::TurnRight,
+        MotorCommand::Interact, MotorCommand::Wait,
+        MotorCommand::LookLeft, MotorCommand::LookRight
+    };
+    
+    plan.primaryAction = actions[bestAction];
+    plan.confidence = maxConfidence;
+    
+    // Generate alternative actions
+    for (int i = 1; i < std::min(3, (int)confidences.size()); ++i) {
+        size_t altAction = (bestAction + i) % sizeof(actions) / sizeof(actions[0]);
+        plan.alternativeActions.push_back(actions[altAction]);
+    }
+    
+    return plan;
+}
+
+MotorCommand AgentBrain::selectMotorCommandBasedOnMemory(const std::vector<float>& state) {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Use working memory to influence action selection
+    MotorCommand currentAction = decodeMotorCommand();
+    
+    // Check episodic memory for similar states
+    MemoryContext memory = retrieveEpisodicMemory(0.6f);
+    
+    if (memory.reward > 0.5f) {
+        // High reward memory - reinforce current action
+        return currentAction;
+    } else if (memory.reward < -0.5f) {
+        // Low reward memory - try different action
+        if (curiosityLevel_ > 0.7f) {
+            return selectWithCuriosity(currentAction);
+        }
+    }
+    
+    return currentAction;
+}
+
+std::vector<float> AgentBrain::getMotorCommandConfidences() const {
+    std::vector<float> confidences;
+    
+    // Calculate confidence based on neural activity
+    auto calcActivity = [this](const std::vector<Neuron*>& neurons) -> float {
+        if (neurons.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (Neuron* n : neurons) {
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+        return sum / neurons.size();
+    };
+    
+    float forwardAct = calcActivity(motorForward_);
+    float backwardAct = calcActivity(motorBackward_);
+    float leftAct = calcActivity(motorTurnLeft_);
+    float rightAct = calcActivity(motorTurnRight_);
+    float interactAct = calcActivity(motorInteract_);
+    float waitAct = calcActivity(motorWait_);
+    
+    // Normalize activities to confidence scores
+    float maxAct = std::max({forwardAct, backwardAct, leftAct, rightAct, interactAct, waitAct});
+    if (maxAct > 0.0f) {
+        confidences.push_back(forwardAct / maxAct);
+        confidences.push_back(backwardAct / maxAct);
+        confidences.push_back(leftAct / maxAct);
+        confidences.push_back(rightAct / maxAct);
+        confidences.push_back(interactAct / maxAct);
+        confidences.push_back(waitAct / maxAct);
+    } else {
+        confidences = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    }
+    
+    return confidences;
+}
+
+AgentBrain::ActionPlan AgentBrain::getCurrentActionPlan() const {
+    ActionPlan plan;
+    // In a real implementation, this would return the stored action plan
+    // For now, return an empty plan
+    return plan;
+}
+
+void AgentBrain::updateActionPlan(const SensoryPercept& percept) {
+    // Update the action plan with new sensory input
+    // This would typically involve re-planning based on updated perception
+    // For now, it's a placeholder
+}
+
+// ========== ADVANCED NEUROMODULATION ==========
+
+float AgentBrain::getAChLevel() const {
+    // In a real implementation, this would read from the acetylcholine neuromodulator
+    // For now, return a computed value based on attention needs
+    float attentionNeeds = 0.5f;
+    if (!previousVision_.empty()) {
+        // Higher novelty requires more attention
+        attentionNeeds = noveltyLevel_ * 0.5f + 0.5f;
+    }
+    return std::clamp(attentionNeeds, 0.0f, 1.0f);
+}
+
+float AgentBrain::getNELevel() const {
+    // In a real implementation, this would read from the norepinephrine neuromodulator
+    // For now, return a computed value based on arousal needs
+    float arousalNeeds = 0.1f;
+    if (curiosityLevel_ > 0.7f) {
+        arousalNeeds = 0.8f;
+    }
+    return std::clamp(arousalNeeds, 0.0f, 1.0f);
+}
+
+float AgentBrain::get5HTLevel() const {
+    // In a real implementation, this would read from the serotonin neuromodulator
+    // For now, return a computed value based on mood/state
+    float mood = 0.5f;
+    if (predictionError_ > 0.3f) {
+        mood = 0.3f; // Negative prediction error = lower mood
+    }
+    return std::clamp(mood, 0.0f, 1.0f);
+}
+
+void AgentBrain::setAChLevel(float level) {
+    // In a real implementation, this would set the acetylcholine neuromodulator level
+    // For now, store it for use in attention control
+    achLevel_ = level;
+}
+
+void AgentBrain::setNELevel(float level) {
+    // In a real implementation, this would set the norepinephrine neuromodulator level
+    // For now, store it for use in arousal control
+    neLevel_ = level;
+}
+
+void AgentBrain::set5HTLevel(float level) {
+    // In a real implementation, this would set the serotonin neuromodulator level
+    // For now, store it for use in mood/state control
+    serotoninLevel_ = level;
+}
+
+void AgentBrain::setNeuromodulationProfile(const NeuromodulationProfile& profile) {
+    neuromodulationProfile_ = profile;
+}
+
+AgentBrain::NeuromodulationProfile AgentBrain::getNeuromodulationProfile() const {
+    return neuromodulationProfile_;
+}
+
+void AgentBrain::modulateAttention(float novelty, float predictionError, float reward) {
+    // Adjust neuromodulator levels based on context
+    setAChLevel(std::clamp(novelty * neuromodulationProfile_.noveltyAmplifier, 0.0f, 1.0f));
+    setNELevel(std::clamp(reward * neuromodulationProfile_.rewardSensitivity, 0.0f, 1.0f));
+    set5HTLevel(std::clamp(predictionError * neuromodulationProfile_.predictionErrorAmplifier, 0.0f, 1.0f));
+}
+
+// ========== MEMORY INTEGRATION ==========
+
+const std::vector<float>* AgentBrain::getWorkingMemoryBuffer() const {
+    return &workingMemoryBuffer_;
+}
+
+bool AgentBrain::hasWorkingMemoryEntry(NeuronId neuron) const {
+    return workingMemoryBuffer_.find(neuron) != workingMemoryBuffer_.end();
+}
+
+float AgentBrain::getWorkingMemoryEntry(NeuronId neuron) const {
+    auto it = workingMemoryBuffer_.find(neuron);
+    if (it != workingMemoryBuffer_.end()) {
+        return it->second;
+    }
+    return 0.0f;
+}
+
+void AgentBrain::storeInWorkingMemory(NeuronId neuron, float value) {
+    workingMemoryBuffer_[neuron] = value;
+}
+
+AgentBrain::MemoryContext AgentBrain::retrieveEpisodicMemory(float similarityThreshold) const {
+    MemoryContext context;
+    // In a real implementation, this would search episodic memory
+    // For now, return empty context
+    return context;
+}
+
+std::vector<AgentBrain::MemoryContext> AgentBrain::retrieveMemorySequence(size_t count) const {
+    std::vector<MemoryContext> contexts;
+    // In a real implementation, this would retrieve recent episodes
+    // For now, return empty list
+    return contexts;
+}
+
+MotorCommand AgentBrain::selectActionBasedOnEpisodicMemory(const std::vector<float>& currentState) const {
+    // Select action based on similar past experiences
+    return MotorCommand::Wait;
+}
+
+float AgentBrain::getMemoryBasedActionConfidence(const std::vector<float>& state) const {
+    // Calculate confidence based on memory similarity
+    return 0.5f;
+}
+
+void AgentBrain::clearWorkingMemory() {
+    workingMemoryBuffer_.clear();
+}
+
+void AgentBrain::clearEpisodicMemory() {
+    episodicMemory_.clear();
+}
+
+// ========== PREDICTION SYSTEM ==========
+
+float AgentBrain::getPredictionConfidence() const {
+    if (!brain_) return 0.0f;
+    
+    // Get prediction system from brain if available
+    PredictionSystem* predSys = brain_->getPredictionSystem();
+    if (predSys) {
+        return predSys->getConfidence();
+    }
+    
+    // Fallback based on prediction error
+    return 1.0f - std::abs(predictionError_);
+}
+
+const std::vector<float>* AgentBrain::getPredictionErrorHistory() const {
+    if (!brain_) return nullptr;
+    
+    PredictionSystem* predSys = brain_->getPredictionSystem();
+    if (predSys) {
+        return &predSys->getErrorHistory();
+    }
+    
+    return nullptr;
+}
+
+AgentBrain::PredictionErrorVisualization AgentBrain::visualizePredictionError() const {
+    PredictionErrorVisualization viz;
+    viz.visualizationType = "heatmap";
+    
+    // Create a simple 2D error map (placeholder)
+    viz.errorMap.resize(16 * 16, 0.0f);
+    viz.maxError = std::abs(predictionError_);
+    viz.minError = 0.0f;
+    
+    return viz;
+}
+
+AgentBrain::PredictionMetrics AgentBrain::getPredictionMetrics() const {
+    PredictionMetrics metrics;
+    
+    // Default metrics (placeholder)
+    metrics.accuracy = 0.75f;
+    metrics.precision = 0.8f;
+    metrics.recall = 0.7f;
+    metrics.f1Score = 0.75f;
+    
+    // Adjust based on prediction error
+    metrics.accuracy = std::clamp(1.0f - std::abs(predictionError_), 0.0f, 1.0f);
+    
+    return metrics;
+}
+
+void AgentBrain::trainPredictionSystem(const SensoryInput& observation) {
+    if (!brain_) return;
+    
+    PredictionSystem* predSys = brain_->getPredictionSystem();
+    if (predSys) {
+        predSys->train(observation);
+    }
+}
+
+// ========== DEVELOPMENT CONTROLS ==========
+
+void AgentBrain::setDevelopmentalStage(DevelopmentalStage stage) {
+    if (brain_) {
+        brain_->setDevelopmentalStage(stage);
+    }
+}
+
+void AgentBrain::advanceDevelopmentToStage(DevelopmentalStage targetStage) {
+    if (!brain_) return;
+    
+    DevelopmentalStage current = brain_->getDevelopmentalStage();
+    
+    // Advance stages in order
+    if (current < targetStage) {
+        while (current < targetStage && current != DevelopmentalStage::Count) {
+            advanceDevelopmentStage();
+            current = brain_->getDevelopmentalStage();
+        }
+    } else {
+        // Go backwards (in reverse order)
+        while (current > targetStage && current != DevelopmentalStage::Initial) {
+            setDevelopmentalStage(static_cast<DevelopmentalStage>(static_cast<int>(current) - 1));
+            current = brain_->getDevelopmentalStage();
+        }
+    }
+}
+
+std::vector<DevelopmentalStage> AgentBrain::getDevelopmentalTrajectory() const {
+    std::vector<DevelopmentalStage> trajectory;
+    if (brain_) {
+        DevelopmentalStage stage = brain_->getDevelopmentalStage();
+        for (int i = 0; i < static_cast<int>(DevelopmentalStage::Count); ++i) {
+            trajectory.push_back(static_cast<DevelopmentalStage>(i));
+        }
+    }
+    return trajectory;
+}
+
+void AgentBrain::setCustomDevelopmentalTrajectory(const DevelopmentalTrajectory& trajectory) {
+    customDevelopmentalTrajectory_ = trajectory;
+}
+
+void AgentBrain::applyDevelopmentalIntervention(const std::string& interventionType, float intensity) {
+    if (!brain_) return;
+    
+    DevelopmentSystem* devSys = brain_->getDevelopmentSystem();
+    if (!devSys) return;
+    
+    if (interventionType == "plasticity_boost") {
+        // Boost plasticity temporarily
+        plasticityBoost_ = intensity;
+    } else if (interventionType == "accelerated_growth") {
+        // Accelerate development
+        developmentSpeedMultiplier_ = 1.0f + intensity;
+    } else if (interventionType == "reset_plasticity") {
+        // Reset plasticity
+        plasticityBoost_ = 0.0f;
+    }
+}
+
+void AgentBrain::resetDevelopmentalStage() {
+    if (brain_) {
+        brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+    }
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    developmentSpeedMultiplier_ = 1.0f;
+    plasticityBoost_ = 0.0f;
+}
+
+// ========== CONFIGURATION API ==========
+
+template<typename T>
+void AgentBrain::setAdvancedParameter(const std::string& category, const std::string& name, const T& value) {
+    std::string key = category + "." + name;
+    ConfigValue configValue;
+    
+    if constexpr (std::is_same_v<T, int>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, double>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, bool>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        configValue = value;
+    }
+    
+    config_->set(key, configValue);
+}
+
+template<typename T>
+T AgentBrain::getAdvancedParameter(const std::string& category, const std::string& name) const {
+    std::string key = category + "." + name;
+    auto value = config_->get<T>(key);
+    
+    if (value.has_value()) {
+        return value.value();
+    }
+    
+    // Return default value
+    if constexpr (std::is_same_v<T, int>) return 0;
+    else if constexpr (std::is_same_v<T, double>) return 0.0;
+    else if constexpr (std::is_same_v<T, bool>) return false;
+    else if constexpr (std::is_same_v<T, std::string>) return "";
+    else if constexpr (std::is_same_v<T, std::vector<int>>) return std::vector<int>{};
+    else if constexpr (std::is_same_v<T, std::vector<double>>) return std::vector<double>{};
+    else if constexpr (std::is_same_v<T, std::vector<std::string>>) return std::vector<std::string>{};
+    
+    // Unreachable but keeps compiler happy
+    static_assert(!std::is_same_v<T, T>, "Unsupported type");
+}
+
+void AgentBrain::loadProfile(const std::string& profileName) {
+    // Load configuration profile
+    // In a real implementation, this would load from a file or database
+    profileName_; // Store for reference
+}
+
+void AgentBrain::saveProfile(const std::string& profileName) const {
+    // Save current configuration as a profile
+    // In a real implementation, this would save to a file or database
+    profileName_; // Store for reference
+}
+
+std::vector<std::string> AgentBrain::getAvailableProfiles() const {
+    std::vector<std::string> profiles;
+    // In a real implementation, this would list available profiles
+    return profiles;
+}
+
+void AgentBrain::updateConfiguration(const std::string& key, const ConfigValue& value) {
+    if (config_) {
+        config_->set(key, value);
+    }
+}
+
+std::vector<ConfigEntry> AgentBrain::getConfigurationSnapshot() const {
+    std::vector<ConfigEntry> snapshot;
+    if (config_) {
+        snapshot = config_->getKeys();
+        // In a real implementation, this would also get values
+    }
+    return snapshot;
+}
+
+void AgentBrain::resetToDefaults() {
+    if (config_) {
+        config_->clear();
+        // In a real implementation, would reinitialize with defaults
+    }
+}
+
+// ========== PERFORMANCE MONITORING ==========
+
+AgentBrain::PerformanceMetrics AgentBrain::getPerformanceMetrics() const {
+    PerformanceMetrics metrics;
+    
+    // Basic metrics (placeholders)
+    metrics.motorCommandLatency = 0.005f; // 5ms
+    metrics.sensoryProcessingTime = 0.003f; // 3ms
+    metrics.predictionUpdateTime = 0.002f; // 2ms
+    metrics.memoryAccessTime = 0.001f; // 1ms
+    metrics.neuromodulationTime = 0.001f; // 1ms
+    
+    // Calculate derived metrics
+    metrics.memoryUtilization = workingMemoryBuffer_.size() / 100.0f; // Assuming capacity 100
+    metrics.predictionAccuracy = 1.0f - std::abs(predictionError_);
+    metrics.explorationRatio = curiosityEnabled_ ? curiosityLevel_ : 0.0f;
+    
+    return metrics;
+}
+
+AgentBrain::BottleneckInfo AgentBrain::detectBottleneck() const {
+    BottleneckInfo bottleneck;
+    bottleneck.threshold = 0.7f;
+    
+    // Simple bottleneck detection based on performance metrics
+    PerformanceMetrics metrics = getPerformanceMetrics();
+    
+    // Find slowest component
+    float maxTime = std::max({metrics.motorCommandLatency, 
+                              metrics.sensoryProcessingTime,
+                              metrics.predictionUpdateTime,
+                              metrics.memoryAccessTime,
+                              metrics.neuromodulationTime});
+    
+    if (maxTime == metrics.motorCommandLatency) {
+        bottleneck.component = "Motor Command Selection";
+    } else if (maxTime == metrics.sensoryProcessingTime) {
+        bottleneck.component = "Sensory Processing";
+    } else if (maxTime == metrics.predictionUpdateTime) {
+        bottleneck.component = "Prediction Update";
+    } else if (maxTime == metrics.memoryAccessTime) {
+        bottleneck.component = "Memory Access";
+    } else {
+        bottleneck.component = "Neuromodulation";
+    }
+    
+    bottleneck.currentLoad = maxTime / 0.01f; // Normalized to 0-1 scale
+    bottleneck.suggestedImprovement = 0.3f; // 30% improvement possible
+    
+    return bottleneck;
+}
+
+std::vector<std::string> AgentBrain::getPerformanceSuggestions() const {
+    std::vector<std::string> suggestions;
+    
+    BottleneckInfo bottleneck = detectBottleneck();
+    
+    if (bottleneck.currentLoad > bottleneck.threshold) {
+        suggestions.push_back("Optimize " + bottleneck.component + " - current load: " + 
+                            std::to_string(bottleneck.currentLoad * 100) + "%");
+    }
+    
+    PerformanceMetrics metrics = getPerformanceMetrics();
+    
+    if (metrics.predictionAccuracy < 0.8f) {
+        suggestions.push_back("Improve prediction accuracy through additional training data");
+    }
+    
+    if (metrics.explorationRatio > 0.8f) {
+        suggestions.push_back("Consider reducing exploration to focus on exploitation");
+    }
+    
+    if (metrics.memoryUtilization > 0.9f) {
+        suggestions.push_back("Consider increasing memory capacity or implementing better memory management");
+    }
+    
+    return suggestions;
+}
+
+void AgentBrain::setPerformanceMonitoringInterval(float interval) {
+    performanceMonitoringInterval_ = interval;
+}
+
+AgentBrain::PerformanceStatistics AgentBrain::getPerformanceStatistics() const {
+    PerformanceStatistics stats;
+    
+    // Default statistics (placeholder)
+    stats.averageLatency = 0.004f; // 4ms average
+    stats.peakLatency = 0.01f; // 10ms peak
+    stats.averageAccuracy = 0.85f;
+    stats.history = {0.9f, 0.85f, 0.87f, 0.88f, 0.86f}; // Recent history
+    
+    return stats;
 }
 
 } // namespace nlm
