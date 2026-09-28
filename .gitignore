@@ -1,0 +1,81 @@
+# NLM CI/CD Configuration Files
+# Additional configuration files for the comprehensive CI/CD setup
+
+# GitHub Actions Configuration
+github/
+├── workflows/
+│   └── ci-cd.yml                    # Main CI/CD workflow
+
+# Docker Configuration
+docker/
+├── Dockerfile                         # Base Docker image
+├── docker-compose.yml                 # Multi-container setup
+├── production/                        # Production configuration
+│   ├── nginx.conf                     # Reverse proxy config
+│   └── app.conf                       # Application config
+
+# Scripts directory
+scripts/
+├── quality_check.sh                   # Code quality gates
+├── test_runner.sh                     # Test execution
+├── deploy.sh                          # Build and deployment
+├── monitor.sh                         # Monitoring and observability
+├── performance_report.py              # Performance reporting
+├── load_test.py                       # Load testing
+├── junit_report.py                    # JUnit XML generation
+├── integration_test.sh                # Integration testing
+├── benchmark_runner.sh                # Benchmark execution
+└── dev_setup.sh                       # Development environment setup
+
+# Configuration files
+config/
+├── codecov.yml                        # Codecov configuration
+├── sonarcloud.properties              # SonarCloud properties
+├── clang-tidy.yml                     # Clang-tidy configuration
+├── cppcheck.xml                       # Cppcheck configuration
+├── iwyu.cfg                          # Include-what-you-use configuration
+└── pre-commit-config.yaml             # Pre-commit hooks
+
+# Documentation
+docs/
+├── CI_CD/
+│   ├── setup-guide.md                 # Complete setup guide
+│   ├── architecture.md                # CI/CD architecture
+│   ├── troubleshooting.md             # Troubleshooting guide
+│   └── best-practices.md               # Best practices
+
+# Project root files
+Makefile                              # Build automation
+AGENTS.md                            # Agent configuration
+CONTRIBUTING.md                      # Contribution guidelines
+CHANGELOG.md                         # Change log
+
+# Generated artifacts
+build/                                # Build outputs
+artifacts/                            # Deployment artifacts
+reports/                              # Test and performance reports
+coverage/                             # Code coverage reports
+logs/                                 # Application logs
+
+# Temporary files
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Python virtual environments
+venv/
+.env
+
+# C++ build directories
+build/
+cmake-build-*
+
+# Docker build caches
+Dockerfile*
+Dockerfile.*

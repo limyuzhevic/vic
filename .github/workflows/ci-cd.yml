@@ -1,0 +1,267 @@
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  BUILD_TYPE: Release
+
+jobs:
+  # Quality Gates
+  quality-gates:
+    runs-on: ubuntu-latest
+    name: Quality Gates Check
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup C++ Environment
+        uses: dawidd6/action-setup-cmake@v1
+        with:
+          cmake-version: '3.25'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy cppcheck include-what-you-use gcovr
+          pip install pytest numpy
+
+      - name: Run clang-format
+        run: |
+          find src tests -name "*.cpp" -o -name "*.h" | xargs clang-format --style=file --dry-run
+
+      - name: Run clang-tidy
+        run: |
+          mkdir -p build_tidy
+          cd build_tidy
+          cmake -DCMAKE_BUILD_TYPE=Debug ../src
+          make -j$(nproc)
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --std=c++20 --project=src/CMakeLists.txt
+
+      - name: Run include-what-you-use
+        run: |
+          find src tests -name "*.cpp" | xargs iwyu --config=.iwyu.cfg
+
+      - name: Check code quality
+        run: scripts/quality_check.sh
+
+  # Build and Test
+  build-and-test:
+    needs: quality-gates
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [Debug, Release, RelWithDebInfo]
+        include:
+          - build-type: Debug
+          - build-type: Release
+          - build-type: RelWithDebInfo
+    name: Build and Test (${{ matrix.build-type }})
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup C++ Environment
+        uses: dawidd6/action-setup-cmake@v1
+        with:
+          cmake-version: '3.25'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgtest-dev gtest/libgtest-dev
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build_${{ matrix.build-type }}
+          cd build_${{ matrix.build-type }}
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ../src
+
+      - name: Build NLM Core
+        run: |
+          cd build_${{ matrix.build-type }}
+          make -j$(nproc)
+
+      - name: Build Python Bindings
+        run: |
+          cd python
+          pip install scikit-build-core pybind11
+          python -m build
+
+      - name: Run Tests
+        run: |
+          cd build_${{ matrix.build-type }}
+          ./tests/test_runner
+          python -m pytest tests/ -v
+
+      - name: Generate Code Coverage
+        run: |
+          cd build_${{ matrix.build-type }}
+          gcovr --root ../src --exclude "*/test_*" --exclude "*/benchmark*" --xml --output coverage.xml
+
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: build_${{ matrix.build-type }}/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  # Performance Testing
+  performance-tests:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    name: Performance Tests
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Performance Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y time perl
+
+      - name: Run Benchmarks
+        run: |
+          mkdir -p build_perf
+          cd build_perf
+          cmake -DCMAKE_BUILD_TYPE=Release ../src
+          make -j$(nproc)
+          time ./benchmarks/benchmark
+
+      - name: Run Load Tests
+        run: |
+          python scripts/load_test.py
+
+  # Docker Build and Test
+  docker-build:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    name: Docker Build and Test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build NLM Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker Image
+        run: |
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest nlm --help
+
+  # Static Analysis and Security Scanning
+  static-analysis:
+    runs-on: ubuntu-latest
+    name: Static Analysis and Security Scanning
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          audit-url: https://semgrep.patched.live
+
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r python/ -f json -o bandit-report.json
+
+      - name: Run ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          find . -name "*.sh" -type f -exec shellcheck {} \;
+
+  # Multi-Platform Builds
+  multi-platform-build:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    name: Multi-Platform Builds
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build for ${{ matrix.platform }}
+        run: |
+          if [[ ${{ matrix.platform }} == "windows-latest" ]]; then
+            cmake -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build --config Release
+          else
+            mkdir -p build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Release ../src
+            make -j$(nproc)
+          fi
+
+  # Deployment
+  deploy:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Production
+        run: |
+          echo "Deploying to production..."
+          # Add deployment commands here
+          curl -X POST "https://your-deployment-server/deploy" \
+            -H "Authorization: Bearer ${{ secrets.DEPLOYMENT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"}'

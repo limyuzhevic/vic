@@ -29,6 +29,14 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Logging/AdvancedLogger.cpp
+    src/core/Logging/AsyncLogger.cpp
+    src/core/Logging/StructuredLogger.cpp
+    src/core/Logging/LoggerManager.cpp
+    src/core/Debug/DebugConsole.cpp
+    src/core/Debug/SystemMonitor.cpp
+    src/core/Utilities/PerformanceProfiler.cpp
+    src/core/Utilities/MemoryTracker.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp

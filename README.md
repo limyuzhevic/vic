@@ -1,230 +1,528 @@
-# NLM — 熙然
+# NLM CI/CD Pipeline Setup
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+This repository contains a comprehensive CI/CD pipeline for the NLM (Neural Learning Machine) project. The setup provides:
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+- **GitHub Actions**: Automated CI/CD workflows
+- **Docker**: Containerized development and production environments
+- **Static Analysis**: Code quality gates and validation
+- **Testing**: Comprehensive test suites with coverage and performance metrics
+- **Deployment**: Multi-stage build and deployment strategies
+- **Monitoring**: Production monitoring and observability
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
-
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
-
-## Current Phase
-
-**PHASE 6: FINAL INTEGRATION**
-
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
-
-### Phase 6 Integration Achievements
-
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
-
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-```
-
-## Running
-
-### Phase 6 Demo (Integration Test)
-```bash
-./nlm_phase6_demo
-```
-
-This runs a comprehensive integration test verifying all brain systems are connected.
-
-## Project Structure
+## Repository Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml                    # GitHub Actions workflow
+├── docker/
+│   ├── Dockerfile                         # Base Docker image
+│   ├── docker-compose.yml                 # Multi-container setup
+│   └── production/                        # Production config
+├── scripts/
+│   ├── quality_check.sh                   # Code quality gates
+│   ├── test_runner.sh                     # Test execution
+│   ├── deploy.sh                          # Build and deployment
+│   ├── monitor.sh                         # Monitoring and observability
+│   └── integration_test.sh                # Integration testing
+├── config/
+│   ├── codecov.yml                        # Codecov configuration
+│   ├── sonarcloud.properties              # SonarCloud properties
+│   └── clang-tidy.yml                     # Clang-tidy configuration
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── CI_CD/                             # CI/CD documentation
+├── Makefile                               # Build automation
+└── README.md
 ```
 
-## Phase Summary
+## Quick Start
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+### 1. Local Development Setup
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+```bash
+# Setup development environment
+docker-compose up -d
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+# Enter development container
+docker-compose exec nlm-dev /bin/bash
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+# Install development dependencies
+./scripts/dev_setup.sh
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+### 2. Run Tests
+
+```bash
+# Quick test run (unit tests only)
+./scripts/test_runner.sh quick
+
+# Full test suite
+./scripts/test_runner.sh full
 ```
+
+### 3. Quality Gates
+
+```bash
+# Run quality checks
+./scripts/quality_check.sh
+```
+
+### 4. Build and Deploy
+
+```bash
+# Build and test locally
+./scripts/deploy.sh build
+
+# Deploy to staging
+./scripts/deploy.sh deploy staging
+
+# Deploy to production
+./scripts/deploy.sh deploy production
+```
+
+### 5. Monitor
+
+```bash
+# Check system status
+./scripts/monitor.sh status
+
+# Export monitoring reports
+./scripts/monitor.sh export
+
+# Start monitoring stack
+./scripts/monitor.sh setup
+```
+
+## CI/CD Pipeline
+
+### Workflow Stages
+
+1. **Quality Gates**
+   - Code formatting (clang-format)
+   - Static analysis (clang-tidy)
+   - Code checking (cppcheck)
+   - Include validation (iwyu)
+   - Python quality checks
+
+2. **Build and Test**
+   - Multi-configuration builds (Debug, Release, RelWithDebInfo)
+   - C++ unit tests and integration tests
+   - Python bindings testing
+   - Code coverage generation
+   - Automated reporting
+
+3. **Performance Testing**
+   - Benchmark execution
+   - Load testing
+   - Performance metrics collection
+
+4. **Docker Build**
+   - Multi-stage Docker image building
+   - Container testing and validation
+
+5. **Static Analysis**
+   - Security scanning (Semgrep)
+   - Python security analysis (Bandit)
+   - Script validation (ShellCheck)
+
+6. **Multi-Platform Builds**
+   - Cross-platform build testing
+
+7. **Deployment**
+   - Production image deployment
+   - Rollback procedures
+   - Health checks and validation
+
+## GitHub Actions Workflow
+
+### Key Features
+
+- **Parallel Testing**: Multiple build configurations run in parallel
+- **Coverage Reporting**: Automatic code coverage tracking
+- **Security Scanning**: Integrated security vulnerability detection
+- **Artifact Management**: Build artifacts and test reports are preserved
+- **Deploy on Merge**: Automatic deployment to production on main branch pushes
+
+### Workflow File: `.github/workflows/ci-cd.yml`
+
+**Triggers:**
+- Push to main and develop branches
+- Pull requests to main branch
+- Manual workflow dispatch
+
+**Environment Variables:**
+- `REGISTRY`: Container registry (default: ghcr.io)
+- `IMAGE_NAME`: Docker image name
+- `BUILD_TYPE`: Build type (default: Release)
+
+**Jobs:**
+- `quality-gates`: Code quality validation
+- `build-and-test`: Multi-configuration builds and testing
+- `performance-tests`: Performance benchmarking
+- `docker-build`: Docker image building
+- `static-analysis`: Security and code analysis
+- `multi-platform-build`: Cross-platform testing
+- `deploy`: Production deployment
+
+## Docker Configuration
+
+### Multi-Container Setup
+
+The Docker configuration provides a complete development environment:
+
+| Service | Purpose | Ports |
+|---------|---------|-------|
+| `nlm-core` | Main NLM application | 8080 |
+| `redis` | Caching and session management | 6379 |
+| `postgres` | Persistent data storage | 5432 |
+| `elasticsearch` | Logging and search | 9200 |
+| `kafka` | Message streaming | 9092 |
+| `prometheus` | Metrics collection | 9090 |
+| `grafana` | Visualization | 3000 |
+| `jaeger` | Distributed tracing | 16686 |
+| `nginx` | Reverse proxy | 80, 443 |
+
+### Docker Compose Commands
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# Execute in container
+docker-compose exec nlm-dev bash
+```
+
+## Static Analysis and Quality Gates
+
+### Code Formatting (clang-format)
+
+Validates code style consistency:
+```bash
+find src tests -name "*.cpp" -o -name "*.h" | xargs clang-format --style=file --dry-run
+```
+
+### Static Analysis (clang-tidy)
+
+Checks for code quality issues:
+```bash
+# Configuration
+cat > .clang-tidy << EOF
+Checks:
+  - readability.*
+  - performance.*
+  - portability.*
+  - misc.*
+EOF
+
+# Execute
+mkdir -p build_tidy && cd build_tidy && cmake -DCMAKE_BUILD_TYPE=Debug ../src && make -j$(nproc) && cd ..
+```
+
+### Code Quality (cppcheck)
+
+Detects potential bugs and issues:
+```bash
+cppcheck --enable=all --std=c++20 --project=src/CMakeLists.txt
+```
+
+### Include Validation (include-what-you-use)
+
+Ensures proper header dependencies:
+```bash
+# Configuration
+cat > .iwyu.cfg << EOF
+include_paths: ["src/"]
+compatibility: { style: google }
+EOF
+
+# Execute
+find src tests -name "*.cpp" | xargs iwyu --config=.iwyu.cfg
+```
+
+## Testing Infrastructure
+
+### Test Categories
+
+1. **Unit Tests**
+   - Individual component testing
+   - Mock-based testing
+   - Isolated testing
+
+2. **Integration Tests**
+   - System-wide functionality
+   - Component interaction
+   - End-to-end testing
+
+3. **Performance Tests**
+   - Benchmarking
+   - Stress testing
+   - Load testing
+
+### Test Execution
+
+```bash
+# Run unit tests
+./scripts/test_runner.sh quick
+
+# Run full test suite
+./scripts/test_runner.sh full
+
+# Run specific test type
+./scripts/test_runner.sh integration
+```
+
+### Coverage Reporting
+
+Generates comprehensive coverage reports:
+- **HTML Reports**: Interactive web-based coverage
+- **XML Reports**: Machine-readable format
+- **Codecov Integration**: Online coverage tracking
+
+## Build and Deployment
+
+### Build Process
+
+```bash
+# Complete build process
+./scripts/deploy.sh build
+
+# Build only
+./scripts/deploy.sh build --skip-tests
+
+# Deploy with specific environment
+./scripts/deploy.sh deploy staging
+./scripts/deploy.sh deploy production
+```
+
+### Deployment Strategies
+
+1. **Multi-Stage Build**
+   - Development → Staging → Production
+   - Docker image optimization
+   - Version-based rollback
+
+2. **Kubernetes Deployment**
+   - Automated rolling updates
+   - Health checks
+   - Resource management
+
+3. **Docker Swarm**
+   - Scalable container orchestration
+   - Load balancing
+   - Service discovery
+
+## Monitoring and Observability
+
+### Monitoring Stack
+
+The monitoring setup includes:
+
+- **Prometheus**: Metrics collection and storage
+- **Grafana**: Visualization and dashboards
+- **Jaeger**: Distributed tracing
+- **Elasticsearch**: Log aggregation and search
+
+### Key Metrics
+
+- **Application Metrics**: Request rates, response times, error rates
+- **System Metrics**: CPU, memory, disk usage
+- **Custom Metrics**: Simulation parameters, learning progress
+- **Business Metrics**: User engagement, model performance
+
+### Monitoring Commands
+
+```bash
+# Check system status
+./scripts/monitor.sh status
+
+# Start monitoring stack
+./scripts/monitor.sh setup
+
+# Export reports
+./scripts/monitor.sh export
+
+# Stop monitoring stack
+./scripts/monitor.sh cleanup
+```
+
+## Performance Testing
+
+### Benchmark Execution
+
+Run performance benchmarks:
+```bash
+docker-compose exec nlm-bench /bin/bash
+./benchmarks/run_benchmarks.sh
+```
+
+### Load Testing
+
+Execute load tests:
+```bash
+python scripts/load_test.py --duration 300 --rate 100
+```
+
+## Configuration Files
+
+### Project Configuration
+
+| File | Purpose |
+|------|---------|
+| `CMakeLists.txt` | C++ build configuration |
+| `pyproject.toml` | Python package configuration |
+| `Makefile` | Build automation |
+
+### Tool Configuration
+
+| File | Tool | Purpose |
+|------|------|---------|
+| `config/clang-tidy.yml` | clang-tidy | Static analysis configuration |
+| `config/cppcheck.xml` | cppcheck | Code quality configuration |
+| `config/iwyu.cfg` | iwyu | Include validation configuration |
+
+## Best Practices
+
+### Development
+
+1. **Code Quality**
+   - Follow consistent coding standards
+   - Write comprehensive unit tests
+   - Use code formatting tools
+   - Validate with static analysis
+
+2. **Testing**
+   - Test early and often
+   - Maintain test coverage > 80%
+   - Use integration tests for system validation
+   - Monitor performance benchmarks
+
+3. **Deployment**
+   - Use feature flags for gradual rollout
+   - Implement automated rollback
+   - Monitor system health continuously
+   - Track performance metrics
+
+### Security
+
+1. **Static Analysis**
+   - Regular security scanning
+   - Dependency vulnerability checks
+   - Code review processes
+
+2. **Runtime Security**
+   - Input validation
+   - Authentication and authorization
+   - Secure configuration management
+
+### Operations
+
+1. **Monitoring**
+   - Set up comprehensive alerts
+   - Monitor key performance indicators
+   - Track system resource usage
+   - Log all important events
+
+2. **Maintenance**
+   - Regular system updates
+   - Backup and recovery procedures
+   - Performance optimization
+   - Capacity planning
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Build Failures**
+   ```bash
+   # Check for missing dependencies
+   docker-compose logs
+   
+   # Check container status
+   docker ps
+   
+   # View build logs
+   docker-compose exec nlm-dev ls -la
+   ```
+
+2. **Test Failures**
+   ```bash
+   # Run tests with verbose output
+   ./scripts/test_runner.sh full
+   
+   # Check test configuration
+   cat tests/test_config.json
+   
+   # Verify test environment
+   docker-compose exec nlm-dev which python3
+   ```
+
+3. **Docker Issues**
+   ```bash
+   # Check Docker service status
+   sudo systemctl status docker
+   
+   # Verify network connectivity
+   docker network ls
+   
+   # Clean up unused resources
+   docker system prune -a
+   ```
+
+### Debugging Commands
+
+```bash
+# Check container status
+docker ps
+
+# View container logs
+docker logs <container_name>
+
+# Check network connectivity
+docker exec <container_name> ping <host>
+
+# Examine files in container
+docker exec <container_name> ls -la <directory>
+```
+
+## Future Enhancements
+
+### Planned Features
+
+1. **Advanced CI/CD**
+   - Machine learning model optimization
+   - Adaptive testing strategies
+   - Real-time monitoring dashboards
+   - Automated performance tuning
+
+2. **Integration**
+   - GitHub Actions integration
+   - Slack/Teams notifications
+   - External monitoring services
+   - Custom metrics collection
+
+3. **Scaling**
+   - Horizontal scaling support
+   - Load balancing configuration
+   - Auto-scaling rules
+   - Geographic distribution
 
 ## License
 
-MIT
+This CI/CD setup is provided under the same license as the NLM project (MIT License).
 
-## Authors
+## Acknowledgments
 
-Research project — See docs for scientific background.
+This CI/CD setup was developed to provide a robust, scalable, and maintainable pipeline for the NLM project. It incorporates industry best practices for software development, testing, deployment, and monitoring.
+
+## Contact
+
+For questions or issues with the CI/CD setup, please refer to the project documentation or contact the development team.
