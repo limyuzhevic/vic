@@ -273,8 +273,9 @@ bool Brain::initialize() {
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    // Apply synaptic weight as current (use configurable scale factor)
+                    float scaleFactor = pImpl->config->getOr<float>("synaptic_scale_factor", 10.0f);
+                    MembranePotential synapticCurrent = event.weight * scaleFactor;
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
                     } else {

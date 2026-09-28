@@ -1,18 +1,17 @@
 #pragma once
 
 #include "SensoryInput.hpp"
+#include <string>
 
 namespace nlm {
 
-// Vision processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real vision processing using NLM's own neurons
-
+// Vision processing using NLM's neural machinery
 class VisionProcessor {
 public:
     VisionProcessor();
     ~VisionProcessor();
     
-    // Process vision input
+    // Process vision input with neural-based feature extraction
     void process(const Vision& input);
     
     // Get feature representation
@@ -20,6 +19,16 @@ public:
     
     // Get feature dimensionality
     size_t getFeatureDimensions() const;
+    
+    // Configuration methods for neural processing
+    void setPreprocessingGain(float gain);
+    void setNoiseReductionFactor(float factor);
+    void enableNeuralFeatures(bool enable);
+    
+    // Get configuration status
+    bool getNeuralFeaturesEnabled() const;
+    float getPreprocessingGain() const;
+    float getNoiseReductionFactor() const;
     
 private:
     struct Impl;

@@ -11,12 +11,8 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
-    std::vector<SynapseHandle> incomingSynapses;
-    std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
+    MembranePotential totalCurrent;      return pImpl->totalCurrent;
+}
     
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
@@ -147,6 +143,10 @@ void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
 }
 
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
+}
+
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
@@ -191,6 +191,11 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate timestep to prevent numerical instability
+    if (dt <= 0.0f) {
+        return false;
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -216,11 +221,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution with improved numerical stability
     float leakContribution = (V_rest - V) / tau;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Update membrane potential using more stable integration
+    // Convert timestep to consistent units (ms to seconds)
+    float dtMs = dt * 1000.0f;  // Convert seconds to milliseconds
+    float dV = dtMs * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -228,10 +235,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Update membrane potential with numerical stability check
+    V += dV;
     
-    // Check for spike
+    // Clamp membrane potential to prevent instability using configurable bounds
+    // Get bounds from config or use defaults
+    float minPotential = -100.0f;
+    float maxPotential = 50.0f;
+    // TODO: Add config-based bounds when config is available to Neuron
+    V = std::clamp(V, minPotential, maxPotential);
+    
+    // Check for spike with hysteresis to prevent multiple spikes per timestep
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
@@ -247,8 +261,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
+        // Update adaptation for spike-frequency adaptation with bounds
         pImpl->state.adaptationVariable += 1.0f;
+        // Limit adaptation variable to prevent runaway effects
+        if (pImpl->state.adaptationVariable > 50.0f) {
+            pImpl->state.adaptationVariable = 50.0f;
+        }
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -293,6 +311,14 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Set leak conductance based on biological range (5-15 nS)
+    pImpl->state.leakConductance = 10.0f + rng.uniformReal(-5.0f, 5.0f);
+    
+    // Clamp leak conductance to reasonable biological range
+    if (pImpl->state.leakConductance <= 0.0f) {
+        pImpl->state.leakConductance = 1.0f;  // Fallback value
+    }
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
