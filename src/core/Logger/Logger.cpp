@@ -20,7 +20,9 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    closeOutputFile();
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {

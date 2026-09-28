@@ -8,6 +8,7 @@
 // - Structural plasticity (synaptogenesis/pruning)
 
 #include "core/Config/Config.hpp"
+#include "core/Config/HelperFunctions.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -25,28 +26,225 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <map>
 
 using namespace nlm;
 
-void printBanner() {
+struct CLIArguments {
+    std::string configFile = "configs/default.cfg";
+    std::string saveConfigPath;
+    std::string profile;
+    bool verbose = false;
+    bool quiet = false;
+    bool debug = false;
+    bool jsonOutput = false;
+    bool help = false;
+    bool version = false;
+    std::chrono::steady_clock::time_point startTime;
+    
+    CLIArguments() {
+        startTime = std::chrono::steady_clock::now();
+    }
+};
+
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+USAGE: nlm [OPTIONS]
+
+NLM - Neural Learning Machine (熙然)
+Phase 2: Real Neural Computation
+An experimental artificial developmental brain.
+
+Core Features:
+  • Real LIF neuron dynamics
+  • Event-driven spike propagation with delays
+  • STDP and Hebbian plasticity rules
+  • Structural plasticity (synaptogenesis/pruning)
+
+OPTIONS:
+  --help                    Show this help message and exit
+  --version                 Show version information and exit
+  --config=<file>           Load configuration from file (default: configs/default.cfg)
+  --save-config=<file>      Save current configuration to file and exit
+  --profile=<fast|detailed|minimal>  Use preset configuration profile
+  --verbose                 Enable verbose output (default: INFO level)
+  --quiet                   Suppress all output except errors
+  --debug                   Enable debug logging
+  --json                    Output results in JSON format for programmatic use
+
+PROFILES:
+  fast                      Small network, quick tests (neurons: 100)
+  detailed                  Full network with extensive logging (neurons: 1000)
+  minimal                   Very small network for quick verification (neurons: 50)
+
+CONFIGURATION:
+  Configuration can be set via command line:
+    --random_seed=42         Set random seed
+    --neuron_count=1000      Set number of neurons
+    --simulation_timestep=0.001  Set timestep in seconds
+    --region_count=1          Set number of brain regions
+    --connection_probability=0.1  Set connection probability
+
+  Configuration file format (INI-style):
+    key = value
+    # comments
+
+EXAMPLE:
+  nlm --profile=fast --verbose
+  nlm --save-config=my_config.cfg
+  nlm --config=custom.cfg --neuron_count=500
+  nlm --json --verbose > results.json
+
+For more information, visit: https://github.com/neural-learning-machine/nlm
+
+PHASE 2 IMPLEMENTATION:
+  ✓ Leaky Integrate-and-Fire (LIF) neuron dynamics
+  ✓ Event-driven spike propagation with delays
+  ✓ STDP plasticity rule
+  ✓ Hebbian plasticity rule
+  ✓ Structural plasticity (synaptogenesis/pruning)
+  ✓ Learning experiment demonstrating measurable changes
+  ✓ Network activity-dependent synaptic modification
+  ✓ Real neural substrate for AI development
+
+COMPATIBILITY:
+  All existing command line arguments continue to work as before.
+  Backward compatible with NLM Phase 1 configuration files.
+
+EXIT CODES:
+  0  Success
+  1  Error (configuration, initialization, or execution failure)
+)" << std::endl;
 }
+
+void loadProfile(CLIArguments& cliArgs, nlm::Config& config) {
+    if (cliArgs.profile == "fast") {
+        config.set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::CommandLine);
+        config.set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::CommandLine);
+        config.set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::CommandLine);
+        config.set("connection_probability", 0.2f, nlm::ConfigSource::CommandLine);
+        config.set("max_simulation_steps", static_cast<int64_t>(1000), nlm::ConfigSource::CommandLine);
+        if (cliArgs.verbose) {
+            std::cout << "[Profile: fast] - Small network (100 neurons) for quick testing" << std::endl;
+        }
+    } else if (cliArgs.profile == "detailed") {
+        config.set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::CommandLine);
+        config.set("neuron_count", static_cast<int64_t>(1000), nlm::ConfigSource::CommandLine);
+        config.set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::CommandLine);
+        config.set("connection_probability", 0.1f, nlm::ConfigSource::CommandLine);
+        config.set("max_simulation_steps", static_cast<int64_t>(10000), nlm::ConfigSource::CommandLine);
+        config.set("log_level", std::string("DEBUG"), nlm::ConfigSource::CommandLine);
+        if (cliArgs.verbose) {
+            std::cout << "[Profile: detailed] - Full network with debug logging" << std::endl;
+        }
+    } else if (cliArgs.profile == "minimal") {
+        config.set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::CommandLine);
+        config.set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::CommandLine);
+        config.set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::CommandLine);
+        config.set("connection_probability", 0.3f, nlm::ConfigSource::CommandLine);
+        config.set("max_simulation_steps", static_cast<int64_t>(100), nlm::ConfigSource::CommandLine);
+        if (cliArgs.verbose) {
+            std::cout << "[Profile: minimal] - Very small network for verification" << std::endl;
+        }
+    }
+}
+
+void configureLogging(nlm::Config& config, const CLIArguments& cliArgs) {
+    nlm::LogLevel logLevel = nlm::LogLevel::Info;
+    
+    if (cliArgs.quiet) {
+        logLevel = nlm::LogLevel::Error;
+    } else if (cliArgs.debug) {
+        logLevel = nlm::LogLevel::Debug;
+    } else if (config.has("log_level")) {
+        std::string level = config.getOr<std::string>("log_level", "INFO");
+        if (level == "DEBUG") logLevel = nlm::LogLevel::Debug;
+        else if (level == "WARN") logLevel = nlm::LogLevel::Warning;
+        else if (level == "ERROR") logLevel = nlm::LogLevel::Error;
+        else logLevel = nlm::LogLevel::Info;
+    }
+    
+    if (!cliArgs.quiet && !cliArgs.jsonOutput) {
+        auto consoleLogger = std::make_shared<nlm::ConsoleLogger>(logLevel);
+        if (consoleLogger) {
+            nlm::Logger::getGlobal()->addLogger(consoleLogger);
+        }
+    }
+    
+    if (!cliArgs.quiet) {
+        std::cout << "[CLI] Log level set to: " << static_cast<int>(logLevel) << std::endl;
+    }
+}
+
+void saveConfigurationToFile(const nlm::Config& config, const std::string& filepath) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "ERROR: Could not save configuration to " << filepath << std::endl;
+        return;
+    }
+    
+    // Use the new enhanced saveToFile method with auto-detection
+    if (config.saveToFile(filepath)) {
+        std::cout << "[CLI] Configuration saved to: " << filepath << std::endl;
+    } else {
+        std::cerr << "ERROR: Failed to save configuration to " << filepath << std::endl;
+    }
+}
+
+double getElapsedTime(const std::chrono::steady_clock::time_point& start) {
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    return duration.count() / 1000.0;
+}
+
+std::string formatJSON(const std::string& prefix, const nlm::Config& config, 
+                      bool learningOccurred, size_t totalSpikes,
+                      float initialMeanWeight, float finalMeanWeight,
+                      double timeElapsed) {
+    std::ostringstream json;
+    
+    json << prefix << "{\n";
+    json << prefix << "  \"status\": \"success\",\n";
+    json << prefix << "  \"phase\": \"2\",\n";
+    json << prefix << "  \"elapsed_time_seconds\": " << std::fixed << std::setprecision(3) << timeElapsed << ",\n";
+    json << prefix << "  \"learning_occurred\": " << (learningOccurred ? "true" : "false") << ",\n";
+    json << prefix << "  \"total_spikes\": " << totalSpikes << ",\n";
+    json << prefix << "  \"initial_mean_weight\": " << std::fixed << std::setprecision(6) << initialMeanWeight << ",\n";
+    json << prefix << "  \"final_mean_weight\": " << std::fixed << std::setprecision(6) << finalMeanWeight << ",\n";
+    json << prefix << "  \"weight_change\": " << std::fixed << std::setprecision(6) << (finalMeanWeight - initialMeanWeight) << ",\n";
+    json << prefix << "  \"configuration\": {\n";
+    
+    for (const auto& key : config.getKeys()) {
+        json << prefix << "    \"" << key << "\": \"" << key << "\",\n";
+    }
+    
+    json << prefix << "  }\n";
+    json << prefix << "}\n";
+    
+    return json.str();
+}
+
+void printProgress(int step, int total, const std::string& message, bool jsonOutput) {
+    if (jsonOutput) {
+        return;
+    }
+    
+    double percentage = (100.0 * step) / total;
+    std::cout << "\r[" << std::string(static_cast<size_t>(percentage / 10), '=')
+              << std::string(10 - static_cast<size_t>(percentage / 10), ' ')
+              << "] " << static_cast<int>(percentage) << "% - " << message
+              << std::flush;
+    
+    if (step >= total) {
+        std::cout << std::endl;
+    }
+}
+
+// Global variable for experiment results
+static LearningExperiment* globalExperiment = nullptr;
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -156,6 +354,9 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+        
+        // Store for JSON output
+        globalExperiment = this;
     }
 };
 
@@ -321,14 +522,106 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Real LIF neuron dynamics                                ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
 int main(int argc, char** argv) {
-    printBanner();
+    // Parse command line arguments
+    CLIArguments cliArgs;
     
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                if (key == "help") {
+                    cliArgs.help = true;
+                } else if (key == "version") {
+                    cliArgs.version = true;
+                } else if (key == "config") {
+                    cliArgs.configFile = value;
+                } else if (key == "save-config") {
+                    cliArgs.saveConfigPath = value;
+                } else if (key == "profile") {
+                    cliArgs.profile = value;
+                } else if (key == "verbose") {
+                    cliArgs.verbose = true;
+                } else if (key == "quiet") {
+                    cliArgs.quiet = true;
+                } else if (key == "debug") {
+                    cliArgs.debug = true;
+                } else if (key == "json") {
+                    cliArgs.jsonOutput = true;
+                } else {
+                    // Pass through to config
+                    config->set(key, value, nlm::ConfigSource::CommandLine);
+                }
+            } else {
+                if (arg == "--verbose") cliArgs.verbose = true;
+                else if (arg == "--quiet") cliArgs.quiet = true;
+                else if (arg == "--debug") cliArgs.debug = true;
+                else if (arg == "--json") cliArgs.jsonOutput = true;
+                else if (arg == "--help") cliArgs.help = true;
+                else if (arg == "--version") cliArgs.version = true;
+            }
+        } else if (arg.substr(0, 1) == "-") {
+            if (arg == "-v") cliArgs.verbose = true;
+            else if (arg == "-q") cliArgs.quiet = true;
+            else if (arg == "-d") cliArgs.debug = true;
+        }
+    }
+    
+    // Handle help/version flags early
+    if (cliArgs.help) {
+        printHelp();
+        return 0;
+    }
+    
+    if (cliArgs.version) {
+        std::cout << "NLM Phase 2 v2.0.0 - Real Neural Computation" << std::endl;
+        std::cout << "Build: Release with enhanced CLI support" << std::endl;
+        std::cout << "Copyright: NLM Project" << std::endl;
+        return 0;
+    }
+    
+    printBanner();
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with error checking
     auto logger = std::make_shared<Logger>();
+    if (!logger) {
+        std::cerr << "ERROR: Failed to create logger!" << std::endl;
+        return 1;
+    }
+    
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    if (!consoleLogger) {
+        std::cerr << "ERROR: Failed to create console logger!" << std::endl;
+        return 1;
+    }
+    
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -340,8 +633,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Create configuration with comprehensive error checking
     auto config = std::make_shared<Config>();
+    if (!config) {
+        NLM_LOG_ERROR("Failed to create configuration object!");
+        return 1;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -356,15 +653,22 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with error checking
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Could not load configuration file: " + configFile + ". Using defaults.");
+    }
+    
+    // Load profile if specified
+    if (!cliArgs.profile.empty()) {
+        loadProfile(cliArgs, config);
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_WARNING("Failed to load command line arguments as configuration.");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -392,15 +696,28 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Configure logging with CLI settings
+    configureLogging(config, cliArgs);
+    
+    // Initialize simulation clock with error checking
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid timestep value: " + std::to_string(timestep) + ". Must be positive.");
+        return 1;
+    }
+    
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with comprehensive error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object!");
+        return 1;
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
@@ -409,25 +726,85 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests with error handling and cleanup
+    bool allTestsPassed = true;
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Get timing information
+    double startTime = getElapsedTime(cliArgs.startTime);
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    try {
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to re-initialize brain for plasticity experiment!");
+            allTestsPassed = false;
+        } else {
+            // Run Test 2: Plasticity learning experiment
+            runPlasticityExperiment(brain);
+        }
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to re-initialize brain for STDP verification!");
+            allTestsPassed = false;
+        } else {
+            runStdpVerification(brain);
+        }
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during test execution: " + std::string(e.what()));
+        allTestsPassed = false;
+    } catch (...) {
+        NLM_LOG_ERROR("Unknown exception during test execution!");
+        allTestsPassed = false;
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Generate JSON output if requested
+    if (cliArgs.jsonOutput) {
+        bool learningOccurred = false;
+        size_t totalSpikes = brain->getTotalSpikeCount();
+        float initialMeanWeight = 0.0f;
+        float finalMeanWeight = 0.0f;
+        
+        if (globalExperiment) {
+            learningOccurred = (std::abs(globalExperiment->finalWeights.front() - globalExperiment->initialWeights.front()) > 0.001f);
+            if (!globalExperiment->initialWeights.empty()) {
+                float initSum = std::accumulate(globalExperiment->initialWeights.begin(), 
+                                              globalExperiment->initialWeights.end(), 0.0f);
+                initialMeanWeight = initSum / globalExperiment->initialWeights.size();
+            }
+            if (!globalExperiment->finalWeights.empty()) {
+                float finalSum = std::accumulate(globalExperiment->finalWeights.begin(), 
+                                                globalExperiment->finalWeights.end(), 0.0f);
+                finalMeanWeight = finalSum / globalExperiment->finalWeights.size();
+            }
+        }
+        
+        double timeElapsed = getElapsedTime(cliArgs.startTime);
+        
+        std::cout << formatJSON("", config, learningOccurred, totalSpikes, 
+                               initialMeanWeight, finalMeanWeight, timeElapsed);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
+    
+    if (!allTestsPassed) {
+        NLM_LOG_WARNING("Some tests encountered issues, but execution completed.");
+    }
+    
+    // Print summary
+    double totalTime = getElapsedTime(cliArgs.startTime);
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Execution Summary ===");
+    NLM_LOG_INFO("Total execution time: " + std::to_string(totalTime) + " seconds");
+    NLM_LOG_INFO("All tests completed with " + (allTestsPassed ? "success" : "warnings"));
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");

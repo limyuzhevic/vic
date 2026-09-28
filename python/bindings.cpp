@@ -145,13 +145,21 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (auto-detects JSON, YAML, or key=value format)")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("jsonString"),
+             "Load configuration from a JSON string")
+        .def("loadFromYAML", &Config::loadFromYAML, py::arg("yamlString"),
+             "Load configuration from a YAML string")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (auto-detects format from extension)")
+        .def("saveToJSON", &Config::saveToJSON,
+             "Save configuration to a JSON string")
+        .def("saveToYAML", &Config::saveToYAML,
+             "Save configuration to a YAML string")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +168,18 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate,
+             "Validate configuration (basic schema validation)")
+        .def("setNested", &Config::setNested, py::arg("key"), py::arg("value"),
+             "Set a nested configuration value (e.g., 'database.host')")
+        .def("getNested", &Config::getNested<std::string>, py::arg("key"),
+             "Get a nested configuration value")
+        .def("removeNested", &Config::removeNested, py::arg("key"),
+             "Remove a nested configuration value")
+        .def("getKeysWithPrefix", &Config::getKeysWithPrefix, py::arg("prefix"),
+             "Get all configuration keys with given prefix")
+        .def("detectFileFormat", &Config::detectFileFormat, py::arg("filename"),
+             "Detect file format from filename extension")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
