@@ -12,6 +12,39 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Quick Tips for Better Usage
+
+### Tip 1: Initialize Properly
+```python
+# Always initialize your brain first
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()  # Critical step!
+```
+
+### Tip 2: Check Brain Health
+```python
+# Periodically check your brain's status
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Active neurons: {brain.getFiringNeuronCount()}")
+print(f"Learning stage: {brain.getDevelopmentalStage().name}")
+```
+
+### Tip 3: Use Appropriate Step Counts
+```python
+# Brain needs time to "warm up"
+for i in range(100):  # More steps = better learning
+    brain.step(i)
+```
+
+### Tip 4: Enable Advanced Features
+```python
+# Enable power user features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+```
+
 ---
 
 ## The 3 Things You Need to Know

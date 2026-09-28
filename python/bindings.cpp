@@ -29,6 +29,13 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Custom exception types for type safety
+    py::register_exception<std::runtime_error>(m, "BrainError", PyExc_RuntimeError);
+    py::register_exception<std::runtime_error>(m, "ConfigError", PyExc_RuntimeError);
+    py::register_exception<std::runtime_error>(m, "WorldError", PyExc_RuntimeError);
+    py::register_exception<std::runtime_error>(m, "AgentError", PyExc_RuntimeError);
+    py::register_exception<std::runtime_error>(m, "ValidationError", PyExc_RuntimeError);
+
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -351,9 +358,98 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        // Convenience methods for brain
+        .def("createRegionWithNeurons", [](Brain& brain, const std::string& name, size_t count) {
+            auto regionId = brain.addRegion(name);
+            auto* region = brain.getRegion(regionId);
+            if (region) {
+                // Create neurons in the region based on count
+                size_t neuronsPerPop = count / 3; // Split among 3 types
+                auto sensoryPopId = region->addPopulation(neuronsPerPop, NeuronType::Sensory);
+                auto internalPopId = region->addPopulation(neuronsPerPop, NeuronType::Internal);
+                auto motorPopId = region->addPopulation(neuronsPerPop, NeuronType::Motor);
+            }
+            return regionId;
+        }, py::arg("name"), py::arg("count"),
+            "Create a new neural region with a specific number of neurons")
+        .def("setNeuronExcitatory", [](Brain& brain, NeuronId neuronId, bool isExcitatory) {
+            for (auto& region : brain.getRegions()) {
+                if (region) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            neuron->setType(isExcitatory ? NeuronType::Excitatory : NeuronType::Inhibitory);
+                            return;
+                        }
+                    }
+                }
+            }
+            throw py::value_error("Neuron not found");
+        }, py::arg("neuron_id"), py::arg("is_excitatory"),
+            "Set whether a neuron is excitatory (True) or inhibitory (False)")
+        .def("enableAllPlasticity", [](Brain& brain) {
+            if (auto* stdp = brain.getSTDP()) {
+                stdp->enable();
+            }
+            }
+            if (auto* structural = brain.getStructuralPlasticity()) {
+                structural->enable();
+            }
+        }, "Enable all plasticity mechanisms at once")
+
+        // Batch operations for brain
+        .def("step_multiple", [](Brain& brain, size_t steps) {
+            for (size_t i = 0; i < steps; ++i) {
+                brain.step(static_cast<SimulationStep>(i));
+            }
+        }, py::arg("steps"),
+            "Perform multiple simulation steps for performance")
+        .def("get_memory_usage", [](Brain& brain) {
+            // Return basic memory usage info
+            return std::map<std::string, size_t>{
+                {"total_neurons", brain.getTotalNeuronCount()},
+                {"total_synapses", brain.getTotalSynapseCount()},
+                {"active_neurons", brain.getActiveNeuronCount()},
+                {"firing_neurons", brain.getFiringNeuronCount()}
+            };
+        }, "Get memory statistics as a dictionary")
+        .def("get_performance_stats", [](Brain& brain) {
+            // Return basic performance statistics
+            return std::map<std::string, double>{
+                {"avg_firing_rate", brain.getAverageFiringRate()},
+                {"e_i_ratio", brain.getExcitationInhibitionRatio()},
+                {"total_spikes", static_cast<double>(brain.getTotalSpikeCount())}
+            };
+        }, "Get timing statistics as a dictionary")
+        .def("export_for_export", [](Brain& brain) {
+            // Return brain state for analysis
+            std::map<std::string, py::object> state;
+            
+            // Get brain configuration
+            auto config = brain.getConfig();
+            state["config"] = py::cast(config);
+            
+            // Get regions
+            auto regions = brain.getRegions();
+            std::vector<py::object> region_states;
+            for (const auto& region : regions) {
+                if (region) {
+                    std::map<std::string, py::object> region_state;
+                    region_state["id"] = py::cast(region->getId());
+                    region_state["name"] = py::cast(region->getName());
+                    region_state["neuron_count"] = py::cast(region->getTotalNeuronCount());
+                    region_states.push_back(py::cast(region_state));
+                }
+            }
+            state["regions"] = py::cast(region_states);
+            
+            // Get developmental stage
+            state["developmental_stage"] = py::cast(brain.getDevelopmentalStage());
+            
+            return state;
+        }, "Export brain state for analysis as a dictionary");
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -398,11 +494,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        // Convenience methods for AgentBrain
+        .def("setCuriosityScale", [](AgentBrain& agent, float scale) {
+            if (auto* curiosity = agent.getBrain()->getCuriosity()) {
+                curiosity->setSensitivity(scale);
+            }
+        }, py::arg("scale"),
+            "Set curiosity sensitivity/scale")
+        .def("process_sensory_batch", [](AgentBrain& agent, const std::vector<SensoryPercept>& percepts) {
+            for (const auto& percept : percepts) {
+                agent.processSensoryInput(percept);
+            }
+        }, py::arg("percepts"),
+            "Process multiple sensory inputs in batch")
+        .def("create_behavioral_strategy", [](AgentBrain& agent, const std::string& strategyType) {
+            // Create predefined behavioral strategies
+            if (strategyType == "exploration") {
+                agent.enableCuriosity(true);
+                agent.enableRewardModulation(false);
+            } else if (strategyType == "exploitation") {
+                agent.enableCuriosity(false);
+                agent.enableRewardModulation(true);
+            } else if (strategyType == "balanced") {
+                agent.enableCuriosity(true);
+                agent.enableRewardModulation(true);
+            }
+        }, py::arg("strategy_type"),
+            "Create predefined behavioral strategy")
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
