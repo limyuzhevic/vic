@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Error.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,16 +20,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // Phase 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigError("Failed to open config file: " + filepath, ErrorCode::FileNotFound);
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +52,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            throw ConfigError("Invalid config format at line " + std::to_string(lineNumber) + ": " + line,
+                            ErrorCode::ConfigParseError);
         }
     }
     
@@ -56,6 +62,8 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    NLM_CHECK(argc > 1, ConfigError, "No command line arguments provided for config loading");
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +74,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                throw ConfigError("Invalid command line argument format: " + arg, ErrorCode::ConfigParseError);
             }
         }
         // Handle -key value format
@@ -73,6 +83,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            throw ConfigError("Invalid command line argument: " + arg, ErrorCode::ConfigParseError);
         }
     }
     return true;
@@ -81,7 +93,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigError("Failed to write config file: " + filepath, ErrorCode::FileError);
     }
     
     for (const auto& entry : pImpl->entries) {
@@ -149,8 +161,9 @@ bool Config::has(const std::string& key) const {
 
 void Config::remove(const std::string& key) {
     pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
+        std::remove_if(pImpl->entries.begin(),
+                      pImpl->entries.end(),
+                      [&key](const ConfigEntry& e) { return e.key == key; }),
         pImpl->entries.end()
     );
 }
