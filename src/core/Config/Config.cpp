@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,16 +20,99 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format based on extension
+    std::filesystem::path path(filepath);
+    std::string extension = path.extension().string();
     
+    // Convert to lowercase for comparison
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    if (extension == ".json") {
+        return loadFromJSONFile(filepath);
+    } else if (extension == ".yaml" || extension == ".yml") {
+        return loadFromYAMLFile(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimpleFile(filepath);
+    }
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON configuration file: " + filepath);
         return false;
     }
     
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        for (auto& [key, value] : jsonData.items()) {
+            // Convert JSON value to ConfigValue
+            ConfigValue configValue;
+            
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                configValue = value.get<int64_t>();
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Convert array to vector of appropriate type
+                if (!value.empty()) {
+                    if (value[0].is_string()) {
+                        std::vector<std::string> strArray;
+                        for (const auto& item : value) {
+                            strArray.push_back(item.get<std::string>());
+                        }
+                        configValue = strArray;
+                    } else if (value[0].is_number_integer()) {
+                        std::vector<int64_t> intArray;
+                        for (const auto& item : value) {
+                            intArray.push_back(item.get<int64_t>());
+                        }
+                        configValue = intArray;
+                    } else if (value[0].is_number_float()) {
+                        std::vector<double> doubleArray;
+                        for (const auto& item : value) {
+                            doubleArray.push_back(item.get<double>());
+                        }
+                        configValue = doubleArray;
+                    }
+                }
+            }
+            
+            set(key, configValue, ConfigSource::File);
+        }
+        
+        NLM_LOG_INFO("Loaded JSON configuration from: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON configuration file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // TODO: Implement YAML support when YAML library is available
+    NLM_LOG_WARNING("YAML configuration format is not yet implemented. Falling back to simple format.");
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+        return false;
+    }
+    
+    size_t lineNumber = 0;
     std::string line;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,9 +133,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Skipping invalid line in config file " + filepath + ": " + std::to_string(lineNumber));
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from: " + filepath);
     return true;
 }
 
@@ -76,6 +163,163 @@ bool Config::loadFromArgs(int argc, char** argv) {
         }
     }
     return true;
+}
+
+bool Config::validate() const {
+    // Get default configuration
+    auto defaults = getDefaultConfig();
+    
+    bool isValid = true;
+    
+    for (const auto& defaultEntry : defaults) {
+        const std::string& key = defaultEntry.first;
+        const ConfigValue& defaultValue = defaultEntry.second;
+        
+        if (!has(key)) {
+            NLM_LOG_WARNING("Missing configuration key: " + key);
+            isValid = false;
+        }
+    }
+    
+    // Additional validation rules
+    if (has("neuron_count")) {
+        auto neuronCountOpt = get<int64_t>("neuron_count");
+        if (neuronCountOpt.has_value()) {
+            int64_t neuronCount = neuronCountOpt.value();
+            if (neuronCount < 10 || neuronCount > 10000) {
+                NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be between 10 and 10000.");
+                isValid = false;
+            }
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto timestepOpt = get<double>("simulation_timestep");
+        if (timestepOpt.has_value()) {
+            double timestep = timestepOpt.value();
+            if (timestep <= 0.0 || timestep > 1.0) {
+                NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be between 0.001 and 1.0.");
+                isValid = false;
+            }
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto probOpt = get<double>("connection_probability");
+        if (probOpt.has_value()) {
+            double prob = probOpt.value();
+            if (prob < 0.0 || prob > 1.0) {
+                NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(prob) + ". Must be between 0.0 and 1.0.");
+                isValid = false;
+            }
+        }
+    }
+    
+    return isValid;
+}
+
+std::map<std::string, ConfigValue> Config::getDefaultConfig() {
+    std::map<std::string, ConfigValue> defaults;
+    
+    // Brain configuration
+    defaults["random_seed"] = int64_t(42);
+    defaults["neuron_count"] = int64_t(500);
+    defaults["region_count"] = int64_t(1);
+    defaults["connection_probability"] = 0.15f;
+    defaults["brain.v_thresh"] = -50.0;
+    defaults["brain.v_rest"] = -70.0;
+    defaults["brain.v_reset"] = -75.0;
+    defaults["brain.tau_mem"] = 20.0;
+    defaults["brain.tau_ref"] = 2.0;
+    
+    // Plasticity configuration
+    defaults["plasticity.stdp.enable"] = true;
+    defaults["plasticity.stdp.learning_rate"] = 0.001f;
+    defaults["plasticity.stdp.tau_plus"] = 20.0f;
+    defaults["plasticity.stdp.tau_minus"] = 20.0f;
+    defaults["plasticity.hebbian.enable"] = true;
+    defaults["plasticity.hebbian.learning_rate"] = 0.001f;
+    defaults["plasticity.structural.enable"] = true;
+    defaults["plasticity.structural.synaptogenesis_rate"] = 0.0001f;
+    defaults["plasticity.structural.pruning_rate"] = 0.00001f;
+    
+    // Neuromodulation configuration
+    defaults["neuromod.dopamine.scale"] = 1.0f;
+    defaults["neuromod.curiosity.enable"] = true;
+    defaults["neuromod.curiosity.exploration_strength"] = 0.5f;
+    defaults["neuromod.novelty.enable"] = true;
+    defaults["neuromod.novelty.sensitivity"] = 0.5f;
+    
+    // Development configuration
+    defaults["development.synaptogenesis_rate"] = 0.001f;
+    defaults["development.pruning_rate"] = 0.0001f;
+    defaults["development.maturation_rate"] = 0.01f;
+    
+    // Environment configuration
+    defaults["environment.name"] = std::string("SimpleWorld");
+    defaults["environment.width"] = 10;
+    defaults["environment.height"] = 10;
+    defaults["environment.vision_width"] = 8;
+    defaults["environment.vision_height"] = 8;
+    
+    // Logging configuration
+    defaults["log_level"] = std::string("INFO");
+    defaults["log_to_file"] = false;
+    defaults["log_filename"] = std::string("nlm.log");
+    
+    // Simulation configuration
+    defaults["max_simulation_steps"] = int64_t(10000);
+    defaults["simulation_time_limit"] = 0.0;
+    defaults["visualization_enabled"] = false;
+    defaults["visualization_update_rate"] = 30.0f;
+    
+    return defaults;
+}
+
+// Convert ConfigValue to JSON
+nlohmann::json configValueToJSON(const ConfigValue& value) {
+    nlohmann::json result;
+    
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = arg;
+        }
+    }, value);
+    
+    return result;
+}
+
+void Config::saveToJSONFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to save configuration to JSON file: " + filepath);
+        return;
+    }
+    
+    nlohmann::json jsonData;
+    
+    for (const auto& entry : pImpl->entries) {
+        jsonData[entry.key] = configValueToJSON(entry.value);
+    }
+    
+    file << jsonData.dump(2); // Pretty print with 2-space indentation
+    
+    NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
 }
 
 bool Config::saveToFile(const std::string& filepath) const {

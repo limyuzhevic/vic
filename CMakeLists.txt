@@ -21,6 +21,16 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Ensure the include directory exists for nlohmann JSON header
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include/nlohmann)
+
+# Copy the nlohmann/json.hpp file to the include directory
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include/nlohmann/json.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include/nlohmann/json.hpp
+    COPYONLY
+)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -83,12 +93,17 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    # Test Experiments (Phase 2 core functionality)
+    src/experiments/BasicConnectivityTest.cpp
+    src/experiments/PlasticityExperiment.cpp
+    src/experiments/StdpVerification.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/include>
     $<INSTALL_INTERFACE:include>
 )
 

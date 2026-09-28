@@ -55,51 +55,29 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Internal file loaders
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
+    
+    // Load from file (JSON, YAML, or simple format)
+    bool loadFromFile(const std::string& filepath);
+    
+    // Internal file loaders
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Validate configuration
+    bool validate() const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
-};
+    // Get default configuration values for validation
+    static std::map<std::string, ConfigValue> getDefaultConfig();
 
 } // namespace nlm
