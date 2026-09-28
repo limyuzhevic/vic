@@ -8,6 +8,16 @@ namespace nlm {
 // Abstract base class for plasticity rules
 // PLACEHOLDER - Phase 2 will implement real plasticity rules
 
+// Plasticity rule types for configuration
+enum class Type {
+    Hebbian,
+    AntiHebbian,
+    STDP,
+    BCM,
+    RewardModulated,
+    Triplet
+};
+
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;

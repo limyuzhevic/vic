@@ -70,11 +70,38 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Neural constant thresholds and parameters
+    struct Constants {
+        constexpr static float CURIOUSITY_THRESHOLD = 0.5f;                    // Threshold for curiosity-based exploration
+        constexpr static float EXPLORATION_CHANCE_MULTIPLIER = 0.3f;            // Base multiplier for exploration chance
+        constexpr static float ELIGIBILITY_TRACE_THRESHOLD = 0.001f;            // Minimum eligibility trace magnitude to process
+        constexpr static float ELIGIBILITY_TRACE_DECAY = 0.1f;                  // Decay rate for eligibility traces per timestep
+        constexpr static float EXPECTED_REWARD_SMOOTHING = 0.95f;               // Smoothing factor for expected reward updates
+        constexpr static float DOPAMINE_CLAMP_MIN = -1.0f;                      // Minimum allowable dopamine level
+        constexpr static float DOPAMINE_CLAMP_MAX = 1.0f;                       // Maximum allowable dopamine level
+        constexpr static float PLASTICITY_FACTOR_MIN = 0.1f;                    // Minimum plasticity factor
+        constexpr static float PLASTICITY_FACTOR_MAX = 2.0f;                    // Maximum plasticity factor
+        constexpr static float BASIC_ACTIVITY_THRESHOLD = 0.5f;                 // Minimum neural activity required for action
+        constexpr static float DEFAULT_EPS = 0.001f;                           // Default tolerance for numerical comparisons
+        
+        // STDP (Spike-Timing-Dependent Plasticity) weights
+        constexpr static float STDP_LTP_WEIGHT = 0.01f;                         // Long-Term Potentiation weight
+        constexpr static float STDP_LTD_WEIGHT = 0.012f;                        // Long-Term Depression weight
+        
+        // Developmental system parameters
+        constexpr static float SYNAPTOGENESIS_RATE_BASE = 0.0001f;              // Base synaptogenesis rate
+        constexpr static float PRUNING_RATE_BASE = 0.00001f;                   // Base pruning rate
+    };
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper methods for neuron distribution
+    void distributeMotorNeurons(const std::vector<Neuron*>& neurons);
+    void distributeSensoryNeurons(const std::vector<Neuron*>& neurons);
     
     std::shared_ptr<Brain> brain_;
     

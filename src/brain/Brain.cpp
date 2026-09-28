@@ -22,11 +22,24 @@
 
 namespace nlm {
 
-struct Brain::Impl {
+DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+};
+
+// =========================================================================
+// ENHANCED PIMPL IMPLEMENTATION
+// =========================================================================
+
+struct Brain::ImplEnhanced {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Enhanced memory management with RAII and pooling
+    NeuralResourcePool<Neuron, 256> neuronPool;
+    NeuralResourcePool<Synapse, 512> synapsePool;
+    NeuralResourcePool<NeuralPopulation, 128> populationPool;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -56,6 +69,10 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Enhanced neural arrays with smart pointers
+    NeuralArray<Neuron*> sensoryNeurons;
+    NeuralArray<Neuron*> motorNeurons;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -65,12 +82,8 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
     // Integration state
-    bool isResting;  // For sleep/rest cycle
+    bool isResting;
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -78,7 +91,16 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
+    // Resource tracking and lifecycle management
+    std::atomic<size_t> allocationCount;
+    std::atomic<size_t> deallocationCount;
+    std::chrono::steady_clock::time_point creationTime;
+    bool cleanupCompleted;
+    
+    DevelopmentalStage developmentalStage;
+    RegionId nextRegionId;
+
+    ImplEnhanced(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
@@ -90,15 +112,153 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , creationTime(std::chrono::steady_clock::now())
+        , cleanupCompleted(false)
+        , allocationCount(0)
+        , deallocationCount(0)
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
+        // Initialize random generator with enhanced error handling
+        uint64_t seed = 42;
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Initialize all integrated systems with RAII
+        initializeIntegratedSystems();
+    }
+    
+    ~ImplEnhanced() {
+        safeCleanup();
+    }
+    
+    void initializeIntegratedSystems() {
+        try {
+            // Initialize plasticity systems with resource management
+            spikeSystem = std::make_unique<SpikeSystem>();
+            stdp = std::make_unique<STDP>();
+            hebbian = std::make_unique<Hebbian>();
+            structuralPlasticity = std::make_unique<StructuralPlasticity>();
+            
+            // Initialize memory systems
+            workingMemory = std::make_unique<NeuralWorkingMemory>();
+            episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+            associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+            
+            // Initialize prediction and cognition systems
+            predictionSystem = std::make_unique<PredictionSystem>();
+            planner = std::make_unique<NeuralPlanner>();
+            conceptFormation = std::make_unique<ConceptFormation>();
+            attention = std::make_unique<AttentionalSelection>();
+            
+            // Initialize development and neuromodulation systems
+            developmentSystem = std::make_unique<DevelopmentSystem>();
+            dopamine = std::make_unique<Dopamine>();
+            curiosity = std::make_unique<Curiosity>();
+            predictionError = std::make_unique<PredictionError>();
+            novelty = std::make_unique<Novelty>();
+            
+            // Configure plasticity systems
+            configurePlasticitySystems();
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Error initializing integrated systems: ") + e.what());
+            safeCleanup();
+            throw;
+        }
+    }
+    
+    void configurePlasticitySystems() {
+        if (!stdp) return;
+        
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        stdp->configure(ltpWeight, ltdWeight, tau);
+        
+        if (structuralPlasticity) {
+            float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+            float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+            structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+            structuralPlasticity->setPruningRate(pruningRate);
+        }
+    }
+    
+    void safeCleanup() noexcept {
+        try {
+            // Cleanup integrated systems in reverse order
+            checkpointManager.reset();
+            
+            novelty.reset();
+            predictionError.reset();
+            curiosity.reset();
+            dopamine.reset();
+            
+            developmentSystem.reset();
+            attention.reset();
+            conceptFormation.reset();
+            planner.reset();
+            predictionSystem.reset();
+            
+            associativeMemory.reset();
+            episodicMemory.reset();
+            workingMemory.reset();
+            
+            structuralPlasticity.reset();
+            hebbian.reset();
+            stdp.reset();
+            spikeSystem.reset();
+            
+            // Cleanup neural arrays
+            sensoryNeurons.resize(0);
+            motorNeurons.resize(0);
+            
+            // Clear regions and connections
+            regions.clear();
+            interRegionConnections.clear();
+            
+            // Cleanup memory pools
+            neuronPool.clear();
+            synapsePool.clear();
+            populationPool.clear();
+            
+            cleanupCompleted = true;
+            
+        } catch (...) {
+            cleanupCompleted = true;
+        }
+    }
+    
+    void moveNeurons(std::vector<Neuron*>& source, NeuralArray<Neuron*>& target) {
+        if (source.empty()) return;
+        
+        RAIIWrapper<std::vector<Neuron*>> tempWrapper(std::make_unique<std::vector<Neuron*>>());
+        auto& temp = tempWrapper.get();
+        
+        temp.reserve(source.size());
+        for (size_t i = 0; i < source.size(); ++i) {
+            temp.push_back(source[i]);
+        }
+        
+        target.resize(temp.size());
+        for (size_t i = 0; i < temp.size(); ++i) {
+            target[i] = temp[i];
+        }
+        
+        source.clear();
+    }
+    
+    size_t getAllocationCount() const noexcept { return allocationCount.load(); }
+    size_t getDeallocationCount() const noexcept { return deallocationCount.load(); }
+    bool isCleanupCompleted() const noexcept { return cleanupCompleted; }
+    std::chrono::steady_clock::time_point getCreationTime() const { return creationTime; }
+    
+    size_t getNeuronPoolSize() const { return neuronPool.size(); }
+    size_t getSynapsePoolSize() const { return synapsePool.size(); }
+    size_t getPopulationPoolSize() const { return populationPool.size(); }
+};
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -157,9 +317,11 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(new ImplEnhanced(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
