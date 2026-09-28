@@ -5,34 +5,79 @@
 
 namespace nlm {
 
+// Neural Working Memory Implementation
+// ===================================
+// 
+// This file implements the NeuralWorkingMemory class for maintaining short-term memory
+// through persistent neural activation patterns. Working memory allows the system to
+// retain information across simulation steps for later use in decision making.
+// 
+// Core Architecture:
+// 1. Pattern Storage: Converts input patterns into persistent neural activation
+// 2. Maintenance: Continuously reinforces stored patterns through recurrent connections
+// 3. Competition: Selects the most relevant patterns through winner-take-all dynamics
+// 4. Decay: Gradually weakens unused traces to prevent memory overload
+// 
+// Memory System Design:
+// - Stores activation levels rather than exact patterns for robustness
+// - Uses neural identity (neuron IDs) for pattern representation
+// - Capacity-limited to prevent unbounded growth
+// - Decay mechanism prevents memory corruption over time
+// 
+// Cross-references:
+// - NeuralWorkingMemory.hpp: Interface definition and data structures
+// - brain/Brain.hpp: Integration with main neural system
+// - Synapse.hpp: Recurrent connection management
+
+namespace nlm {
+
 struct NeuralWorkingMemory::Impl {
-    Brain* brain;
-    
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
-    
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
-    
-    Impl() : brain(nullptr) {}
+    // Implementation state is now empty since all functionality moved to header
+    // This maintains the pImpl pattern while minimizing overhead
+    Impl() {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
-    , capacity_(100)
-    , decayRate_(0.01f)
+    , capacity_(100)           // Store up to 100 distinct patterns
+    , decayRate_(0.01f)        // 1% decay per timestep
+    // Initialize working memory vectors
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
+    // Constructor initializes empty working memory with default parameters
+    // All vectors start empty; memory is built through store() operations
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
+// Initialize working memory system with brain reference
+// Establishes connection to main neural system for memory operations
+// Must be called before any other NeuralWorkingMemory operations
 void NeuralWorkingMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
+    // Use the brain_ member directly, remove redundant pImpl->brain
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
+// Store a pattern in working memory through neural activation
+// Converts input pattern into persistent neural firing patterns
+// The pattern is encoded by injecting current into representative neurons
+// 
+// Pattern encoding process:
+// 1. Find neurons to represent pattern components (one neuron per pattern element)
+// 2. Inject current proportional to pattern strength into each neuron
+// 3. Create recurrent connections to maintain the pattern
+// 4. Store activation levels and timestamps for later retrieval
+// 
+// The working memory system uses a distributed representation where
+// each pattern element is maintained by a different neuron, allowing
+// robust storage of multi-dimensional patterns.
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
@@ -43,15 +88,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Set neuron activation - inject current directly without region lookup
+        brain_->injectCurrent(neuron, activation * 5.0f);
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -89,6 +127,17 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
 }
 
+// Retrieve stored pattern from working memory
+// Returns the current activation levels of all stored patterns
+// The retrieved pattern represents the current state of memory
+// 
+// Memory retrieval process:
+// 1. Convert stored activation levels to pattern vector
+// 2. Maintain order based on storage sequence for consistency
+// 3. Return empty vector if no patterns are stored
+// 
+// The returned pattern can be used by other systems to make decisions
+// or to guide further processing based on recent experiences.
 std::vector<float> NeuralWorkingMemory::retrieve() const {
     std::vector<float> result;
     result.reserve(memoryActivations_.size());
@@ -113,6 +162,18 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     return 0.0f;
 }
 
+// Update working memory state for one simulation timestep
+// Maintains stored patterns through reinforcement, decay, and competition
+// This is the core memory maintenance cycle
+// 
+// Update process:
+// 1. Reinforce active memory traces through continuous neural activation
+// 2. Age traces and decay weak patterns to prevent memory corruption
+// 3. Run competition to select the most relevant patterns
+// 4. Apply inhibition to non-winning patterns to suppress interference
+// 
+// The update method ensures that working memory remains stable and
+// representative of recent experiences while maintaining capacity constraints.
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
@@ -149,7 +210,7 @@ void NeuralWorkingMemory::clear() {
     memoryActivations_.clear();
     memoryTimestamps_.clear();
     activeTraces_.clear();
-    pImpl->maintenanceSynapses.clear();
+    recurrentConnections_.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -198,17 +259,18 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
+    // Check if connection already exists (using the correct container)
+    for (const auto& conn : recurrentConnections_) {
         if (conn.first == from && conn.second == to) return;
     }
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    // Add new recurrent connection
+    recurrentConnections_.emplace_back(from, to);
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
-    // Apply maintenance currents through recurrent connections
-    for (const auto& conn : pImpl->maintenanceSynapses) {
+    // Apply maintenance currents through recurrent connections (using the correct container)
+    for (const auto& conn : recurrentConnections_) {
         float fromActivation = 0.0f;
         
         // Find from neuron activation

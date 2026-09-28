@@ -94,10 +94,30 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    // Validate weight is within reasonable bounds
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        NLM_LOG_ERROR("Synapse::setWeight: invalid weight " + std::to_string(weight) + 
+                     ". Must be in range [" + std::to_string(Impl::MIN_WEIGHT) + ", " +
+                     std::to_string(Impl::MAX_WEIGHT) + "]");
+        return;
+    }
+    
     pImpl->weight = weight;
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    // Validate weight delta is reasonable
+    if (delta < -1.0f || delta > 1.0f) {
+        NLM_LOG_WARNING("Synapse::addToWeight: large weight change delta " + std::to_string(delta) + ". May cause instability.");
+    }
+    
+    // Check for extreme resulting weights
+    float newWeight = pImpl->weight + delta;
+    if (newWeight < Impl::MIN_WEIGHT - 0.1f || newWeight > Impl::MAX_WEIGHT + 0.1f) {
+        NLM_LOG_WARNING("Synapse::addToWeight: potential weight out of bounds after change: " + 
+                       std::to_string(newWeight) + ". Clamping will occur.");
+    }
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -128,14 +148,48 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    // Validate timestamp is reasonable
+    if (timestamp < 0.0) {
+        NLM_LOG_WARNING("Synapse::recordPreSpike: negative timestamp " + std::to_string(timestamp));
+    }
+    
+    // Check for reasonable pre-post spike timing
+    float lastPostTime = pImpl->lastPostSpikeTime;
+    if (lastPostTime >= 0.0f) {
+        float dt = static_cast<float>(timestamp) - lastPostTime;
+        if (std::abs(dt) < 1.0f) {  // Very close in time
+            NLM_LOG_WARNING("Synapse::recordPreSpike: pre and post spikes very close in time (" + 
+                           std::to_string(dt) + "ms)");
+        }
+    }
+    
     pImpl->preSpikeHistory.push_back(timestamp);
+    pImpl->lastPreSpikeTime = static_cast<float>(timestamp);
+    
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    // Validate timestamp is reasonable
+    if (timestamp < 0.0) {
+        NLM_LOG_WARNING("Synapse::recordPostSpike: negative timestamp " + std::to_string(timestamp));
+    }
+    
+    // Check for reasonable pre-post spike timing
+    float lastPreTime = pImpl->lastPreSpikeTime;
+    if (lastPreTime >= 0.0f) {
+        float dt = static_cast<float>(timestamp) - lastPreTime;
+        if (std::abs(dt) < 1.0f) {  // Very close in time
+            NLM_LOG_WARNING("Synapse::recordPostSpike: pre and post spikes very close in time (" + 
+                           std::to_string(dt) + "ms)");
+        }
+    }
+    
     pImpl->postSpikeHistory.push_back(timestamp);
+    pImpl->lastPostSpikeTime = static_cast<float>(timestamp);
+    
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
     }
@@ -192,12 +246,23 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // Validate time parameter
+    if (currentTime < 0.0) {
+        NLM_LOG_WARNING("Synapse::step: current time " + std::to_string(currentTime) + " is negative");
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
     TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // Validate timestep
+    if (dt <= 0.0) {
+        NLM_LOG_ERROR("Synapse::step: invalid timestep " + std::to_string(dt) + ". Must be positive.");
+        return;
+    }
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
@@ -217,6 +282,13 @@ void Synapse::step(Timestamp currentTime) {
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
+    
+    // Validate efficacy is reasonable
+    if (pImpl->efficacy < 0.0f || pImpl->efficacy > 2.0f) {
+        NLM_LOG_WARNING("Synapse::step: efficacy " + std::to_string(pImpl->efficacy) + 
+                       " outside expected range [0.0, 2.0]");
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
+    }
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);

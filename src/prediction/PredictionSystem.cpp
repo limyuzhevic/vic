@@ -14,6 +14,57 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
+// Prediction System Implementation
+// ===============================
+// 
+// This file implements the PredictionSystem class for predictive coding.
+// The prediction system enables the NLM to anticipate future states and
+// reduce prediction errors through learning.
+// 
+// Current Implementation (Phase 1 Complete):
+// - predictNextState(): Placeholder returns copy of current state
+// - updatePredictions(): Computes simple mean squared error
+// - getPredictionError(), getConfidence(), getErrorHistory(): Accessors
+// - clearHistory(): Clears error history
+// 
+// Implementation Details:
+// The prediction system tracks how well predictions match actual states.
+// Current implementation uses simple Euclidean distance between state vectors.
+// The confidence metric is a placeholder (fixed at 0.5).
+// 
+// TODO PLACEHOLDERS (Phase 2):
+// - predictNextState(): Real prediction using NLM's neural substrate
+// - updatePredictions(): Real prediction error computation
+// - train(): Train prediction model using neural learning rules
+// 
+// Phase 2 Planned Enhancements:
+// 1. Implement real neural prediction using brain dynamics
+// 2. Integrate prediction errors into plasticity mechanisms
+// 3. Implement predictive coding learning rules
+// 4. Add confidence estimation based on prediction uncertainty
+// 5. Implement prediction error-based neuromodulation
+// 6. Use predictions to guide action selection
+// 
+// Cross-references:
+// - PredictionSystem.hpp: Interface definition
+// - sensory/SensoryInput.hpp: State representation
+// - neuromodulation/Curiosity.hpp: Integration with curiosity-driven learning
+// - main.cpp: Usage examples in learning experiments
+
+namespace nlm {
+
+struct PredictionSystem::Impl {
+    float predictionError;
+    float confidence;
+    std::vector<float> errorHistory;
+    
+    Impl() : predictionError(0.0f), confidence(0.5f) {}
+};
+
+PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+
+PredictionSystem::~PredictionSystem() = default;
+
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state

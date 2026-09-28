@@ -300,30 +300,53 @@ bool Brain::initialize() {
 }
 
 void Brain::step(SimulationStep currentStep) {
-    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+    // Validate step number
+    if (currentStep < pImpl->currentStep) {
+        NLM_LOG_WARNING("Brain::step: current step " + std::to_string(currentStep) + 
+                       " is less than previous step " + std::to_string(pImpl->currentStep) +
+                       ". This may indicate time travel or simulation reset.");
+    }
+    
+    // Calculate and validate time
+    Timestamp currentTime = static_cast<Timestamp>(currentStep) * pImpl->timestep;
+    if (currentTime < 0.0) {
+        NLM_LOG_ERROR("Brain::step: calculated time " + std::to_string(currentTime) + 
+                     " is negative for step " + std::to_string(currentStep));
+        return;
+    }
+    
+    step(currentStep, currentTime);
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    /*
-     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
-     * 
-     * This implements the complete integrated brain simulation:
-     * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
-     */
+    // Validate step number
+    if (currentStep < pImpl->currentStep) {
+        NLM_LOG_WARNING("Brain::step: current step " + std::to_string(currentStep) + 
+                       " is less than previous step " + std::to_string(pImpl->currentStep) +
+                       ". This may indicate time travel or simulation reset.");
+    }
+    
+    // Validate time
+    if (currentTime < 0.0) {
+        NLM_LOG_ERROR("Brain::step: current time " + std::to_string(currentTime) + 
+                     " is negative for step " + std::to_string(currentStep));
+        return;
+    }
+    
+    // Validate timestep if not zero
+    if (pImpl->timestep <= 0.0) {
+        NLM_LOG_ERROR("Brain::step: timestep " + std::to_string(pImpl->timestep) + 
+                     " is invalid (must be positive) for step " + std::to_string(currentStep));
+        return;
+    }
+    
+    // Validate that time matches step
+    Timestamp expectedTime = static_cast<Timestamp>(currentStep) * pImpl->timestep;
+    if (std::abs(currentTime - expectedTime) > 1e-6) {
+        NLM_LOG_WARNING("Brain::step: provided time " + std::to_string(currentTime) + 
+                       " doesn't match expected time " + std::to_string(expectedTime) +
+                       " from step " + std::to_string(currentStep));
+    }
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
@@ -589,14 +612,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    // Basic validation: check input is valid
+    if (!input.getData()) {
+        NLM_LOG_ERROR("Brain::receiveSensoryInput: invalid input data pointer");
+        return;
+    }
     
     const auto& values = input.getData();
-    if (values.empty()) return;
+    if (values.empty()) {
+        NLM_LOG_WARNING("Brain::receiveSensoryInput: empty input values");
+        return;
+    }
     
     size_t numSensory = pImpl->sensoryNeurons.size();
-    if (numSensory == 0) return;
+    if (numSensory == 0) {
+        NLM_LOG_ERROR("Brain::receiveSensoryInput: no sensory neurons available");
+        return;
+    }
+    
+    // Validate that each value is within reasonable bounds
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (values[i] < -1000 || values[i] > 1000) {
+            NLM_LOG_WARNING("Brain::receiveSensoryInput: input value " + std::to_string(values[i]) + 
+                           " outside reasonable bounds at index " + std::to_string(i));
+        }
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -604,6 +644,12 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
+        }
+        
+        // Validate normalized value range
+        if (normalizedValue < -100.0f || normalizedValue > 50.0f) {
+            NLM_LOG_WARNING("Brain::receiveSensoryInput: normalized value " + std::to_string(normalizedValue) + 
+                           " outside expected range [-100, 50] mV");
         }
         
         // Inject current into this sensory neuron
@@ -617,26 +663,61 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Basic validation: check neuron exists and current value is reasonable
+    bool neuronFound = false;
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
             if (n->getId() == neuron) {
+                neuronFound = true;
+                // Validate current value - neurons typically operate in [-100, 50] mV range
+                if (current < -100.0f || current > 50.0f) {
+                    NLM_LOG_WARNING("Brain::injectCurrent: current value " + std::to_string(current) + 
+                                   " outside expected range [-100, 50] mV for neuron " + 
+                                   std::to_string(neuron.index()));
+                }
                 n->injectCurrent(current);
                 return;
             }
         }
     }
+    
+    // Error handling: neuron not found
+    if (!neuronFound) {
+        NLM_LOG_ERROR("Brain::injectCurrent: neuron ID " + std::to_string(neuron.index()) + 
+                     " not found. Available neurons in brain.");
+    }
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate neuron type is valid
+    if (static_cast<uint8_t>(type) > static_cast<uint8_t>(NeuronType::Internal)) {
+        NLM_LOG_ERROR("Brain::injectCurrentToNeurons: invalid neuron type " + std::to_string(static_cast<int>(type)));
+        return;
+    }
+    
+    // Validate current value range
+    if (current < -100.0f || current > 50.0f) {
+        NLM_LOG_WARNING("Brain::injectCurrentToNeurons: current value " + std::to_string(current) + 
+                       " outside expected range [-100, 50] mV for neuron type " + 
+                       std::to_string(static_cast<int>(type)));
+    }
+    
+    bool neuronsFound = false;
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
+                neuronsFound = true;
                 for (auto* neuron : pop->getNeurons()) {
                     neuron->injectCurrent(current);
                 }
             }
         }
+    }
+    
+    if (!neuronsFound) {
+        NLM_LOG_ERROR("Brain::injectCurrentToNeurons: no neurons found for type " + 
+                     std::to_string(static_cast<int>(type)));
     }
 }
 
@@ -693,22 +774,45 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
+    // Validate that motorNeurons vector is not null (should always be valid in this design)
     if (pImpl->motorNeurons.empty()) {
+        NLM_LOG_WARNING("Brain::produceAction: no motor neurons available for action production");
         return std::make_unique<Action>(ActionType::Wait);
+    }
+    
+    // Validate each motor neuron pointer is not null
+    for (size_t i = 0; i < pImpl->motorNeurons.size(); ++i) {
+        if (!pImpl->motorNeurons[i]) {
+            NLM_LOG_ERROR("Brain::produceAction: null motor neuron pointer at index " + std::to_string(i));
+            continue;
+        }
     }
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
+        if (!neuron) {
+            NLM_LOG_ERROR("Brain::produceAction: encountered null neuron pointer");
+            continue;
+        }
         if (neuron->isFiring()) {
             ++firingMotor;
         }
+    }
+    
+    // Validate firing count is within reasonable bounds
+    if (firingMotor > pImpl->motorNeurons.size()) {
+        NLM_LOG_WARNING("Brain::produceAction: firing motor count " + std::to_string(firingMotor) + 
+                       " exceeds total motor neurons " + std::to_string(pImpl->motorNeurons.size()));
+        firingMotor = static_cast<size_t>(pImpl->motorNeurons.size());
     }
     
     // Return a simple action
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
         type = ActionType::MoveForward;
+        NLM_LOG_DEBUG("Brain::produceAction: producing movement action (" + 
+                     std::to_string(firingMotor) + " firing motor neurons)");
     }
     
     auto action = std::make_unique<Action>(type);

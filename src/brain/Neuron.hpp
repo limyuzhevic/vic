@@ -98,7 +98,11 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    // LIF step function - implements Leaky Integrate-and-Fire dynamics for one timestep
+    // Returns true if neuron crossed firing threshold during this timestep
+    // Implements differential equation: dV/dt = (V_rest - V)/tau + I/C
+    // where V is membrane potential, V_rest is resting potential, tau is time constant,
+    // I is synaptic current input, and C is membrane capacitance
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
     // Incoming signals (post-synaptic potentials)
@@ -134,7 +138,13 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // IMPLEMENTED: Real integrate-and-fire dynamics using Leaky Integrate-and-Fire (LIF) model
+    // The stepLIF method implements dV/dt = (V_rest - V)/tau + I/C
+    // where V is membrane potential, V_rest is resting potential, tau is time constant,
+    // I is synaptic current, and C is membrane capacitance
+    void stepLIF(Timestamp currentTime, TimestepDuration dt);
+    
+    // Convenience step function with standard 1ms timestep
     void step(Timestamp currentTime);
     
     // Reset to initial state

@@ -1,11 +1,35 @@
-// NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// NLM (熙然) - Neural Learning Machine - Phase 2
+// ================================================
 //
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+// - Working memory with attentional selection
+// - Motor system output generation
+// 
+// Key Features:
+// - Demonstrates measurable synaptic changes through experience
+// - Implements biologically plausible learning rules
+// - Shows network-level dynamics and competition
+// - Provides comprehensive logging of neural activity
+// - Validates plasticity mechanisms with controlled experiments
+// 
+// Program Structure:
+// 1. Parse configuration and initialize neural components
+// 2. Run basic connectivity test (Test 1)
+// 3. Run plasticity learning experiment (Test 2)
+// 4. Run STDP verification (Test 3)
+// 5. Report final neural network status
+// 
+// Cross-references:
+// - Config.hpp: Configuration system for neural parameters
+// - brain/Brain.hpp: Main neural network implementation
+// - brain/Neuron.hpp: Leaky Integrate-and-Fire neuron model
+// - memory/NeuralWorkingMemory.hpp: Working memory system
+// - experiments/ExperimentRunner.hpp: Experiment framework
+// - development/Synaptogenesis.hpp, development/Pruning.hpp: Structural plasticity
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -28,6 +52,8 @@
 
 using namespace nlm;
 
+// Display program banner with NLM information
+// Shows project name, description, and Phase 2 capabilities
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -48,7 +74,23 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Learning experiment to demonstrate measurable synaptic changes through experience
+// Records neural network state before and after learning periods
+// Validates that plasticity mechanisms actually produce synaptic modification
+// 
+// Experiment design:
+// 1. Record initial network state (synapses, spike counts)
+// 2. Apply repeated sensory input patterns to stimulate learning
+// 3. Record final network state after learning period
+// 4. Compare weights and spike activity to detect learning
+// 
+// Key metrics measured:
+// - Synaptic weight changes (strengthening/weakening)
+// - Spike count increases indicating neural activation
+// - Learning occurrence detection based on statistical significance
+// 
+// The experiment demonstrates that NLM networks can learn from experience
+// and produce measurable, biologically plausible synaptic modifications.
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -60,6 +102,8 @@ struct LearningExperiment {
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    // Record initial state before learning begins
+    // Captures baseline synaptic weights and spike activity
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
@@ -80,6 +124,8 @@ struct LearningExperiment {
         }
     }
     
+    // Record final state after learning period
+    // Captures synaptic modifications and neural activity changes
     void recordFinalState() {
         finalWeights.clear();
         
@@ -101,6 +147,8 @@ struct LearningExperiment {
         }
     }
     
+    // Compute and display comprehensive statistics
+    // Analyzes synaptic changes and spike activity to determine learning occurrence
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
@@ -159,6 +207,21 @@ struct LearningExperiment {
     }
 };
 
+// Test basic neural connectivity and spike propagation
+// Verifies that neurons can fire and spikes propagate through the network
+// This is a fundamental test to ensure the neural hardware is functioning
+// 
+// Test procedure:
+// 1. Get neurons from brain region
+// 2. Inject current into first 10 neurons to stimulate them
+// 3. Run simulation for 50 timesteps
+// 4. Count spikes generated during test
+// 5. Check if spikes were successfully propagated
+// 
+// Success criteria:
+// - Spikes > 0 indicates functional neural connectivity
+// - Spike counts should increase with stronger current injection
+// - Neuron parameters should be within expected ranges
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -202,6 +265,23 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Run plasticity learning experiment
+// Demonstrates that synaptic weights change through repeated experience
+// This test validates that Hebbian and STDP learning rules are working
+// 
+// Experiment design:
+// 1. Reset brain and re-initialize to ensure clean state
+// 2. Enable plasticity on synapses (Hebbian + STDP)
+// 3. Apply repeated input patterns for 1000 simulation steps
+// 4. Each step injects current into sensory-like neurons
+// 5. Monitor spike activity and synaptic changes over time
+// 6. Record final state and compute learning statistics
+// 
+// Learning mechanism:
+// - Repeated correlated activity strengthens synapses (Hebbian)
+// - Pre-before-post timing induces LTP (STDP)
+// - Network competition refines which synapses are most effective
+// - Spike-frequency adaptation prevents runaway excitation
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
@@ -245,6 +325,28 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
+// Run STDP verification test
+// Specifically tests spike-timing-dependent plasticity mechanism
+// Verifies that pre-before-post activity strengthens synapses (LTP)
+// 
+// STDP test design:
+// 1. Reset brain to ensure clean state
+// 2. Select first 5 synapses for testing
+// 3. Record initial weights of selected synapses
+// 4. Enable only STDP plasticity (Hebbian disabled)
+// 5. Create correlated pre->post activity for 50 trials
+// 6. For each trial:
+//    a. Fire pre-synaptic neuron (inject current)
+//    b. Step simulation briefly
+//    c. Fire post-synaptic neuron (inject current)
+//    d. Step simulation briefly
+// 7. Record final weights and compute changes
+// 8. Determine if LTP occurred (weights should increase)
+// 
+// Biological basis:
+// - STDP implements the classical timing rule: pre before post = LTP
+// - This reflects Hebbian learning with temporal credit assignment
+// - Critical for temporal sequence learning and prediction
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
@@ -345,6 +447,7 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configLoaded = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -356,11 +459,12 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (with better error reporting)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoaded = true;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using default configuration.");
     }
     
     // Override with command line args
@@ -392,10 +496,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Initialize simulation clock and use it for time management
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
+    auto clock = std::make_shared<SimulationClock>(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    config->set("simulation_timestep", timestep, ConfigSource::Default);
     
     // Initialize brain
     NLM_LOG_INFO("");

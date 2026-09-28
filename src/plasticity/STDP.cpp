@@ -24,40 +24,48 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate input parameters
+    if (!synapse) {
+        NLM_LOG_ERROR("STDP::update: null synapse pointer provided");
         return;
+    }
+    
+    if (preSpikes.empty()) {
+        NLM_LOG_ERROR("STDP::update: preSpikes vector is empty");
+        return;
+    }
+    
+    if (postSpikes.empty()) {
+        NLM_LOG_ERROR("STDP::update: postSpikes vector is empty");
+        return;
+    }
+    
+    if (dt <= 0.0) {
+        NLM_LOG_ERROR("STDP::update: invalid timestep duration " + std::to_string(dt) + ". Must be positive.");
+        return;
+    }
+    
+    // Validate spike timestamps are reasonable
+    for (Timestamp time : preSpikes) {
+        if (time < 0.0) {
+            NLM_LOG_WARNING("STDP::update: negative preSpike timestamp " + std::to_string(time));
+        }
+    }
+    
+    for (Timestamp time : postSpikes) {
+        if (time < 0.0) {
+            NLM_LOG_WARNING("STDP::update: negative postSpike timestamp " + std::to_string(time));
+        }
     }
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
+    
+    // Validate tau is reasonable
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("STDP::update: invalid time constant tau " + std::to_string(tau) + ". Must be positive.");
+        return;
+    }
     
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
@@ -80,9 +88,33 @@ void STDP::update(Synapse* synapse,
     
     // Apply weight change with bounds
     if (std::abs(totalDelta) > 1e-6f) {
+        // Validate STDP parameters are reasonable
+        if (pImpl->ltpWeight < 0.0f || pImpl->ltpWeight > 1.0f) {
+            NLM_LOG_WARNING("STDP::update: LTP weight " + std::to_string(pImpl->ltpWeight) + 
+                           " outside expected range [0.0, 1.0]");
+        }
+        
+        if (pImpl->ltdWeight < 0.0f || pImpl->ltdWeight > 1.0f) {
+            NLM_LOG_WARNING("STDP::update: LTD weight " + std::to_string(pImpl->ltdWeight) + 
+                           " outside expected range [0.0, 1.0]");
+        }
+        
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
+        if (efficacy < 0.0f || efficacy > 2.0f) {
+            NLM_LOG_WARNING("STDP::update: synapse efficacy " + std::to_string(efficacy) + 
+                           " outside expected range [0.0, 2.0]");
+        }
+        
         totalDelta *= efficacy;
+        
+        // Validate resulting weight change
+        float currentWeight = synapse->getWeight();
+        float newWeight = currentWeight + totalDelta;
+        if (newWeight < pImpl->minWeight - 0.1f || newWeight > pImpl->maxWeight + 0.1f) {
+            NLM_LOG_WARNING("STDP::update: weight change may result in out-of-bounds weight: " + 
+                           std::to_string(newWeight) + ". Current: " + std::to_string(currentWeight));
+        }
         
         // Apply weight change
         synapse->addToWeight(totalDelta);

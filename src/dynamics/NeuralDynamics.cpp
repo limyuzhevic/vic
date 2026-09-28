@@ -14,6 +14,57 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
+// Neural Dynamics Implementation
+// ==============================
+// 
+// This file implements the IntegrateAndFireDynamics class for neural simulation.
+// The dynamics layer handles the temporal evolution of neurons and synapses.
+// 
+// Current Implementation (Phase 1 Complete):
+// - IntegrateAndFireDynamics::updateNeuron() implements basic LIF integration
+// - IntegrateAndFireDynamics::applySpikeInput() handles synaptic input application
+// - shouldFire() checks threshold crossing for spike generation
+// - Refractory period management and current clearing
+// 
+// Implementation Details:
+// The LIF integration uses the differential equation:
+// dV/dt = (V_rest - V)/tau + I/C
+// where V is membrane potential, V_rest is resting potential,
+// tau is time constant, I is synaptic current, and C is membrane capacitance.
+// 
+// Current placeholders (Phase 2 TODOs):
+// - updateNeuron(): Current placeholder uses simple explicit Euler integration
+// - updateSynapse(): Placeholder - real synaptic dynamics not implemented
+// - applySpikeInput(): Placeholder - simplified input application
+// - Recording timestamps in updateNeuron() are placeholder values (0.0)
+// 
+// Phase 2 Planned Enhancements:
+// 1. Implement real synaptic dynamics in updateSynapse()
+// 2. Implement Hodgkin-Huxley dynamics for biophysical realism
+// 3. Implement FitzHugh-Nagumo (FHN) dynamics for simplified spiking
+// 4. Improve spike timing recording with actual timestamps
+// 5. Add synaptic transmission delays and filtering
+// 6. Implement synaptic plasticity dynamics
+// 
+// Cross-references:
+// - NeuralDynamics.hpp: Interface definition
+// - brain/Neuron.hpp: Neuron class integration
+// - brain/Synapse.hpp: Synapse class integration
+// - main.cpp: Integration with main simulation loop
+
+namespace nlm {
+
+struct IntegrateAndFireDynamics::Impl {
+    float membraneTimeConstant;  // ms
+    float membraneResistance;     // MOhm
+    
+    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f) {}
+};
+
+IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
+
+IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
+
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     // PLACEHOLDER: Simple leaky integrator
