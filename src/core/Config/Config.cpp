@@ -1,4 +1,6 @@
+// Include Config.hpp for declarations
 #include "Config.hpp"
+
 #include <fstream>
 #include <sstream>
 #include <algorithm>

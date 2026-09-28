@@ -333,18 +333,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Optimized: Cache region pointers and use direct iterators
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        const auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            const auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Optimized: Cache region pointers and use direct iterators
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        const auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            const auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -357,13 +363,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     pImpl->spikeSystem->queueSpike(event);
 
                     // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+                    const auto& incomingSynapses = region->getSynapsesTo(neuron->getId());
                     for (Synapse* syn : incomingSynapses) {
                         syn->recordPostSpike(currentTime);
                     }
 
                     // Get outgoing synapses and schedule delayed spike events
-                    auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+                    const auto& outgoingSynapses = region->getSynapsesFrom(neuron->getId());
                     for (Synapse* syn : outgoingSynapses) {
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
@@ -425,13 +431,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        if (dopamineLevel > 0.0f) {
+            float excitabilityMod = dopamineLevel * 0.5f;
+            
+            // Optimized: Cache region pointers and use direct iterators
+            for (auto& region : pImpl->regions) {
+                const auto& populations = region->getPopulations();
+                for (auto& pop : populations) {
+                    const auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
+                        // Dopamine modulates excitability by injecting additional current
+                        // Positive dopamine adds excitatory bias
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
@@ -446,8 +456,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Optimized: Cache region and synapse pointers
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        const auto& synapses = region->getSynapses();
+        for (auto& syn : synapses) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -488,21 +500,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Store active neurons - Optimized: Cache region and population pointers
             for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+                const auto& populations = region->getPopulations();
+                for (auto& pop : populations) {
+                    const auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
+                        const auto& state = neuron->getState();
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                                std::abs(state.membranePotential - state.restingPotential) / 20.0f);
                         }
                     }
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (store twice for redundancy in original code)
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
