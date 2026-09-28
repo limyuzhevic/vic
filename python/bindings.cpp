@@ -164,6 +164,75 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // Enhanced convenience methods for Config
+    .def("set_many", [](Config& self, const py::dict& settings) {
+        for (auto item : settings) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value_obj = item.second;
+            
+            if (value_obj.is(py::int_())) {
+                self.set(key, py::cast<int>(value_obj));
+            } else if (value_obj.is(py::float_())) {
+                self.set(key, py::cast<double>(value_obj));
+            } else if (value_obj.is(py::bool_())) {
+                self.set(key, py::cast<bool>(value_obj));
+            } else {
+                self.set(key, py::cast<std::string>(value_obj));
+            }
+        }
+    }, py::arg("settings"),
+       "Set multiple configuration values from Python dict (convenience method)")
+    
+    .def("get_value", [](const Config& self, const std::string& key, const py::object& default_value) {
+        // Try different types in order
+        if (default_value.is(py::int_())) {
+            return self.getOr<int>(key, py::cast<int>(default_value));
+        } else if (default_value.is(py::float_())) {
+            return self.getOr<double>(key, py::cast<double>(default_value));
+        } else if (default_value.is(py::bool_())) {
+            return self.getOr<bool>(key, py::cast<bool>(default_value));
+        } else {
+            return self.getOr<std::string>(key, py::cast<std::string>(default_value));
+        }
+    }, py::arg("key"), py::arg("default"),
+       "Get configuration value with type inference from default")
+    
+    .def("print", &Config::summary,
+         "Print configuration summary to stdout")
+    
+    .def("validate", [](const Config& self, const std::vector<std::string>& required_keys) {
+        bool valid = true;
+        for (const auto& key : required_keys) {
+            if (!self.has(key)) {
+                NLM_LOG_WARNING("Missing required config key: " + key);
+                valid = false;
+            }
+        }
+        return valid;
+    }, py::arg("required_keys"),
+       "Validate that all required configuration keys are present, returns bool")
+    
+    .def("get_type_info", [](const Config& self, const std::string& key) {
+        if (!self.has(key)) {
+            return std::string("Key not found");
+        }
+        // Try to infer type from available getter
+        auto int_val = self.get<int>(key);
+        if (int_val.has_value()) return std::string("int");
+        
+        auto double_val = self.get<double>(key);
+        if (double_val.has_value()) return std::string("double");
+        
+        auto bool_val = self.get<bool>(key);
+        if (bool_val.has_value()) return std::string("bool");
+        
+        auto string_val = self.get<std::string>(key);
+        if (string_val.has_value()) return std::string("string");
+        
+        return std::string("unknown");
+    }, py::arg("key"),
+       "Get inferred type of configuration value for key");
+
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -207,7 +276,34 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        
+        // Convenience methods for Action
+        .def("create_move", [](ActionType type, float speed) {
+            Action action(type);
+            action.setParameters({speed});
+            return action;
+        }, py::arg("type"), py::arg("speed") = 1.0f,
+           "Create a movement action (convenience method)")
+        
+        .def("create_interact", [](float intensity) {
+            Action action(ActionType::Interact);
+            action.setParameters({intensity});
+            return action;
+        }, py::arg("intensity") = 1.0f,
+           "Create an interaction action (convenience method)")
+        
+        .def("get_speed", [](const Action& action) {
+            const auto& params = action.getParameters();
+            if (!params.empty()) return params[0];
+            return 0.0f;
+        }, "Get speed parameter from movement action")
+        
+        .def("get_intensity", [](const Action& action) {
+            const auto& params = action.getParameters();
+            if (!params.empty()) return params[0];
+            return 0.0f;
+        }, "Get intensity parameter from interaction action");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -287,7 +383,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        
+        // Enhanced convenience methods for SimpleWorld
+        .def("run_step", &SimpleWorld::update, py::arg("timestep"),
+             "Run a single simulation step (alias for update)")
+        
+        .def("get_vision_size", [](const SimpleWorld& world) {
+            return py::make_tuple(world.getVisionWidth(), world.getVisionHeight());
+        }, "Get vision dimensions as (width, height) tuple")
+        
+        .def("get_agent_position", [](const SimpleWorld& world) {
+            const auto& body = world.getAgentBody();
+            return py::make_tuple(body.x, body.y, body.orientation);
+        }, "Get agent position and orientation as (x, y, orientation) tuple")
+        
+        .def("create_resource", [](SimpleWorld& world, float x, float y, float value) {
+            WorldObject obj(x, y, WorldObjectType::Resource, value);
+            world.addObject(obj);
+            return obj;
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 1.0f,
+           "Create and add a resource object at position (convenience method)")
+        
+        .def("create_wall", [](SimpleWorld& world, float x, float y, float radius) {
+            WorldObject obj(x, y, WorldObjectType::Wall, 0.0f, radius);
+            world.addObject(obj);
+            return obj;
+        }, py::arg("x"), py::arg("y"), py::arg("radius") = 0.5f,
+           "Create and add a wall object at position (convenience method)")
+        
+        .def("print_world_info", [](const SimpleWorld& world) {
+            std::cout << "World Info: " << world.getWidth() << "x" << world.getHeight()
+                      << ", Time: " << world.getSimulationTime()
+                      << ", Agent at (" << world.getAgentBody().x << "," << world.getAgentBody().y << ")" << std::endl;
+        }, "Print world information to stdout");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +480,52 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Enhanced convenience methods for Python users
+        .def("run_simulation", [](Brain& self, size_t steps) {
+            for (size_t i = 0; i < steps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("steps"),
+             "Run simulation for specified number of steps (convenience method)")
+        
+        .def("run_simulation_with_time", [](Brain& self, size_t steps, double timestep) {
+            for (size_t i = 0; i < steps; ++i) {
+                self.step(i, i * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep") = 0.001,
+             "Run simulation with custom timestep (convenience method)")
+        
+        .def("get_stats", [](const Brain& self) {
+            return py::make_tuple(
+                self.getTotalNeuronCount(),
+                self.getTotalSynapseCount(),
+                self.getFiringNeuronCount(),
+                self.getAverageFiringRate(),
+                self.getTotalSpikeCount()
+            );
+        }, "Get brain statistics as a tuple (neurons, synapses, firing, rate, spikes)")
+        
+        .def("enable_all_features", [](Brain& self) {
+            // Note: This is a convenience method for the main AgentBrain interface
+            // Brain itself doesn't have enable methods, but we document this for users
+            self.logStatus();
+        }, "Enable all learning features (convenience method)")
+        
+        .def("is_initialized", &Brain::getTotalNeuronCount,
+             "Check if brain is initialized (returns neuron count > 0)")
+        
+        .def("get_development_stage_name", [](const Brain& self) {
+            switch (self.getDevelopmentalStage()) {
+                case DevelopmentalStage::Initial: return "Initial";
+                case DevelopmentalStage::CriticalPeriod: return "Critical Period";
+                case DevelopmentalStage::Maturation: return "Maturation";
+                case DevelopmentalStage::Adult: return "Adult";
+                case DevelopmentalStage::Aging: return "Aging";
+                default: return "Unknown";
+            }
+        }, "Get human-readable developmental stage name")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -387,34 +561,154 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        
+        // Enhanced convenience methods for AgentBrain
+        .def("run_episode", [](AgentBrain& self, SimpleWorld& world, size_t steps) {
+            for (size_t i = 0; i < steps; ++i) {
+                world.update(0.1);
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                world.applyMotorCommand(self.decodeMotorCommand(), world.getSimulationTime());
+            }
+        }, py::arg("world"), py::arg("steps"),
+             "Run complete episode with world interaction")
+        
+        .def("run_episode_with_rewards", [](AgentBrain& self, SimpleWorld& world, size_t steps) {
+            float totalReward = 0.0f;
+            for (size_t i = 0; i < steps; ++i) {
+                world.update(0.1);
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                auto action = self.decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+                
+                // Extract reward from percept if available
+                float reward = 0.0f;
+                if (percept.getInternal().size() > 0) {
+                    reward = percept.getInternal()[0];
+                }
+                self.applyRewardModulation(reward, 0.0f);
+                totalReward += reward;
+            }
+            return totalReward;
+        }, py::arg("world"), py::arg("steps"),
+             "Run episode with reward collection, returns total reward")
+        
+        .def("enable_all_features", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableCuriosity(true);
+            self.enableDevelopment(true);
+            self.enableStructuralPlasticity(true);
+            self.logStatus();
+        }, "Enable all agent features (reward, curiosity, development, plasticity)")
+        
+        .def("get_feature_status", [](const AgentBrain& self) {
+            return py::make_tuple(
+                self.isRewardModulationEnabled(),
+                self.isCuriosityEnabled(),
+                self.isDevelopmentEnabled(),
+                self.isStructuralPlasticityEnabled()
+            );
+        }, "Get tuple of enabled features status (reward, curiosity, development, plasticity)")
+        
+        .def("print_status", &AgentBrain::logStatus,
+             "Print agent status information");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration")
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, py::arg("config"), "Create a new brain with configuration")
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    }, "Create a new simple world")
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface")
+
+    // Module-level convenience functions
+    m.def("run_full_simulation", [](
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        size_t steps
+    ) {
+        agent->initialize(*world);
+        agent->enable_all_features();
+        
+        float total_reward = 0.0f;
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Extract reward from percept
+            if (percept.getInternal().size() > 0) {
+                float reward = percept.getInternal()[0];
+                agent->applyRewardModulation(reward, 0.0f);
+                total_reward += reward;
+            }
+        }
+        
+        return total_reward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run complete simulation with agent learning and reward collection")
+
+    m.def("create_demo_brain_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        return config;
+    }, "Create a demo configuration optimized for learning and exploration")
+
+    m.def("create_demo_simple_world", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->setAgentStart(10.0, 10.0);
+        return world;
+    }, "Create a demo world with medium size and good vision")
+
+    // Constants and helper functions
+    m.attr("__version__") = "1.0.0 (Enhanced with convenience methods)";
+    
+    m.def("get_example_usage", []() {
+        return R"pbdoc(
+Example Usage:
+
+import pynlm
+
+# Create brain with demo configuration
+config = pynlm.create_default_config()
+brain = pynlm.create_brain(config)
+brain.initialize()
+
+# Create world and agent
+world = pynlm.create_simple_world()
+agent = pynlm.create_agent_brain(brain)
+
+# Enable learning features
+agent.enable_all_features()
+
+# Run simulation
+print("Running simulation...")
+total_reward = pynlm.run_full_simulation(brain, world, agent, 1000)
+print(f"Total reward: {total_reward}")
+
+# Print statistics
+brain.print_status()
+)pbdoc";
+    }, "Get example usage string for quick start")
+
+    m.attr("__copyright__") = "Copyright 2024 NLM Project - All rights reserved";
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -5,7 +5,31 @@
 
 namespace nlm {
 
-// Strongly-typed identifiers for safety
+// ============================================================================
+// Type Definitions and Strongly-Typed Identifiers
+// ============================================================================
+// Comprehensive type system for safe neural simulation with clear semantics
+// 
+// This type system provides several key benefits:
+// 1. **Type Safety**: Compile-time checking prevents invalid operations
+// 2. **Clarity**: Named types make code self-documenting
+// 3. **Performance**: Can be optimized by compiler for specific operations
+// 4. **Interoperability**: Consistent with C++ type system
+// 
+// Strong identifiers prevent logical errors like mixing neuron IDs with
+// synapse IDs or treating population IDs as region IDs.
+// 
+// Time units are explicitly typed to avoid unit conversion errors:
+// - SimulationStep: Integer step counter (discrete)
+// - Timestamp: Floating-point time in seconds (continuous)
+// - TimestepDuration: Duration between simulation steps
+//
+// Memory units use standard SI prefixes for clarity:
+// - nF: Nanofarads for membrane capacitance
+// - ms: Milliseconds for time constants
+// - mV: Millivolts for electrical potentials
+
+namespace nlm {
 
 // Neuron identifier
 struct NeuronId {
