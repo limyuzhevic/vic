@@ -26,7 +26,6 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
-    pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
