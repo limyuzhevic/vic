@@ -178,6 +178,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
+    auto neurons = region->getAllNeurons();
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }

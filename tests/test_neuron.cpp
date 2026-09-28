@@ -3,6 +3,8 @@
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>
+#include <vector>
+#include <algorithm>
 
 namespace test_neuron {
 
@@ -111,6 +113,9 @@ void testSpikeHistory() {
     neuron.recordSpike(0.3);
     
     assert(neuron.getSpikeHistory().size() == 3);
+    assert(neuron.getSpikeHistory()[0] == 0.1);
+    assert(neuron.getSpikeHistory()[1] == 0.2);
+    assert(neuron.getSpikeHistory()[2] == 0.3);
     
     neuron.clearSpikeHistory();
     assert(neuron.getSpikeHistory().empty());
@@ -127,6 +132,9 @@ void testRandomInitialization() {
     // Just verify it doesn't crash and values are in reasonable range
     assert(neuron.getMembranePotential() < -60.0f && neuron.getMembranePotential() > -80.0f);
     assert(neuron.getThreshold() < -50.0f && neuron.getThreshold() > -60.0f);
+    assert(neuron.getRestingPotential() < -60.0f && neuron.getRestingPotential() > -80.0f);
+    assert(neuron.getResetPotential() >= neuron.getRestingPotential());
+    assert(neuron.getRefractoryPeriod() >= 2 && neuron.getRefractoryPeriod() <= 10);
     
     std::cout << "    testRandomInitialization passed" << std::endl;
 }
@@ -137,14 +145,100 @@ void testReset() {
     neuron.setMembranePotential(-60.0f);
     neuron.injectCurrent(5.0f);
     neuron.recordSpike(0.1);
+    neuron.setFiringState(nlm::FiringState::Active);
+    neuron.setRefractoryPeriod(5);
     
     neuron.reset();
     
     assert(neuron.getMembranePotential() == -70.0f);
     assert(neuron.getTotalCurrent() == 0.0f);
     assert(neuron.getSpikeHistory().empty());
+    assert(!neuron.isFiring());
+    assert(!neuron.isRefractory());
+    assert(neuron.getRefractoryPeriod() == 0);
     
     std::cout << "    testReset passed" << std::endl;
+}
+
+void testLIFIntegration() {
+    nlm::RandomGenerator rng(123);
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Initialize with reasonable values
+    neuron.initializeRandom(rng);
+    neuron.setFiringState(nlm::FiringState::Resting);
+    neuron.setRefractoryPeriod(0);
+    
+    // Test LIF integration without spiking
+    float initialV = neuron.getMembranePotential();
+    neuron.injectCurrent(10.0f);  // Strong current
+    neuron.step(0.0);  // timestep = 0.001ms default
+    
+    // Should move towards threshold
+    assert(neuron.getMembranePotential() > initialV);
+    
+    std::cout << "    testLIFIntegration passed" << std::endl;
+}
+
+void testPlasticityEnableDisable() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Enable all plasticity
+    neuron.enablePlasticity(true, true, false);
+    auto flags1 = neuron.getPlasticityFlags();
+    assert(flags1.hebbian);
+    assert(flags1.stdp);
+    assert(!flags1.reward_modulated);
+    
+    // Disable all plasticity
+    neuron.enablePlasticity(false, false, false);
+    auto flags2 = neuron.getPlasticityFlags();
+    assert(!flags2.hebbian);
+    assert(!flags2.stdp);
+    assert(!flags2.reward_modulated);
+    
+    // Enable only STDP
+    neuron.enablePlasticity(false, true, false);
+    auto flags3 = neuron.getPlasticityFlags();
+    assert(!flags3.hebbian);
+    assert(flags3.stdp);
+    assert(!flags3.reward_modulated);
+    
+    std::cout << "    testPlasticityEnableDisable passed" << std::endl;
+}
+
+void testPerformanceScaling() {
+    const size_t numNeurons = 1000;
+    std::vector<nlm::Neuron> neurons;
+    neurons.reserve(numNeurons);
+    
+    nlm::RandomGenerator rng(999);
+    
+    // Create many neurons
+    for (size_t i = 0; i < numNeurons; ++i) {
+        neurons.emplace_back(nlm::NeuronId(i));
+        neurons.back().initializeRandom(rng);
+    }
+    
+    // Inject current into all neurons
+    for (auto& neuron : neurons) {
+        neuron.injectCurrent(1.0f);
+    }
+    
+    // Simulate steps for all neurons (this tests memory efficiency)
+    for (size_t step = 0; step < 10; ++step) {
+        for (auto& neuron : neurons) {
+            neuron.step(step * 0.001);
+        }
+    }
+    
+    // Verify all neurons still valid
+    for (size_t i = 0; i < numNeurons; ++i) {
+        assert(neurons[i].getId() == nlm::NeuronId(i));
+        assert(neurons[i].getMembranePotential() < 50.0f);  // Should not overflow
+    }
+    
+    std::cout << "    testPerformanceScaling passed" << std::endl;
 }
 
 void runAll() {
@@ -158,6 +252,9 @@ void runAll() {
     testSpikeHistory();
     testRandomInitialization();
     testReset();
+    testLIFIntegration();
+    testPlasticityEnableDisable();
+    testPerformanceScaling();
 }
 
 } // namespace test_neuron

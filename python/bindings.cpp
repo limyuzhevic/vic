@@ -289,7 +289,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    // Add more advanced Python features to the Brain class
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -350,10 +351,113 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             "Get random generator")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Advanced features for expert users
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulation")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulation")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulation")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal")
+        // Advanced configuration and control methods
+        .def("configureSimulation", [](Brain& self, double timestep, size_t maxSteps,
+                                      const std::string& mode) {
+            self.getConfig()->set("simulation_timestep", timestep);
+            self.getConfig()->set("max_steps", static_cast<int64_t>(maxSteps));
+            self.getConfig()->set("simulation_mode", mode);
+        }, py::arg("timestep"), py::arg("maxSteps"), py::arg("mode"),
+             "Configure simulation parameters for advanced use")
+        .def("setDevelopmentStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage (Expert mode)")
+        .def("getDevelopmentStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("enablePlasticity", [](Brain& self, bool hebbian, bool stdp,
+                                  bool rewardModulated) {
+            auto* region = self.getRegion(RegionId(1));
+            if (region) {
+                for (auto& syn : region->getSynapses()) {
+                    syn->enablePlasticity(hebbian, stdp, rewardModulated);
+                }
+            }
+        }, py::arg("hebbian") = true, py::arg("stdp") = true, py::arg("rewardModulated") = false,
+             "Enable plasticity rules for expert experimentation")
+        .def("disablePlasticity", [](Brain& self) {
+            auto* region = self.getRegion(RegionId(1));
+            if (region) {
+                for (auto& syn : region->getSynapses()) {
+                    syn->enablePlasticity(false, false, false);
+                }
+            }
+        }, "Disable all plasticity rules")
+        .def("getSimulationStatistics", [](const Brain& self) {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            stats["region_count"] = self.getRegionCount();
+            return stats;
+        }, "Get comprehensive simulation statistics as dictionary")
+        .def("exportBrainState", &Brain::save, py::arg("filepath"),
+             "Export brain state to file for persistence")
+        .def("importBrainState", &Brain::load, py::arg("filepath"),
+             "Import brain state from file to restore previous state")
+        .def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration")
+        .def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+            return std::make_shared<Brain>(config);
+        }, py::arg("config"), "Create a new brain with configuration")
+        .def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+            return std::make_shared<SimpleWorld>();
+        }, "Create a new simple world")
+        .def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+            return std::make_shared<AgentBrain>(brain);
+        }, py::arg("brain"), "Create a new agent brain interface")
+        .attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID)
+        .attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID)
+        .attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID)
+        .attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    // Enhanced AgentBrain class with advanced features
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
@@ -395,10 +499,63 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        // Advanced AgentBrain features
+        .def("configureAgent", [](AgentBrain& self, double energyDecay, double maxEnergy,
+                                const std::string& behaviorMode) {
+            auto* world = self.getBrain()->getConfig()->getOr<std::string>("world_type", "simple");
+            if (world == "simple") {
+                auto* simpleWorld = reinterpret_cast<SimpleWorld*>(self.getBrain()->getConfig()->getOr<void*>("world_ptr", nullptr));
+                if (simpleWorld) {
+                    simpleWorld->setMaxEnergy(maxEnergy);
+                    simpleWorld->setEnergyDecayRate(energyDecay);
+                }
+            }
+            self.getBrain()->getConfig()->set("behavior_mode", behaviorMode);
+        }, py::arg("energyDecay"), py::arg("maxEnergy"), py::arg("behaviorMode"),
+             "Configure agent behavior parameters")
+        .def("setBehaviorMode", [](AgentBrain& self, const std::string& mode) {
+            self.getBrain()->getConfig()->set("behavior_mode", mode);
+        }, py::arg("mode"), "Set behavioral mode (e.g., 'exploration', 'exploitation', 'balanced')")
+        .def("getBehaviorMode", [](const AgentBrain& self) {
+            return self.getBrain()->getConfig()->getOr<std::string>("behavior_mode", "balanced");
+        }, "Get current behavioral mode")
+        .def("enableAdvancedLearning", [](AgentBrain& self, bool enable) {
+            self.getBrain()->getConfig()->set("advanced_learning", enable);
+        }, py::arg("enable"), "Enable advanced learning algorithms")
+        .def("isAdvancedLearningEnabled", [](const AgentBrain& self) {
+            return self.getBrain()->getConfig()->getOr<bool>("advanced_learning", false);
+        }, "Check if advanced learning is enabled")
+        .def("createEpisodeStats", [](AgentBrain& self) {
+            py::dict stats;
+            stats["start_time"] = 0.0f;
+            stats["total_reward"] = 0.0f;
+            stats["steps_taken"] = 0;
+            stats["successful_actions"] = 0;
+            stats["failed_actions"] = 0;
+            return stats;
+        }, "Create empty episode statistics dictionary")
+        .def("updateEpisodeStats", [](py::dict& stats, double reward, bool success) {
+            stats["total_reward"] = stats["total_reward"].cast<double>() + reward;
+            stats["steps_taken"] = stats["steps_taken"].cast<int>() + 1;
+            if (success) {
+                stats["successful_actions"] = stats["successful_actions"].cast<int>() + 1;
+            } else {
+                stats["failed_actions"] = stats["failed_actions"].cast<int>() + 1;
+            }
+            stats["success_rate"] = stats["successful_actions"].cast<double>() / 
+                                   (stats["successful_actions"].cast<int>() + 
+                                    stats["failed_actions"].cast<int>());
+        }, py::arg("stats"), py::arg("reward"), py::arg("success"),
+             "Update episode statistics with new reward and success data")
+        .def("getAgentStats", [](const AgentBrain& self) {
+            py::dict stats;
+            stats["neuromodulation_level"] = self.getNeuromodulationLevel();
+            stats["curiosity_level"] = self.getCuriosityLevel();
+            stats["novelty_level"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive agent statistics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
