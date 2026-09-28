@@ -1,11 +1,16 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the complete integrated artificial brain with:
+// - Real LIF neuron dynamics with event-driven spike propagation
+// - STDP and Hebbian plasticity with structural plasticity
+// - Integrated memory systems (working, episodic, associative)
+// - Prediction system for temporal sequence learning
+// - Cognition systems (attention, planning, concept formation, self-model)
+// - Neuromodulation (dopamine, novelty, curiosity, prediction error)
+// - Full developmental system with stages
+// - Sleep/rest cycle with memory consolidation and replay
+// - Checkpoint save/load persistence
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,17 +40,20 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                 ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     This phase implements the complete integrated brain with:   ║
+    ║     - Real LIF neuron dynamics                                 ║
+    ║     - Integrated memory systems                               ║
+    ║     - Prediction and cognition systems                        ║
+    ║     - Neuromodulation                                         ║
+    ║     - Full development with stages                             ║
+    ║     - Sleep/rest with memory consolidation                     ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

@@ -37,8 +37,8 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
+    std::cout << "NLM Phase 6: Cognition and Memory Integration\n";
+    std::cout << "========================================\n\n";
     
     // Parse command line arguments
     size_t numTrials = 50;
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    printHeader("PHASE 4 EXPERIMENTS");
+    printHeader("PHASE 6 EXPERIMENTS");
     
     // Run Temporal Prediction Experiment
     printSection("1. Temporal Prediction Learning");
@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Run Integrated Experiment
-    printSection("10. Integrated Phase 4");
+    printSection("10. Integrated Phase 6");
     {
         Phase4IntegratedExperiment experiment;
         Phase4Results results = experiment.run(brain.get(), 10, 50);
@@ -201,24 +201,22 @@ int main(int argc, char* argv[]) {
     }
     
     // Final summary
-    printHeader("PHASE 4 SUMMARY");
+    printHeader("PHASE 6 SUMMARY");
     
-    std::cout << "\nPhase 4 demonstrates:\n";
-    std::cout << "  - Temporal prediction: Learning relationships between events\n";
-    std::cout << "  - Working memory: Maintaining information across delays\n";
-    std::cout << "  - Episodic memory: Storing and recalling experiences\n";
-    std::cout << "  - Concept formation: Discovering patterns without labels\n";
-    std::cout << "  - Neural attention: Selective processing through competition\n";
-    std::cout << "  - Multi-step planning: Using predictions to select actions\n";
-    std::cout << "  - Self-model: Learning body schema and action consequences\n";
-    std::cout << "  - Social learning: Observing and imitating others\n";
-    std::cout << "  - Continual learning: Adapting to new tasks\n";
+    std::cout << "\nPhase 6 demonstrates:\n";
+    std::cout << "  - Integrated memory systems (working, episodic, associative)\n";
+    std::cout << "  - Prediction system for temporal sequence learning\n";
+    std::cout << "  - Full cognition (attention, planning, concept formation)\n";
+    std::cout << "  - Complete neuromodulation (dopamine, ACh, NE, 5-HT)\n";
+    std::cout << "  - Development with distinct stages\n";
+    std::cout << "  - Sleep/rest with memory consolidation and replay\n";
+    std::cout << "  - Checkpoint persistence and state management\n";
     
-    std::cout << "\nAll mechanisms emerge from neural dynamics and plasticity.\n";
-    std::cout << "No predefined concepts, rules, or symbolic AI were used.\n";
+    std::cout << "\nAll systems work together as an integrated artificial brain.\n";
+    std::cout << "Experience-driven learning without predefined concepts.\n"
     
     std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "Phase 4 Complete!\n";
+    std::cout << "Phase 6 Complete!\n";
     std::cout << std::string(60, '=') << "\n";
     
     return 0;

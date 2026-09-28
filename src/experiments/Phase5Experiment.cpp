@@ -132,9 +132,9 @@ LifetimeExperimentResult Phase5IntegratedExperiment::run(
         currentStep = phaseEnd;
     }
     
-    // Phase 4: Associative Development
+// Phase 6: Associative Development
     {
-        NLM_LOG_INFO("Phase 4: Associative Development");
+        NLM_LOG_INFO("Phase 6: Associative Development");
         uint64_t phaseEnd = currentStep + config.associativeDevelopmentSteps;
         auto phaseResult = runPhase(
             brain.get(), "Associative Development", currentStep, phaseEnd,

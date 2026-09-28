@@ -13,6 +13,7 @@ namespace nlm {
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
+// Updated to Phase 6 integration
 
 class Phase3Demo {
 public:
@@ -21,7 +22,7 @@ public:
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
         std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
+        std::cout << "NLM PHASE 6 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
         // Create configuration
