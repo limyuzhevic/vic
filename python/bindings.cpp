@@ -39,6 +39,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return "NeuronId(" + std::to_string(id.value) + ")";
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -399,6 +402,60 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Python convenience methods for AgentBrain
+    m.def("processSensoryPercept", [](std::shared_ptr<AgentBrain> agent, const std::vector<float>& vision,
+                                    const std::vector<float>& touch, const std::vector<float>& internal,
+                                    const std::vector<float>& audio, float timestamp) {
+        SensoryPercept percept;
+        percept.setVision(vision);
+        percept.setTouch(touch);
+        percept.setInternal(internal);
+        percept.setAudio(audio);
+        percept.setTimestamp(timestamp);
+        agent->processSensoryInput(percept);
+    }, py::arg("agent"), py::arg("vision"), py::arg("touch"), py::arg("internal"),
+       py::arg("audio"), py::arg("timestamp") = 0.0f, "Process sensory input from vectors");
+
+    m.def("createAction", [](ActionType type, const std::vector<float>& parameters = std::vector<float>()) {
+        Action action;
+        action.setType(type);
+        action.setParameters(parameters);
+        return action;
+    }, py::arg("type"), py::arg("parameters") = std::vector<float>(), "Create an action from type and parameters");
+
+    // Python helper functions for common operations
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                            std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1); // Default timestep
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete simulation loop");
+
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["neurons"] = brain->getTotalNeuronCount();
+        stats["synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Get brain statistics as a dictionary");
+
+    m.def("enableAllFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"), "Enable all learning and development features");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
