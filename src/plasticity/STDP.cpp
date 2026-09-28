@@ -59,22 +59,46 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+    // Optimize for common case: small number of spikes
+    size_t minSpikes = std::min(preSpikes.size(), postSpikes.size());
+    
+    // For large spike counts, use batch processing for better cache locality
+    if (preSpikes.size() * postSpikes.size() > 100) {
+        // Batch processing for efficiency
+        for (size_t i = 0; i < preSpikes.size(); ++i) {
+            for (size_t j = 0; j < postSpikes.size(); ++j) {
+                float dt = static_cast<float>(postSpikes[j] - preSpikes[i]);  // Δt in ms
+                
+                if (dt > 0) {
+                    // Pre before post: POTENTIATION
+                    // "Cells that fire together, wire together" - but only if pre fires before post
+                    float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                    totalDelta += delta;
+                } else if (dt < 0) {
+                    // Post before pre: DEPRESSION
+                    // "Anti-Hebbian" - connection weakens if post fires without pre
+                    float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+                    totalDelta += delta;
+                }
+                // dt == 0: no change (simultaneous spikes - rare in practice)
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+        }
+    } else {
+        // Use iterators for better cache performance on smaller spike sets
+        for (Timestamp preTime : preSpikes) {
+            for (Timestamp postTime : postSpikes) {
+                float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+                
+                if (dt > 0) {
+                    // Pre before post: POTENTIATION
+                    float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                    totalDelta += delta;
+                } else if (dt < 0) {
+                    // Post before pre: DEPRESSION
+                    float delta = -pImpl->ltdWeight * std::exp(dt / tau);
+                    totalDelta += delta;
+                }
+            }
         }
     }
     

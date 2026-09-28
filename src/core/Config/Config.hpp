@@ -78,20 +78,73 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
     
-    // Remove key
-    void remove(const std::string& key);
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Get configuration entry (with metadata)
+    const ConfigEntry* getEntry(const std::string& key) const;
     
-    // Clear all
-    void clear();
+    // Validate configuration against schema
+    bool validate(const std::string& schema) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Set default values
+    void setDefaults();
+    
+    // Get source of configuration value
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Check if key exists and has valid value
+    bool hasValid(const std::string& key) const;
+    
+    // Get all keys with source information
+    std::vector<std::pair<std::string, ConfigSource>> getKeySources() const;
+    
+    // Clear configuration by source
+    void clearBySource(ConfigSource source);
+    
+    // Merge configurations
+    void merge(const Config& other);
+    
+    // Configuration schema validation
+    struct ValidationRule {
+        std::string key;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string description;
+    };
+    
+    void addValidationRule(const ValidationRule& rule);
+    
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration statistics
+    struct Stats {
+        size_t totalEntries;
+        size_t defaultEntries;
+        size_t fileEntries;
+        size_t commandLineEntries;
+        size_t runtimeEntries;
+        double entropy;  // Measure of configuration uncertainty
+    };
+    
+    Stats getStats() const;
+    
+    // Get configuration hash for change detection
+    std::string getHash() const;
+    
+    // Compare configurations
+    bool equals(const Config& other) const;
+    
+    // Export configuration to different formats
+    std::string exportToYAML() const;
+    std::string exportToJSON() const;
+    std::string exportToINI() const;
     
 private:
     struct Impl;

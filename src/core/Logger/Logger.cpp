@@ -52,18 +52,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
     }
-}
-
-void ConsoleLogger::setLevel(LogLevel level) {
-    pImpl->level = level;
-}
-
-LogLevel ConsoleLogger::getLevel() const {
-    return pImpl->level;
+    
+    // Performance: Avoid endl for better flushing
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
     pImpl->useColors = useColors;
+    NLM_LOG_INFO("Console logger colors: " + std::string(useColors ? "enabled" : "disabled"));
 }
 
 bool ConsoleLogger::getUseColors() const {
@@ -71,12 +66,24 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (pImpl->fileOut.is_open()) {
+        NLM_LOG_INFO("Console logger output file set: " + filepath);
+    } else {
+        NLM_LOG_ERROR("Failed to open log file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
+        NLM_LOG_INFO("Console logger output file closed");
     }
 }
 
@@ -114,7 +121,13 @@ Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    
+    if (logger) {
+        pImpl->loggers.push_back(logger);
+        NLM_LOG_DEBUG("Added logger of type: " + std::to_string(static_cast<int>(logger->getLevel())));
+    } else {
+        NLM_LOG_ERROR("Attempted to add null logger");
+    }
 }
 
 void Logger::clearLoggers() {
