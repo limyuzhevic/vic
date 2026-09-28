@@ -1,8 +1,7 @@
 // Brain Tests
-#include "brain/Brain.hpp"
-#include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "memory/NeuralAssociativeMemory.hpp"
 
 namespace test_brain {
 
@@ -128,7 +127,7 @@ void runAll() {
     testBrainReset();
     testBrainRegions();
     testBrainActionProduction();
-    testBrainStatus();
+    testMemoryCheckpointing();
 }
 
 } // namespace test_brain

@@ -19,7 +19,6 @@ struct NeuralWorkingMemory::Impl {
 
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
@@ -29,12 +28,11 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !pImpl->brain) return;
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,7 +42,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
+        if (auto* n = pImpl->brain->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
             for (auto* nn : *n) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
@@ -84,8 +82,8 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+    if (pImpl->brain) {
+        pImpl->brain->injectCurrent(neuron, activation * 5.0f);
     }
 }
 
@@ -114,7 +112,7 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    if (!pImpl->brain) return;
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -123,7 +121,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         
         if (activation > 0.1f) {
             // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            pImpl->brain->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -170,17 +168,17 @@ void NeuralWorkingMemory::runCompetition() {
         if (memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
-    }
-    
-    // Inhibitory competition - suppress non-winners
-    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
-        
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
-    }
+            
+            // Inhibitory competition - suppress non-winners
+            for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+                bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
+                
+                if (!isWinner && pImpl->brain) {
+                    // Apply strong inhibition
+                    pImpl->brain->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+                }
+            }
 }
 
 bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
@@ -218,9 +216,9 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
             fromActivation = memoryActivations_[idx];
         }
         
-        if (fromActivation > 0.1f && brain_) {
+        if (fromActivation > 0.1f && pImpl->brain) {
             // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+            pImpl->brain->injectCurrent(conn.second, fromActivation * 2.0f);
         }
     }
 }
@@ -255,7 +253,6 @@ struct AttentionalSelection::Impl {
 
 AttentionalSelection::AttentionalSelection()
     : pImpl(new Impl)
-    , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)
     , competitionThreshold_(0.3f)
@@ -266,7 +263,6 @@ AttentionalSelection::~AttentionalSelection() = default;
 
 void AttentionalSelection::initialize(Brain* brain) {
     pImpl = std::make_unique<Impl>();
-    brain_ = brain;
     NLM_LOG_INFO("AttentionalSelection initialized");
 }
 
@@ -307,8 +303,8 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
             
             if (relativeActivity > 1.5f) {
                 // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
+                if (pImpl->brain) {
+                    pImpl->brain->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
                 }
                 pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
             }
@@ -323,8 +319,8 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
             winners_.push_back(competitors[i]);
             
             // Apply excitation to winners
-            if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+            if (pImpl->brain) {
+                pImpl->brain->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
             }
         }
     }
@@ -423,4 +419,51 @@ void AttentionalSelection::reset() {
     pImpl->inhibitionLevel.clear();
 }
 
-} // namespace nlm
+// Implementation of saveToCheckpoint and loadFromCheckpoint for NeuralWorkingMemory
+
+bool NeuralWorkingMemory::saveToCheckpoint(CheckpointWriter& writer) const {
+    WorkingMemoryCheckpointData data;
+    
+    // Capture working memory state
+    data.memoryNeurons = memoryNeurons_;
+    data.memoryActivations = memoryActivations_;
+    data.memoryTimestamps = memoryTimestamps_;
+    data.activeTraces = activeTraces_;
+    data.recurrentConnections = pImpl->maintenanceSynapses;
+    data.winners = winners_;
+    data.capacity = capacity_;
+    data.decayRate = decayRate_;
+    
+    // Write checkpoint section
+    return writer.writeSection(CheckpointSection::Memory, &data, sizeof(WorkingMemoryCheckpointData));
+}
+
+bool NeuralWorkingMemory::loadFromCheckpoint(CheckpointReader& reader) {
+    WorkingMemoryCheckpointData data;
+    
+    // Read checkpoint section
+    std::vector<uint8_t> sectionData = reader.readSection(CheckpointSection::Memory);
+    if (sectionData.empty()) {
+        return false;
+    }
+    
+    // Copy data back (this is a simplified approach)
+    // In a real implementation, we would properly deserialize the binary data
+    if (sectionData.size() >= sizeof(WorkingMemoryCheckpointData)) {
+        std::memcpy(&data, sectionData.data(), sizeof(WorkingMemoryCheckpointData));
+        
+        // Restore working memory state
+        memoryNeurons_ = data.memoryNeurons;
+        memoryActivations_ = data.memoryActivations;
+        memoryTimestamps_ = data.memoryTimestamps;
+        activeTraces_ = data.activeTraces;
+        pImpl->maintenanceSynapses = data.recurrentConnections;
+        winners_ = data.winners;
+        capacity_ = data.capacity;
+        decayRate_ = data.decayRate;
+        
+        return true;
+    }
+    
+    return false;
+}

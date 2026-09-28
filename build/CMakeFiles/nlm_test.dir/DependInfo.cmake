@@ -1,0 +1,30 @@
+
+# Consider dependencies only in project.
+set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
+
+# The set of languages for which implicit dependencies are needed:
+set(CMAKE_DEPENDS_LANGUAGES
+  )
+
+# The set of dependency files which are needed:
+set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_brain.cpp" "CMakeFiles/nlm_test.dir/tests/test_brain.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_brain.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_clock.cpp" "CMakeFiles/nlm_test.dir/tests/test_clock.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_clock.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_config.cpp" "CMakeFiles/nlm_test.dir/tests/test_config.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_config.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_main.cpp" "CMakeFiles/nlm_test.dir/tests/test_main.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_main.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_memory_checkpointing.cpp" "CMakeFiles/nlm_test.dir/tests/test_memory_checkpointing.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_memory_checkpointing.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_neuron.cpp" "CMakeFiles/nlm_test.dir/tests/test_neuron.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_neuron.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_random.cpp" "CMakeFiles/nlm_test.dir/tests/test_random.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_random.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_stdp.cpp" "CMakeFiles/nlm_test.dir/tests/test_stdp.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_stdp.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_synapse.cpp" "CMakeFiles/nlm_test.dir/tests/test_synapse.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_synapse.cpp.o.d"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/tests/test_types.cpp" "CMakeFiles/nlm_test.dir/tests/test_types.cpp.o" "gcc" "CMakeFiles/nlm_test.dir/tests/test_types.cpp.o.d"
+  )
+
+# Targets to which this target links.
+set(CMAKE_TARGET_LINKED_INFO_FILES
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/build/CMakeFiles/nlm_brain.dir/DependInfo.cmake"
+  "/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_e14bcbfb-2d39-4efc-8224-ea4e3329d918/build/CMakeFiles/nlm_core.dir/DependInfo.cmake"
+  )
+
+# Fortran module output directory.
+set(CMAKE_Fortran_TARGET_MODULE_DIR "")

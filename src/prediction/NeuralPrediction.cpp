@@ -33,7 +33,6 @@ NeuralPrediction::NeuralPrediction()
     , predictionHorizon_(1)
     , temporalPredictionEnabled_(true)
     , actionConsequenceEnabled_(true)
-    , brain_(nullptr)
     , predictionError_(0.0f)
     , predictionConfidence_(0.5f)
 {
@@ -43,7 +42,6 @@ NeuralPrediction::~NeuralPrediction() = default;
 
 void NeuralPrediction::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     
     NLM_LOG_INFO("NeuralPrediction initialized");
 }

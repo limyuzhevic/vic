@@ -14,7 +14,6 @@ struct ConceptFormation::Impl {
 
 ConceptFormation::ConceptFormation()
     : pImpl(new Impl)
-    , brain_(nullptr)
     , nextConceptId_(1)
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
@@ -26,7 +25,6 @@ ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
@@ -303,55 +301,6 @@ struct SpatialRepresentation::Impl {
     Impl() : brain(nullptr) {}
 };
 
-SpatialRepresentation::SpatialRepresentation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , currentX_(0)
-    , currentY_(0)
-    , gridSpacing_(1.0f)
-{
-}
-
-SpatialRepresentation::~SpatialRepresentation() = default;
-
-void SpatialRepresentation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SpatialRepresentation initialized");
-}
-
-void SpatialRepresentation::recordPosition(float x, float y, const std::vector<float>& sensoryCues) {
-    currentX_ = x;
-    currentY_ = y;
-    lastSensoryCue_ = sensoryCues;
-    
-    // Check if we have a place cell near this position
-    bool hasNearbyCell = false;
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < pc.fieldRadius) {
-            hasNearbyCell = true;
-            break;
-        }
-    }
-    
-    // Create new place cell if needed
-    if (!hasNearbyCell && brain_) {
-        PlaceCell newCell;
-        newCell.neuron = NeuronId(placeCells_.size() + 40000);
-        newCell.x = x;
-        newCell.y = y;
-        newCell.fieldRadius = 0.5f;  // Place field size
-        newCell.activation = 1.0f;
-        
-        placeCells_.push_back(newCell);
-        
-        // Inject current to activate this neuron
-        brain_->injectCurrent(newCell.neuron, 5.0f);
-    }
-}
-
 std::pair<float, float> SpatialRepresentation::getPredictedPosition() const {
     return {currentX_, currentY_};
 }
@@ -408,7 +357,6 @@ struct TemporalRelation::Impl {
 
 TemporalRelation::TemporalRelation()
     : pImpl(new Impl)
-    , brain_(nullptr)
 {
 }
 
@@ -416,7 +364,6 @@ TemporalRelation::~TemporalRelation() = default;
 
 void TemporalRelation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
 }
 
 void TemporalRelation::recordSequence(const std::vector<float>& eventA,

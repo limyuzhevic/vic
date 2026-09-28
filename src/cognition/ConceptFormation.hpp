@@ -153,7 +153,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
     
@@ -215,7 +214,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     std::vector<PlaceCell> placeCells_;
     float currentX_;
     float currentY_;
@@ -253,8 +251,7 @@ public:
     // Clear sequences
     void clear();
 
-private:
-    struct SequenceLink {
+struct SequenceLink {
         std::vector<float> fromEvent;
         std::vector<float> toEvent;
         float strength;
@@ -264,7 +261,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     std::vector<SequenceLink> sequences_;
 };
 

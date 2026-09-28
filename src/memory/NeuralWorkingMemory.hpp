@@ -2,12 +2,25 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
 #include <unordered_map>
 
 namespace nlm {
+
+// Working memory checkpoint data structure
+struct WorkingMemoryCheckpointData {
+    std::vector<NeuronId> memoryNeurons;
+    std::vector<float> memoryActivations;
+    std::vector<SimulationStep> memoryTimestamps;
+    std::vector<size_t> activeTraces;
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections;
+    std::vector<NeuronId> winners;
+    size_t capacity;
+    float decayRate;
+};
 
 // NeuralWorkingMemory: Implements working memory using neural dynamics
 // NOT a simple storage vector - uses persistent activity and recurrent connections
@@ -74,6 +87,10 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Checkpoint support
+    bool saveToCheckpoint(CheckpointWriter& writer) const;
+    bool loadFromCheckpoint(CheckpointReader& reader);
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
@@ -87,7 +104,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     size_t capacity_;
     float decayRate_;
     
@@ -170,7 +186,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     float inhibitionStrength_;
     float excitationStrength_;
     float competitionThreshold_;

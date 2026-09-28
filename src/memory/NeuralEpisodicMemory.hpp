@@ -1,11 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
-#include <vector>
-#include <memory>
-#include <deque>
-#include <functional>
+#include "../performance/CheckpointSystem.hpp"
 
 namespace nlm {
 
@@ -41,14 +34,13 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
-    EpisodicMemoryItem()
-        : timestamp(0), positionX(0), positionY(0), orientation(0)
-        , action(ActionType::Wait)
-        , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+    // Episodic memory checkpoint data structure
+struct EpisodicMemoryCheckpointData {
+    std::deque<EpisodicMemoryItem> episodes;
+    std::vector<NeuronId> episodeNeurons;
+    size_t maxEpisodes;
+    bool replayEnabled;
 };
-
-// NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
 // NOT a database - episodes are encoded as synaptic patterns and can influence neural activity
 //
 // Key mechanisms:
@@ -124,6 +116,10 @@ public:
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
+    // Checkpoint support
+    bool saveToCheckpoint(CheckpointWriter& writer) const;
+    bool loadFromCheckpoint(CheckpointReader& reader);
+
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
@@ -139,13 +135,14 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     std::deque<EpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
     bool replayEnabled_;
+// Associative memory checkpoint data structure
+struct AssociativeMemoryCheckpointData {
+    std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons;
+    std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
 };
-
-// AssociativeMemory: Creates and retrieves relationships between experiences
 // NOT a lookup table - associations are encoded in synaptic connectivity
 //
 // Key mechanisms:
@@ -195,6 +192,10 @@ public:
     // Get number of associations
     size_t getAssociationCount() const { return associations_.size(); }
 
+    // Checkpoint support
+    bool saveToCheckpoint(CheckpointWriter& writer) const;
+    bool loadFromCheckpoint(CheckpointReader& reader);
+
 private:
     // Find pattern neuron or create one
     NeuronId findPatternNeuron(const std::vector<float>& pattern);
@@ -206,7 +207,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons_;
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations_;
 };

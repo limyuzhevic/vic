@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <deque>
 
 namespace nlm {
 
@@ -71,6 +72,12 @@ public:
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
 
+    // Update planning context with working memory and neuromodulation
+    void updatePlanningContext(const std::vector<float>& workingMemoryState,
+                              const std::vector<float>& goal,
+                              float curiosityLevel,
+                              float noveltyLevel);
+
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
@@ -81,21 +88,23 @@ private:
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
+    // Update planning with neuromodulatory signals
+    void applyNeuromodulationToPlanning(float curiosity, float novelty);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     size_t planningDepth_;
     float planningConfidence_;
     
     // Current goal state
     std::vector<float> currentGoal_;
     
-    // Action quality from experience
-    std::vector<float> actionQuality_;
-    
-    // Recent plan success history
-    std::deque<bool> recentPlanSuccess_;
+    // Working memory context for planning
+    std::vector<float> workingMemoryContext_;
+
+    // Novelty bonus for exploration
+    float noveltyBonus_;
 };
 
 // SelfModel: Represents the agent's internal model of itself
@@ -129,7 +138,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -234,7 +243,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     size_t observationCount_;
     
     // Observed action effects (other agent's actions)

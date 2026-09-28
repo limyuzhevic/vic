@@ -17,7 +17,6 @@ struct NeuralEpisodicMemory::Impl {
 
 NeuralEpisodicMemory::NeuralEpisodicMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
@@ -27,7 +26,6 @@ NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 
@@ -39,7 +37,7 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion
-    if (brain_ && !episode.sensoryState.empty()) {
+    if (pImpl->brain && !episode.sensoryState.empty()) {
         NeuronId epNeuron(episodes_.size() + 20000);
         pImpl->episodeNeurons.push_back(epNeuron);
         
@@ -165,7 +163,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 }
 
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
-    if (!episode || !brain_) return;
+    if (!episode || !pImpl->brain) return;
     
     // Reactivate neurons that were active during this episode
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
@@ -174,7 +172,7 @@ void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
                           episode->neuronActivations[i] : 0.5f;
         
         // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        pImpl->brain->injectCurrent(neuron, activation * 3.0f);
     }
     
     // Also inject sensory pattern if available
@@ -327,7 +325,6 @@ struct NeuralAssociativeMemory::Impl {
 
 NeuralAssociativeMemory::NeuralAssociativeMemory()
     : pImpl(new Impl)
-    , brain_(nullptr)
 {
 }
 
@@ -335,7 +332,6 @@ NeuralAssociativeMemory::~NeuralAssociativeMemory() = default;
 
 void NeuralAssociativeMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     NLM_LOG_INFO("NeuralAssociativeMemory initialized");
 }
 
@@ -572,6 +568,90 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+namespace nlm {
+
+// Implementation of saveToCheckpoint and loadFromCheckpoint for NeuralAssociativeMemory
+
+bool NeuralAssociativeMemory::saveToCheckpoint(CheckpointWriter& writer) const {
+    AssociativeMemoryCheckpointData data;
+    
+    // Capture associative memory state
+    data.patternNeurons = patternNeurons_;
+    data.associations = associations_;
+    
+    // Write checkpoint section
+    return writer.writeSection(CheckpointSection::Memory, &data, sizeof(AssociativeMemoryCheckpointData));
+}
+
+bool NeuralAssociativeMemory::loadFromCheckpoint(CheckpointReader& reader) {
+    AssociativeMemoryCheckpointData data;
+    
+    // Read checkpoint section
+    std::vector<uint8_t> sectionData = reader.readSection(CheckpointSection::Memory);
+    if (sectionData.empty()) {
+        return false;
+    }
+    
+    // Copy data back (this is a simplified approach)
+    // In a real implementation, we would properly deserialize the binary data
+    if (sectionData.size() >= sizeof(AssociativeMemoryCheckpointData)) {
+        std::memcpy(&data, sectionData.data(), sizeof(AssociativeMemoryCheckpointData));
+        
+        // Restore associative memory state
+        patternNeurons_ = data.patternNeurons;
+        associations_ = data.associations;
+        
+        return true;
+    }
+    
+    return false;
+}
+
+} // namespace nlm
+
+namespace nlm {
+
+// Implementation of saveToCheckpoint and loadFromCheckpoint for NeuralEpisodicMemory
+
+bool NeuralEpisodicMemory::saveToCheckpoint(CheckpointWriter& writer) const {
+    EpisodicMemoryCheckpointData data;
+    
+    // Capture episodic memory state
+    data.episodes = episodes_;
+    data.episodeNeurons = pImpl->episodeNeurons;
+    data.maxEpisodes = maxEpisodes_;
+    data.replayEnabled = replayEnabled_;
+    
+    // Write checkpoint section
+    return writer.writeSection(CheckpointSection::Memory, &data, sizeof(EpisodicMemoryCheckpointData));
+}
+
+bool NeuralEpisodicMemory::loadFromCheckpoint(CheckpointReader& reader) {
+    EpisodicMemoryCheckpointData data;
+    
+    // Read checkpoint section
+    std::vector<uint8_t> sectionData = reader.readSection(CheckpointSection::Memory);
+    if (sectionData.empty()) {
+        return false;
+    }
+    
+    // Copy data back (this is a simplified approach)
+    // In a real implementation, we would properly deserialize the binary data
+    if (sectionData.size() >= sizeof(EpisodicMemoryCheckpointData)) {
+        std::memcpy(&data, sectionData.data(), sizeof(EpisodicMemoryCheckpointData));
+        
+        // Restore episodic memory state
+        episodes_ = data.episodes;
+        pImpl->episodeNeurons = data.episodeNeurons;
+        maxEpisodes_ = data.maxEpisodes;
+        replayEnabled_ = data.replayEnabled;
+        
+        return true;
+    }
+    
+    return false;
 }
 
 } // namespace nlm
