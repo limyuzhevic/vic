@@ -194,6 +194,32 @@ public:
     void logStatus() const;
     
 private:
+    // Core brain simulation methods
+    void executeDelayedSpikeProcessing(SimulationStep currentStep, Timestamp currentTime);
+    void executeNeuronDynamics(Timestamp currentTime);
+    void executeSpikeDetectionAndScheduling(SimulationStep currentStep, Timestamp currentTime);
+    void processImmediateSpikes(SimulationStep currentStep);
+    
+    // Memory systems
+    void updateWorkingMemory();
+    void updateEpisodicMemory();
+    
+    // Neuromodulation and plasticity
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    
+    // Cognitive systems
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    
+    // Structural and developmental processes
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void updateMemoryConsolidation(SimulationStep currentStep);
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    
     struct Impl;
     Impl* pImpl;
 };
