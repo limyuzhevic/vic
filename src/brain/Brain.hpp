@@ -28,6 +28,30 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class NeuralRegion;
+class NeuralPopulation;
+class Neuron;
+class Synapse;
+
+// Brain helper functions
+void executeDelayedSpikeProcessing(Brain* brain, SimulationStep currentStep, Timestamp currentTime);
+void executeLIFDynamics(Brain* brain, Timestamp currentTime);
+void executeSpikeDetectionAndScheduling(Brain* brain, SimulationStep currentStep, Timestamp currentTime);
+void executeWorkingMemoryUpdate(Brain* brain);
+void executeNeuromodulationUpdate(Brain* brain);
+void executePlasticityUpdate(Brain* brain);
+void executeEpisodicMemoryUpdate(Brain* brain);
+void executePredictionSystemUpdate(Brain* brain);
+void executeAttentionSystemUpdate(Brain* brain);
+void executeConceptFormationUpdate(Brain* brain);
+void executeStructuralPlasticityUpdate(Brain* brain);
+void executeMemoryReplay(Brain* brain);
+void executeDevelopmentEffects(Brain* brain);
+void executeStatisticsCollection(Brain* brain);
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

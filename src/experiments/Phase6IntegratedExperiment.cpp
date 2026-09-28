@@ -19,6 +19,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
+    // Input validation
+    if (config.maxSteps == 0 || config.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid configuration: maxSteps and neuronCount must be positive");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
@@ -37,6 +44,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
+        // Attempt to clean up partially initialized brain
+        brain.reset();
         result.endTime = time(nullptr);
         return result;
     }
@@ -62,7 +71,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        auto regions = agent.getBrain()->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No regions found in brain");
+            break;
+        }
+        SensoryPercept percept = world.observe(regions[0].get());
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +88,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(regions[0].get(), cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(regions[0].get());
         totalReward += reward;
         
         // Apply reward modulation
@@ -140,6 +154,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                 result.checkpointingWorks = true;
             } else {
                 NLM_LOG_ERROR("Failed to load checkpoint");
+                // Clean up partially initialized brain
+                brain2.reset();
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
@@ -170,6 +186,15 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Brain initialization failed");
+        return false;
+    }
+    
+    // Validate brain has required systems
+    if (!brain->getWorkingMemory() || !brain->getEpisodicMemory() || 
+        !brain->getDopamine() || !brain->getPredictionSystem() ||
+        !brain->getPlanner() || !brain->getConceptFormation() ||
+        !brain->getAttention() || !brain->getDevelopmentSystem()) {
+        NLM_LOG_ERROR("Brain missing required integrated systems");
         return false;
     }
     
@@ -253,7 +278,10 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain in memory integration test");
+        return false;
+    }
     
     // Get memory systems
     auto* wm = brain->getWorkingMemory();
@@ -293,7 +321,10 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain in neuromodulation integration test");
+        return false;
+    }
     
     // Get neuromodulation systems
     auto* dopamine = brain->getDopamine();
@@ -324,7 +355,10 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     // Create and initialize brain
     auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
+    if (!brain1->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain1 in checkpoint test");
+        return false;
+    }
     
     // Run some steps
     for (int i = 0; i < 100; ++i) {
@@ -346,10 +380,17 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    if (!brain2->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain2 in checkpoint test");
+        brain1.reset();
+        return false;
+    }
     
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
+        // Clean up
+        brain2.reset();
+        brain1.reset();
         return false;
     }
     
@@ -370,7 +411,10 @@ bool Phase6IntegratedExperiment::testReplay() {
     cfg->set("neuron_count", 100);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain in replay test");
+        return false;
+    }
     
     auto* em = brain->getEpisodicMemory();
     if (!em) {

@@ -86,7 +86,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Serialize the value based on its type
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << arg[i];
+                }
+                file << "\"]\n";
+            } else {
+                // For primitive types (int, int64_t, double, bool)
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -193,23 +226,15 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
 // Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+template std::optional<int> Config::get<int>(const std::string& key) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string& key) const;
+template std::optional<double> Config::get<double>(const std::string& key) const;
+template std::optional<bool> Config::get<bool>(const std::string& key) const;
+template std::optional<std::string> Config::get<std::string>(const std::string& key) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+template int Config::getOr<int>(const std::string& key, const int& defaultValue) const;
+template int64_t Config::getOr<int64_t>(const std::string& key, const int64_t& defaultValue) const;
+template double Config::getOr<double>(const std::string& key, const double& defaultValue) const;
+template bool Config::getOr<bool>(const std::string& key, const bool& defaultValue) const;
+template std::string Config::getOr<std::string>(const std::string& key, const std::string& defaultValue) const;
