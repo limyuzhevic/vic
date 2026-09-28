@@ -69,6 +69,29 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced configuration methods
+    void configureForExploration();
+    void configureForExploitation();
+    void configureForBalancedLearning();
+    void enableAllFeatures();
+    void disableAllFeatures();
+    
+    // Utility methods
+    std::string getStatusSummary() const;
+    bool isExploring() const;
+    void recordAction(MotorCommand action);
+    float getActionUsageRatio(MotorCommand action) const;
+    
+    // Development control
+    void advanceDevelopmentStage();
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    float getPlasticityModifier() const;
+    void setPlasticityModifier(float modifier);
+    
+    // Debugging and monitoring
+    void logCurrentState() const;
+    void validateState() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +135,11 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Statistics and tracking
+    mutable std::vector<MotorCommand> actionHistory_;
+    mutable std::array<int, 8> actionCounts_;
+    mutable size_t totalActionsRecorded_;
 };
 
 } // namespace nlm

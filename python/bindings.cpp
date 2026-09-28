@@ -416,6 +416,94 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced helper functions for experienced users
+    m.def("enableAllFeatures", [](AgentBrain& agent) {
+        agent.enableRewardModulation(true);
+        agent.enableStructuralPlasticity(true);
+        agent.enableDevelopment(true);
+        agent.enableCuriosity(true);
+    }, "Enable all learning and adaptation features");
+    
+    m.def("disableAllFeatures", [](AgentBrain& agent) {
+        agent.enableRewardModulation(false);
+        agent.enableStructuralPlasticity(false);
+        agent.enableDevelopment(false);
+        agent.enableCuriosity(false);
+    }, "Disable all learning and adaptation features");
+    
+    m.def("createExplorationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("plasticity.curiosity.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("brain.neuron_count", 2000); // More neurons for exploration
+        return config;
+    }, "Create a configuration optimized for exploration and curiosity");
+    
+    m.def("createExploitationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("plasticity.curiosity.enable", false);
+        config->set("neuromod.curiosity.enable", false);
+        config->set("neuromod.novelty.enable", false);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        return config;
+    }, "Create a configuration optimized for exploitation and learning from rewards");
+    
+    m.def("runEpisode", [](Brain& brain, SimpleWorld& world, AgentBrain& agent, 
+                         int numSteps, float timestep) {
+        agent.reset();
+        brain.reset();
+        world.reset();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world.update(timestep);
+            auto percept = world.getSensoryPercept();
+            agent.processSensoryInput(percept);
+            brain.step(step);
+            auto action = agent.decodeMotorCommand();
+            world.applyMotorCommand(action, world.getSimulationTime());
+            
+            float reward = 0.0f;
+            if (!percept.getInternal().empty()) {
+                reward = percept.getInternal()[0];
+            }
+            agent.applyRewardModulation(reward, 0.0f);
+            agent.updateDevelopment(timestep);
+        }
+        
+        return step;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+       py::arg("numSteps"), py::arg("timestep"), 
+       "Run a complete simulation episode with automatic reward and development updates");
+    
+    m.def("getBrainStatistics", [](Brain& brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain.getTotalNeuronCount();
+        stats["total_synapses"] = brain.getTotalSynapseCount();
+        stats["firing_neurons"] = brain.getFiringNeuronCount();
+        stats["firing_rate"] = brain.getAverageFiringRate();
+        stats["excitatory_inhibitory_ratio"] = brain.getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain.getTotalSpikeCount();
+        stats["development_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+        stats["active_regions"] = brain.getRegionCount();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a dictionary");
+    
+    m.def("getAgentStatistics", [](AgentBrain& agent) {
+        py::dict stats;
+        stats["curiosity_level"] = agent.getCuriosityLevel();
+        stats["novelty_level"] = agent.getNoveltyLevel();
+        stats["prediction_error"] = agent.getPredictionError();
+        stats["neuromodulation_level"] = agent.getNeuromodulationLevel();
+        stats["developmental_stage"] = static_cast<int>(agent.getDevelopmentalStage());
+        stats["reward_modulation_enabled"] = agent.isRewardModulationEnabled();
+        stats["structural_plasticity_enabled"] = agent.isStructuralPlasticityEnabled();
+        stats["development_enabled"] = agent.isDevelopmentEnabled();
+        stats["curiosity_enabled"] = agent.isCuriosityEnabled();
+        return stats;
+    }, py::arg("agent"), "Get comprehensive agent statistics as a dictionary");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
