@@ -1,0 +1,15 @@
+# Environment file example for NLM test configuration
+# This file allows configuring tests without modifying code
+
+# Basic Connectivity Test Configuration
+basic_connectivity=steps=100,current_strength=60.0
+
+# Plasticity Test Configuration  
+plasticity=steps=2000,current_strength=40.0,hebbian_enabled=true,stdp_enabled=true
+
+# STDP Verification Test Configuration
+stdp=trials=100,current_strength=80.0
+
+# Comment out tests you don't want to run
+# plasticity=steps=500,current_strength=20.0
+# stdp=trials=25,current_strength=50.0
