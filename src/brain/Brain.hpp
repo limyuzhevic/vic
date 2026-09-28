@@ -47,55 +47,212 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
-
+// 
+// This class represents the complete artificial brain architecture for NLM Phase 6.
+// It integrates all subsystems including:
+// - Real spiking neural computation (LIF neurons, event-driven spike propagation)
+// - Memory systems (working, episodic, associative memory)
+// - Prediction systems (temporal and action-consequence prediction)
+// - Cognition systems (neural planning, concept formation, attention)
+// - Neuromodulation systems (dopamine, curiosity, novelty)
+// - Development system (maturation, plasticity modulation)
+// - Structural plasticity (synaptogenesis, pruning)
+// - Replay and consolidation mechanisms
+// 
+// The brain operates as a closed-loop system with:
+// 1. Sensory input from environment
+// 2. Neural processing (spiking dynamics, memory updates)
+// 3. Action selection (motor output)
+// 4. Reward prediction error and neuromodulation
+// 5. Plasticity updates (STDP, Hebbian, structural)
+// 6. Development effects (plasticity modulation)
+// 7. Memory replay and consolidation
 class Brain {
 public:
     // Create brain with configuration
+    /**
+     * @brief Construct a new Brain object with configuration
+     * 
+     * @param config Shared pointer to configuration object containing brain parameters
+     * 
+     * @details The configuration typically includes:
+     * - Number of neurons and regions
+     * - Connection probabilities
+     * - Plasticity rule parameters
+     * - Simulation timestep
+     * - Random seed for reproducibility
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destroy the Brain object
+     * 
+     * @details Destructor cleans up all brain resources and subsystems
+     */
     ~Brain();
     
     // Disable copying, enable moving
     Brain(const Brain&) = delete;
     Brain& operator=(const Brain&) = delete;
+    
+    /**
+     * @brief Move constructor
+     * 
+     * @param other Another Brain object to move from
+     * 
+     * @details Transfers ownership of the internal implementation (pImpl) from other to this object.
+     * After the move, the source object will have null pImpl pointer.
+     */
     Brain(Brain&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator
+     * 
+     * @param other Another Brain object to move from
+     * 
+     * @return Reference to this Brain object
+     * 
+     * @details Transfers ownership of the internal implementation (pImpl) from other to this object.
+     * After the move, the source object will have null pImpl pointer.
+     */
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    /**
+     * @brief Initialize the brain with configuration
+     * 
+     * @return true if initialization succeeded, false otherwise
+     * 
+     * @details This method creates the neural architecture:
+     * - Creates brain regions with neurons
+     * - Sets up initial connectivity
+     * - Initializes all integrated subsystems
+     * - Configures plasticity systems
+     * - Sets up random number generator
+     * 
+     * @throw std::runtime_error if initialization fails
+     */
     bool initialize();
     
-    // Main simulation step
+    /**
+     * @brief Perform a simulation step using default timestamp calculation
+     * 
+     * @param currentStep Current simulation step number (integer)
+     * 
+     * @details This performs one time step of the simulation:
+     * - Processes delayed spike events
+     * - Updates neuron membrane potentials
+     * - Detects and queues spikes
+     * - Updates working memory
+     * - Applies neuromodulation
+     * - Updates plasticity rules
+     * - Updates episodic memory
+     * - Applies structural plasticity
+     * - Triggers memory replay
+     * - Applies developmental effects
+     * - Collects statistics
+     * 
+     * @note This is the main loop of the integrated brain simulation
+     */
     void step(SimulationStep currentStep);
     
-    // Simulation time step
+    /**
+     * @brief Perform a simulation step with explicit timestamp
+     * 
+     * @param currentStep Current simulation step number (integer)
+     * @param currentTime Current simulation time (seconds, double)
+     * 
+     * @details This performs one time step of the simulation with precise timing:
+     * See details for step(SimulationStep currentStep) for full algorithm
+     * 
+     * @note Use this method when you need precise timing control for multiple clocks
+     */
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    /**
+     * @brief Receive sensory input from environment
+     * 
+     * @param input SensoryInput object containing sensory data (vision, touch, etc.)
+     * 
+     * @details Injects current into sensory neurons based on the input pattern:
+     * - Maps sensory values to neural currents
+     * - Updates working memory with current sensory information
+     * - Triggers prediction error computation if prediction system is active
+     * - Updates novelty detection
+     * 
+     * @note This is called by AgentBrain::processSensoryInput()
+     */
     void receiveSensoryInput(const class SensoryInput& input);
     
-    // Inject current directly into a specific neuron
+    /**
+     * @brief Inject current directly into a specific neuron
+     * 
+     * @param neuron Neuron ID to inject current into
+     * @param current Current value to inject (microsiemens * millivolts)
+     * 
+     * @details Finds the neuron with the given ID across all brain regions and injects
+     * the specified current. This is useful for direct neural control or testing.
+     * 
+     * @throw std::runtime_error if neuron with given ID is not found
+     */
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
-    // Inject current into all neurons of a specific type
+    /**
+     * @brief Inject current into all neurons of a specific type
+     * 
+     * @param type Neuron type (Sensory, Motor, Internal, etc.)
+     * @param current Current value to inject (microsiemens * millivolts)
+     * 
+     * @details Injects the specified current into all neurons of the given type across
+     * all brain regions. This is useful for global modulation effects (e.g., neuromodulation).
+     */
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
+    /**
+     * @brief Get access to the spike system for advanced control
+     * 
+     * @return Pointer to the SpikeSystem object
+     * 
+     * @details The SpikeSystem manages event-driven spike propagation and timing.
+     * Advanced users can access it for custom spike event handling or testing.
+     */
     SpikeSystem* getSpikeSystem();
+    
+    /**
+     * @brief Get read-only access to the spike system
+     * 
+     * @return Const pointer to the SpikeSystem object
+     */
     const SpikeSystem* getSpikeSystem() const;
     
-    // Plasticity system access
+    /**
+     * @brief Get access to the STDP plasticity system
+     * 
+     * @return Pointer to the STDP object
+     * 
+     * @details Spike-Timing-Dependent Plasticity (STDP) is a learning rule that
+     * modifies synaptic weights based on the relative timing of pre- and post-synaptic spikes.
+     */
     STDP* getSTDP();
+    
+    /**
+     * @brief Get access to the Hebbian plasticity system
+     * 
+     * @return Pointer to the Hebbian object
+     * 
+     * @details Hebbian learning strengthens synapses that are simultaneously active,
+     * implementing the principle "neurons that fire together, wire together".
+     */
     Hebbian* getHebbian();
+    
+    /**
+     * @brief Get access to the structural plasticity system
+     * 
+     * @return Pointer to the StructuralPlasticity object
+     * 
+     * @details Structural plasticity manages the creation and elimination of synaptic
+     * connections over longer timescales, implementing synaptogenesis and pruning.
+     */
     StructuralPlasticity* getStructuralPlasticity();
-    
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
-    
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
