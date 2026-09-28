@@ -243,11 +243,13 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
+    pImpl->predictionSystem->setRandomSeed(pImpl->config->getOr<uint64_t>("random_seed", 42));
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPredictionSystem(pImpl->predictionSystem.get());
     
     pImpl->conceptFormation->initialize(this);
     
@@ -511,25 +513,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // In a real implementation, this would use actual sensory input
+        // For now, just call integration methods
+        
+        // Make prediction for next state based on current neural state
+        // This would use the prediction system's internal neural substrate
+        
+        // Integrate prediction with attention
+        pImpl->predictionSystem->integrateWithAttention(this);
+        
+        // Update prediction based on prediction error
+        // This would track prediction accuracy and adjust future predictions
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
+        // Apply prediction to attention allocation
+        if (pImpl->predictionSystem) {
+            float predictionInfluence = pImpl->predictionSystem->getPredictionInfluence();
+            if (predictionInfluence > 0.3f) {
+                // Strong prediction errors require attentional adjustment
+                // Signal attention to focus on prediction-relevant features
+                // This would modulate inhibition/excitation in attentional selection
+            }
+        }
+        
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
-    }
-    
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -574,6 +590,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Apply enhanced developmental modulation based on prediction errors
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->developmentSystem->enhancePlasticityBasedOnPrediction(
+                this, predictionError, pImpl->timestep * 1000);
+        }
+        
+        // Apply enhanced developmental modulation to all plasticity systems
+        pImpl->developmentSystem->applyDevelopmentalModulation(this, pImpl->timestep * 1000);
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
@@ -712,6 +738,157 @@ std::unique_ptr<class Action> Brain::produceAction() {
     }
     
     auto action = std::make_unique<Action>(type);
+    
+    // ENHANCED BEHAVIORAL EFFECTS FROM PREDICTION AND DEVELOPMENT SYSTEMS
+    
+    // 1. Prediction system influence on action selection
+    if (pImpl->predictionSystem) {
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float predictionInfluence = pImpl->predictionSystem->getPredictionInfluence();
+        
+        if (predictionError > 0.5f) {
+            // High prediction error: action needs adjustment or exploration
+            // Add exploration to action selection
+            if (type == ActionType::MoveForward && pImpl->rng) {
+                float exploration = pImpl->rng->nextFloat();
+                if (exploration < predictionError * 0.3f) {
+                    // Explore - try different action based on prediction uncertainty
+                    ActionType exploredType = getActionBasedOnPrediction(pImpl->predictionSystem.get(), type);
+                    if (exploredType != type) {
+                        type = exploredType;
+                        action = std::make_unique<Action>(type);
+                    }
+                }
+            }
+        }
+        
+        if (predictionInfluence > 0.7f) {
+            // Very high prediction influence: action should reflect prediction uncertainty
+            // Modify action based on prediction confidence
+            if (type == ActionType::MoveForward) {
+                if (pImpl->predictionSystem->getConfidence() < 0.3f) {
+                    // Low prediction confidence: be cautious
+                    type = ActionType::Wait;  // Hesitate when prediction is uncertain
+                    action = std::make_unique<Action>(type);
+                }
+            }
+        }
+    }
+    
+    // 2. Development system behavioral effects
+    if (pImpl->developmentSystem) {
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        float developmentalPlasticity = pImpl->developmentSystem->getPlasticityModifier();
+        
+        // Development stage affects action selection strategy
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                // Initial stage: exploratory actions for learning
+                if (type == ActionType::MoveForward && pImpl->rng) {
+                    float explorationProb = 0.4f * developmentalPlasticity;
+                    if (pImpl->rng->nextFloat() < explorationProb) {
+                        type = ActionType::TurnLeft;  // Try different direction
+                        action = std::make_unique<Action>(type);
+                    }
+                }
+                break;
+                
+            case DevelopmentalStage::CriticalPeriod:
+                // Critical period: fine-tuned actions for skill development
+                if (type == ActionType::MoveForward) {
+                    // During critical period, actions are more precise
+                    // Add slight hesitation based on developmental progress
+                    float stageProgress = pImpl->developmentSystem->getCriticalPeriodProgress();
+                    if (stageProgress > 0.7f && pImpl->rng) {
+                        float hesitation = pImpl->rng->nextFloat() * (1.0f - stageProgress) * 0.3f;
+                        if (hesitation > 0.5f) {
+                            type = ActionType::Wait;  // Hesitate at high critical period progress
+                            action = std::make_unique<Action>(type);
+                        }
+                    }
+                }
+                break;
+                
+            case DevelopmentalStage::Maturation:
+                // Maturation: balanced exploration and exploitation
+                if (type == ActionType::MoveForward && pImpl->rng) {
+                    float balance = 0.3f + (1.0f - developmentalPlasticity) * 0.4f;
+                    if (pImpl->rng->nextFloat() < balance) {
+                        // More exploitation during maturation
+                        type = ActionType::MoveForward;
+                        action = std::make_unique<Action>(type);
+                    }
+                }
+                break;
+                
+            case DevelopmentalStage::Adult:
+                // Adult stage: optimized actions for efficiency
+                if (type == ActionType::MoveForward) {
+                    // Adults use more efficient, learned actions
+                    // In a full implementation, this would select actions
+                    // based on learned experience and efficiency
+                }
+                break;
+                
+            case DevelopmentalStage::Aging:
+                // Aging stage: conservative actions with fallback mechanisms
+                if (type == ActionType::MoveForward && pImpl->rng) {
+                    float caution = 0.3f * (1.0f - developmentalPlasticity);
+                    if (pImpl->rng->nextFloat() < caution) {
+                        type = ActionType::Wait;  // Be cautious when aging
+                        action = std::make_unique<Action>(type);
+                    }
+                }
+                break;
+        }
+        
+        // Development system modulates action quality and effectiveness
+        if (pImpl->structuralPlasticity) {
+            float plasticityEffects = developmentalPlasticity * 0.2f;
+            if (plasticityEffects > 0.1f && pImpl->rng) {
+                // Developmental plasticity affects action execution
+                float actionQuality = pImpl->rng->nextFloat() * plasticityEffects;
+                if (actionQuality > 0.7f) {
+                    // High developmental plasticity can cause action improvement
+                    // In a full implementation, this would improve action quality
+                }
+            }
+        }
+    }
+    
+    // 3. Cross-system behavioral effects
+    // 3a. Prediction system affects attention and action coherence
+    if (pImpl->predictionSystem && pImpl->attention) {
+        float predictionUncertainty = 1.0f - pImpl->predictionSystem->getConfidence();
+        if (predictionUncertainty > 0.5f) {
+            // High prediction uncertainty requires attentional adjustment
+            // This would signal attention system to refocus
+            // In a full implementation, this would integrate with attentional selection
+        }
+    }
+    
+    // 3b. Development system affects prediction-action feedback loop
+    if (pImpl->developmentSystem && pImpl->predictionSystem) {
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Development stage affects how prediction errors influence action
+        if (stage == DevelopmentalStage::CriticalPeriod && predictionError > 0.3f) {
+            // Critical period: high prediction errors strongly influence action modification
+            // This would drive more significant action changes to reduce prediction errors
+            if (type == ActionType::MoveForward && pImpl->rng) {
+                float correction = pImpl->rng->nextFloat() * predictionError * 0.5f;
+                if (correction > 0.7f) {
+                    type = ActionType::TurnRight;  // Corrective action
+                    action = std::make_unique<Action>(type);
+                }
+            }
+        }
+    }
+    
+    // 4. Behavioral learning effects based on prediction and development
+    // Store behavioral effects for learning
+    recordBehavioralEffect(type, predictionError, developmentalPlasticity);
     
     return action;
 }

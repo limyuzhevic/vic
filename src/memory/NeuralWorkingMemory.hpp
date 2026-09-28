@@ -74,15 +74,40 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Neuromodulator getters
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getDevelopmentalStage() const;
+    float getPredictionError() const;
+
+    // Set target memory activity level for prediction error
+    void setTargetMemoryActivity(float target) { targetMemoryActivity_ = target; }
+
+    // Integration with prediction system
+    void integratePrediction(const std::vector<float>& prediction);
+
+    // Integration with attention system
+    void integrateAttention(const std::vector<NeuronId>& attendedNeurons);
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
 
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
+    // Create maintenance trace using biologically realistic mechanisms
+    void createMaintenanceTrace(NeuronId neuron, float activation);
 
-    // Decay weak memory traces
-    void decayWeakTraces();
+    // Check if pattern is novel
+    bool checkNovelty(const std::vector<float>& pattern) const;
+
+    // Apply neuromodulatory plasticity (STDP-like)
+    void applyNeuromodulatoryPlasticity(const std::vector<float>& pattern);
+
+    // Update recurrent connections with neuromodulatory effects
+    void updateRecurrentConnectionsWithNeuromodulation();
+
+    // Run competition with neuromodulatory influence
+    void runCompetitionWithNeuromodulation();
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -90,18 +115,21 @@ private:
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
-    
+    float neuromodulatorBaseStrength_;
+    float developmentalPlasticity_;
+    float targetMemoryActivity_;
+
     // Memory content
     std::vector<NeuronId> memoryNeurons_;
     std::vector<float> memoryActivations_;
     std::vector<SimulationStep> memoryTimestamps_;
-    
+
     // Active memory traces
     std::vector<size_t> activeTraces_;
-    
+
     // Recurrent connections for maintenance
     std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
+
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
 };

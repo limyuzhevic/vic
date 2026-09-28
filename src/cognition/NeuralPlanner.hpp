@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include "../prediction/PredictionSystem.hpp"
 
 namespace nlm {
 
@@ -74,6 +75,12 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Set prediction system for enhanced prediction
+    void setPredictionSystem(PredictionSystem* prediction) { predictionSystem_ = prediction; }
+    
+    // Get prediction system
+    PredictionSystem* getPredictionSystem() const { return predictionSystem_; }
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -96,6 +103,9 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Prediction system reference
+    PredictionSystem* predictionSystem_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

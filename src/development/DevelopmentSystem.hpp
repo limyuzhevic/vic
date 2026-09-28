@@ -33,8 +33,26 @@ public:
     // Update development with full parameters
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
     
+    // Enhanced development update with plasticity modulation
+    void updateDevelopment(Brain* brain, float plasticityRate);
+    
+    // Apply developmental modulation to plasticity systems
+    void applyDevelopmentalModulation(Brain* brain, float plasticityRate);
+    
+    // Enhance plasticity based on prediction errors
+    void enhancePlasticityBasedOnPrediction(Brain* brain, float predictionError, float plasticityRate);
+    
+    // Get developmental stage specific plasticity boost
+    float getStageSpecificPlasticityBoost() const;
+    
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
+    
+    // Get Hebbian learning rate for developmental stage
+    float getHebbianLearningRate(DevelopmentalStage stage) const;
+    
+    // Get STDP learning rate for developmental stage
+    float getSTDPlearningRate(DevelopmentalStage stage) const;
     
     // Get critical period info
     bool isCriticalPeriod() const;
@@ -45,6 +63,12 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Should enhance synaptic connections based on stage?
+    bool shouldEnhanceSynapticConnections(DevelopmentalStage stage) const;
+    
+    // Should prune weak connections based on stage?
+    bool shouldPruneWeakConnections(DevelopmentalStage stage) const;
     
 private:
     struct Impl;
