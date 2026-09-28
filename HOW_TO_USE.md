@@ -70,7 +70,7 @@ make install
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 2: Installing the Enhanced Python Library
 
 ### From Source (Recommended for Development)
 
@@ -78,39 +78,70 @@ make install
 # Install build dependencies
 pip install pybind11 scikit-build-core pytest numpy
 
-# Build and install
-pip install .
+# Install the enhanced API as well
+pip install -e .[dev]
 
-# Or install in development mode
-pip install -e .
+# Or install both the C++ extension and enhanced API
+pip install py_nlm_enhanced
 ```
 
-### Using pyproject.toml (Modern Python Packaging)
+### Enhanced Python API Installation
+
+The enhanced Python API provides additional features and functionality:
 
 ```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
+# Install enhanced API separately (requires the C++ extension)
+pip install py_nlm_enhanced
 
-# Build only (without installing)
-pip install build
-python -m build
-
-# Install specific build from wheel
-pip install dist/*.whl
+# Or install with the main package
+pip install pybind11 scikit-build-core pytest numpy
+pip install -e .
+pip install py_nlm_enhanced
 ```
 
-### Verifying Installation
+### Using Enhanced API
 
 ```python
-import pynlm
+# Import the enhanced API
+import py_nlm_enhanced as pynlm
 
-# Check version
-print(pynlm.__version__)
+# Check version and functionality
+print(f"NLM Enhanced API Version: {pynlm.__version__}")
+print(f"Description: {pynlm.__description__}")
 
-# Create a simple brain
+# Create enhanced brain with advanced features
+brain = pynlm.create_advanced_brain(name="MyAdvancedBrain")
+brain.initialize(enable_learning=True, enable_curiosity=True)
+print(f"Created brain with {brain.get_total_neuron_count()} neurons")
+
+# The enhanced API is automatically available when imported
+# No additional configuration needed for basic functionality
+```
+
+### Verifying Enhanced Installation
+
+```python
+import py_nlm_enhanced as pynlm
+
+# Check enhanced API availability
+print(f"Enhanced API Version: {pynlm.__version__}")
+print(f"Features available:")
+print("  - AdvancedBrain class with learning, development, curiosity")
+print("  - EnhancedWorld class with dynamic objects and resource mapping")
+print("  - AdvancedAgent class with memory, planning, and decision systems")
+print("  - Event callback system")
+print("  - State save/load functionality")
+print("  - Comprehensive performance monitoring")
+
+# Create basic functionality test
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Basic brain neurons: {brain.getTotalNeuronCount()}")
+
+# Create advanced functionality test
+advanced_brain = pynlm.create_advanced_brain()
+advanced_brain.initialize()
+print(f"Advanced brain features enabled: {advanced_brain.get_state_summary()}")
 ```
 
 ---

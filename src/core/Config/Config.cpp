@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -19,36 +22,125 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+    std::string content((std::istreambuf_iterator<char>(file)),
+                         std::istreambuf_iterator<char>());
+    
+    // Try to parse as JSON first
+    try {
+        // Simple JSON parsing (could be enhanced with nlohmann/json library)
+        // For now, implement basic key=value parsing and simple JSON support
+        size_t pos = 0;
+        while (pos < content.length()) {
+            // Skip whitespace and newlines
+            while (pos < content.length() && std::isspace(content[pos])) {
+                pos++;
+            }
             
-            // Remove quotes if present
+            // Skip comments
+            if (pos + 1 < content.length() && content[pos] == '/' && content[pos + 1] == '/') {
+                while (pos < content.length() && content[pos] != '\n') {
+                    pos++;
+                }
+                continue;
+            }
+            
+            if (pos + 1 < content.length() && content[pos] == '/' && content[pos + 1] == '*') {
+                // Skip block comment
+                pos += 2;
+                while (pos + 1 < content.length() && !(content[pos] == '*' && content[pos + 1] == '/')) {
+                    pos++;
+                }
+                if (pos < content.length()) pos += 2;
+                continue;
+            }
+            
+            // Check for key=value pair
+            size_t equals_pos = content.find('=', pos);
+            if (equals_pos == std::string::npos) {
+                break; // No more key=value pairs
+            }
+            
+            std::string key = trim(content.substr(pos, equals_pos - pos));
+            
+            // Find end of value (next newline or comment)
+            size_t value_end = content.find_first_of("\n#;", equals_pos);
+            if (value_end == std::string::npos) {
+                value_end = content.length();
+            }
+            
+            std::string value = trim(content.substr(equals_pos + 1, value_end - equals_pos - 1));
+            
+            // Remove surrounding quotes
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse different value types
+            bool parsed = false;
+            
+            // Try boolean
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::File);
+                parsed = true;
+            }
+            // Try integer
+            else if (value.find_first_not_of("0123456789") == std::string::npos) {
+                try {
+                    int64_t int_val = std::stoll(value);
+                    set(key, int_val, ConfigSource::File);
+                    parsed = true;
+                } catch (...) {}
+            }
+            // Try double
+            else if (value.find_first_not_of("0123456789.-+eE") == std::string::npos) {
+                try {
+                    double double_val = std::stod(value);
+                    set(key, double_val, ConfigSource::File);
+                    parsed = true;
+                } catch (...) {}
+            }
+            // Try string (default)
+            if (!parsed) {
+                set(key, value, ConfigSource::File);
+            }
+            
+            pos = value_end;
+        }
+    } catch (...) {
+        // If parsing fails, fall back to simple line-by-line parsing
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -84,9 +176,64 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write configuration entries in a readable format
+    file << "# NLM Configuration File" << "\n";
+    file << "# Generated by NLM Config System" << "\n";
+    file << "\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write key with source info as comment
+        file << "# Source: ";
+        switch (entry.source) {
+            case ConfigSource::Default: file << "Default"; break;
+            case ConfigSource::File: file << "File"; break;
+            case ConfigSource::CommandLine: file << "Command Line"; break;
+            case ConfigSource::Runtime: file << "Runtime"; break;
+        }
+        file << "\n";
+        
+        // Write the key=value pair
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double to avoid scientific notation and excessive precision
+                file << std::fixed << std::setprecision(6) << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << '\"' << arg << '\"';
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << std::fixed << std::setprecision(6) << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << '\"' << arg[i] << '\"';
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

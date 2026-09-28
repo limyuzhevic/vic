@@ -191,7 +191,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period - fast path check
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -206,30 +206,39 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
+    // Store local references for cache efficiency
     MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    const MembranePotential V_rest = pImpl->state.restingPotential;
+    const MembranePotential V_reset = pImpl->state.resetPotential;
+    const MembranePotential threshold = pImpl->state.threshold;
+    const float tau = Impl::TIME_CONSTANT;  // ms
+    const float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Pre-calculate constant factors for numerical optimization
+    const float dt_factor = static_cast<float>(dt) * 1000.0f;  // Convert to ms
+    const float leak_factor = 1.0f / tau;
+    const float input_factor = 1.0f / C;
     
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    float synapticContribution = pImpl->synapticInput * input_factor;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution - optimized: (V_rest - V) * leak_factor
+    float leakContribution = (V_rest - V) * leak_factor;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V += dt_factor * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Only if adaptation is present to avoid unnecessary calculations
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Use faster comparison with inline clamp
+    if (V < -100.0f) V = -100.0f;
+    else if (V > 50.0f) V = 50.0f;
     
     // Check for spike
     if (V >= threshold) {
