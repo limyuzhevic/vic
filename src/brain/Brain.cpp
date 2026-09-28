@@ -28,6 +28,16 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
+    // ========== PERFORMANCE STATISTICS ==========
+    uint64_t totalSteps;
+    uint64_t totalSpikesThisRun;
+    uint64_t totalSpikesTotalRun;
+    double lastStepTimeMs;
+    double maxStepTimeMs;
+    double avgStepTimeMs;
+    uint64_t stepCountForAverage;
+    double simulationStartTime;
+    
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
@@ -78,6 +88,16 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Performance statistics
+    uint64_t totalSteps;
+    uint64_t totalSpikesThisRun;
+    uint64_t totalSpikesTotalRun;
+    double lastStepTimeMs;
+    double maxStepTimeMs;
+    double avgStepTimeMs;
+    uint64_t stepCountForAverage;
+    double simulationStartTime;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,6 +112,15 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , checkpointManager(nullptr)
+        , totalSteps(0)
+        , totalSpikesThisRun(0)
+        , totalSpikesTotalRun(0)
+        , lastStepTimeMs(0.0)
+        , maxStepTimeMs(0.0)
+        , avgStepTimeMs(0.0)
+        , stepCountForAverage(0)
+        , simulationStartTime(0.0)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -151,6 +180,16 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize performance tracking
+        pImpl->totalSteps = 0;
+        pImpl->totalSpikesThisRun = 0;
+        pImpl->totalSpikesTotalRun = 0;
+        pImpl->lastStepTimeMs = 0.0;
+        pImpl->maxStepTimeMs = 0.0;
+        pImpl->avgStepTimeMs = 0.0;
+        pImpl->stepCountForAverage = 0;
+        pImpl->simulationStartTime = 0.0; // Will be set when first step occurs
     }
     
     DevelopmentalStage developmentalStage;
@@ -323,11 +362,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 12. Replay important memories (during rest or periodically)
      * 13. Apply development effects
      * 14. Collect statistics
+     * 
+     * PERFORMANCE MONITORING:
+     * 15. Measure step execution time
+     * 16. Update performance statistics
      */
+    
+    // Performance timing start
+    auto stepStartTime = std::chrono::high_resolution_clock::now();
     
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    pImpl->totalSteps++;
+    
+    // Initialize performance tracking for this step
+    pImpl->lastStepTimeMs = 0.0;
+    
+    // Set simulation start time on first step
+    if (pImpl->simulationStartTime == 0.0 && pImpl->totalSteps == 1) {
+        pImpl->simulationStartTime = currentTime;
+    }
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -586,6 +641,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // ========== STEP 16: Performance statistics collection ==========
+    auto stepEndTime = std::chrono::high_resolution_clock::now();
+    auto stepDuration = std::chrono::duration_cast<std::chrono::microseconds>(stepEndTime - stepStartTime);
+    double stepTimeMs = stepDuration.count() / 1000.0;
+    
+    // Update performance statistics
+    pImpl->lastStepTimeMs = stepTimeMs;
+    if (stepTimeMs > pImpl->maxStepTimeMs) {
+        pImpl->maxStepTimeMs = stepTimeMs;
+    }
+    
+    // Update average step time (running average)
+    pImpl->stepCountForAverage++;
+    double oldAvg = pImpl->avgStepTimeMs;
+    pImpl->avgStepTimeMs = (oldAvg * (pImpl->stepCountForAverage - 1) + stepTimeMs) / pImpl->stepCountForAverage;
+    
+    // Track spikes for this run
+    pImpl->totalSpikesThisRun += pImpl->totalSpikesTotal;
+    
+    // Log performance statistics periodically (every 1000 steps)
+    if (pImpl->totalSteps % 1000 == 0) {
+        NLM_LOG_INFO("Performance: Step " + std::to_string(pImpl->totalSteps) +
+                    " | Time: " + std::to_string(stepTimeMs) + "ms avg: " + std::to_string(pImpl->avgStepTimeMs) + "ms " +
+                    "| Spikes: " + std::to_string(pImpl->totalSpikesThisStep) + " total: " + std::to_string(pImpl->totalSpikesTotal) +
+                    " | WorkingMem: " + std::to_string(pImpl->workingMemory ? pImpl->workingMemory->getActiveTraces() : 0) +
+                    " | EpisodicMem: " + std::to_string(pImpl->episodicMemory ? pImpl->episodicMemory->getEpisodeCount() : 0));
+    }
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1075,6 +1159,45 @@ std::shared_ptr<const Config> Brain::getConfig() const {
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+// Performance statistics implementations
+uint64_t Brain::getTotalSteps() const {
+    return pImpl->totalSteps;
+}
+
+uint64_t Brain::getTotalSpikesThisRun() const {
+    return pImpl->totalSpikesThisRun;
+}
+
+double Brain::getLastStepTimeMs() const {
+    return pImpl->lastStepTimeMs;
+}
+
+double Brain::getMaxStepTimeMs() const {
+    return pImpl->maxStepTimeMs;
+}
+
+double Brain::getAvgStepTimeMs() const {
+    return pImpl->avgStepTimeMs;
+}
+
+size_t Brain::getStepCountForAverage() const {
+    return pImpl->stepCountForAverage;
+}
+
+float Brain::getSpikesPerSecond() const {
+    double elapsedSeconds = 0.0;
+    if (pImpl->simulationStartTime > 0.0) {
+        elapsedSeconds = (pImpl->currentTime - pImpl->simulationStartTime);
+    }
+    if (elapsedSeconds < 0.001) elapsedSeconds = 0.001;
+    return static_cast<float>(pImpl->totalSpikesThisRun / elapsedSeconds);
+}
+
+float Brain::getNeuronsPerStep() const {
+    if (pImpl->totalSteps == 0) return 0.0f;
+    return static_cast<float>(getTotalNeuronCount()) / static_cast<float>(pImpl->totalSteps);
 }
 
 void Brain::logStatus() const {

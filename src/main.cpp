@@ -28,24 +28,55 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printAdvancedUsage() {
+    std::cout << "" << std::endl;
+    std::cout << "Advanced NLM Usage:" << std::endl;
+    std::cout << "------------------" << std::endl;
+    std::cout << "Performance and Profiling:" << std::endl;
+    std::cout << "  --enable-performance         Enable performance optimizations" << std::endl;
+    std::cout << "  --enable-multithreading     Enable parallel processing" << std::endl;
+    std::cout << "  --enable-event-driven       Enable event-driven spike processing" << std::endl;
+    std::cout << "  --enable-simd              Enable SIMD vectorization" << std::endl;
+    std::cout << "  --enable-sparse-connectivity Enable sparse connectivity optimization" << std::endl;
+    std::cout << "  --profile=mode             Set profiling mode: basic,detailed,memory" << std::endl;
+    std::cout << "  --perf-stats-interval=N     Log performance stats every N steps" << std::endl;
+    std::cout << "  --show-performance         Display performance statistics after simulation" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Experiment Control:" << std::endl;
+    std::cout << "  --experiment=test          Run specific experiment: connectivity,plasticity,stdp" << std::endl;
+    std::cout << "  --experiment-iterations=N  Number of experiment iterations" << std::endl;
+    std::cout << "  --quiet                    Suppress informational output" << std::endl;
+    std::cout << "  --verbose                  Increase verbosity level" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Memory and Persistence:" << std::endl;
+    std::cout << "  --checkpoint-dir=DIR       Directory for checkpoint files" << std::endl;
+    std::cout << "  --checkpoint-interval=N    Save checkpoint every N steps" << std::endl;
+    std::cout << "  --checkpoint-compression   Enable checkpoint compression" << std::endl;
+    std::cout << "  --restore-checkpoint=FILE  Restore brain state from checkpoint" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Visualization and Output:" << std::endl;
+    std::cout << "  --visualize                Enable visualization (requires graphics)" << std::endl;
+    std::cout << "  --output-format=FORMAT     Output format for data export: text,csv,json" << std::endl;
+    std::cout << "  --export-spikes=FILE       Export spike events to file" << std::endl;
+    std::cout << "  --export-synapses=FILE     Export synapse weights to file" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Debug and Development:" << std::endl;
+    std::cout << "  --debug                    Enable debug logging" << std::endl;
+    std::cout << "  --debug-neurons=N          Debug specific neurons (comma-separated)" << std::endl;
+    std::cout << "  --trace-spikes             Trace spike propagation" << std::endl;
+    std::cout << "  --validate-configuration    Validate configuration parameters" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Advanced Configuration:" << std::endl;
+    std::cout << "  --config-commands          Show all available configuration options" << std::endl;
+    std::cout << "  --config-help              Show help for specific configuration option" << std::endl;
+    std::cout << "  --random-seed=N            Set random seed for reproducible experiments" << std::endl;
+    std::cout << "  --development-mode         Enable extended development stage effects" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Analysis and Metrics:" << std::endl;
+    std::cout << "  --analyze-memory           Analyze memory usage patterns" << std::endl;
+    std::cout << "  --analyze-plasticity       Analyze plasticity dynamics" << std::endl;
+    std::cout << "  --analyze-connectivity     Analyze network connectivity" << std::endl;
+    std::cout << "" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -356,31 +387,140 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+// Handle advanced command line arguments for power users
+    std::string profileMode = config->getOr<std::string>("profile_mode", "none");
+    std::string experimentMode = config->getOr<std::string>("experiment_mode", "all");
+    bool enablePerformance = config->getOr<bool>("enable_performance", false);
+    bool enableMultithreading = config->getOr<bool>("enable_multithreading", false);
+    bool enableEventDriven = config->getOr<bool>("enable_event_driven", false);
+    bool enableSIMD = config->getOr<bool>("enable_simd", false);
+    bool enableSparseConnectivity = config->getOr<bool>("enable_sparse_connectivity", false);
+    int perfStatsInterval = config->getOr<int>("perf_stats_interval", 1000);
+    bool showPerformance = config->getOr<bool>("show_performance", false);
+    bool enableDebug = config->getOr<bool>("enable_debug", false);
+    std::string debugNeurons = config->getOr<std::string>("debug_neurons", "");
+    bool traceSpikes = config->getOr<bool>("trace_spikes", false);
+    std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "checkpoints");
+    int checkpointInterval = config->getOr<int>("checkpoint_interval", 1000);
+    bool checkpointCompression = config->getOr<bool>("checkpoint_compression", true);
+    bool enableDevelopmentMode = config->getOr<bool>("enable_development_mode", false);
+    
+    // Parse advanced command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--profile") {
+            if (i + 1 < argc) {
+                profileMode = argv[++i];
+            }
+        } else if (arg == "--experiment") {
+            if (i + 1 < argc) {
+                experimentMode = argv[++i];
+            }
+        } else if (arg == "--enable-performance") {
+            enablePerformance = true;
+        } else if (arg == "--enable-multithreading") {
+            enableMultithreading = true;
+        } else if (arg == "--enable-event-driven") {
+            enableEventDriven = true;
+        } else if (arg == "--enable-simd") {
+            enableSIMD = true;
+        } else if (arg == "--enable-sparse-connectivity") {
+            enableSparseConnectivity = true;
+        } else if (arg == "--perf-stats-interval") {
+            if (i + 1 < argc) {
+                perfStatsInterval = std::atoi(argv[++i]);
+            }
+        } else if (arg == "--show-performance") {
+            showPerformance = true;
+        } else if (arg == "--quiet") {
+            consoleLogger->setLevel(LogLevel::Error);
+        } else if (arg == "--verbose") {
+            consoleLogger->setLevel(LogLevel::Info);
+        } else if (arg == "--debug") {
+            enableDebug = true;
+        } else if (arg == "--debug-neurons") {
+            if (i + 1 < argc) {
+                debugNeurons = argv[++i];
+            }
+        } else if (arg == "--trace-spikes") {
+            traceSpikes = true;
+        } else if (arg == "--checkpoint-dir") {
+            if (i + 1 < argc) {
+                checkpointDir = argv[++i];
+            }
+        } else if (arg == "--checkpoint-interval") {
+            if (i + 1 < argc) {
+                checkpointInterval = std::atoi(argv[++i]);
+            }
+        } else if (arg == "--checkpoint-compression") {
+            checkpointCompression = true;
+        } else if (arg == "--restore-checkpoint") {
+            if (i + 1 < argc) {
+                std::string restoreFile = argv[++i];
+                // Implement checkpoint restore logic here
+                NLM_LOG_INFO("Would restore checkpoint from: " + restoreFile);
+            }
+        } else if (arg == "--enable-development-mode") {
+            enableDevelopmentMode = true;
+        } else if (arg == "--help") {
+            printBanner();
+            printAdvancedUsage();
+            return 0;
+        } else if (arg == "--advanced-help") {
+            printAdvancedUsage();
+            return 0;
+        }
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Set configuration based on advanced arguments
+    if (enablePerformance) {
+        config->set("enable_performance", true, ConfigSource::CommandLine);
+    }
+    if (enableMultithreading) {
+        config->set("enable_multithreading", true, ConfigSource::CommandLine);
+    }
+    if (enableEventDriven) {
+        config->set("enable_event_driven", true, ConfigSource::CommandLine);
+    }
+    if (enableSIMD) {
+        config->set("enable_simd", true, ConfigSource::CommandLine);
+    }
+    if (enableSparseConnectivity) {
+        config->set("enable_sparse_connectivity", true, ConfigSource::CommandLine);
+    }
+    if (profileMode != "none") {
+        config->set("profile_mode", profileMode, ConfigSource::CommandLine);
+    }
+    if (perfStatsInterval > 0) {
+        config->set("perf_stats_interval", perfStatsInterval, ConfigSource::CommandLine);
+    }
+    if (debugNeurons != "") {
+        config->set("debug_neurons", debugNeurons, ConfigSource::CommandLine);
+    }
+    if (traceSpikes) {
+        config->set("trace_spikes", true, ConfigSource::CommandLine);
+    }
+    if (checkpointDir != "checkpoints") {
+        config->set("checkpoint_dir", checkpointDir, ConfigSource::CommandLine);
+    }
+    if (checkpointInterval > 0) {
+        config->set("checkpoint_interval", checkpointInterval, ConfigSource::CommandLine);
+    }
+    if (checkpointCompression) {
+        config->set("checkpoint_compression", true, ConfigSource::CommandLine);
+    }
+    if (enableDevelopmentMode) {
+        config->set("enable_development_mode", true, ConfigSource::CommandLine);
+    }
+    if (enableDebug) {
+        config->set("enable_debug", true, ConfigSource::CommandLine);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
