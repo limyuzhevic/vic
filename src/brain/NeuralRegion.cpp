@@ -245,7 +245,7 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
+    // Create random connections - optimized with early continue
     for (size_t i = 0; i < neuronCount; ++i) {
         Neuron* preNeuron = neurons[i];
         NeuronType preType = preNeuron->getType();

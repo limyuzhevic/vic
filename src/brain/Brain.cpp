@@ -337,7 +337,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+            auto neurons = pop->getNeurons();
+            for (Neuron* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
@@ -345,8 +346,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        auto populations = region->getPopulations();
+        for (auto& pop : populations) {
+            auto neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -449,7 +452,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        auto synapses = region->getSynapses();
+        for (auto& syn : synapses) {
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -492,8 +496,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             // Store active neurons
             for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
+                auto populations = region->getPopulations();
+                for (auto& pop : populations) {
+                    auto neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
                         if (neuron->isFiring() || 
                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
@@ -632,9 +638,11 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
+        auto populations = region->getPopulations();
+        for (auto& pop : populations) {
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
+                auto neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
                     neuron->injectCurrent(current);
                 }
             }
@@ -667,7 +675,8 @@ float Brain::getExcitationInhibitionRatio() const {
     float totalInhibitory = 0.0f;
     
     for (const auto& region : pImpl->regions) {
-        for (const auto& syn : region->getSynapses()) {
+        auto synapses = region->getSynapses();
+        for (const auto& syn : synapses) {
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
