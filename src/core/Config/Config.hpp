@@ -100,6 +100,31 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Parser helper functions
+    static bool isJsonExtension(const std::string& ext);
+    static bool isYamlExtension(const std::string& ext);
+    static bool isConfigExtension(const std::string& ext);
+    static std::string getFileExtension(const std::string& filepath);
+    
+    // JSON/YAML parsing functions
+    bool parseJsonToConfig(const std::string& jsonStr);
+    bool parseYamlToConfig(const std::string& yamlStr);
+    
+    // Legacy support
+    bool loadFromFileLegacy(const std::string& filepath);
+    
+    // File saving functions
+    void saveToFileLegacy(const std::string& filepath) const;
+    void saveToJsonFile(const std::string& filepath) const;
+    void saveToYamlFile(const std::string& filepath) const;
+    
+    // Helper functions
+    std::string getValueString(const ConfigValue& value) const;
+    std::string configValueToJson(const ConfigValue& value) const;
+    std::string configValueToYaml(const ConfigValue& value) const;
+    std::string escapeJsonString(const std::string& str) const;
+    std::string escapeYamlString(const std::string& str) const;
 };
 
 } // namespace nlm

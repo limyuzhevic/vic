@@ -184,14 +184,53 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+// ========== ADVANCED BRAIN MANIPULATION ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Custom neuron creation and manipulation
+    NeuronId createCustomNeuron(const std::string& name = "", NeuronType type = NeuronType::Internal,
+                               float x = 0.0f, float y = 0.0f, float z = 0.0f, float radius = 1.0f);
+    bool setNeuronProperties(NeuronId neuron, const std::string& name = "", NeuronType type = NeuronType::Internal,
+                             float threshold = -55.0f, float restingPotential = -70.0f, float resetPotential = -70.0f,
+                             float leakConductance = 10.0f, uint32_t refractoryPeriod = 5, 
+                             float adaptationRate = 0.01f, bool plasticityEnabled = true);
     
-    // Logging
-    void logStatus() const;
+    // Advanced synapse management
+    SynapseId createCustomSynapse(NeuronId pre, NeuronId post, SynapseType type = SynapseType::Excitatory,
+                                 float weight = 1.0f, float delay = 1, bool plasticityEnabled = true,
+                                 float initialEfficacy = 0.0f);
+    bool modifySynapseProperties(SynapseId synapse, float weight = -1.0f, float delay = -1, 
+                                 bool plasticityEnabled = true, float efficacy = -1.0f);
+    std::vector<InterRegionConnection> getInterRegionConnections() const;
+    
+    // Brain structure manipulation
+    RegionId addCustomRegion(const std::string& name = "", NeuronType defaultType = NeuronType::Internal,
+                            bool enableStructuralPlasticity = true);
+    PopulationId createNeuronPopulation(RegionId region, const std::string& name = "", 
+                                       NeuronType type = NeuronType::Excitatory, size_t size = 10);
+    bool connectRegions(RegionId source, RegionId target, float weight = 0.0f, Delay delay = 1,
+                        PlasticityFlags plasticityFlags = PlasticityFlags());
+    
+    // Advanced simulation control
+    std::map<SimulationStep, std::map<std::string, double>> stepWithDetailedStats(SimulationStep currentStep);
+    bool setCustomTimestep(TimestepDuration timestep);
+    bool pauseResumeSimulation(bool pause);
+    bool isSimulationPaused() const;
+    
+    // Enhanced export/import
+    std::string exportConnectivityMatrix() const;
+    std::string exportNeuralActivity() const;
+    std::string exportDetailedState() const;
+    
+    // Advanced configuration
+    bool mergeConfig(const Config& otherConfig, bool overwriteExisting = true);
+    std::vector<std::string> validateConfig() const;
+    std::map<std::string, double> getConfigStats() const;
+    
+    // Helper methods
+    NeuralRegion* getRegionFromNeuron(NeuronId neuron) const;
+    NeuralRegion* getRegionFromSynapse(SynapseId synapse) const;
+    float getAverageSynapseWeight() const;
+    float getExcitatoryInhibitionRatio() const;
     
 private:
     struct Impl;

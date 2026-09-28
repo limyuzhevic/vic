@@ -285,7 +285,183 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
----
+## Command Line Interface (CLI)
+
+The NLM project includes a powerful CLI tool (`nlm`) that lets you run simulations without writing Python code. The CLI provides several commands for different use cases:
+
+### Basic Commands
+
+```bash
+# Show help
+nlm --help
+
+# Run a simple simulation
+nlm simulate --steps 100
+
+# Run with custom configuration
+nlm simulate --config my_config.cfg --steps 500 --output json
+
+# Run a world simulation
+nlm simulate-world --width 20 --height 20 --steps 50
+
+# Run batch processing with multiple configs
+nlm batch config1.cfg config2.cfg --steps 200 --batches 5
+
+# Export/import brain states
+nlm brain save --file brain_state.json
+nlm brain load --file saved_brain.json
+```
+
+### Advanced CLI Features
+
+#### Simple Simulation
+
+```bash
+# Basic usage
+nlm simulate --steps 1000
+
+# With configuration file
+nlm simulate --config production.cfg --steps 5000
+
+# Different output formats
+nlm simulate --steps 100 --output text      # Human readable (default)
+nlm simulate --steps 100 --output json      # Machine readable
+nlm simulate --steps 100 --output csv       # Spreadsheet format
+```
+
+#### World Simulation
+
+```bash
+# Standard world simulation
+nlm simulate-world --width 30 --height 30 --vision-width 12 --vision-height 12 --steps 100
+
+# Agent navigation with learning
+nlm simulate-world --config agent_config.cfg --steps 1000 --output json
+```
+
+#### Batch Processing
+
+```bash
+# Run multiple configurations
+nlm batch config_a.cfg config_b.cfg config_c.cfg --steps 500 --batches 3
+
+# Different output formats for batch processing
+nlm batch configs/*.cfg --steps 200 --batches 10 --output json
+```
+
+#### Configuration Management
+
+```bash
+# Export current configuration
+nlm config export --output production_config.json
+
+# Load configuration
+nlm config export --config template.cfg --output my_config.json
+```
+
+#### Brain State Management
+
+```bash
+# Save brain state (checkpoint)
+nlm brain save --file checkpoint_1000.json
+
+# Load brain state (resume)
+nlm brain load --file checkpoint_500.json
+```
+
+#### Example Commands
+
+```bash
+# Run built-in examples
+nlm example simple          # Silent brain simulation
+nlm example world           # Agent in world navigation
+nlm example batch           # Batch processing demo
+```
+
+### CLI Script Installation
+
+The CLI tool is installed as `nlm` in your system PATH. If you installed NLM via pip, you can run it directly. For development, you can also run it as:
+
+```bash
+# From the nlm-cli directory
+python -m nlm_cli
+
+# Or run the script directly
+./nlm-cli/bin/nlm simulate
+```
+
+## Advanced Python API Methods
+
+The enhanced Python bindings provide many more methods for advanced usage:
+
+### Batch Processing
+
+```python
+# Run a batch of simulation steps efficiently
+brain.runBatch(start_step=100, num_steps=500)
+
+# Run an episode with statistics collection
+stats = brain.runEpisode(num_steps=1000, record_stats=True)
+for step_stat in stats:
+    print(f"Step {step_stat['step']}: {step_stat['firing_neuron_count']} neurons firing")
+
+# Run simulation with reward tracking
+rewards = [0.1, 0.2, 0.0, 0.3, 0.1]
+cumulative_rewards = brain.runWithRewards(5, rewards)
+```
+
+### Advanced Brain Manipulation
+
+```python
+# Create custom neurons with specific parameters
+neuron_id = brain.createCustomNeuron(
+    pynlm.NeuronType.Excitatory,
+    x=1.0, y=2.0, z=0.0, radius=1.5
+)
+
+# Create custom synapses between specific neurons
+brain.createCustomSynapse(
+    pre=neuron_id,
+    post=other_neuron_id,
+    type=pynlm.SynapseType.Excitatory,
+    weight=2.5,
+    delay=2.0
+)
+
+# Add connections between neural regions
+brain.addInterRegionConnection(
+    source_region1,
+    target_region2,
+    weight=0.8,
+    delay=5
+)
+```
+
+### Visualization Support
+
+```python
+# Export comprehensive visualization data
+viz_data = brain.exportForVisualization(format="json")
+
+# Get neuron positions for 3D visualization
+neurons = viz_data["neurons"]
+for neuron in neurons:
+    print(f"Neuron {neuron['id']}: position ({neuron['x']}, {neuron['y']}, {neuron['z']})")
+
+# Get connectivity matrix for network analysis
+connectivity = viz_data["connectivity"]
+
+# Get spike train data for temporal analysis
+spikes = viz_data["spikes"]
+```
+
+### Complete Examples
+
+See the `examples/` directory for complete demonstration scripts:
+
+- `silent_brain.py` - Simple brain simulation
+- `agent_world.py` - Agent navigation in world
+- `complete_agent.py` - Full agent with learning
 
 ## Next Steps
 
@@ -293,5 +469,7 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the new CLI tool for command-line simulations
+5. Explore the advanced examples in the examples/ directory
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM at all levels, from simple one-liners to complex, research-grade simulations!

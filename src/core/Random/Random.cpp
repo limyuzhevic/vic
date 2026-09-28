@@ -1,5 +1,8 @@
 #include "Random.hpp"
+#include "../Logger/Logger.hpp"
 #include <stdexcept>
+#include <limits>
+#include <cmath>
 
 namespace nlm {
 
@@ -40,7 +43,8 @@ uint64_t RandomGenerator::getSeed() const {
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        NLM_LOG_WARNING("Invalid range in uniformInt: min (" + std::to_string(min) + ") > max (" + std::to_string(max) + ") - returning min value");
+        return min;
     }
     if (min == max) {
         return min;
@@ -51,7 +55,8 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        NLM_LOG_WARNING("Invalid range in uniformInt: min (" + std::to_string(min) + ") > max (" + std::to_string(max) + ") - returning min value");
+        return min;
     }
     if (min == max) {
         return min;
@@ -62,7 +67,8 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 
 double RandomGenerator::uniformReal(double min, double max) {
     if (min >= max) {
-        throw std::invalid_argument("min must be < max");
+        NLM_LOG_WARNING("Invalid range in uniformReal: min (" + std::to_string(min) + ") >= max (" + std::to_string(max) + ") - returning min value");
+        return min;
     }
     std::uniform_real_distribution<double> dist(min, max);
     return dist(pImpl->gen);
@@ -70,7 +76,8 @@ double RandomGenerator::uniformReal(double min, double max) {
 
 float RandomGenerator::uniformReal(float min, float max) {
     if (min >= max) {
-        throw std::invalid_argument("min must be < max");
+        NLM_LOG_WARNING("Invalid range in uniformReal: min (" + std::to_string(min) + ") >= max (" + std::to_string(max) + ") - returning min value");
+        return min;
     }
     std::uniform_real_distribution<float> dist(min, max);
     return dist(pImpl->gen);
@@ -106,12 +113,13 @@ bool RandomGenerator::randomBool() {
 }
 
 uint32_t RandomGenerator::randomBit() {
-    return uniformInt(0, 1);
+    return uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(1));
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
-        throw std::invalid_argument("Cannot pick from zero items");
+        NLM_LOG_ERROR("Cannot pick from zero items - returning 0");
+        return 0;
     }
     return uniformInt(0, n - 1);
 }
@@ -119,7 +127,7 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
 void RandomGenerator::fillBytes(void* data, size_t size) {
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
-        bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
+        bytes[i] = static_cast<uint8_t>(uniformInt(static_cast<uint32_t>(0), static_cast<uint32_t>(255)));
     }
 }
 

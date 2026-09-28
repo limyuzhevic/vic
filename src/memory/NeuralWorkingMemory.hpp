@@ -20,73 +20,153 @@ namespace nlm {
 
 class NeuralWorkingMemory {
 public:
+    /**
+     * @brief Construct a new NeuralWorkingMemory object
+     * Initializes memory with default capacity (100) and decay rate (0.01)
+     */
     NeuralWorkingMemory();
+    
+    /**
+     * @brief Destroy the NeuralWorkingMemory object
+     * Cleans up any allocated memory and resources
+     */
     ~NeuralWorkingMemory();
-
-    // Initialize with brain reference
+    
+    /**
+     * @brief Initialize the working memory with a brain reference
+     * @param brain Pointer to the brain object that contains the neural population
+     * The working memory will use this brain to access neurons and inject currents
+     */
     void initialize(Brain* brain);
-
-    // Store information in working memory
-    // The information is encoded as neural activity pattern
+    
+    /**
+     * @brief Store information pattern in working memory
+     * Encodes the input pattern as persistent neural activity using the brain's neurons
+     * @param pattern Vector of activation values representing the information to store
+     * @param strength Multiplier for the initial activation strength (default: 1.0f)
+     * Higher strength values result in stronger persistent activity
+     */
     void store(const std::vector<float>& pattern, float strength = 1.0f);
-
-    // Store specific neuron activation
+    
+    /**
+     * @brief Store specific neuron activation in working memory
+     * Directly activates a specific neuron rather than encoding a pattern
+     * @param neuron ID of the neuron to activate
+     * @param activation Activation level to set (0.0 to 1.0 typical range)
+     */
     void storeToNeuron(NeuronId neuron, float activation);
-
-    // Retrieve current working memory content as activity levels
+    
+    /**
+     * @brief Retrieve current working memory content as activation levels
+     * @return std::vector<float> Vector of activation values for each stored item
+     * The values are in the range 0.0 to 1.0, with higher values indicating stronger memory traces
+     */
     std::vector<float> retrieve() const;
-
-    // Check if specific neuron is part of working memory
+    
+    /**
+     * @brief Check if a specific neuron is part of the working memory
+     * @param neuron ID of the neuron to check
+     * @return bool true if neuron is in working memory, false otherwise
+     */
     bool contains(NeuronId neuron) const;
-
-    // Get activation level of a specific neuron in working memory
+    
+    /**
+     * @brief Get activation level of a specific neuron in working memory
+     * @param neuron ID of the neuron to query
+     * @return float Activation level of the neuron (0.0 if not in memory)
+     */
     float getNeuronActivation(NeuronId neuron) const;
-
-    // Update working memory (maintenance and decay)
+    
+    /**
+     * @brief Update working memory for one timestep
+     * Maintains persistent activity through recurrent connections and applies decay
+     * @param dt Time step duration in simulation steps
+     */
     void update(TimestepDuration dt);
-
-    // Clear working memory
+    
+    /**
+     * @brief Clear all working memory content
+     * Resets memory to empty state, removing all stored patterns and connections
+     */
     void clear();
-
-    // Get number of active memory traces
+    
+    /**
+     * @brief Get the number of active memory traces
+     * @return size_t Count of memory traces above activity threshold
+     */
     size_t getActiveTraces() const { return activeTraces_.size(); }
-
-    // Get capacity
+    
+    /**
+     * @brief Get the memory capacity (maximum number of items)
+     * @return size_t Maximum number of memory items that can be stored
+     */
     size_t getCapacity() const { return capacity_; }
+    
+    /**
+     * @brief Set the memory capacity
+     * @param cap Maximum number of memory items (must be > 0)
+     */
     void setCapacity(size_t cap) { capacity_ = cap; }
-
-    // Decay rate for memory traces
+    
+    /**
+     * @brief Get the decay rate for memory traces
+     * @return float Decay rate per timestep (typically 0.01 for 1% decay per step)
+     */
     float getDecayRate() const { return decayRate_; }
+    
+    /**
+     * @brief Set the decay rate for memory traces
+     * @param rate Decay rate per timestep (typically 0.01 for 1% decay per step)
+     */
     void setDecayRate(float rate) { decayRate_ = rate; }
-
-    // Get neurons currently in working memory
+    
+    /**
+     * @brief Get neurons currently in working memory
+     * @return const std::vector<NeuronId>& Vector of neuron IDs
+     */
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
-
-    // Strengthen working memory representation (for rehearsal)
+    
+    /**
+     * @brief Strengthen working memory representation (for rehearsal)
+     * Increases activation of all memory traces to reinforce the memory
+     * @param factor Multiplier for activation levels (typically > 1.0 for strengthening)
+     */
     void strengthenMemory(float factor);
-
-    // Competition between memory traces
+    
+    /**
+     * @brief Run competition between memory traces
+     * Applies lateral inhibition to suppress weaker traces and amplify winners
+     * This implements neural competition for selective attention/retention
+     */
     void runCompetition();
-
-    // Is this neuron part of the winning population?
+    
+    /**
+     * @brief Check if this neuron is part of the winning population
+     * @param neuron ID of the neuron to check
+     * @return bool true if neuron is a winner from recent competition
+     */
     bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
+    
+    /**
+     * @brief Get overall memory activity level
+     * @return float Average activation across all memory traces
+     * Useful for monitoring overall memory load
+     */
     float getMemoryActivity() const;
-
+    
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
+    
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
-
+    
     // Decay weak memory traces
     void decayWeakTraces();
-
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
@@ -117,59 +197,127 @@ private:
 
 class AttentionalSelection {
 public:
+    /**
+     * @brief Construct a new AttentionalSelection object
+     */
     AttentionalSelection();
+    
+    /**
+     * @brief Destroy the AttentionalSelection object
+     */
     ~AttentionalSelection();
-
-    // Initialize with brain reference
+    
+    /**
+     * @brief Initialize with brain reference
+     * @param brain Pointer to the brain object
+     */
     void initialize(Brain* brain);
-
-    // Process competing sensory inputs and select winners
-    // Returns IDs of winning neural populations
+    
+    /**
+     * @brief Process competing sensory inputs and select winners
+     * Implements neural competition using lateral inhibition
+     * @param competitors Vector of neuron IDs that are competing for attention
+     * @param globalInhibition Global inhibition strength (0.0 to 1.0, default: 0.5f)
+     * @return std::vector<NeuronId> IDs of winning neural populations
+     */
     std::vector<NeuronId> processCompetition(const std::vector<NeuronId>& competitors,
                                               float globalInhibition = 0.5f);
-
-    // Apply attention to a specific region (focus processing there)
+    
+    /**
+     * @brief Apply attention to a specific region (focus processing there)
+     * @param region Region ID to attend to
+     */
     void focusOnRegion(RegionId region);
-
-    // Release attention (allow all regions equal processing)
+    
+    /**
+     * @brief Release attention (allow all regions equal processing)
+     */
     void releaseAttention();
-
-    // Get current attention focus
+    
+    /**
+     * @brief Get current attention focus
+     * @return std::vector<RegionId> Vector of attended region IDs
+     */
     std::vector<RegionId> getAttendedRegions() const;
-
-    // Set attention parameters
+    
+    /**
+     * @brief Set attention parameters
+     * @param strength Inhibition strength for attentional competition
+     */
     void setInhibitionStrength(float strength);
+    
+    /**
+     * @brief Set attention parameters
+     * @param strength Excitation strength for attended regions
+     */
     void setExcitationStrength(float strength);
+    
+    /**
+     * @brief Set attention parameters
+     * @param threshold Activity threshold for winning populations
+     */
     void setCompetitionThreshold(float threshold);
-
-    // Get inhibition level for a neuron
+    
+    /**
+     * @brief Get inhibition level for a neuron
+     * @param neuron Neuron ID to query
+     * @return float Inhibition level (0.0 for winners, > 0 for losers)
+     */
     float getInhibitionFor(NeuronId neuron) const;
-
-    // Get excitation level for a neuron
+    
+    /**
+     * @brief Get excitation level for a neuron
+     * @param neuron Neuron ID to query
+     * @return float Excitation level (0.0 for losers, > 0 for winners)
+     */
     float getExcitationFor(NeuronId neuron) const;
-
-    // Update attention dynamics
+    
+    /**
+     * @brief Update attention dynamics
+     * Applies decay to salience and bias values over time
+     * @param dt Time step duration
+     */
     void update(TimestepDuration dt);
-
-    // Is this neuron currently attended?
+    
+    /**
+     * @brief Check if this neuron is currently attended
+     * @param neuron Neuron ID to check
+     * @return bool true if neuron is currently being attended
+     */
     bool isAttended(NeuronId neuron) const;
-
-    // Get attention winners
+    
+    /**
+     * @brief Get attention winners
+     * @return const std::vector<NeuronId>& Vector of winning neuron IDs
+     */
     const std::vector<NeuronId>& getWinners() const { return winners_; }
-
-    // Top-down attention (goal-directed)
+    
+    /**
+     * @brief Top-down attention (goal-directed)
+     * Applies bias to neurons based on goals/intentions
+     * @param neuron Neuron ID to bias
+     * @param biasStrength Strength of the bias (positive = attract attention)
+     */
     void applyTopDownBias(NeuronId neuron, float biasStrength);
-
-    // Bottom-up attention (stimulus-driven)
+    
+    /**
+     * @brief Bottom-up attention (stimulus-driven)
+     * Applies salience to neurons based on stimulus properties
+     * @param neuron Neuron ID to bias
+     * @param salienceStrength Strength of the salience (positive = attract attention)
+     */
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
-
-    // Reset attention
+    
+    /**
+     * @brief Reset attention state
+     * Clears all attention biases, winners, and attended regions
+     */
     void reset();
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     float inhibitionStrength_;
     float excitationStrength_;
