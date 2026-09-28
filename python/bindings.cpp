@@ -25,9 +25,255 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Features:
+        - Advanced error handling with NLM-specific exceptions
+        - Convenience factory functions for common use cases
+        - Rich API for simulation control and analysis
+        - Validation for parameter safety
+        - Performance profiling tools
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register NLM-specific exceptions
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
+    py::register_exception<std::invalid_argument>(m, "ConfigurationError", PyExc_ValueError);
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    py::register_exception<std::logic_error>(m, "LogicError", PyExc_RuntimeError);
+    
+    // Custom exception for simulation errors
+    py::class_<py::error_already_set>(m, "NLMError")
+        .def(py::init<>())
+        .def("what", &py::error_already_set::what);
+        
+    // Utility functions for validation
+    m.def("validate_simulation_params", [](const Config& config) {
+        if (!config.has("brain.neuron_count") || config.get<uint64_t>("brain.neuron_count") == 0) {
+            throw py::value_error("brain.neuron_count must be specified and > 0");
+        }
+        if (config.has("brain.connection_probability")) {
+            float prob = config.get<float>("brain.connection_probability");
+            if (prob < 0.0f || prob > 1.0f) {
+                throw py::value_error("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        return true;
+    }, py::arg("config"), "Validate simulation parameters and throw if invalid");
+    
+    m.def("create_realistic_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Brain parameters
+        config->set("brain.neuron_count", 10000);
+        config->set("brain.synapse_density", 0.15f);
+        config->set("brain.connection_probability", 0.08f);
+        config->set("brain.initial_weight_mean", 0.6f);
+        config->set("brain.initial_weight_std", 0.2f);
+        config->set("brain.v_thresh", -55.0f);
+        config->set("brain.v_rest", -70.0f);
+        config->set("brain.v_reset", -75.0f);
+        config->set("brain.tau_mem", 20.0f);
+        config->set("brain.tau_ref", 2.0f);
+        
+        // Plasticity parameters
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.stdp.tau_plus", 20.0f);
+        config->set("plasticity.stdp.tau_minus", 20.0f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Neuromodulation parameters
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        // Development parameters
+        config->set("development.initial_plasticity", 1.0f);
+        config->set("development.critical_period", 1000);
+        config->set("development.maturation_rate", 0.1f);
+        
+        // Memory parameters
+        config->set("memory.working_memory.capacity", 1000);
+        config->set("memory.episodic_memory.capacity", 100);
+        
+        // Simulation parameters
+        config->set("simulation.dt", 0.001f);
+        config->set("simulation.max_steps", 10000);
+        config->set("simulation.random_seed", 42);
+        
+        return config;
+    }, "Create a configuration optimized for realistic neural simulations");
+    
+    m.def("create_minimal_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100);
+        config->set("brain.connection_probability", 0.05f);
+        return config;
+    }, "Create a minimal configuration for quick testing");
+    
+    m.def("create_benchmark_config", [](int neuronCount = 5000) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("brain.connection_probability", 0.1f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("simulation.dt", 0.001f);
+        config->set("simulation.max_steps", 5000);
+        return config;
+    }, py::arg("neuron_count") = 5000, 
+        "Create a configuration optimized for benchmarking and performance testing");
+        
+    // Advanced configuration presets
+    m.def("create_high_performance_config", []() {
+        auto config = std::make_shared<Config>();
+        // Optimized for large-scale simulations
+        config->set("brain.neuron_count", 50000);
+        config->set("brain.synapse_density", 0.12f);
+        config->set("brain.connection_probability", 0.06f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.0008f);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.initial_plasticity", 1.5f);
+        config->set("simulation.dt", 0.001f);
+        config->set("simulation.max_steps", 10000);
+        config->set("memory.working_memory.capacity", 5000);
+        config->set("memory.episodic_memory.capacity", 500);
+        return config;
+    }, "Create a high-performance configuration for large-scale simulations");
+    
+    m.def("create_debug_config", []() {
+        auto config = std::make_shared<Config>();
+        // Configuration for debugging and development
+        config->set("brain.neuron_count", 500);
+        config->set("brain.connection_probability", 0.03f);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.01f);  // Higher learning rate for quick debugging
+        config->set("neuromod.curiosity.enable", true);
+        config->set("simulation.dt", 0.001f);
+        config->set("simulation.max_steps", 500);
+        config->set("logging.level", "debug");
+        return config;
+    }, "Create a debug configuration for development and troubleshooting");
+    
+    // Simulation control utilities
+    m.def("run_simulation_profile", [](std::shared_ptr<Brain> brain, 
+                                        const std::string& mode = "quick",
+                                        int steps = 1000) {
+        if (!brain) {
+            throw py::value_error("Brain pointer cannot be null");
+        }
+        
+        if (mode == "quick") {
+            for (int i = 0; i < steps; ++i) {
+                brain->step(i, i * 0.001f);
+            }
+        } else if (mode == "detailed") {
+            for (int i = 0; i < steps; ++i) {
+                brain->step(i, i * 0.001f);
+                if (i % 100 == 0) {
+                    brain->logStatus();
+                }
+            }
+        } else if (mode == "performance") {
+            auto start = std::chrono::high_resolution_clock::now();
+            for (int i = 0; i < steps; ++i) {
+                brain->step(i, i * 0.001f);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            return std::make_pair(steps, duration.count());
+        }
+        return std::make_pair(steps, 0);
+    }, py::arg("brain"), py::arg("mode") = "quick", py::arg("steps") = 1000,
+        "Run a simulation with different modes (quick, detailed, performance)");
+        
+    // Agent convenience functions
+    m.def("create_advanced_agent", [](std::shared_ptr<Brain> brain, 
+                                     const std::shared_ptr<SimpleWorld>& world,
+                                     bool enableLearning = true,
+                                     bool enableDevelopment = true,
+                                     bool enableCuriosity = true) {
+        if (!brain || !world) {
+            throw py::value_error("Brain and world pointers cannot be null");
+        }
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+        }
+        if (enableDevelopment) {
+            agent->enableDevelopment(true);
+        }
+        if (enableCuriosity) {
+            agent->enableCuriosity(true);
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), py::arg("enableLearning") = true,
+        py::arg("enableDevelopment") = true, py::arg("enableCuriosity") = true,
+        "Create an advanced agent with all learning systems enabled");
+        
+    // Validation and safety functions
+    m.def("validate_agent_configuration", [](const std::shared_ptr<Brain>& brain,
+                                             const std::shared_ptr<SimpleWorld>& world) {
+        if (!brain) {
+            throw py::value_error("Brain pointer cannot be null");
+        }
+        if (!world) {
+            throw py::value_error("World pointer cannot be null");
+        }
+        
+        auto config = brain->getConfig();
+        if (!config->has("brain.neuron_count")) {
+            throw py::value_error("Configuration missing brain.neuron_count");
+        }
+        
+        if (world->getWidth() == 0 || world->getHeight() == 0) {
+            throw py::value_error("World dimensions must be positive");
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("world"), "Validate that agent and world configuration is compatible");
+        
+    // Statistics and analysis helpers
+    m.def("compute_simulation_statistics", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw py::value_error("Brain pointer cannot be null");
+        }
+        
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        if (auto* memory = brain->getWorkingMemory()) {
+            stats["working_memory_active_traces"] = memory->getActiveTraces();
+            stats["working_memory_capacity"] = memory->getCapacity();
+        }
+        
+        if (auto* episodicMem = brain->getEpisodicMemory()) {
+            stats["episodic_memory_episodes"] = episodicMem->getEpisodeCount();
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive statistics about the brain state");
+        
+    // Export performance and utility constants
+    m.attr("DEFAULT_BRAIN_NEURONS") = 1000;
+    m.attr("DEFAULT_WORLD_SIZE") = 10;
+    m.attr("DEFAULT_SIMULATION_STEPS") = 1000;
+    m.attr("MAX_REASONABLE_NEURONS") = 100000;
+    m.attr("MIN_SIMULATION_STEPS") = 1;
+    m.attr("MAX_SIMULATION_STEPS") = 100000;
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -415,6 +661,116 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Brain validation and safety functions
+    m.def("check_brain_validity", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw py::value_error("Brain pointer cannot be null");
+        }
+        
+        std::vector<std::string> issues;
+        
+        // Check for excessive spike activity
+        if (brain->getTotalSpikeCount() > 1000000) {
+            issues.push_back("Excessive spike activity detected (>1,000,000 spikes)");
+        }
+        
+        // Check E/I balance
+        float ei_ratio = brain->getExcitationInhibitionRatio();
+        if (ei_ratio < 0.1f || ei_ratio > 10.0f) {
+            issues.push_back("Unbalanced excitation/inhibition ratio: " + std::to_string(ei_ratio));
+        }
+        
+        if (issues.empty()) {
+            return py::dict({
+                {"valid", true},
+                {"issues", py::list()}
+            });
+        }
+        
+        py::list issue_list;
+        for (const auto& issue : issues) {
+            issue_list.append(py::str(issue));
+        }
+        
+        return py::dict({
+            {"valid", false},
+            {"issues", issue_list}
+        });
+    }, py::arg("brain"), "Check brain validity and return any issues found");
+    
+    // Configuration utility functions
+    m.def("validate_simulation_params", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw py::value_error("Config pointer cannot be null");
+        }
+        
+        // Check required keys
+        std::vector<std::string> requiredKeys = {
+            "brain.neuron_count",
+            "brain.connection_probability",
+            "plasticity.stdp.enable",
+            "neuromod.curiosity.enable"
+        };
+        
+        py::list missingKeys;
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                missingKeys.append(py::str(key));
+            }
+        }
+        
+        if (!missingKeys.empty()) {
+            return py::dict({
+                {"valid", false},
+                {"missing_keys", missingKeys}
+            });
+        }
+        
+        // Validate specific values
+        auto neuronCount = config->get<int64_t>("brain.neuron_count");
+        if (neuronCount && (*neuronCount < 10 || *neuronCount > 100000)) {
+            return py::dict({
+                {"valid", false},
+                {"error", "brain.neuron_count must be 10-100000"}
+            });
+        }
+        
+        auto connProb = config->get<double>("brain.connection_probability");
+        if (connProb && (*connProb < 0.0 || *connProb > 1.0)) {
+            return py::dict({
+                {"valid", false},
+                {"error", "brain.connection_probability must be 0.0-1.0"}
+            });
+        }
+        
+        return py::dict({
+            {"valid", true},
+            {"missing_keys", py::list()}
+        });
+    }, py::arg("config"), "Validate simulation parameters and return validation results");
+    
+    // Performance constants
+    m.attr("DEFAULT_BRAIN_NEURONS") = 1000;
+    m.attr("DEFAULT_WORLD_SIZE") = 10;
+    m.attr("DEFAULT_SIMULATION_STEPS") = 1000;
+    m.attr("MAX_REASONABLE_NEURONS") = 100000;
+    m.attr("MIN_SIMULATION_STEPS") = 1;
+    m.attr("MAX_SIMULATION_STEPS") = 100000;
+    
+    // Template names
+    m.attr("AVAILABLE_TEMPLATES") = py::list({
+        "default",
+        "high_performance",
+        "debug"
+    });
+    
+    // Preset names
+    m.attr("AVAILABLE_PRESETS") = py::list({
+        "default",
+        "high_performance",
+        "debug"
+    });
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

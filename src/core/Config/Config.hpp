@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -92,6 +94,29 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // ========== ADVANCED CONFIGURATION FEATURES ==========
+    
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    std::vector<std::string> getValidationWarnings() const;
+    
+    // Export/Import
+    std::string toYAML() const;
+    bool loadFromYAML(const std::string& yamlContent);
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Configuration management
+    void merge(const Config& other);
+    bool equals(const Config& other) const;
+    std::vector<std::pair<std::string, std::pair<ConfigValue, ConfigValue>>> diff(const Config& other) const;
+    
+    // Templates
+    void applyTemplate(const std::string& templateName);
+    
+    // Configuration presets
+    static void applyPreset(Config& config, const std::string& presetName);
     
 private:
     struct Impl;
