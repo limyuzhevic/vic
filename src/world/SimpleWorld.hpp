@@ -51,6 +51,20 @@ public:
     // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
     
+    // Get sensory percept (alias for getSensoryPercept)
+    const SensoryPercept& observe() const { return getSensoryPercept(); }
+    
+    // Apply motor command (alias for applyMotorCommand)
+    ActionResult applyAction(MotorCommand cmd, double currentTime) { return applyMotorCommand(cmd, currentTime); }
+    
+    // Compute reward based on agent state (placeholder)
+    float computeReward(Brain* brain) const {
+        // TODO: Implement real reward computation
+        // For now, return a simple function of agent energy and health
+        if (!brain) return 0.0f;
+        return agent_.energy * 0.01f + agent_.health * 0.1f;
+    }
+    
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     

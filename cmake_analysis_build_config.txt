@@ -1,0 +1,103 @@
+# Additional build configuration for the new analysis classes
+# This should be added to the main CMakeLists.txt in the project root
+
+# Find the python bindings directory
+find_package(Python REQUIRED COMPONENTS Development)
+find_package(pybind11 REQUIRED)
+
+# Set the output directory for the Python module
+set_target_properties(pynlm PROPERTIES
+    PREFIX ""
+    SUFFIX ".so"
+)
+
+# Add the new analysis source files to the build
+# These should be added to the existing target that builds the Python module
+
+# The following lines should be added to the existing target that builds pynlm
+# (assuming there's a target named pynlm or similar)
+
+# Add analysis source files
+list(APPEND PYNLM_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/analysis/NeuralVisualization.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/analysis/NeuralActivityAnalyzer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/analysis/TimeSeriesAnalyzer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/analysis/PerformanceMetrics.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/convenience/ConvenienceFunctions.cpp
+)
+
+# Add analysis include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/analysis)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/convenience)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# Compiler optimizations
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(-O3 -march=native -ffast-math)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-g -O0 -Wall -Wextra -Wpedantic)
+endif()
+
+# Thread safety
+find_package(Threads REQUIRED)
+
+# Python module dependencies
+find_package(Python3 REQUIRED COMPONENTS Development)
+
+# Pybind11
+find_package(pybind11 REQUIRED)
+
+# Build the Python module
+pybind11_add_module(pynlm
+    python/bindings.cpp
+    ${PYNLM_SOURCES}
+)
+
+# Link with NLM libraries
+target_link_libraries(pynlm PRIVATE
+    ${NLM_LIBRARIES}
+    Threads::Threads
+)
+
+# Set target properties
+target_compile_features(pynlm PRIVATE cxx_std_17)
+
+# Install the Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION ${PYTHON_SITE_PACKAGES_DIR}
+)
+
+# Add test target for the new analysis classes
+if(BUILD_TESTING)
+    enable_testing()
+    
+    # Add test for new API
+    add_test(NAME test_neural_visualization_api
+        COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_new_api.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    
+    # Set timeout for test
+    set_tests_properties(test_neural_visualization_api PROPERTIES TIMEOUT 60)
+endif()
+
+# Configuration summary
+message(STATUS "Building NLM Python bindings with analysis support")
+message(STATUS "  - Neural visualization: ON")
+message(STATUS "  - Neural activity analysis: ON")
+message(STATUS "  - Time series analysis: ON")
+message(STATUS "  - Performance metrics: ON")
+message(STATUS "  - Convenience functions: ON")
+message(STATUS "  - Python module name: pynlm")
+message(STATUS "  - C++ standard: 17")
+
+# Print build information
+message(STATUS "Build configuration:")
+message(STATUS "  - Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  - Python executable: ${Python_EXECUTABLE}")
+message(STATUS "  - Python include directories: ${Python_INCLUDE_DIRS}")
+message(STATUS "  - Python library directories: ${Python_LIBRARY_DIRS}")
+message(STATUS "  - Pybind11 include directories: ${PYBIND11_INCLUDE_DIR}")

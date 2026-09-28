@@ -1,4 +1,4 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - Comprehensive HOW TO USE Guide
 
 ## Overview
 
@@ -7,7 +7,11 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the NLM Python API (complete implementation)
+4. Experiment management
+5. Training loops and reinforcement learning
+6. Visualization and analysis
+7. Advanced features
 
 ---
 
@@ -115,7 +119,7 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the NLM Python API
 
 ### Basic Usage
 
@@ -274,7 +278,7 @@ brain.reset()                     # Reset brain state
 
 # Input/Output
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+brain.produceAction()             # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
@@ -290,6 +294,40 @@ brain.load("checkpoint.bin")       # Load state
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+
+# Convenience methods
+brain.runSimulationForSteps(500, world)    # Run simulation for steps
+brain.runEpisode(world, maxSteps=1000)     # Run complete episode
+brain.saveCheckpoint("checkpoint.bin")    # Save state to file
+brain.loadCheckpoint("checkpoint.bin")    # Load state from file
+stats = brain.getBrainStats()              # Get formatted stats
+stats_dict = brain.getBrainStatsMap()      # Get stats as dict
+
+# Neuromodulation
+brain.applyNeuromodulation(signal)         # Apply neuromodulation
+brain.updatePlasticity()                   # Update plasticity
+brain.develop()                            # Apply developmental changes
+
+# Memory systems
+brain.getWorkingMemory()                   # Get working memory
+brain.getEpisodicMemory()                  # Get episodic memory
+brain.getAssociativeMemory()               # Get associative memory
+brain.getPredictionSystem()                # Get prediction system
+brain.getPlanner()                         # Get neural planner
+brain.getConceptFormation()                # Get concept formation
+brain.getAttention()                       # Get attentional selection
+brain.getDevelopmentSystem()               # Get development system
+brain.getDopamine()                       # Get dopamine system
+brain.getCuriosity()                      # Get curiosity system
+brain.getNovelty()                        # Get novelty system
+brain.getPredictionErrorSignal()          # Get prediction error signal
+brain.getRandomGenerator()                # Get random generator
+
+# System access
+brain.getSpikeSystem()                    # Get spike system
+brain.getSTDP()                           # Get STDP plasticity system
+brain.getHebbian()                        # Get Hebbian plasticity system
+brain.getStructuralPlasticity()           # Get structural plasticity system
 ```
 
 #### Config Class
@@ -344,6 +382,9 @@ agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
 agent.getNeuromodulationLevel()
+
+# Status
+status = agent.getStatus()  # Comprehensive status dict
 ```
 
 #### SimpleWorld Class
@@ -363,6 +404,9 @@ world.setRandomSeed(42)
 # Agent interaction
 world.setAgentStart(x, y)
 world.applyMotorCommand(motor_cmd, current_time)
+world.applyAction(motor_cmd, current_time)  # Alias
+world.observe()                             # Alias for getSensoryPercept()
+world.computeReward(brain)                 # Compute reward
 
 # State access
 percept = world.getSensoryPercept()
@@ -379,6 +423,86 @@ world.getHeight()
 world.getSimulationTime()
 world.getMaxEnergy()
 world.setMaxEnergy(100.0)
+```
+
+#### High-Level Creation Functions
+
+```python
+# Quick test brain for development/testing
+brain = pynlm.createQuickTestBrain()
+brain.initialize()
+
+# Training environment setup
+brain, world, agent = pynlm.createTrainingEnvironment()
+brain.initialize()
+
+# Evaluation environment setup
+brain, world, agent = pynlm.createEvaluationEnvironment()
+brain.initialize()
+
+# Experiment configuration
+config = pynlm.ExperimentConfig.createTrainingConfig()
+config.setNeuronCount(500)
+config.setMaxSteps(10000)
+
+# Experiment runner
+runner = pynlm.createExperimentRunner(config)
+
+# Phase 6 experiment
+experiment = pynlm.Phase6Experiment()
+config = pynlm.Phase6Config()
+config.neuronCount = 500
+config.maxSteps = 2000
+result = experiment.run(config)
+```
+
+#### Visualization and Analysis Classes
+
+```python
+# Neural visualization
+brain = pynlm.createQuickTestBrain()
+visualizer = pynlm.createVisualizer(brain, "PNG")
+network_data = visualizer.visualizeNetwork()
+visualizer.saveVisualization("network.png")
+
+# Activity visualization
+activity_data = visualizer.visualizeActivity()
+
+# Neural activity analyzer
+analyzer = pynlm.analyzeNetwork(brain, "full")
+firing_patterns = analyzer.analyzeFiringPatterns()
+oscillations = analyzer.detectOscillations()
+cohesion = analyzer.computeCohesion()
+
+# Time series analysis
+ts_analyzer = pynlm.createTimeSeriesAnalyzer(metrics, 1000.0)
+spectrum = ts_analyzer.computePowerSpectrum()
+stationarity = ts_analyzer.detectStationarity("adf")
+
+# Performance metrics
+perf_metrics = pynlm.generatePerformanceReport(brain)
+efficiency = perf_metrics.computeEfficiency(benchmark)
+report = perf_metrics.generateReport("text")
+```
+
+#### Experiment Management
+
+```python
+# Experiment metrics
+metrics = pynlm.ExperimentMetrics()
+metrics.recordStep(step, reward, firing_rate, active_neurons, firing_neurons, total_spikes)
+metrics.recordEpisode(total_reward, avg_firing_rate, total_active_neurons, total_firing_neurons, total_spikes)
+
+# Experiment runner
+runner.setup(config, brain, agent, world, environment)
+runner.runEpisode()
+runner.runExperiment(maxEpisodes=10)
+results = runner.getExperimentMetrics()
+
+# Phase 6 experiment
+phase6 = pynlm.Phase6Experiment()
+success, result = pynlm.runPhase6Experiment(config)
+print(result.getIntegrationSummary())
 ```
 
 ### Enumerations
@@ -401,10 +525,30 @@ pynlm.DevelopmentalStage.Aging
 
 # Action types
 pynlm.ActionType.MoveForward
+pynlm.ActionType.MoveBackward
+pynlm.ActionType.MoveLeft
+pynlm.ActionType.MoveRight
 pynlm.ActionType.TurnLeft
+pynlm.ActionType.TurnRight
+pynlm.ActionType.Look
+pynlm.ActionType.LookUp
+pynlm.ActionType.LookDown
 pynlm.ActionType.Interact
 pynlm.ActionType.Eat
-# ... and more
+pynlm.ActionType.Drink
+pynlm.ActionType.Rest
+pynlm.ActionType.Wait
+pynlm.ActionType.Custom
+
+# Motor commands
+pynlm.MotorCommand.MoveForward
+pynlm.MotorCommand.MoveBackward
+pynlm.MotorCommand.TurnLeft
+pynlm.MotorCommand.TurnRight
+pynlm.MotorCommand.LookLeft
+pynlm.MotorCommand.LookRight
+pynlm.MotorCommand.Interact
+pynlm.MotorCommand.Wait
 
 # World object types
 pynlm.WorldObjectType.Empty
@@ -412,6 +556,19 @@ pynlm.WorldObjectType.Resource
 pynlm.WorldObjectType.Hazard
 pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
+
+# Visualization formats
+pynlm.NeuralVisualization.OutputFormat.PNG
+pynlm.NeuralVisualization.OutputFormat.SVG
+pynlm.NeuralVisualization.OutputFormat.ASCII
+
+# Visualization color schemes
+pynlm.NeuralVisualization.ColorScheme.Default
+pynlm.NeuralVisualization.ColorScheme.Thermal
+pynlm.NeuralVisualization.ColorScheme.CoolWarm
+pynlm.NeuralVisualization.ColorScheme.Viridis
+pynlm.NeuralVisualization.ColorScheme.Plasma
+pynlm.NeuralVisualization.ColorScheme.Custom
 ```
 
 ---
@@ -451,6 +608,21 @@ pynlm.WorldObjectType.Marker
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+
+### Experiment Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `experiment.name` | string | "" | Experiment name |
+| `experiment.max_steps` | int | -1 | Maximum simulation steps |
+| `experiment.neuron_count` | int | 1000 | Number of neurons |
+| `experiment.region_count` | int | 1 | Number of brain regions |
+| `experiment.connection_probability` | float | 0.05 | Connection probability |
+| `experiment.checkpoint_enabled` | bool | false | Enable checkpointing |
+| `experiment.replay_enabled` | bool | false | Enable experience replay |
+| `experiment.development_enabled` | bool | true | Enable developmental processes |
+| `experiment.checkpoint_path` | string | "" | Checkpoint file path |
+| `experiment.seed` | int | 0 | Random seed (0 = random) |
 
 ---
 
@@ -496,9 +668,128 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Training Example
+
+```python
+import pynlm
+
+# Create training environment
+brain, world, agent = pynlm.createTrainingEnvironment()
+brain.initialize()
+
+# Setup experiment
+config = pynlm.ExperimentConfig.createTrainingConfig()
+config.setNeuronCount(500)
+config.setMaxSteps(5000)
+
+runner = pynlm.createExperimentRunner(config)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Train
+runner.runExperiment(maxEpisodes=100)
+
+# Get results
+metrics = runner.getExperimentMetrics()
+print(f"Total reward: {metrics.getTotalReward()}")
+print(f"Average reward: {metrics.getAverageRewardPerStep()}")
+```
+
+### Experiment Management Example
+
+```python
+import pynlm
+
+# Create experiment configuration
+config = pynlm.ExperimentConfig.createBenchmarkConfig()
+config.setName("benchmark_test")
+config.setNeuronCount(200)
+config.setMaxSteps(1000)
+
+# Validate configuration
+if not config.validate():
+    print(f"Config error: {config.validateAndGetError()}")
+    exit(1)
+
+# Create experiment metrics
+metrics = pynlm.ExperimentMetrics()
+
+# Create experiment runner
+runner = pynlm.createExperimentRunner(config)
+
+# Setup and run experiment (would need actual brain, agent, world components)
+# runner.setup(config, brain, agent, world, environment)
+# results = runner.runExperiment()
+
+# Compare experiments
+# experiments = [runner1, runner2, runner3]
+# comparisons = pynlm.compareExperiments(experiments, "total_reward")
+
+print("Experiment setup complete!")
+```
+
 ---
 
-## Troubleshooting
+## Part 6: Error Handling
+
+### Custom Exceptions
+
+```python
+import pynlm
+
+try:
+    # Any NLM operation can throw NLMRuntimeError
+    brain.runEpisode(world, 1000)
+except pynlm.NLMRuntimeError as e:
+    print(f"Error: {e}")
+    # Handle specific error cases
+    if "invalid configuration" in str(e):
+        print("Fix your configuration and try again")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Error Handling Best Practices
+
+```python
+import pynlm
+
+def safe_simulation_run(brain, world, agent, steps=1000):
+    """Safely run a simulation with error handling."""
+    try:
+        brain.initialize()
+        world.reset()
+        agent.initialize(world)
+        
+        total_reward = brain.runEpisode(world, steps)
+        return total_reward
+        
+    except pynlm.NLMRuntimeError as e:
+        print(f"NLM Error: {e}")
+        return None
+    except MemoryError:
+        print("Out of memory - reduce simulation size or use smaller brain")
+        return None
+    except KeyboardInterrupt:
+        print("Simulation interrupted by user")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return None
+
+# Use it
+reward = safe_simulation_run(brain, world, agent, 500)
+if reward is not None:
+    print(f"Simulation completed with reward: {reward}")
+```
+
+---
+
+## Part 7: Troubleshooting
 
 ### Build Issues
 
@@ -513,21 +804,156 @@ cmake .. -DPython_EXECUTABLE=$(which python)
 - Check CMake version >= 3.16
 - Verify all source files are present
 
-### Runtime Issues
-
 **ImportError: No module named 'pynlm':**
 ```bash
 pip install --force-reinstall .
 ```
 
-**Segmentation faults:**
+**Memory issues:**
+- Reduce brain size in configuration
+- Use smaller world dimensions
+- Disable unnecessary plasticity mechanisms
+
+**Performance issues:**
+- Use Release build for better performance
+- Increase `make -j` for parallel compilation
+- Monitor memory usage during long simulations
+
+### Runtime Issues
+
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Ensure neurons have proper connectivity
+- Check configuration parameters
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Ensure `world.update()` is being called
+- Check agent's motor neuron connectivity
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+- Enable neuromodulation for better activity
+
+**"Segmentation faults"**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+- Validate configuration parameters
 
 ---
 
-## Further Reading
+## Part 8: Performance Tips
 
+### Memory Optimization
+```python
+# Use minimal configuration for testing
+config = pynlm.ExperimentConfig.createQuickTestConfig()
+
+# Disable unnecessary features
+agent.enableStructuralPlasticity(False)
+agent.enableDevelopment(False)
+agent.enableCuriosity(False)
+```
+
+### Speed Optimization
+```python
+# Use Release build
+# Use larger -j for parallel compilation
+# Monitor memory usage
+# Use efficient data structures
+```
+
+### Monitoring Performance
+```python
+import pynlm
+
+# Create performance metrics
+perf_metrics = pynlm.generatePerformanceReport(brain)
+
+# Get system information
+profile = perf_metrics.profilePerformance()
+print(f"CPU usage: {profile.cpuUtilization}%")
+print(f"Memory usage: {profile.memoryUtilization}%")
+print(f"Steps per second: {profile.stepsPerSecond}")
+
+# Generate detailed report
+report = perf_metrics.generateReport("text")
+with open("performance_report.txt", "w") as f:
+    f.write(report)
+```
+
+---
+
+## Part 9: Best Practices
+
+### Configuration Management
+```python
+# Always validate configurations
+config = pynlm.ExperimentConfig.createTrainingConfig()
+if not config.validate():
+    raise ValueError(config.validateAndGetError())
+
+# Use factory methods for common configurations
+config = pynlm.ExperimentConfig.createQuickTestConfig()
+config = pynlm.ExperimentConfig.createTrainingConfig()
+config = pynlm.ExperimentConfig.createBenchmarkConfig()
+```
+
+### Error Handling
+```python
+# Always handle errors gracefully
+try:
+    # Your NLM code here
+    pass
+except pynlm.NLMRuntimeError as e:
+    print(f"NLM error: {e}")
+    # Retry or abort
+except Exception as e:
+    print(f"Unexpected error: {e}")
+    # Log and abort
+```
+
+### Resource Management
+```python
+# Always clean up resources
+try:
+    # Your NLM code here
+    pass
+finally:
+    # Clean up
+    if 'brain' in locals():
+        brain.reset()
+    if 'world' in locals():
+        world.reset()
+    if 'agent' in locals():
+        agent.reset()
+```
+
+### Reproducibility
+```python
+# Set random seeds for reproducibility
+config.setSeed(42)
+world.setRandomSeed(42)
+
+# Save checkpoints for recovery
+brain.saveCheckpoint("checkpoint_before_crash.bin")
+```
+
+---
+
+## Part 10: Further Reading
+
+- [EXPERIMENT_MANAGEMENT.md](EXPERIMENT_MANAGEMENT.md) - Detailed experiment management documentation
+- [TRAINING_LOOP.md](TRAINING_LOOP.md) - Training loop and reinforcement learning documentation
+- [VISUALIZATION_ANALYSIS.md](VISUALIZATION_ANALYSIS.md) - Visualization and analysis APIs documentation
+- [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md) - Advanced features and use cases
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+---
+
+*Last updated: 2026-09-28*
+
+This documentation has been updated to match the actual NLM implementation, including all new features such as experiment management, training loops, visualization and analysis APIs, and advanced convenience methods.

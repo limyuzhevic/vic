@@ -1,53 +1,147 @@
 #pragma once
 
-#include "Experiment.hpp"
+#include "../experiments/ExperimentConfig.hpp"
+#include "../experiments/ExperimentMetrics.hpp"
+#include "../experiments/Experiment.hpp"
 #include "../brain/Brain.hpp"
+#include "../agent/AgentBrain.hpp"
+#include "../world/SimpleWorld.hpp"
 #include "../environment/Environment.hpp"
+#include <string>
 #include <memory>
 #include <vector>
+#include <map>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
 
 namespace nlm {
 
-// ExperimentRunner: Runs experiments and collects data
+/**
+ * @brief Comprehensive experiment running framework
+ * 
+ * This class provides a complete framework for running neural learning machine
+ * experiments with support for:
+ * - Automatic experiment setup and initialization
+ * - Episode-based simulation execution
+ * - Multi-episode experiment running
+ * - Checkpoint saving and loading
+ * - Thread-safe operations
+ * - Comprehensive metrics collection
+ * - Parameter validation
+ * - Error handling with NLMRuntimeError
+ * - Serialization support
+ */
 class ExperimentRunner {
 public:
+    // Constructor and destructor
     ExperimentRunner();
     ~ExperimentRunner();
     
-    // Create new experiment
-    std::shared_ptr<Experiment> createExperiment(const std::string& name);
+    // Copy control
+    ExperimentRunner(const ExperimentRunner& other);
+    ExperimentRunner& operator=(const ExperimentRunner& other);
+    ExperimentRunner(ExperimentRunner&& other) noexcept;
+    ExperimentRunner& operator=(ExperimentRunner&& other) noexcept;
     
-    // Run single experiment
-    bool runExperiment(std::shared_ptr<Experiment> experiment,
-                      std::shared_ptr<Brain> brain,
-                      std::shared_ptr<Environment> environment,
-                      SimulationStep maxSteps);
+    // Core experiment setup and execution
+    bool setup(std::shared_ptr<ExperimentConfig> config,
+               std::shared_ptr<Brain> brain,
+               std::shared_ptr<AgentBrain> agent,
+               std::shared_ptr<SimpleWorld> world,
+               std::shared_ptr<Environment> environment);
     
-    // Run batch of experiments
-    std::vector<std::shared_ptr<Experiment>> runBatch(
-        const std::vector<std::shared_ptr<Experiment>>& experiments,
-        std::shared_ptr<Brain> brainTemplate,
-        std::shared_ptr<Environment> environmentTemplate,
-        SimulationStep maxSteps);
+    float runEpisode();
+    bool runExperiment(int maxEpisodes = -1);
     
-    // Get all experiments
-    const std::vector<std::shared_ptr<Experiment>>& getExperiments() const;
+    // Component management
+    bool initializeComponents();
+    void resetComponents();
+    void cleanupComponents();
     
-    // Get experiment by name
-    std::shared_ptr<Experiment> getExperiment(const std::string& name) const;
+    // Checkpoint management
+    bool saveCheckpoint(const std::string& filepath);
+    bool loadCheckpoint(const std::string& filepath);
     
-    // Clear all experiments
-    void clearExperiments();
+    // State management
+    void pause();
+    void resume();
+    bool isRunning() const;
     
-    // Set random seed for reproducibility
-    void setGlobalSeed(uint64_t seed);
+    // Results and metrics
+    const std::vector<std::shared_ptr<ExperimentMetrics>>& getExperimentMetrics() const;
+    const std::shared_ptr<ExperimentMetrics>& getCurrentMetrics() const;
+    std::string getResultsSummary() const;
     
-    // Save experiment results
-    bool saveResults(const std::string& filepath) const;
+    // Configuration access
+    std::shared_ptr<ExperimentConfig> getConfig() const;
+    void setConfig(std::shared_ptr<ExperimentConfig> config);
+    
+    // Component access
+    std::shared_ptr<Brain> getBrain() const;
+    std::shared_ptr<AgentBrain> getAgent() const;
+    std::shared_ptr<SimpleWorld> getWorld() const;
+    std::shared_ptr<Environment> getEnvironment() const;
+    
+    // Progress tracking
+    double getProgress() const;
+    size_t getCurrentEpisode() const;
+    size_t getTotalEpisodes() const;
+    
+    // Validation and error handling
+    bool validateSetup() const;
+    std::string validateAndGetError() const;
+    
+    // Thread safety
+    void lock();
+    void unlock();
+    bool isThreadSafe() const;
+    
+    // Convenience methods
+    float runQuickTest();
+    float runTrainingSession();
+    float runBenchmark();
+    
+    // Statistics
+    struct PerformanceStats {
+        double averageEpisodeDuration;
+        float averageEpisodeReward;
+        float totalReward;
+        float peakFiringRate;
+        size_t totalSteps;
+        size_t peakActiveNeurons;
+        size_t peakFiringNeurons;
+        
+        std::string toString() const;
+    };
+    
+    PerformanceStats getPerformanceStats() const;
+    
+    // Batch operations
+    std::vector<std::shared_ptr<ExperimentMetrics>> runMultipleExperiments(
+        const std::vector<std::shared_ptr<ExperimentConfig>>& configs,
+        int episodesPerConfig = 1);
+    
+    // Comparison utilities
+    double compareWith(const ExperimentRunner& other, const std::string& metricName) const;
+    
+    // Export and import
+    bool exportResults(const std::string& filepath) const;
+    bool importResults(const std::string& filepath);
+    
+    // Monitoring and debugging
+    std::string getDebugInfo() const;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Internal helper methods
+    void initializeMetrics();
+    void updateProgress();
+    void cleanupOnError();
+    void validateComponents() const;
 };
 
 } // namespace nlm
