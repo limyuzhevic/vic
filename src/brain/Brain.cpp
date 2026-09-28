@@ -190,15 +190,18 @@ bool Brain::initialize() {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
-    // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
+    // Create neurons across regions with zero division protection
+    size_t neuronsPerRegion = regionCount > 0 ? neuronCount / regionCount : 0;
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            // Add populations with bounds checking
+            size_t sensoryNeurons = neuronsPerRegion / 4;
+            size_t internalNeurons = neuronsPerRegion / 2;
+            size_t motorNeurons = neuronsPerRegion / 4;
+            auto sensoryPopId = region->addPopulation(sensoryNeurons, NeuronType::Sensory);
+            auto internalPopId = region->addPopulation(internalNeurons, NeuronType::Internal);
+            auto motorPopId = region->addPopulation(motorNeurons, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
