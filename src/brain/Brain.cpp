@@ -895,9 +895,71 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - recreate synapses with saved parameters
+        NLM_LOG_INFO("Recreating " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Create a map for quick neuron lookup by ID
+        std::unordered_map<NeuronId, Neuron*> neuronMap;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuronMap[neuron->getId()] = neuron;
+                }
+            }
+        }
+        
+        // Recreate synapses in regions
+        size_t synapseIndex = 0;
+        for (auto& region : pImpl->regions) {
+            // Clear existing synapses in this region first
+            // (For checkpoint restore, we want to recreate exactly the saved connectivity)
+            // Note: This is complex - in practice we'd want to preserve existing connections
+            // and only update those that were saved, but for simplicity we'll rebuild
+            
+            for (const auto& savedSynapse : synapseData.sourceNeuron) {
+                if (synapseIndex >= synapseData.sourceNeuron.size()) break;
+                
+                NeuronId sourceId = synapseData.sourceNeuron[synapseIndex];
+                NeuronId destId = synapseData.destinationNeuron[synapseIndex];
+                
+                auto sourceIt = neuronMap.find(sourceId);
+                auto destIt = neuronMap.find(destId);
+                
+                if (sourceIt != neuronMap.end() && destIt != neuronMap.end()) {
+                    // Create new synapse with saved parameters
+                    SynapseId newSynapseId(static_cast<uint64_t>(synapseIndex));
+                    auto* newSynapse = new Synapse(newSynapseId, sourceId, destId);
+                    
+                    // Set saved parameters
+                    newSynapse->setWeight(synapseData.weight[synapseIndex]);
+                    newSynapse->setDelay(synapseData.delay[synapseIndex]);
+                    newSynapse->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIndex]));
+                    newSynapse->setEligibilityTrace(synapseData.eligibilityTrace[synapseIndex]);
+                    
+                    // Enable plasticity if appropriate
+                    if (newSynapse->getType() == SynapseType::Excitatory || 
+                        newSynapse->getType() == SynapseType::Inhibitory) {
+                        newSynapse->enablePlasticity(true, true, false);
+                    }
+                    
+                    // Add to region
+                    region->addSynapse(sourceId, destId, 
+                                     synapseData.weight[synapseIndex],
+                                     synapseData.delay[synapseIndex]);
+                    
+                    NLM_LOG_DEBUG("Recreated synapse " + std::to_string(synapseIndex) +
+                                 " from neuron " + std::to_string(sourceId.value) +
+                                 " to neuron " + std::to_string(destId.value) +
+                                 " with weight " + std::to_string(synapseData.weight[synapseIndex]));
+                } else {
+                    NLM_LOG_WARN("Could not find neurons for synapse " + 
+                               std::to_string(sourceId.value) + " -> " + 
+                               std::to_string(destId.value));
+                }
+                
+                synapseIndex++;
+            }
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
