@@ -1,105 +1,98 @@
-#pragma once
+#ifndef CONFIG_HPP
+#define CONFIG_HPP
 
 #include <string>
+#include <map>
 #include <memory>
-#include <vector>
-#include <variant>
 #include <optional>
+#include <variant>
+#include <vector>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
+// Configuration entry with type safety
 struct ConfigEntry {
     std::string key;
-    ConfigValue value;
-    ConfigSource source;
+    std::variant<int64_t, double, bool, std::string> value;
+    enum class Source { File, CommandLine, Default } source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
+    ConfigEntry(const std::string& k, const ConfigValue& v, 
+                Source s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Forward declaration for Config
 class Config {
 public:
     Config();
     ~Config();
+    Config(Config&&) noexcept = default;
+    Config& operator=(Config&&) noexcept = default;
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
+    // Configuration loading
     bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Configuration saving
     bool saveToFile(const std::string& filepath) const;
+    std::string toYAML() const;
+    std::string toJSON() const;
     
-    // Get values
+    // Configuration management
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const ConfigValue& value, 
+             ConfigEntry::Source source = ConfigEntry::Source::Default,
+             const std::string& description = "");
     
-    // Check existence
+    void set(const std::string& key, int64_t value, 
+             ConfigEntry::Source source = ConfigEntry::Source::Default,
+             const std::string& description = "");
+    
+    void set(const std::string& key, double value, 
+             ConfigEntry::Source source = ConfigEntry::Source::Default,
+             const std::string& description = "");
+    
+    void set(const std::string& key, bool value, 
+             ConfigEntry::Source source = ConfigEntry::Source::Default,
+             const std::string& description = "");
+    
+    void set(const std::string& key, const std::string& value, 
+             ConfigEntry::Source source = ConfigEntry::Source::Default,
+             const std::string& description = "");
+    
     bool has(const std::string& key) const;
-    
-    // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
+    // Configuration introspection
     std::vector<std::string> getKeys() const;
-    
-    // Clear all
+    std::string summary() const;
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validation
+    bool validate() const;
+    std::string getValidationErrors() const;
+    
+    // Static utility functions
+    static bool isJSON(const std::string& filepath);
+    static bool isYAML(const std::string& filepath);
     
 private:
-    struct Impl;
+    class Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm
+
+#endif // CONFIG_HPP
