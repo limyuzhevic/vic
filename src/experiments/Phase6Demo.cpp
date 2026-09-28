@@ -6,7 +6,7 @@
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;
@@ -54,11 +54,12 @@ int main(int argc, char* argv[]) {
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.neuronCount = 500;                    // Demonstrates typical brain size (500 neurons)
+    config.maxSteps = 2000;                      // ~20 seconds of simulation at 0.001 timestep
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.checkpointPath = "./demo_checkpoint_test.bin";  // Use demo-specific path
     
     auto result = experiment.run(config);
     

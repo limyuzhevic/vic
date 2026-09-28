@@ -1,4 +1,5 @@
-#include "Phase6IntegratedExperiment.hpp"
+#include "experiment_helpers.hpp"
+#include "EnhancedResults.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"
@@ -131,11 +132,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         if (brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
+            // Create new brain and load using factory for consistency
+            auto brain2 = BrainFactory::createTestBrain(config.neuronCount);
+            if (!brain2) {
+                NLM_LOG_ERROR("Failed to create brain for checkpoint load test");
+            } else if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {
@@ -162,13 +163,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
-    // Create minimal brain
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    cfg->set("region_count", 1);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    if (!brain->initialize()) {
+    // Create minimal brain using factory for consistency
+    auto brain = BrainFactory::createTestBrain(100);
+    if (!brain) {
         NLM_LOG_ERROR("Brain initialization failed");
         return false;
     }
@@ -249,11 +246,12 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    // Create test brain using factory for consistency
+    auto brain = BrainFactory::createTestBrain(100);
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create test brain");
+        return false;
+    }
     
     // Get memory systems
     auto* wm = brain->getWorkingMemory();
@@ -289,11 +287,12 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    // Create test brain using factory for consistency
+    auto brain = BrainFactory::createTestBrain(100);
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create test brain");
+        return false;
+    }
     
     // Get neuromodulation systems
     auto* dopamine = brain->getDopamine();
@@ -319,12 +318,12 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
 bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    // Create and initialize brain
-    auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
+    // Create and initialize first brain using factory
+    auto brain1 = BrainFactory::createTestBrain(100);
+    if (!brain1) {
+        NLM_LOG_ERROR("Failed to create first brain for checkpoint test");
+        return false;
+    }
     
     // Run some steps
     for (int i = 0; i < 100; ++i) {
@@ -344,9 +343,12 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         return false;
     }
     
-    // Create new brain and load
-    auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    // Create new brain and load using factory
+    auto brain2 = BrainFactory::createTestBrain(100);
+    if (!brain2) {
+        NLM_LOG_ERROR("Failed to create second brain for checkpoint test");
+        return false;
+    }
     
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
@@ -366,11 +368,12 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
 bool Phase6IntegratedExperiment::testReplay() {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    // Create test brain using factory for consistency
+    auto brain = BrainFactory::createTestBrain(100);
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create test brain");
+        return false;
+    }
     
     auto* em = brain->getEpisodicMemory();
     if (!em) {
