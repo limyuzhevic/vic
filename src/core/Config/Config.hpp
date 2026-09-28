@@ -16,10 +16,12 @@ using ConfigValue = std::variant<
     int,
     int64_t,
     double,
+    float,
     bool,
     std::string,
     std::vector<int>,
     std::vector<double>,
+    std::vector<float>,
     std::vector<std::string>
 >;
 
@@ -75,7 +77,9 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
@@ -102,4 +106,50 @@ private:
     static std::string toLower(const std::string& str);
 };
 
+// Convenience macro for file/line/function info
+#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Stream-style logging helper
+class LogStream {
+public:
+    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
+    ~LogStream();
+    
+    template<typename T>
+    LogStream& operator<<(const T& value) {
+        oss_ << value;
+        return *this;
+    }
+    
+private:
+    LogLevel level_;
+    std::ostringstream oss_;
+    std::string file_;
+    int line_;
+    std::string function_;
+};
+
+#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
 } // namespace nlm
+
+// Explicit template declarations for Config
+namespace nlm {
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+}

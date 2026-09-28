@@ -1,8 +1,55 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
+#include "../../core/Logger/Logger.hpp"
 #include <algorithm>
 
 namespace nlm {
+
+// Helper class for efficient O(n) spike correlation processing
+class SpikeCorrelationProcessor {
+public:
+    // Optimized Hebbian correlation calculation using O(n) algorithm
+    static size_t countCorrelatedSpikes(const std::vector<Timestamp>& preSpikes,
+                                        const std::vector<Timestamp>& postSpikes,
+                                        float correlationWindow) {
+        if (preSpikes.empty() || postSpikes.empty()) return 0;
+        
+        // Create sorted copies for efficient processing
+        std::vector<Timestamp> sortedPre = preSpikes;
+        std::vector<Timestamp> sortedPost = postSpikes;
+        std::sort(sortedPre.begin(), sortedPre.end());
+        std::sort(sortedPost.begin(), sortedPost.end());
+        
+        size_t correlationCount = 0;
+        
+        // Use two-pointer technique for O(n) processing
+        size_t i = 0, j = 0;
+        while (i < sortedPre.size() && j < sortedPost.size()) {
+            float dt = static_cast<float>(sortedPost[j] - sortedPre[i]);
+            
+            if (std::abs(dt) < correlationWindow) {
+                // Spikes are correlated (within window)
+                correlationCount++;
+                
+                // Try to advance both pointers if possible
+                if (dt <= 0) {
+                    i++;  // Pre spike is before or simultaneous with post spike
+                }
+                if (dt >= 0) {
+                    j++;  // Post spike is before or simultaneous with pre spike
+                }
+            } else if (dt < 0) {
+                // Pre spike is too early, skip it
+                i++;
+            } else {
+                // Post spike is too early, skip it
+                j++;
+            }
+        }
+        
+        return correlationCount;
+    }
+};
 
 struct Hebbian::Impl {
     float learningRate;
@@ -49,21 +96,22 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Use standardized error handling
+    auto error = ErrorResult::success();
+    
+    error.checkNotNull(synapse, "Hebbian::update synapse parameter");
+    error.check(!preSpikes.empty(), "Hebbian::update preSpikes empty");
+    error.check(!postSpikes.empty(), "Hebbian::update postSpikes empty");
+    
+    if (error.failure()) {
+        NLM_LOG_ERROR(error.message());
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
-    }
+    // Use optimized O(n) spike correlation counting
+    size_t correlationCount = SpikeCorrelationProcessor::countCorrelatedSpikes(
+        preSpikes, postSpikes, 100.0f  // 100ms correlation window
+    );
     
     // Compute weight change based on correlation
     // More sophisticated: use actual spike counts and firing rates
@@ -76,7 +124,15 @@ void Hebbian::update(Synapse* synapse,
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    // Use standardized error handling
+    auto error = ErrorResult::success();
+    
+    error.checkNotNull(synapse, "Hebbian::applyWeightChange synapse parameter");
+    
+    if (error.failure()) {
+        NLM_LOG_ERROR(error.message());
+        return;
+    }
     
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);

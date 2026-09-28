@@ -2,16 +2,12 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations - avoid circular dependencies
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -28,6 +24,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -196,6 +196,24 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+
+    // Private helper methods for step() decomposition
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeurons(Timestamp currentTime);
+    void detectSpikesAndScheduleEvents(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory(Timestamp currentTime);
+    void applyNeuromodulation(Timestamp currentTime);
+    void updatePlasticity(Timestamp currentTime);
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem(Timestamp currentTime);
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void consolidateMemories(SimulationStep currentStep);
+    void updateCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    void collectStatistics();
 };
 
 } // namespace nlm
