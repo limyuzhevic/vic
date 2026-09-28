@@ -19,16 +19,28 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced file loading with JSON support
+    // Supports simple key=value format and JSON for better interoperability
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Check if it looks like JSON (starts with { or [)
+    if (!content.empty() && (content.front() == '{' || content.front() == '[')) {
+        return loadFromJson(content);
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    std::stringstream ss(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(ss, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,7 +55,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -84,10 +96,58 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header with description comments
+    file << "# NLM Configuration File (Generated " << getTimestamp() << ")\n";
+    file << "# This file contains configuration for the NLM neural simulation framework\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Write the actual value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format doubles with reasonable precision
+                file.precision(6);
+                file << std::fixed << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
+    
+    // Write JSON backup for easy integration with other tools
+    file << "# JSON backup (for tool compatibility)\n";
+    file << "{\n";
+    bool first = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!first) file << ",\n";
+        file << "  \"" << entry.key << "\": ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file.precision(6);
+                file << std::fixed << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            }
+        }, entry.value);
+        
+        first = false;
+    }
+    file << "\n}\n";
     
     return true;
 }
@@ -199,17 +259,57 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+bool Config::loadFromJson(const std::string& jsonContent) {
+    // Basic JSON parsing for key-value pairs
+    // This is a simplified implementation for Phase 6
+    // In production, use a proper JSON library like nlohmann/json
+    
+    try {
+        // Simple JSON parsing for object format: {"key": "value", "key2": "value2"}
+        if (jsonContent.front() != '{' || jsonContent.back() != '}') {
+            return false; // Not a valid JSON object
+        }
+        
+        std::string content = jsonContent.substr(1, jsonContent.size() - 2); // Remove braces
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Find next key
+            size_t keyStart = content.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = content.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace and colon
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == ':')) {
+                pos++;
+            }
+            
+            if (pos >= content.size() || content[pos] != '\"') {
+                break; // Malformed JSON
+            }
+            
+            // Find value
+            size_t valueStart = pos;
+            size_t valueEnd = content.find('\"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            
+            std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            pos = valueEnd + 1;
+            
+            // Remove any trailing comma
+            if (pos < content.size() && content[pos] == ',') {
+                pos++;
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        // Fallback to simple parsing if JSON parsing fails
+        return loadFromFile();
+    }
+}
