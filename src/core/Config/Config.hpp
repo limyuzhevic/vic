@@ -93,6 +93,32 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // ========== VALIDATION AND VALID DEFAULTS ==========
+    
+    // Validate configuration values and fix invalid ones
+    bool validateAndFix() const;
+    
+    // Apply user-friendly default values
+    void applyUserDefaults();
+    
+    // Get configuration description for user reference
+    std::string getConfigDescription() const;
+    
+    // ========== SPECIFIC VALIDATION ==========
+    
+    // Validate neural network parameters
+    bool validateNeuralParameters() const;
+    
+    // Validate simulation parameters
+    bool validateSimulationParameters() const;
+    
+    // Validate plasticity parameters
+    bool validatePlasticityParameters() const;
+    
+    // Get safe default value for a specific key
+    template<typename T>
+    T getSafeDefault(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +126,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isValidNeuronCount(size_t count) { return count > 0 && count <= 1000000; }
+    static bool isValidTimestep(double timestep) { return timestep > 0.0 && timestep <= 1.0; }
+    static bool isValidConnectionProbability(float prob) { return prob >= 0.0f && prob <= 1.0f; }
+    static bool isValidWeight(float weight) { return weight >= -1.0f && weight <= 1.0f; }
 };
 
 } // namespace nlm
