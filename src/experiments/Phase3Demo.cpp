@@ -244,18 +244,50 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Parse and validate command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
     if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+        try {
+            numEpisodes = std::stoi(argv[1]);
+            if (numEpisodes <= 0 || numEpisodes > 100) {
+                std::cerr << "Error: Number of episodes must be between 1 and 100" << std::endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid number of episodes: " << argv[1] << std::endl;
+            return 1;
+        }
     }
     
+    if (argc > 2) {
+        try {
+            stepsPerEpisode = std::stoi(argv[2]);
+            if (stepsPerEpisode <= 0 || stepsPerEpisode > 10000) {
+                std::cerr << "Error: Steps per episode must be between 1 and 10000" << std::endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid steps per episode: " << argv[2] << std::endl;
+            return 1;
+        }
+    }
+    
+    std::cout << "NLM Phase 3 Demo Configuration:" << std::endl;
+    std::cout << "  Episodes: " << numEpisodes << std::endl;
+    std::cout << "  Steps per episode: " << stepsPerEpisode << std::endl;
+    
     nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    try {
+        demo.run(numEpisodes, stepsPerEpisode);
+    } catch (const std::exception& e) {
+        std::cerr << "Error during Phase 3 demo execution: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown error during Phase 3 demo execution" << std::endl;
+        return 1;
+    }
     
     return 0;
 }
