@@ -28,6 +28,38 @@
 
 using namespace nlm;
 
+// ============= HEADER INCLUDES =============
+// Standard C++ libraries
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <iomanip>
+#include <numeric>
+
+// NLM core modules
+#include "core/Config/Config.hpp"
+#include "core/Random/Random.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/SimulationClock/SimulationClock.hpp"
+#include "brain/Brain.hpp"
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "sensory/SensoryInput.hpp"
+#include "motor/Action.hpp"
+#include "environment/Environment.hpp"
+#include "experiments/ExperimentRunner.hpp"
+
+using namespace nlm;
+
+// ============= UTILITY FUNCTIONS =============
+
+/**
+ * @brief Display the NLM program banner with version and phase information.
+ * 
+ * This function prints a formatted ASCII art banner showing the NLM project
+ * name, version, and current phase (Phase 2 for this demo).
+ */
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -48,18 +80,38 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// ============= LEARNING EXPERIMENT STRUCTURE =============
+
+/**
+ * @brief A data structure for recording and analyzing learning experiments.
+ * 
+ * This structure captures the state of the brain before and after learning
+ * experiments, enabling quantitative analysis of synaptic changes and
+ * neural activity patterns.
+ */
 struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
+    std::shared_ptr<Brain> brain;              ///< Pointer to the brain being studied
+    uint64_t seed;                            ///< Random seed for reproducible experiments
+    size_t initialSynapseCount;               ///< Number of synapses before experiment
+    std::vector<float> initialWeights;        ///< Synaptic weights before experiment
+    std::vector<float> finalWeights;          ///< Synaptic weights after experiment
+    std::vector<NeuronId> mostActiveNeurons;  ///< Neurons with highest firing activity
     
+    /**
+     * @brief Construct a new LearningExperiment object.
+     * 
+     * @param b Shared pointer to the brain
+     * @param s Random seed for experiment reproducibility
+     */
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    /**
+     * @brief Record the initial state of the brain before learning.
+     * 
+     * Captures the total synapse count and average synaptic weights from
+     * the first brain region for later comparison with final state.
+     */
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
@@ -80,6 +132,12 @@ struct LearningExperiment {
         }
     }
     
+    /**
+     * @brief Record the final state of the brain after learning.
+     * 
+     * Captures the final synapse count, synaptic weights, and most active
+     * neurons for comparison with initial state.
+     */
     void recordFinalState() {
         finalWeights.clear();
         
@@ -101,6 +159,12 @@ struct LearningExperiment {
         }
     }
     
+    /**
+     * @brief Compute and display statistics comparing initial and final states.
+     * 
+     * Calculates synaptic weight changes, identifies strengthened/weakened
+     * synapses, and determines if learning occurred during the experiment.
+     */
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
@@ -159,13 +223,18 @@ struct LearningExperiment {
     }
 };
 
+// ============= TEST FUNCTIONS =============
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: No region found in brain!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -206,6 +275,11 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Brain pointer is null!");
+        return;
+    }
+    
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
@@ -216,6 +290,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+    } else {
+        NLM_LOG_ERROR("ERROR: No region found for plasticity experiment!");
+        return;
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -249,8 +326,16 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Brain pointer is null!");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: No region found in brain!");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();

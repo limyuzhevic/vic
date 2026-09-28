@@ -41,6 +41,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         return result;
     }
     
+    // Validate brain was created successfully
+    if (!brain->getTotalNeuronCount() || !brain->getTotalSynapseCount()) {
+        NLM_LOG_ERROR("Brain initialization failed: insufficient neurons or synapses");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     // Create simple world
     SimpleWorld world;
     world.initialize(16, 16);
@@ -53,6 +60,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     agent.enableDevelopment(config.enableDevelopment);
     agent.enableCuriosity(true);
     
+    // Validate agent was created successfully
+    if (!agent.getBrain()) {
+        NLM_LOG_ERROR("Failed to create agent brain interface");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
     // Run simulation
@@ -61,8 +75,23 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
-        // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        // Validate world and agent state before processing
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + 
+                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                            brain->getWorkingMemory()->getActiveTraces() : 0));
+        }
+        
+        // Get observation with error checking
+        auto regions = agent.getBrain()->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No brain regions available for sensory observation");
+            break;
+        }
+        
+        SensoryPercept percept = world.observe(regions[0].get());
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -70,14 +99,21 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Brain step
         brain->step(step, step * 0.001);
         
-        // Get motor command
+        // Get motor command with validation
         MotorCommand cmd = agent.decodeMotorCommand();
+        if (!cmd.isValid()) {
+            NLM_LOG_WARNING(std::string("Invalid motor command at step ") + std::to_string(step));
+            cmd = MotorCommand(ActionType::Wait); // Default to wait action
+        }
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        if (!world.applyAction(regions[0].get(), cmd)) {
+            NLM_LOG_ERROR(std::string("Failed to apply action at step ") + std::to_string(step));
+            // Continue simulation but log error
+        }
         
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        // Compute reward with error checking
+        float reward = world.computeReward(regions[0].get());
         totalReward += reward;
         
         // Apply reward modulation
@@ -88,18 +124,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             agent.updateDevelopment(0.001);
         }
         
-        // Collect metrics
+        // Collect metrics with bounds checking
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
-        
-        // Periodic status
-        if (step % 1000 == 0) {
-            NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
-        }
     }
     
     // Collect final metrics
