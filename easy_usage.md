@@ -104,53 +104,377 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## Enhanced Patterns with New Convenience Functions
 
-### Pattern 1: Run a Simulation
+### Pattern 1: Run a Complete Agent Simulation (NEW!)
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
+def run_complete_agent_simulation(brain, world, agent, num_steps):
+    """Run a complete simulation using the enhanced convenience function."""
+    total_spikes = pynlm.run_agent_simulation(brain, world, agent, num_steps, verbose=True)
+    return total_spikes
+
+# Create and run a complete agent simulation in just 2 lines:
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run the simulation using the convenience function
+total_spikes = run_complete_agent_simulation(brain, world, agent, 1000)
+print(f"Simulation complete! Total spikes: {total_spikes}")
+```
+
+### Pattern 2: Learning Experiment (NEW!)
+
+```python
+def run_learning_experiment():
+    """Run a learning experiment using the convenience function."""
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Run learning experiment
+    initial, final, spikes, change = pynlm.create_learning_experiment(brain, agent, world, 500)
+    
+    print(f"Learning Experiment Results:")
+    print(f"  Initial mean weight: {initial:.4f}")
+    print(f"  Final mean weight: {final:.4f}")
+    print(f"  Weight change: {change:.4f}")
+    print(f"  Total spikes: {spikes}")
+    print(f"  Learning occurred: {abs(change) > 0.01}")
+
+run_learning_experiment()
+```
+
+### Pattern 3: Brain Statistics and Monitoring (ENHANCED)
+
+```python
+def monitor_brain_health(brain, duration_steps=1000):
+    """Monitor brain health and collect statistics."""
+    # Get comprehensive stats
+    stats = pynlm.get_brain_stats(brain)
+    
+    print("Brain Statistics:")
+    for key, value in stats.items():
+        print(f"  {key}: {value}")
+    
+    # Monitor over time
+    history = pynlm.monitor_brain_health(brain, duration_steps, update_interval=100.0)
+    
+    print(f"\nCollected {len(history)} monitoring snapshots")
+    return history
+
+# Usage:
+stats_history = monitor_brain_health(brain, duration_steps=1000)
+```
+
+### Pattern 4: Safe Save/Load with Validation (NEW!)
+
+```python
+def save_and_load_brain(brain, filepath):
+    """Demonstrate safe save/load with validation."""
+    # Save with backup and validation
+    print("Saving brain with backup...")
+    pynlm.save_brain_with_validation(brain, filepath, create_backup=True)
+    print(f"Brain saved to {filepath}")
+    
+    # Load with validation
+    print("Loading brain...")
+    loaded_successfully = pynlm.load_brain_with_validation(brain, filepath)
+    if loaded_successfully:
+        print("Brain loaded successfully!")
+    else:
+        print("Failed to load brain")
+        return False
+    
+    return True
+```
+
+### Pattern 5: Configuration Management (ENHANCED)
+
+```python
+def demonstrate_configurations():
+    """Demonstrate different configuration options."""
+    # Create different types of configurations
+    default_config = pynlm.createDefaultConfig()
+    
+    brain_only_config = pynlm.create_advanced_config("brain_only")
+    high_perf_config = pynlm.create_advanced_config("high_performance")
+    dev_config = pynlm.create_advanced_config("developmental")
+    
+    print("Configuration validation:")
+    for name, config in [("default", default_config), 
+                         ("brain_only", brain_only_config),
+                         ("high_performance", high_perf_config),
+                         ("developmental", dev_config)]:
+        warnings = pynlm.validate_config(config)
+        print(f"  {name}: {len(warnings)} warnings")
+        for warning in warnings:
+            print(f"    - {warning}")
+```
+
+### Pattern 6: Quick Testing Setup (NEW!)
+
+```python
+def quick_test_setup():
+    """Quick setup for testing and development."""
+    config, brain = pynlm.quick_test_setup()
+    
+    print("Quick test setup complete:")
+    print(f"  Config neurons: {config.getOr('brain.neuron_count', 1000)}")
+    print(f"  Brain neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Brain synapses: {brain.getTotalSynapseCount()}")
+    
+    # Run a quick simulation
+    for i in range(100):
+        brain.step(i)
+    
+    print(f"  Total spikes after 100 steps: {brain.getTotalSpikeCount()}")
+    return config, brain
+
+# Usage:
+config, brain = quick_test_setup()
+```
+
+### Pattern 7: Learning Demonstration (NEW!)
+
+```python
+def learning_demo():
+    """Run a complete learning demonstration."""
+    brain, final_weight, synapse_count = pynlm.run_learning_demo()
+    
+    print("Learning Demo Results:")
+    print(f"  Final mean synaptic weight: {final_weight:.4f}")
+    print(f"  Number of synapses: {synapse_count}")
+    print(f"  Learning {'detected' if final_weight != 0.0 else 'not detected'}")
+    print(f"  Brain spike count: {brain.getTotalSpikeCount()}")
+    print(f"  Brain firing neurons: {brain.getFiringNeuronCount()}")
+
+learning_demo()
+```
+
+### Pattern 8: Enhanced Basic Usage
+
+```python
+# Enhanced version of the basic examples with validation
+
+# Example 1: Just neurons with error handling
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+if brain.getTotalNeuronCount() > 0:
+    brain.initialize()
+    for i in range(100):
+        brain.step(i)
+    print(f"Done! Your brain thought {brain.getTotalSpikeCount()} times")
+else:
+    print("Error: Failed to create brain")
+
+# Example 2: World interaction with monitoring
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run with monitoring
+for step in range(50):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print(f"Simulation finished! Firing neurons: {brain.getFiringNeuronCount()}")
+```
+
+### Pattern 9: Enable All Advanced Features
+
+```python
+def advanced_brain_simulation():
+    """Create a brain with all advanced features enabled."""
+    config = pynlm.create_advanced_config("high_performance")
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all advanced features
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Run with advanced monitoring
+    print("Running advanced simulation with all features enabled...")
+    for step in range(200):
         world.update(0.1)
-        
-        # 2. Get what the agent sees
         percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
         agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
         
-        # 4. Brain thinks
+        if step % 50 == 0:
+            stats = pynlm.get_brain_stats(brain)
+            print(f"  Step {step}: {stats['firing_neurons']} firing neurons, "
+                  f"{stats['total_spikes']} total spikes, "
+                  f"curiosity: {agent.getCuriosityLevel():.3f}")
+    
+    print("Advanced simulation complete!")
+
+advanced_brain_simulation()
+```
+
+### Pattern 10: Error Handling and Robust Usage
+
+```python
+def robust_simulation():
+    """Robust simulation with comprehensive error handling."""
+    try:
+        # Create brain
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        # Create world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        # Create agent
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Run simulation
+        for step in range(500):
+            try:
+                world.update(0.1)
+                percept = world.getSensoryPercept()
+                agent.processSensoryInput(percept)
+                brain.step(step)
+                action = agent.decodeMotorCommand()
+                world.applyMotorCommand(action, world.getSimulationTime())
+                
+            except Exception as e:
+                print(f"Error at step {step}: {e}")
+                # Continue simulation despite errors
+                continue
+        
+        print(f"Robust simulation completed successfully!")
+        return brain.getTotalSpikeCount()
+        
+    except Exception as e:
+        print(f"Fatal error in robust simulation: {e}")
+        return None
+
+# Usage:
+spike_count = robust_simulation()
+if spike_count is not None:
+    print(f"Simulation generated {spike_count} total spikes")
+```
+
+### Pattern 11: Data Collection and Analysis
+
+```python
+def collect_and_analyze_data():
+    """Collect and analyze brain data for research."""
+    import json
+    
+    # Create brain
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    # Collect data over time
+    data_points = []
+    for step in range(1000):
         brain.step(step)
         
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
+        if step % 10 == 0:
+            stats = pynlm.get_brain_stats(brain)
+            stats["step"] = step
+            data_points.append(stats)
+    
+    # Analyze collected data
+    spike_analysis = {
+        "max_spikes": max(dp["total_spikes"] for dp in data_points),
+        "avg_firing_rate": sum(dp["avg_firing_rate"] for dp in data_points) / len(data_points),
+        "stability": "stable" if len(set(dp["firing_neurons"] for dp in data_points)) < 100 else "unstable"
+    }
+    
+    # Save data for later analysis
+    with open("brain_data.json", "w") as f:
+        json.dump({
+            "data_points": data_points,
+            "analysis": spike_analysis,
+            "config": "default_1000"
+        }, f, indent=2)
+    
+    print(f"Data collected and saved. Analysis: {spike_analysis}")
+    return data_points
+
+# Usage:
+collected_data = collect_and_analyze_data()
+```
+
+### Pattern 12: Comparative Analysis
+
+```python
+def compare_configurations():
+    """Compare different configurations."""
+    configs_to_test = ["default", "brain_only", "high_performance", "developmental"]
+    
+    results = {}
+    
+    for config_name in configs_to_test:
+        print(f"\nTesting configuration: {config_name}")
+        config = pynlm.create_advanced_config(config_name)
         
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run quick simulation
+        for step in range(100):
+            brain.step(step)
+        
+        final_stats = pynlm.get_brain_stats(brain)
+        results[config_name] = final_stats
+        
+        print(f"  Neurons: {final_stats['total_neurons']}")
+        print(f"  Synapses: {final_stats['total_synapses']}")
+        print(f"  Total spikes: {final_stats['total_spikes']}")
+        print(f"  Development stage: {final_stats['development_stage']}")
+    
+    # Find best performer
+    best_config = max(results.keys(), 
+                     key=lambda x: results[x]['total_spikes'] / results[x]['total_neurons'])
+    
+    print(f"\nBest performing configuration: {best_config}")
+    return results
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+# Usage:
+comparison_results = compare_configurations()
 ```
 
 ---
