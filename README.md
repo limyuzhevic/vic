@@ -82,6 +82,92 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### New CLI Interface
+```bash
+# Central NLM command line interface (new in Phase 6)
+nlm-cli --help
+
+# Create and initialize a Phase 6 brain
+nlm-cli create --neurons 1000 --output brain.bin
+
+# Run Phase 6 integration experiment
+nlm-cli experiment phase6 --steps 2000 --neurons 500
+
+# Inspect brain system state
+nlm-cli inspect brain.bin --memory --neuromodulation --cognition
+
+# Save/load checkpoints
+nlm-cli checkpoint --brain brain.bin --save checkpoint.bin
+nlm-cli checkpoint --brain brain.bin --load checkpoint.bin
+
+# List saved sessions
+nlm-cli list
+```
+
+### Python API (Enhanced for Phase 6)
+```python
+import pynlm
+
+# Create Phase 6 brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run Phase 6 integration experiment
+result = brain.runPhase6Integration(steps=5000)
+print(f"Integration successful: {result['integration']}")
+print(f"Total reward: {result['totalReward']:.3f}")
+print(f"Memory episodes: {result['memoryEpisodesStored']}")
+
+# Save brain state
+brain.save("nlm_phase6_brain.bin")
+
+# Create agent and world
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable all Phase 6 features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run simulation loop
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: Firing rate {brain.getAverageFiringRate():.2f} Hz")
+```
+
+### Visualization Tools (New in Phase 6)
+```bash
+# Neural network visualization
+nlm-viz network --brain brain.bin --output network.png
+
+# Memory system visualization
+nlm-viz memory --brain brain.bin --episodes 20 --output memory.png
+
+# Plasticity system visualization
+nlm-viz plasticity --brain brain.bin --output plasticity.png
+
+# Neuromodulation system visualization
+nlm-viz neuromod --brain brain.bin --output neuromod.png
+
+# Time series visualization
+nlm-viz time-series --brain brain.bin --metric firing_rate --output time_series.png
+
+# Animation of brain dynamics
+nlm-viz animate --brain brain.bin --steps 100 --output animation.gif
+```
+
 ## Project Structure
 
 ```
@@ -94,7 +180,9 @@ NLM/
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   └── PHASE6_FINAL_RESULTS.md    # Phase 6 results and usage
+├── nlm_cli.py                      # New CLI interface
+├── nlm_viz.py                      # New visualization tools
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
@@ -221,6 +309,31 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## New in Phase 6
+
+### CLI Interface
+- **nlm-cli**: Unified command-line interface for all operations
+- **nlm-viz**: Comprehensive visualization tools
+- **Enhanced Python API**: Better integration with Phase 6 features
+
+### Documentation
+- **Phase6_FINAL_RESULTS.md**: Comprehensive results and usage guide
+- **USAGE_GUIDE.md**: Beginner-friendly tutorials
+- **ADVANCED_FEATURES.md**: Advanced visualization, profiling, debugging
+- **CLI_REFERENCE.md**: Complete command reference
+
+### Scientific Achievements
+- **Memory Integration**: Working memory, episodic memory, and associative memory all connected to neural processing
+- **Neuromodulation Integration**: Dopamine, curiosity, and novelty systems coordinate plasticity and dynamics
+- **Prediction Integration**: Temporal prediction with error computation becomes central organizing principle
+- **Development Integration**: Multi-stage development modulates plasticity rates appropriately
+- **Complete Brain Loop**: All 15 systems update in unified framework each simulation step
+
+### Performance
+- **Optimization**: SIMD vectorization and parallel processing maintained
+- **Memory Efficiency**: Memory pools and event queues for efficient simulation
+- **Scalability**: Can simulate up to 5000+ neurons on modern hardware
+
 ## License
 
 MIT
@@ -228,3 +341,57 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Getting Help
+
+### Quick Start (5 minutes)
+```bash
+# Create Phase 6 brain
+nlm-cli create --neurons 500 --output demo_brain.bin
+
+# Run integration test
+nlm-cli experiment phase6 --steps 1000 --neurons 200
+
+# Visualize results
+nlm-viz memory --brain demo_brain.bin --output memory_demo.png
+```
+
+### Getting Started with Python
+```python
+# Import the enhanced Python bindings
+import pynlm
+
+# Create Phase 6 brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run integration
+result = brain.runPhase6Integration(2000)
+print("Phase 6 integration successful!")
+```
+
+### Advanced Usage
+1. Read `docs/PHASE6_FINAL_RESULTS.md` for Phase 6 capabilities
+2. Read `docs/ARCHITECTURE.md` for system architecture
+3. Read `docs/SCIENCE.md` for scientific background
+4. Read `docs/EXPERIMENTS.md` for experiment descriptions
+5. Use `nlm-cli --help` for complete CLI documentation
+6. Use `nlm-viz --help` for visualization options
+
+### Getting Help
+- **GitHub Issues**: Report bugs, request features, ask questions
+- **Documentation**: Comprehensive docs in `docs/` directory
+- **Examples**: Look at `src/experiments/` for working examples
+- **Community**: Join discussions and share findings
+
+## Contributing
+
+NLM is an open research project. Contributions are welcome for:
+- Adding new brain systems and integration patterns
+- Improving visualization and analysis tools
+- Developing new experimental paradigms
+- Optimizing performance and scalability
+- Enhancing documentation and tutorials
+- Implementing new neuromodulation mechanisms
+
+See `docs/ROADMAP.md` for current priorities and upcoming features.
