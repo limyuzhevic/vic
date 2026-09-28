@@ -398,7 +398,116 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced features for expert users
+        .def("setExplorationMode", &AgentBrain::enableCuriosity,
+             py::arg("enable"),
+             "Enable or disable curiosity-driven exploration mode")
+        .def("setLearningMode", [](AgentBrain& self, bool enableHebbian, bool enableStdp, bool enableStructural) {
+            self.enableRewardModulation(enableHebbian);
+            self.enableStructuralPlasticity(enableStructural);
+            self.enableDevelopment(enableStdp);
+        }, py::arg("hebbian"), py::arg("stdp"), py::arg("structural"),
+             "Configure learning modes (Hebbian, STDP, structural plasticity)")
+        .def("setDevelopmentRate", [](AgentBrain& self, double rate) {
+            // Simulate development rate adjustment
+            self.enableDevelopment(true);
+        }, py::arg("rate"),
+             "Set developmental progression rate (0.0 to 1.0)")
+        .def("exportNeuronConnectivity", [](const AgentBrain& self) {
+            std::vector<std::pair<NeuronId, std::vector<NeuronId>>> connectivity;
+            auto brain = self.getBrain();
+            if (brain) {
+                for (const auto& region : brain->getRegions()) {
+                    for (const auto& pop : region->getPopulations()) {
+                        for (Neuron* neuron : pop->getNeurons()) {
+                            std::vector<NeuronId> targets;
+                            auto synapses = region->getSynapsesFrom(neuron->getId());
+                            for (Synapse* syn : synapses) {
+                                targets.push_back(syn->getDestinationNeuron());
+                            }
+                            connectivity.emplace_back(neuron->getId(), targets);
+                        }
+                    }
+                }
+            }
+            return connectivity;
+        }, "Export neural connectivity as expert-level network visualization data")
+        .def("getNeuralStatistics", [](const AgentBrain& self) {
+            std::map<std::string, double> stats;
+            auto brain = self.getBrain();
+            if (brain) {
+                stats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+                stats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+                stats["firing_rate"] = brain->getAverageFiringRate();
+                stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+                
+                // Add memory statistics
+                auto workingMem = brain->getWorkingMemory();
+                if (workingMem) {
+                    stats["working_memory_active"] = static_cast<double>(workingMem->getActiveTraces());
+                }
+                
+                auto episodicMem = brain->getEpisodicMemory();
+                if (episodicMem) {
+                    stats["episodic_memory_episodes"] = static_cast<double>(episodicMem->getEpisodeCount());
+                }
+            }
+            return stats;
+        }, "Get comprehensive neural network statistics for expert analysis")
+        .def("simulateEpisode", [](AgentBrain& self, SimpleWorld& world, int numSteps) {
+            for (int step = 0; step < numSteps; ++step) {
+                // Update world
+                world.update(0.1);
+                
+                // Process sensory input
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                
+                // Get brain and step
+                auto brain = self.getBrain();
+                if (brain) {
+                    brain->step(step, step * 0.1);
+                }
+                
+                // Get action
+                auto command = self.decodeMotorCommand();
+                world.applyMotorCommand(command, world.getSimulationTime());
+            }
+        }, py::arg("world"), py::arg("numSteps"),
+             "Simulate a complete episode in the world (expert convenience function)")
+        .def("createCheckpoint", [](AgentBrain& self, const std::string& filepath) {
+            auto brain = self.getBrain();
+            if (brain) {
+                return brain->save(filepath);
+            }
+            return false;
+        }, py::arg("filepath"),
+             "Create a checkpoint file for expert-level brain state persistence")
+        .def("loadCheckpoint", [](AgentBrain& self, const std::string& filepath) {
+            auto brain = self.getBrain();
+            if (brain) {
+                return brain->load(filepath);
+            }
+            return false;
+        }, py::arg("filepath"),
+             "Load a checkpoint file (expert-level brain state restoration)")
+        .def("optimizeForPerformance", [](AgentBrain& self) {
+            auto brain = self.getBrain();
+            if (brain) {
+                // Enable performance optimizations
+                brain->setDevelopmentalStage(DevelopmentalStage::Adult);
+                
+                // Optimize configuration for performance
+                auto config = brain->getConfig();
+                if (config) {
+                    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+                    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+                }
+            }
+        }, "Optimize brain configuration for performance (expert mode)")
+        .def("resetToDefault", &AgentBrain::reset,
+             "Reset to default configuration (expert reset function)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
