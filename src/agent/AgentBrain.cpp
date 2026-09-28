@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
 
@@ -19,7 +20,37 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    // Initialize advanced configuration defaults
+    , learningStrategy_(LearningStrategy::Balanced)
+    , actionSelectionStrategy_(ActionSelectionStrategy::Boltzmann)
+    , explorationRate_(0.1f)
+    , exploitationRate_(0.9f)
+    , dopamineEffect_(1.0f)
+    , curiosityEffect_(1.0f)
+    , noveltyEffect_(0.5f)
+    , predictionErrorEffect_(1.0f)
+    , developmentSpeed_(1.0)
+    , criticalPeriodAge_(60.0)
+    , maturationPeriodAge_(300.0)
+    , workingMemoryEnabled_(false)
+    , episodicMemoryEnabled_(false)
+    , semanticMemoryEnabled_(false)
+    , debugLevel_(DebugLevel::Basic)
+    , profilingEnabled_(false)
+    , sensoryFilteringEnabled_(false)
+    , visionFilteringStrength_(0.5f)
+    , touchFilteringStrength_(0.5f)
+    , rewardFunctionEnabled_(false)
+    , episodeLimit_(1000)
+    , stepLimit_(10000)
+    , timeLimit_(0.0)
+    , currentEpisode_(0)
+    , stepsInCurrentEpisode_(0)
+    , currentEpisodeTime_(0.0)
 {
+    // Initialize random number generator
+    randomGen_ = std::make_unique<std::mt19937>(std::random_device{}());
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -68,6 +99,23 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
+    // Reset advanced state
+    currentEpisode_ = 0;
+    stepsInCurrentEpisode_ = 0;
+    currentEpisodeTime_ = 0.0;
+    
+    // Initialize performance tracking
+    currentStats_ = PerformanceStats();
+    currentStats_.totalTime = 0.0;
+    currentStats_.stepsExecuted = 0;
+    currentStats_.avgFiringRate = 0.0f;
+    currentStats_.avgSpikesPerStep = 0.0f;
+    currentStats_.totalReward = 0.0f;
+    currentStats_.maxFiringRate = 0.0f;
+    currentStats_.avgNeuromodulationLevel = 0.0f;
+    currentStats_.memoryUsage = 0;
+    currentStats_.cpuUsage = 0.0;
+    
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
@@ -91,8 +139,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Apply sensory filtering if enabled
+            float current = vision[i] * 5.0f; // Scale factor
+            if (sensoryFilteringEnabled_) {
+                current *= visionFilteringStrength_;
+            }
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +152,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * 8.0f; // Collision signal
+            if (sensoryFilteringEnabled_) {
+                current *= touchFilteringStrength_;
+            }
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +164,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 2.0f - 1.0f) * 5.0f; // Center and scale
+            if (sensoryFilteringEnabled_) {
+                current *= visionFilteringStrength_; // Use same strength for internal
+            }
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,7 +176,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f; // Center and scale
+            if (sensoryFilteringEnabled_) {
+                current *= visionFilteringStrength_; // Use same strength for proprioception
+            }
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -142,9 +202,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = noveltyLevel_ * curiosityEffect_ + std::abs(predictionError_) * predictionErrorEffect_ * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -181,24 +241,116 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
+    // Apply action selection strategy
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
+    float bestActivity = waitAct; // Default to wait if nothing stronger
     
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
-        }
+    switch (actionSelectionStrategy_) {
+        case ActionSelectionStrategy::Deterministic:
+            // Pure exploitation: choose highest activity
+            bestActivity = std::max({forwardAct, backwardAct, leftAct, rightAct, interactAct, waitAct});
+            if (bestActivity >= forwardAct) best = MotorCommand::MoveForward;
+            if (bestActivity >= backwardAct) best = MotorCommand::MoveBackward;
+            if (bestActivity >= leftAct) best = MotorCommand::TurnLeft;
+            if (bestActivity >= rightAct) best = MotorCommand::TurnRight;
+            if (bestActivity >= interactAct) best = MotorCommand::Interact;
+            break;
+            
+        case ActionSelectionStrategy::Random:
+            // Pure exploration: random choice
+            std::uniform_int_distribution<> dist(0, 7);
+            int choice = dist(*randomGen_);
+            switch (choice) {
+                case 0: best = MotorCommand::MoveForward; break;
+                case 1: best = MotorCommand::MoveBackward; break;
+                case 2: best = MotorCommand::TurnLeft; break;
+                case 3: best = MotorCommand::TurnRight; break;
+                case 4: best = MotorCommand::LookLeft; break;
+                case 5: best = MotorCommand::LookRight; break;
+                case 6: best = MotorCommand::Interact; break;
+                default: best = MotorCommand::Wait; break;
+            }
+            break;
+            
+        case ActionSelectionStrategy::Boltzmann:
+            // Soft-max over activity values
+            std::vector<std::pair<MotorCommand, float>> options = {
+                {MotorCommand::MoveForward, forwardAct},
+                {MotorCommand::MoveBackward, backwardAct},
+                {MotorCommand::TurnLeft, leftAct},
+                {MotorCommand::TurnRight, rightAct},
+                {MotorCommand::Interact, interactAct},
+                {MotorCommand::Wait, waitAct}
+            };
+            
+            float maxAct = std::max_element(options.begin(), options.end(),
+                                          [](const auto& a, const auto& b) { return a.second < b.second; })->second;
+            
+            std::vector<float> weights;
+            for (const auto& opt : options) {
+                weights.push_back(std::exp((opt.second - maxAct) / 2.0f)); // Temperature parameter
+            }
+            
+            float sum = std::accumulate(weights.begin(), weights.end(), 0.0f);
+            if (sum > 0.0f) {
+                std::uniform_real_distribution<> dist(0.0, sum);
+                float r = dist(*randomGen_);
+                float cumsum = 0.0f;
+                for (size_t i = 0; i < options.size(); ++i) {
+                    cumsum += weights[i];
+                    if (r <= cumsum) {
+                        best = options[i].first;
+                        break;
+                    }
+                }
+            }
+            break;
+            
+        case ActionSelectionStrategy::Ucb:
+            // Upper confidence bound for exploration
+            // This is a simplified version using activity with exploration bonus
+            float explorationBonus = 2.0f * std::sqrt(std::log(currentEpisode_ + 1) / std::max(1.0, stepsInCurrentEpisode_));
+            
+            std::vector<std::pair<MotorCommand, float>> ucbOptions = {
+                {MotorCommand::MoveForward, forwardAct + explorationBonus},
+                {MotorCommand::MoveBackward, backwardAct + explorationBonus},
+                {MotorCommand::TurnLeft, leftAct + explorationBonus},
+                {MotorCommand::TurnRight, rightAct + explorationBonus},
+                {MotorCommand::Interact, interactAct + explorationBonus},
+                {MotorCommand::Wait, waitAct + explorationBonus}
+            };
+            
+            best = std::max_element(ucbOptions.begin(), ucbOptions.end(),
+                                   [](const auto& a, const auto& b) { return a.second < b.second; })->first;
+            break;
+            
+        case ActionSelectionStrategy::EpsGreedy:
+            // Epsilon-greedy with adaptive epsilon based on curiosity
+            float epsilon = explorationRate_ * (1.0f - curiosityLevel_); // More curious = less greedy
+            std::uniform_real_distribution<> dist(0.0, 1.0);
+            
+            if (dist(*randomGen_) < epsilon) {
+                // Explore: random action
+                std::uniform_int_distribution<> actionDist(0, 5);
+                int choice = actionDist(*randomGen_);
+                switch (choice) {
+                    case 0: best = MotorCommand::MoveForward; break;
+                    case 1: best = MotorCommand::MoveBackward; break;
+                    case 2: best = MotorCommand::TurnLeft; break;
+                    case 3: best = MotorCommand::TurnRight; break;
+                    case 4: best = MotorCommand::Interact; break;
+                    default: best = MotorCommand::Wait; break;
+                }
+            } else {
+                // Exploit: best activity
+                bestActivity = std::max({forwardAct, backwardAct, leftAct, rightAct, interactAct, waitAct});
+                if (bestActivity >= forwardAct) best = MotorCommand::MoveForward;
+                if (bestActivity >= backwardAct) best = MotorCommand::MoveBackward;
+                if (bestActivity >= leftAct) best = MotorCommand::TurnLeft;
+                if (bestActivity >= rightAct) best = MotorCommand::TurnRight;
+                if (bestActivity >= interactAct) best = MotorCommand::Interact;
+            }
+            break;
     }
     
     // Only act if there's meaningful activity
@@ -215,10 +367,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        std::uniform_real_distribution<> dist(0.0f, 1.0f);
+        float r = dist(*randomGen_);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            std::uniform_int_distribution<> actionDist(0, 7);
+            int choice = actionDist(*randomGen_);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -245,7 +399,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
     // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    dopamineLevel_ = predictionError_ * dopamineEffect_;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
@@ -282,14 +436,16 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
-    developmentalAge_ += timestep;
+    developmentalAge_ += timestep * developmentSpeed_;
+    currentEpisodeTime_ += timestep;
+    stepsInCurrentEpisode_++;
     
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
+    if (developmentalAge_ < criticalPeriodAge_) {  // ~1 minute
         plasticityModifier_ = 1.0f;  // High plasticity
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+    } else if (developmentalAge_ < maturationPeriodAge_) {  // ~5 minutes
         plasticityModifier_ = 0.8f;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
     } else if (developmentalAge_ < 900.0) {  // ~15 minutes
@@ -298,6 +454,14 @@ void AgentBrain::updateDevelopment(double timestep) {
     } else {
         plasticityModifier_ = 0.2f;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
+    }
+    
+    // Custom developmental stages
+    for (const auto& stage : customStages_) {
+        if (developmentalAge_ >= stage.first) {
+            brain_->setDevelopmentalStage(stage.second);
+            break;
+        }
     }
     
     // Structural plasticity changes with development
@@ -345,6 +509,68 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+void AgentBrain::addCustomDevelopmentalStage(double age, DevelopmentalStage stage) {
+    customStages_[age] = stage;
+}
+
+DevelopmentalStage AgentBrain::getCustomDevelopmentalStage(double age) const {
+    for (const auto& stage : customStages_) {
+        if (age >= stage.first) {
+            return stage.second;
+        }
+    }
+    return DevelopmentalStage::Initial;
+}
+
+void AgentBrain::updatePerformanceStats(size_t stepsExecuted, float avgFiringRate, 
+                                       float totalReward, double timeElapsed) {
+    currentStats_.totalTime = timeElapsed;
+    currentStats_.stepsExecuted = stepsExecuted;
+    currentStats_.avgFiringRate = avgFiringRate;
+    currentStats_.avgSpikesPerStep = avgFiringRate * 2.0f; // Approximate
+    currentStats_.totalReward = totalReward;
+    currentStats_.maxFiringRate = std::max(currentStats_.maxFiringRate, avgFiringRate);
+    currentStats_.avgNeuromodulationLevel = (currentStats_.avgNeuromodulationLevel + dopamineLevel_) / 2.0f;
+    
+    // Simple memory usage estimation
+    currentStats_.memoryUsage = stepsExecuted * 100; // Rough estimate
+    
+    // CPU usage estimation
+    currentStats_.cpuUsage = timeElapsed > 0.0 ? (1.0 / timeElapsed) * 100.0 : 0.0;
+}
+
+void AgentBrain::recordProfileData(const std::string& name, double value) {
+    if (profilingEnabled_) {
+        profileData_[name] = value;
+    }
+}
+
+void AgentBrain::addCustomActionMapping(ActionType action, const std::string& name) {
+    actionMappings_[action] = name;
+}
+
+void AgentBrain::removeCustomActionMapping(ActionType action) {
+    actionMappings_.erase(action);
+}
+
+std::string AgentBrain::getActionMappingName(ActionType action) const {
+    auto it = actionMappings_.find(action);
+    if (it != actionMappings_.end()) {
+        return it->second;
+    }
+    return "Unknown";
+}
+
+void AgentBrain::triggerExternalEvent(const std::string& event, const std::map<std::string, std::string>& data) {
+    if (externalEventCallback_) {
+        std::string eventData = event;
+        for (const auto& kv : data) {
+            eventData += " | " + kv.first + "=" + kv.second;
+        }
+        externalEventCallback_(eventData);
+    }
 }
 
 } // namespace nlm
