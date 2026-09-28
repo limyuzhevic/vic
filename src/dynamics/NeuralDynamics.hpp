@@ -7,18 +7,15 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
 
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
