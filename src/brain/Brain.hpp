@@ -94,10 +94,15 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
-    
-    // Apply neuromodulatory signals
+    // Brain initialization helper methods (extracted from Imppl constructor)
+    void initializePlasticitySystems();
+    void initializeMemorySystems();
+    void initializePredictionSystem();
+    void initializeCognitionSystems();
+    void initializeDevelopmentSystem();
+    void initializeNeuromodulationSystems();
+    void initializeCheckpointSystem();
+    void initializeSimulationParameters();
     void applyNeuromodulation(const class Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)

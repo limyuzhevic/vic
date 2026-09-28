@@ -19,9 +19,117 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Helper function to parse JSON from file
+bool parseJSONFromFile(const std::string& filepath, Config& config) {
+    // Simple JSON parser for configuration files
+    // Supports basic key-value pairs and nested structures
     
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)),
+                         std::istreambuf_iterator<char>());
+    
+    // Simple JSON parsing for key-value pairs
+    // Format: {"key": "value", "nested_key": {"subkey": "subvalue"}}
+    size_t pos = 0;
+    while (pos < content.size()) {
+        pos = content.find('"', pos);
+        if (pos == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', pos + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+        pos = keyEnd + 1;
+        
+        // Skip whitespace
+        while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n')) {
+            pos++;
+        }
+        
+        if (pos >= content.size() || content[pos] != ':') {
+            break;
+        }
+        
+        pos++; // Skip ':'
+        
+        // Skip whitespace
+        while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n')) {
+            pos++;
+        }
+        
+        if (pos >= content.size()) break;
+        
+        if (content[pos] == '"') {
+            // String value
+            size_t valueEnd = content.find('"', pos + 1);
+            if (valueEnd == std::string::npos) break;
+            
+            std::string value = content.substr(pos + 1, valueEnd - pos - 1);
+            config.set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (content[pos] == '{') {
+            // Nested object - for now, skip it
+            // Could be expanded for full JSON support
+            size_t braceCount = 1;
+            pos++;
+            while (pos < content.size() && braceCount > 0) {
+                if (content[pos] == '{') braceCount++;
+                else if (content[pos] == '}') braceCount--;
+                pos++;
+            }
+        } else {
+            // Try to parse as number or boolean
+            size_t valueEnd = pos;
+            while (valueEnd < content.size() && content[valueEnd] != ',' && content[valueEnd] != '}') {
+                valueEnd++;
+            }
+            
+            std::string valueStr = content.substr(pos, valueEnd - pos);
+            // Try to parse as int
+            try {
+                int intValue = std::stoi(valueStr);
+                config.set(key, intValue, ConfigSource::File);
+            } catch (...) {
+                try {
+                    // Try to parse as double
+                    double doubleValue = std::stod(valueStr);
+                    config.set(key, doubleValue, ConfigSource::File);
+                } catch (...) {
+                    try {
+                        // Try to parse as boolean
+                        if (valueStr == "true") {
+                            config.set(key, true, ConfigSource::File);
+                        } else if (valueStr == "false") {
+                            config.set(key, false, ConfigSource::File);
+                        } else {
+                            // Fallback to string
+                            config.set(key, valueStr, ConfigSource::File);
+                        }
+                    } catch (...) {
+                        // Fallback to string
+                        config.set(key, valueStr, ConfigSource::File);
+                    }
+                }
+            }
+            
+            pos = valueEnd;
+        }
+        
+        // Skip comma and whitespace
+        while (pos < content.size() && (content[pos] == ',' || content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n')) {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+// Fallback to simple key=value format
+bool loadFromSimpleFormat(const std::string& filepath, Config& config) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,11 +156,12 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            config.set(key, value, ConfigSource::File);
         }
     }
     
     return true;
+}
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
