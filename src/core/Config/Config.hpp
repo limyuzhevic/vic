@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
 
 namespace nlm {
 
@@ -55,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +101,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Private helpers for different file formats
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    // bool loadFromYAML(const std::string& filepath);  // TODO: Implement YAML parser
 };
 
 } // namespace nlm

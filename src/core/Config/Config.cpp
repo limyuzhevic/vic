@@ -3,6 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <map>
+#include <optional>
+#include <json.hpp>  // nlohmann/json library
+
+// For YAML support, we'll use yaml-cpp if available
+// #ifdef HAVE_YAML_CPP
+// #include <yaml-cpp/yaml.h>
+// #endif
 
 namespace nlm {
 
@@ -19,9 +27,111 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try different file formats
+    std::string extension = ".";
+    if (!filepath.empty()) {
+        size_t dot_pos = filepath.find_last_of('.');
+        if (dot_pos != std::string::npos) {
+            extension = filepath.substr(dot_pos);
+        }
+    }
     
+    // Try JSON format first
+    if (extension == ".json" || extension == ".JSON") {
+        return loadFromJSON(filepath);
+    }
+    // Try YAML format
+    else if (extension == ".yaml" || extension == ".yml" || extension == ".YAML" || extension == ".YML") {
+        // TODO: Implement YAML parsing
+        // return loadFromYAML(filepath);
+        return loadFromSimpleFormat(filepath); // Fallback for now
+    }
+    // Default: try simple format first, then JSON if simple fails
+    if (loadFromSimpleFormat(filepath)) {
+        return true;
+    }
+    // Try JSON if file exists but simple format parsing failed
+    if (std::filesystem::exists(filepath)) {
+        return loadFromJSON(filepath);
+    }
+    return false;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Parse JSON
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Convert JSON to Config entries
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value;
+            ConfigSource source = ConfigSource::File;
+            
+            // Convert JSON value to ConfigValue
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number_integer()) {
+                value = it->get<int64_t>();
+            } else if (it->is_number_unsigned()) {
+                value = it->get<uint64_t>();
+            } else if (it->is_number_float()) {
+                value = it->get<double>();
+            } else if (it->is_boolean()) {
+                value = it->get<bool>();
+            } else if (it->is_array()) {
+                // Convert array to vector based on element type
+                const auto& arr = *it;
+                if (!arr.empty()) {
+                    if (arr[0].is_number_integer()) {
+                        std::vector<int64_t> vec;
+                        vec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            vec.push_back(item.get<int64_t>());
+                        }
+                        value = vec;
+                    } else if (arr[0].is_number_float()) {
+                        std::vector<double> vec;
+                        vec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            vec.push_back(item.get<double>());
+                        }
+                        value = vec;
+                    } else if (arr[0].is_string()) {
+                        std::vector<std::string> vec;
+                        vec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            vec.push_back(item.get<std::string>());
+                        }
+                        value = vec;
+                    }
+                }
+            }
+            
+            // Add description from JSON comment (if available)
+            std::string description = "";
+            
+            set(key, value, source);
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Log error
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,10 +194,42 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Use JSON format for better readability and maintainability
+    nlohmann::json j;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Skip placeholder values
+        if (std::holds_alternative<std::string>(entry.value) && 
+            std::get<std::string>(entry.value) == "PLACEHOLDER_VALUE") {
+            continue;
+        }
+        
+        // Convert ConfigValue to JSON
+        if (std::holds_alternative<int>(entry.value)) {
+            j[entry.key] = std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            j[entry.key] = std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            j[entry.key] = std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            j[entry.key] = std::get<bool>(entry.value);
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            j[entry.key] = std::get<std::string>(entry.value);
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            std::vector<int64_t> vec;
+            for (int val : std::get<std::vector<int>>(entry.value)) {
+                vec.push_back(val);
+            }
+            j[entry.key] = vec;
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            j[entry.key] = std::get<std::vector<double>>(entry.value);
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            j[entry.key] = std::get<std::vector<std::string>>(entry.value);
+        }
     }
+    
+    // Write JSON to file with pretty formatting
+    file << std::setw(2) << j << std::endl;
     
     return true;
 }
