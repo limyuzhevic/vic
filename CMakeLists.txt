@@ -18,6 +18,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find nlohmann/json package
+find_package(nlohmann_json REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
