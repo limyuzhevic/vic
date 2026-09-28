@@ -25,8 +25,14 @@ public:
     double getTimestamp() const;
     void setTimestamp(double timestamp);
     
-    // Clone
-    virtual std::unique_ptr<SensoryInput> clone() const = 0;
+    // Set entire data vector
+    virtual void setData(const std::vector<float>& data) = 0;
+    
+    // Set data at index (used by Brain.cpp)
+    virtual void setDataAt(size_t index, float value) = 0;
+    
+    // Get data by index
+    virtual float getDataAt(size_t index) const = 0;
     
 protected:
     double timestamp_;
@@ -47,6 +53,10 @@ public:
     // Set image data
     void setData(const std::vector<float>& data);
     void setData(float* data, size_t size);
+    
+    // Set/get data at index (used by prediction system)
+    void setDataAt(size_t index, float value);
+    float getDataAt(size_t index) const;
     
     // Image properties
     size_t getWidth() const;
@@ -74,6 +84,10 @@ public:
     void setData(const std::vector<float>& data);
     void setSampleRate(size_t rate);
     
+    // Set/get data at index (used by prediction system)
+    void setDataAt(size_t index, float value);
+    float getDataAt(size_t index) const;
+    
     size_t getSampleRate() const;
     size_t getNumSamples() const;
     
@@ -96,6 +110,10 @@ public:
     // Add signal
     void addSignal(float value);
     void clearSignals();
+    
+    // Set/get data at index (used by prediction system)
+    void setDataAt(size_t index, float value);
+    float getDataAt(size_t index) const;
     
 private:
     struct Impl;

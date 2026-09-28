@@ -52,10 +52,17 @@ void Vision::setData(const std::vector<float>& data) {
     }
 }
 
-void Vision::setData(float* data, size_t size) {
-    if (size == pImpl->data.size()) {
-        pImpl->data.assign(data, data + size);
+void Vision::setDataAt(size_t index, float value) {
+    if (index < pImpl->data.size()) {
+        pImpl->data[index] = value;
     }
+}
+
+float Vision::getDataAt(size_t index) const {
+    if (index < pImpl->data.size()) {
+        return pImpl->data[index];
+    }
+    return 0.0f;
 }
 
 size_t Vision::getWidth() const { return pImpl->width; }
@@ -95,10 +102,24 @@ std::unique_ptr<SensoryInput> Audio::clone() const {
     return audio;
 }
 
-void Audio::setData(const std::vector<float>& data) {
-    if (data.size() == pImpl->data.size()) {
-        pImpl->data = data;
+void Audio::setDataAt(size_t index, float value) {
+    if (index < pImpl->data.size()) {
+        pImpl->data[index] = value;
     }
+}
+
+float Audio::getDataAt(size_t index) const {
+    if (index < pImpl->data.size()) {
+        return pImpl->data[index];
+    }
+    return 0.0f;
+}
+
+float Audio::getDataAt(size_t index) const {
+    if (index < pImpl->data.size()) {
+        return pImpl->data[index];
+    }
+    return 0.0f;
 }
 
 void Audio::setSampleRate(size_t rate) {
@@ -138,8 +159,17 @@ std::unique_ptr<SensoryInput> InternalSignals::clone() const {
     return clone;
 }
 
-void InternalSignals::addSignal(float value) {
-    pImpl->signals.push_back(value);
+void InternalSignals::setDataAt(size_t index, float value) {
+    if (index < pImpl->signals.size()) {
+        pImpl->signals[index] = value;
+    }
+}
+
+float InternalSignals::getDataAt(size_t index) const {
+    if (index < pImpl->signals.size()) {
+        return pImpl->signals[index];
+    }
+    return 0.0f;
 }
 
 void InternalSignals::clearSignals() {

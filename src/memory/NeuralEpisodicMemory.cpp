@@ -218,6 +218,15 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
+size_t NeuralEpisodicMemory::getEpisodeCount() const {
+    return episodes_.size();
+}
+
+void NeuralEpisodicMemory::clear() {
+    episodes_.clear();
+    pImpl->episodeNeurons.clear();
+}
+
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
     // Remove episodes below relevance threshold
     // In a full implementation, episodes would have relevance scores

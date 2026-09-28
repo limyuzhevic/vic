@@ -171,48 +171,135 @@ float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>&
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,
                                                   const std::vector<float>& currentState) {
-    // Use simple action-consequence prediction
-    // In a full implementation, this would use learned forward models
+    // Enhanced prediction using prediction system and learned forward models
+    // Integrates with prediction system for more accurate state predictions
     
     std::vector<float> nextState = currentState;
     
-    // Apply expected effect based on action
-    // This is a simplified model - real implementation would use experience
-    switch (action) {
-        case ActionType::MoveForward:
-            // Shift visual field forward
-            if (nextState.size() > 10) {
-                for (size_t i = 10; i < nextState.size(); ++i) {
-                    nextState[i-10] = nextState[i] * 0.9f;
+    // First, check prediction system for forward model
+    if (brain_ && brain_->getPredictionSystem()) {
+        // Create state representation for prediction system
+        auto currentInput = std::make_unique<Vision>(16, 16);
+        
+        // Fill with current state if applicable
+        size_t stateSize = std::min(currentState.size(), static_cast<size_t>(256));
+        for (size_t i = 0; i < stateSize; ++i) {
+            currentInput->setDataAt(i, currentState[i % 16]); // Map to 16x16 grid
+        }
+        
+        // Get prediction from prediction system
+        auto predicted = brain_->getPredictionSystem()->predictNextState(*currentInput);
+        if (predicted) {
+            // Use prediction system prediction as base
+            size_t predSize = std::min(predicted->getData().size(), nextState.size());
+            for (size_t i = 0; i < predSize; ++i) {
+                nextState[i] = predicted->getDataAt(i);
+            }
+        }
+    }
+    
+    // Apply expected effect based on action (enhanced with prediction context)
+    // This is a simplified model - real implementation would use learned forward models
+    if (brain_ && brain_->getPredictionError()) {
+        // Use prediction error to modulate action consequences
+        float error = brain_->getPredictionErrorSignal()->getMagnitude();
+        
+        switch (action) {
+            case ActionType::MoveForward:
+                // Enhanced: prediction error affects how state shifts
+                if (nextState.size() > 10) {
+                    for (size_t i = 10; i < nextState.size(); ++i) {
+                        float baseEffect = nextState[i] * 0.9f;
+                        // Modulate by prediction error
+                        float errorModulation = 1.0f + error * 0.2f;
+                        nextState[i-10] = baseEffect * errorModulation;
+                        nextState[i-10] = std::clamp(nextState[i-10], 0.0f, 1.0f);
+                    }
                 }
-            }
-            break;
-        case ActionType::MoveBackward:
-            if (nextState.size() > 10) {
-                for (size_t i = nextState.size() - 1; i >= 10; --i) {
-                    nextState[i] = nextState[i-10] * 0.9f;
+                break;
+                
+            case ActionType::MoveBackward:
+                if (nextState.size() > 10) {
+                    for (size_t i = nextState.size() - 1; i >= 10; --i) {
+                        float baseEffect = nextState[i-10] * 0.9f;
+                        float errorModulation = 1.0f + error * 0.2f;
+                        nextState[i] = baseEffect * errorModulation;
+                        nextState[i] = std::clamp(nextState[i], 0.0f, 1.0f);
+                    }
                 }
-            }
-            break;
-        case ActionType::TurnLeft:
-        case ActionType::TurnRight:
-            // Rotate pattern
-            // Simplified: just add some noise
-            for (auto& v : nextState) {
-                v += 0.05f * (v > 0.5f ? -1.0f : 1.0f);
-                v = std::clamp(v, 0.0f, 1.0f);
-            }
-            break;
-        case ActionType::Interact:
-            // Interaction changes state significantly
-            for (auto& v : nextState) {
-                v = v > 0.5f ? 0.8f : 0.2f;
-            }
-            break;
-        case ActionType::Wait:
-        default:
-            // No change
-            break;
+                break;
+                
+            case ActionType::TurnLeft:
+            case ActionType::TurnRight:
+                // Enhanced: prediction error affects rotation magnitude
+                for (auto& v : nextState) {
+                    float baseChange = 0.05f * (v > 0.5f ? -1.0f : 1.0f);
+                    float errorModulation = 1.0f + error * 0.5f;
+                    v += baseChange * errorModulation;
+                    v = std::clamp(v, 0.0f, 1.0f);
+                }
+                break;
+                
+            case ActionType::Interact:
+                // Enhanced: prediction error affects interaction strength
+                for (auto& v : nextState) {
+                    float baseResult = v > 0.5f ? 0.8f : 0.2f;
+                    float errorModulation = 1.0f + error * 0.3f;
+                    v = baseResult * errorModulation;
+                    v = std::clamp(v, 0.0f, 1.0f);
+                }
+                break;
+                
+            case ActionType::Wait:
+            default:
+                // No change (but can be affected by prediction error drift)
+                if (error > 0.1f) {
+                    // Small drift due to prediction error
+                    for (auto& v : nextState) {
+                        v += (rand() % 100 / 100.0f - 0.5f) * error * 0.01f;
+                        v = std::clamp(v, 0.0f, 1.0f);
+                    }
+                }
+                break;
+        }
+    } else {
+        // Fallback to original behavior
+        switch (action) {
+            case ActionType::MoveForward:
+                // Shift visual field forward
+                if (nextState.size() > 10) {
+                    for (size_t i = 10; i < nextState.size(); ++i) {
+                        nextState[i-10] = nextState[i] * 0.9f;
+                    }
+                }
+                break;
+            case ActionType::MoveBackward:
+                if (nextState.size() > 10) {
+                    for (size_t i = nextState.size() - 1; i >= 10; --i) {
+                        nextState[i] = nextState[i-10] * 0.9f;
+                    }
+                }
+                break;
+            case ActionType::TurnLeft:
+            case ActionType::TurnRight:
+                // Rotate pattern
+                // Simplified: just add some noise
+                for (auto& v : nextState) {
+                    v += 0.05f * (v > 0.5f ? -1.0f : 1.0f);
+                    v = std::clamp(v, 0.0f, 1.0f);
+                }
+                break;
+            case ActionType::Interact:
+                // Interaction changes state significantly
+                for (auto& v : nextState) {
+                    v = v > 0.5f ? 0.8f : 0.2f;
+                }
+                break;
+            case ActionType::Wait:
+            default:
+                // No change
+                break;
+        }
     }
     
     return nextState;

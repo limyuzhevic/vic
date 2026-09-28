@@ -187,14 +187,8 @@ bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
     return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }
 
-float NeuralWorkingMemory::getMemoryActivity() const {
-    if (memoryActivations_.empty()) return 0.0f;
-    
-    float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
-    }
-    return total / memoryActivations_.size();
+bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
+    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {

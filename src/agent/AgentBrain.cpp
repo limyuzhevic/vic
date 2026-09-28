@@ -1,5 +1,6 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -8,6 +9,9 @@ namespace nlm {
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
@@ -22,6 +26,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
+        // Get all neuromodulators
+        auto* dopamine = brain_->getDopamine();
+        auto* acetylcholine = brain_->getAcetylcholine();
+        auto* norepinephrine = brain_->getNorepinephrine();
+        auto* serotonin = brain_->getSerotonin();
+        
+        // Store initial neuromodulator levels for monitoring
+        dopamineLevel_ = dopamine ? dopamine->getLevel() : 0.0f;
+        acetylcholineLevel_ = acetylcholine ? acetylcholine->getLevel() : 0.0f;
+        norepinephrineLevel_ = norepinephrine ? norepinephrine->getLevel() : 0.0f;
+        serotoninLevel_ = serotonin ? serotonin->getLevel() : 0.0f;
+        
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
@@ -87,6 +103,75 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // ===== NEURAL PLANNER INTEGRATION =====
+    // Use neural planner for cognitive processing when available
+    if (brain_->getPlanner() && curiosityEnabled_) {
+        // Create state representation for neural planner
+        std::vector<float> planningState;
+        planningState.reserve(64);
+        
+        // Add vision to planning state
+        const auto& vision = percept.getVision();
+        for (size_t i = 0; i < std::min(vision.size(), static_cast<size_t>(64)); ++i) {
+            planningState.push_back(vision[i]);
+        }
+        
+        // Pad state to desired size
+        while (planningState.size() < 64) {
+            planningState.push_back(0.0f);
+        }
+        
+        // Use neural planner to plan action based on current state
+        float targetReward = 0.5f;  // Could be goal-based or learned
+        ActionType plannedAction = brain_->getPlanner()->planAction(planningState, targetReward);
+        
+        // Integrate planned action with motor neuron bias
+        // This connects planning to action execution
+        for (auto* neuron : motorForward_) {
+            if (plannedAction == ActionType::MoveForward) {
+                neuron->injectCurrent(1.5f);  // Boost forward movement
+            }
+        }
+        for (auto* neuron : motorBackward_) {
+            if (plannedAction == ActionType::MoveBackward) {
+                neuron->injectCurrent(1.5f);  // Boost backward movement
+            }
+        }
+        for (auto* neuron : motorTurnLeft_) {
+            if (plannedAction == ActionType::TurnLeft) {
+                neuron->injectCurrent(1.5f);  // Boost left turn
+            }
+        }
+        for (auto* neuron : motorTurnRight_) {
+            if (plannedAction == ActionType::TurnRight) {
+                neuron->injectCurrent(1.5f);  // Boost right turn
+            }
+        }
+        for (auto* neuron : motorInteract_) {
+            if (plannedAction == ActionType::Interact) {
+                neuron->injectCurrent(1.5f);  // Boost interaction
+            }
+        }
+        
+        // Update concept formation with current experience
+        if (brain_->getConceptFormation()) {
+            brain_->getConceptFormation()->presentExperience(
+                planningState,
+                vision,  // Use vision as features for now
+                curiosityLevel_,
+                currentStep);  // Would need actual step tracking
+        }
+        
+        // Update self-model with actual consequences
+        if (brain_->getSelfModel() && plannedAction != ActionType::Wait) {
+            // Record that we took this action
+            brain_->getSelfModel()->recordSelfAction(
+                plannedAction,
+                planningState,  // Would be before state
+                vision);  // Would be after state
+        }
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
@@ -124,22 +209,88 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+    // Store sensory patterns in working memory
+    if (brain_->getWorkingMemory()) {
+        // Create composite sensory pattern
+        std::vector<float> sensoryPattern;
+        
+        // Add vision pattern (256 values)
+        sensoryPattern.reserve(256 + 8 + 4 + 6);
+        for (size_t i = 0; i < std::min(vision.size(), static_cast<size_t>(256)); ++i) {
+            sensoryPattern.push_back(vision[i]);
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        // Add touch pattern (8 values)
+        for (size_t i = 0; i < std::min(touch.size(), static_cast<size_t>(8)); ++i) {
+            sensoryPattern.push_back(touch[i]);
+        }
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Add internal pattern (4 values)
+        for (size_t i = 0; i < std::min(intern.size(), static_cast<size_t>(4)); ++i) {
+            sensoryPattern.push_back((intern[i] * 2.0f - 1.0f));
+        }
         
-        // Store for next time
-        previousVision_ = vision;
+        // Add proprioception pattern (6 values)
+        for (size_t i = 0; i < std::min(proprio.size(), static_cast<size_t>(6)); ++i) {
+            sensoryPattern.push_back((proprio[i] * 2.0f - 1.0f));
+        }
+        
+        // Store in working memory
+        if (!sensoryPattern.empty()) {
+            brain_->getWorkingMemory()->store(sensoryPattern, 1.0f);
+        }
+        
+        // Trigger working memory replay
+        brain_->getWorkingMemory()->updateRecurrentConnections();
+    }
+    
+    // ===== PREDICTION SYSTEM INTEGRATION =====
+    // Use prediction system for curiosity-driven exploration
+    if (brain_->getPredictionSystem()) {
+        // Create SensoryInput from current percept for prediction system
+        auto sensoryInput = std::make_unique<Vision>(16, 16);
+        
+        // Fill with vision data
+        for (size_t i = 0; i < std::min(vision.size(), static_cast<size_t>(256)); ++i) {
+            sensoryInput->setDataAt(i, vision[i]);
+        }
+        
+        // Get prediction and prediction error
+        auto predicted = brain_->getPredictionSystem()->predictNextState(*sensoryInput);
+        brain_->getPredictionSystem()->updatePredictions(*predicted, *sensoryInput);
+        
+        float predictionError = brain_->getPredictionSystem()->getPredictionError();
+        float predictionConfidence = brain_->getPredictionSystem()->getConfidence();
+        
+        // Update AgentBrain's prediction error state
+        predictionError_ = predictionError;
+        
+        // Use prediction to modulate curiosity
+        if (curiosityEnabled_ && curiosityLevel_ > 0.0f) {
+            // High prediction error = more curiosity = more exploration
+            float errorMultiplier = 1.0f + std::abs(predictionError) * 0.5f;
+            curiosityLevel_ *= errorMultiplier;
+            curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+            
+            // Use prediction to guide exploration
+            if (predictionError > 0.5f && predictionConfidence < 0.5f) {
+                // Unpredictable state = explore more
+                curiosityLevel_ = std::min(1.0f, curiosityLevel_ * 1.5f);
+            }
+        }
+        
+        // Integrate predicted state with working memory for planning
+        if (brain_->getWorkingMemory() && predictionConfidence > 0.7f) {
+            // High confidence predictions can guide planning
+            std::vector<float> predictedPattern;
+            for (size_t i = 0; i < std::min(predicted->getData().size(), static_cast<size_t>(256)); ++i) {
+                predictedPattern.push_back(predicted->getDataAt(i));
+            }
+            
+            if (!predictedPattern.empty()) {
+                brain_->getWorkingMemory()->store(predictedPattern, predictionConfidence);
+            }
+        }
     }
     
     // Update curiosity based on novelty
@@ -148,9 +299,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
+}
 
-MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+void AgentBrain::decodeMotorCommand() {
+    if (!brain_) return;
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -247,8 +399,22 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
+    // Get all neuromodulators from brain
+    auto* dopamine = brain_->getDopamine();
+    auto* acetylcholine = brain_->getAcetylcholine();
+    auto* norepinephrine = brain_->getNorepinephrine();
+    auto* serotonin = brain_->getSerotonin();
+    
+    // Update all neuromodulator levels
+    acetylcholineLevel_ = acetylcholine ? acetylcholine->getLevel() : 0.0f;
+    norepinephrineLevel_ = norepinephrine ? norepinephrine->getLevel() : 0.0f;
+    serotoninLevel_ = serotonin ? serotonin->getLevel() : 0.0f;
+    
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    acetylcholineLevel_ = std::clamp(acetylcholineLevel_, 0.0f, 1.0f);
+    norepinephrineLevel_ = std::clamp(norepinephrineLevel_, 0.0f, 1.0f);
+    serotoninLevel_ = std::clamp(serotoninLevel_, 0.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -256,8 +422,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Apply reward-modulated weight change with neuromodulation
+                // Integrate all neurotransmitters for comprehensive plasticity control
+                float totalModulation = dopamineLevel_ * 0.4f + // Primary reward signal
+                                       acetylcholineLevel_ * 0.3f + // Memory encoding
+                                       norepinephrineLevel_ * 0.2f + // Arousal response
+                                       serotoninLevel_ * 0.1f; // Mood modulation
+                
+                float delta = eligibility * totalModulation * plasticityModifier_;
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -266,9 +438,13 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    // Modulate plasticity based on all neuromodulators
+    // Positive neuromodulation increases plasticity, negative decreases
+    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;  // Base dopamine modulation
+    plasticityFactor += acetylcholineLevel_ * 0.2f;        // ACh enhances memory-based learning
+    plasticityFactor += norepinephrineLevel_ * 0.15f;     // NE modulates arousal-driven learning
+    plasticityFactor += serotoninLevel_ * 0.1f;            // 5-HT modulates mood-based learning
+    
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -319,7 +495,13 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    // Return integrated neuromodulation level from all neurotransmitters
+    // Higher overall neuromodulation indicates more learning and attention
+    float totalNeuromodulation = dopamineLevel_ * 0.4f + // Primary reward and motivation
+                                acetylcholineLevel_ * 0.3f + // Attention and memory
+                                norepinephrineLevel_ * 0.2f + // Arousal and vigilance
+                                serotoninLevel_ * 0.1f; // Mood and social behavior
+    return totalNeuromodulation;
 }
 
 float AgentBrain::getCuriosityLevel() const {
@@ -336,6 +518,9 @@ float AgentBrain::getPredictionError() const {
 
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;

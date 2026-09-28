@@ -55,8 +55,11 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
+        // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Get prediction system pointer
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

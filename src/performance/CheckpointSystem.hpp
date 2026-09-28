@@ -24,6 +24,8 @@
  * - Environment state (optional)
  */
 
+#include "../brain/Brain.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -67,8 +69,10 @@ enum class CheckpointSection : uint32_t {
     RandomState = 10,
     SimulationState = 11,
     Environment = 12,
-    Checksum = 13,
-    End = 14
+    RestState = 13,  // NEW: Rest/sleep cycle state
+    Statistics = 14,
+    Checksum = 15,
+    End = 16
 };
 
 /**
@@ -172,6 +176,240 @@ struct SynapseCheckpointData {
     std::vector<float> efficacy;
     std::vector<float> shortTermDepression;
     std::vector<float> shortTermFacilitation;
+};
+
+/**
+ * Rest state for checkpointing
+ */
+struct RestStateCheckpoint {
+    bool isResting;
+    uint64_t restCounter;
+    uint64_t totalRestSteps;
+    uint64_t totalReplayEvents;
+    float consolidationProgress;
+    uint64_t restInterval;
+    float predictionError;
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+};
+
+/**
+ * Memory checkpoint data for working, episodic, and associative memory systems
+ */
+struct MemoryCheckpointData {
+    // Working memory statistics
+    size_t workingMemoryCapacity;
+    size_t workingMemoryActiveNeurons;
+    std::vector<float> workingMemoryNeurons;
+    std::vector<float> workingMemoryActivations;
+    
+    // Episodic memory statistics  
+    size_t episodicMemoryMaxEpisodes;
+    size_t episodicMemoryEpisodeCount;
+    std::vector<uint64_t> episodicMemoryEpisodeTimestamps;
+    std::vector<float> episodicMemoryEpisodeRewards;
+    std::vector<float> episodicMemoryEpisodeInterests;
+    
+    // Associative memory statistics
+    size_t associativeMemoryAssociationCount;
+    std::vector<uint64_t> associativeMemorySourceNeurons;
+    std::vector<uint64_t> associativeMemoryTargetNeurons;
+    std::vector<float> associativeMemoryStrengths;
+    std::vector<float> associativeMemoryInterests;
+};
+
+/**
+ * Neuromodulation checkpoint data for all neurotransmitters
+ */
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float dopaminePlasticityFactor;
+    float acetylcholineLevel;
+    float acetylcholinePlasticityFactor;
+    float norepinephrineLevel;
+    float norepinephrinePlasticityFactor;
+    float serotoninLevel;
+    float serotoninPlasticityFactor;
+    float curiosityLevel;
+    float predictionErrorLevel;
+    float noveltyLevel;
+    
+    // Neuromodulation statistics
+    size_t dopamineSpikeCount;
+    size_t acetylcholineSpikeCount;
+    size_t norepinephrineSpikeCount;
+    size_t serotoninSpikeCount;
+    size_t curiositySpikeCount;
+    size_t predictionErrorSpikeCount;
+    size_t noveltySpikeCount;
+};
+
+/**
+ * Cognition checkpoint data for neural planner, concept formation, and related systems
+ */
+struct CognitionCheckpointData {
+    // Neural planner state
+    size_t plannerPlanCount;
+    std::vector<ActionType> plannerCurrentGoals;
+    std::vector<float> plannerPlanningConfidences;
+    std::vector<float> plannerPlanQualities;
+    
+    // Concept formation state
+    size_t conceptCount;
+    std::vector<uint64_t> conceptMatchingScores;
+    std::vector<std::vector<float>> conceptPrototypes;
+    std::vector<float> conceptStabilities;
+    std::vector<float> conceptInterests;
+    
+    // Attentional selection
+    float attentionInhibitionStrength;
+    float attentionExcitationStrength;
+    size_t attentionActiveNeurons;
+    std::vector<uint64_t> attentionCompetitors;
+};
+
+/**
+ * Development checkpoint data for development system and maturation stages
+ */
+struct DevelopmentCheckpointData {
+    uint64_t developmentStage;
+    float plasticityRate;
+    float synaptogenesisRate;
+    float pruningRate;
+    float maturationProgress;
+    size_t currentBrainSize;
+    size_t maxBrainSize;
+    
+    // Pruning statistics
+    size_t synapsesPruned;
+    size_t synapsesGrown;
+    
+    // Maturation statistics
+    size_t maturedNeurons;
+    size_t matureNeuronsCount;
+    
+    // Developmental milestones
+    std::vector<float> developmentalScores;
+    std::vector<uint64_t> milestoneSteps;
+};
+
+/**
+ * Statistics checkpoint data for all system statistics
+ */
+struct StatisticsCheckpointData {
+    // Neural statistics
+    size_t totalSpikes;
+    size_t spikesPerStep;
+    size_t totalNeurons;
+    size_t activeNeurons;
+    float averageFiringRate;
+    
+    // Memory statistics
+    size_t workingMemorySize;
+    size_t episodicMemorySize;
+    size_t associativeMemorySize;
+    
+    // Prediction system statistics
+    float predictionError;
+    float predictionConfidence;
+    size_t predictionUpdateCount;
+    
+    // Neuromodulation statistics
+    float averageDopamine;
+    float averageAcetylcholine;
+    float averageNorepinephrine;
+    float averageSerotonin;
+    
+    // Cognition statistics
+    size_t plannerDecisions;
+    size_t conceptForms;
+    
+    // Development statistics
+    float developmentalProgress;
+    
+    // Rest/sleep statistics
+    size_t totalRestSteps;
+    size_t totalRestCycles;
+    size_t totalReplayEvents;
+    
+    // Novelty and curiosity statistics
+    size_t noveltyEvents;
+    size_t curiosityEvents;
+    
+    // Performance metrics
+    double checkpointDuration;
+    uint64_t checkpointSize;
+};
+
+// Checkpoint section types
+enum class CheckpointSection : uint32_t {
+    Header = 0,
+    Config = 1,
+    Neurons = 2,
+    Synapses = 3,
+    Connectivity = 4,
+    Plasticity = 5,
+    Development = 6,
+    Neuromodulation = 7,
+    Memory = 8,
+    SpikeHistory = 9,
+    RandomState = 10,
+    SimulationState = 11,
+    Environment = 12,
+    RestState = 13,  // NEW: Rest/sleep cycle state
+    Statistics = 14,
+    Checksum = 15,
+    End = 16
+};
+
+/**
+ * Complete checkpoint state containing all critical brain systems
+ */
+struct CheckpointState {
+    CheckpointHeader header;
+    
+    // Brain core data
+    NeuronCheckpointData neuronData;
+    SynapseCheckpointData synapseData;
+    
+    // Memory systems
+    MemoryCheckpointData memoryData;
+    
+    // Neuromodulation systems
+    NeuromodulationCheckpointData neuromodulationData;
+    
+    // Cognition systems
+    CognitionCheckpointData cognitionData;
+    
+    // Development system
+    DevelopmentCheckpointData developmentData;
+    
+    // Statistics
+    StatisticsCheckpointData statisticsData;
+    
+    // Rest/sleep state
+    RestStateCheckpoint restStateData;
+    
+    // Additional data
+    std::vector<uint8_t> spikeHistoryData;
+    std::vector<uint8_t> randomStateData;
+    std::vector<uint8_t> environmentData;
+    std::vector<uint8_t> plasticityData;
+    std::vector<uint8_t> connectivityData;
+    std::vector<uint8_t> simulationData;
+    
+    /**
+     * Create a complete checkpoint from Brain state
+     * This would be implemented by the brain to populate this state
+     */
+    static bool create(CheckpointState& state, const Brain& brain);
+    
+    /**
+     * Load Brain state from checkpoint
+     * This would be implemented by the brain to restore this state
+     */
+    static bool load(Brain& brain, const CheckpointState& state);
 };
 
 /**
