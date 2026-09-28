@@ -1,6 +1,8 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
 #include <algorithm>
+#include <cmath>
+#include <numeric>
 
 namespace nlm {
 
@@ -8,83 +10,157 @@ struct Hebbian::Impl {
     float learningRate;
     float maxWeight;
     float minWeight;
-    float covarianceThreshold;  // For covariance rule
+    bool normalizationEnabled;
+    bool symmetric;
+    float normalizationFactor;
+    float activityHistoryWeight;
+    float temporalWindow;
+    
+    // Statistics for debugging and analysis
+    size_t totalUpdates;
+    size_t normalizationCount;
+    float lastCovariance;
     
     Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
-             covarianceThreshold(0.0f) {}
+             normalizationEnabled(true), symmetric(false),
+             normalizationFactor(0.1f), activityHistoryWeight(0.5f),
+             temporalWindow(50.0f), totalUpdates(0), normalizationCount(0),
+             lastCovariance(0.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+// Private helper functions for the Hebbian class
+namespace {
+    float CalculateSpikeTimingCovariance(
+        const std::vector<Timestamp>& preSpikes,
+        const std::vector<Timestamp>& postSpikes,
+        TimestepDuration dt) {
+        
+        // Calculate cross-correlation of spike trains
+        std::vector<float> preCounts(dt, 0.0f);
+        std::vector<float> postCounts(dt, 0.0f);
+        
+        // Bin spikes into time windows
+        for (Timestamp spike : preSpikes) {
+            size_t bin = std::min(static_cast<size_t>(spike), dt - 1);
+            preCounts[bin]++;
+        }
+        
+        for (Timestamp spike : postSpikes) {
+            size_t bin = std::min(static_cast<size_t>(spike), dt - 1);
+            postCounts[bin]++;
+        }
+        
+        // Calculate means
+        float preMean = std::accumulate(preCounts.begin(), preCounts.end(), 0.0f) / dt;
+        float postMean = std::accumulate(postCounts.begin(), postCounts.end(), 0.0f) / dt;
+        
+        // Calculate covariance
+        float covariance = 0.0f;
+        for (size_t i = 0; i < dt; ++i) {
+            float preDev = preCounts[i] - preMean;
+            float postDev = postCounts[i] - postMean;
+            covariance += preDev * postDev;
+        }
+        
+        covariance /= dt;
+        
+        return covariance;
+    }
+    
+    float NormalizeWeightChange(Hebbian::Impl* impl, Synapse* synapse, float delta) {
+        float currentWeight = synapse->getWeight();
+        
+        // Calculate target weight based on desired activity
+        float targetWeight = 0.0f;
+        if (impl->lastCovariance > 0.0f) {
+            targetWeight = std::min(currentWeight + delta * 2.0f, impl->maxWeight);
+        }
+        
+        // Normalize the change
+        float normalizedDelta = delta * impl->normalizationFactor;
+        
+        if (++impl->normalizationCount % 10 == 0) {
+            // Apply soft normalization periodically
+            float normFactor = std::exp(-std::abs(currentWeight - targetWeight) * impl->activityHistoryWeight);
+            normalizedDelta *= normFactor;
+        }
+        
+        return normalizedDelta;
+    }
+}
+
+Hebbian::Hebbian(float learningRate, float maxWeight, float minWeight,
+                bool normalizationEnabled) : pImpl(new Impl) {
+    setLearningRate(learningRate);
+    setMaxWeight(maxWeight);
+    pImpl->minWeight = minWeight;
+    pImpl->normalizationEnabled = normalizationEnabled;
+    pImpl->symmetric = false;
+}
 
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
-    /*
-     * Real Hebbian learning implementation
-     * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
-     */
-    
+                     const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes,
+                     TimestepDuration dt) {
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    // Calculate spike statistics
+    float preFiringRate = static_cast<float>(preSpikes.size()) / dt;
+    float postFiringRate = static_cast<float>(postSpikes.size()) / dt;
+    
+    // Calculate covariance between pre- and post-synaptic activity
+    float covariance = CalculateSpikeTimingCovariance(
+        preSpikes, postSpikes, dt);
+    
+    // Store for statistics
+    pImpl->lastCovariance = covariance;
+    
+    // Apply Hebbian learning rule with biological constraints
+    float delta = pImpl->learningRate * covariance;
+    
+    // Apply synaptic normalization if enabled
+    if (pImpl->normalizationEnabled) {
+        delta = NormalizeWeightChange(pImpl.get(), synapse, delta);
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Apply asymmetric depression for anti-correlated activity if symmetric mode
+    if (pImpl->symmetric && covariance < -1e-3f) {
+        // Additional depression for anti-correlated activity
+        delta += pImpl->learningRate * 0.5f * covariance;
+    }
     
-    // Apply with bounds
+    // Apply the weight change
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
+        ++pImpl->totalUpdates;
     }
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    float newWeight = synapse->getWeight() + delta;
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Apply bounds checking
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    
+    // Apply synaptic history modulation if available
+    float efficacy = synapse->getEfficacy();
+    newWeight *= (1.0f + efficacy * 0.1f);  // Modulate by efficacy
+    
+    // Re-clamp after efficacy modulation
+    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    
     synapse->setWeight(newWeight);
 }
 
 const char* Hebbian::getName() const {
-    return "Hebbian";
+    return "Hebbian (Covariance-based)";
 }
 
 void Hebbian::setLearningRate(float rate) {
@@ -101,6 +177,22 @@ void Hebbian::setMaxWeight(float maxWeight) {
 
 float Hebbian::getMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+void Hebbian::setNormalizationEnabled(bool enabled) {
+    pImpl->normalizationEnabled = enabled;
+}
+
+bool Hebbian::isNormalizationEnabled() const {
+    return pImpl->normalizationEnabled;
+}
+
+void Hebbian::setSymmetric(bool symmetric) {
+    pImpl->symmetric = symmetric;
+}
+
+bool Hebbian::isSymmetric() const {
+    return pImpl->symmetric;
 }
 
 } // namespace nlm
