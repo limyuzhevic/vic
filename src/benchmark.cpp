@@ -1,5 +1,6 @@
 // NLM Performance Benchmark
 // Measures simulation performance for different network sizes
+// Provides quantitative analysis of computational efficiency and scalability
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -14,52 +15,69 @@
 #include <vector>
 #include <iomanip>
 #include <string>
+#include <stdexcept>
 
 using namespace nlm;
 
-// Simple performance measurement
+// Simple performance measurement structure
+// Contains comprehensive metrics for evaluating NLM simulation efficiency
 struct BenchmarkResult {
-    size_t neurons;
-    size_t synapses;
-    size_t steps;
-    double totalTime;      // seconds
-    double stepsPerSecond;
-    double spikesPerStep;
-    double synapsesPerNeuron;
-};
+    size_t neurons;                    // Total number of neurons in the network
+    size_t synapses;                   // Total number of synaptic connections
+    size_t steps;                      // Number of simulation steps executed
+    double totalTime;                  // Total execution time in seconds
+    double stepsPerSecond;             // Computational throughput
+    double spikesPerStep;              // Average spike generation rate
+    double synapsesPerNeuron;          // Average connectivity density
+}; 
 
 BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
+    // Validate input parameters to prevent invalid benchmarks
+    if (neuronCount == 0) {
+        throw std::invalid_argument("Neuron count must be greater than 0");
+    }
+    if (steps == 0) {
+        throw std::invalid_argument("Step count must be greater than 0");
+    }
+    
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
     
-    // Create configuration
+    // Create configuration for benchmark
     auto config = std::make_shared<Config>();
+    
+    // Configure benchmark-specific parameters
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.1f, ConfigSource::Default);
     config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
     
-    // Create brain
+    // Create and initialize brain for benchmark
     auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
+    if (!brain->initialize()) {
+        throw std::runtime_error("Failed to initialize brain for benchmark");
+    }
     
-    // Run simulation
+    // Record start time for performance measurement
     auto startTime = std::chrono::high_resolution_clock::now();
     
+    // Run benchmark simulation with controlled input patterns
     for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
+        // Inject controlled input to maintain consistent activity levels
         for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
+        // Execute single simulation step
         brain->step(step, step * 0.001);
     }
     
+    // Record end time and calculate performance metrics
     auto endTime = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(endTime - startTime).count();
     
-    // Collect results
+    // Calculate comprehensive performance statistics
     BenchmarkResult result;
     result.neurons = brain->getTotalNeuronCount();
     result.synapses = brain->getTotalSynapseCount();
@@ -78,6 +96,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
 }
 
 void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
+    // Display benchmark results in a formatted, readable table
     std::cout << std::endl;
     std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
     std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
@@ -110,7 +129,7 @@ int main() {
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
     
-    // Initialize logger
+    // Initialize logger for performance benchmarking
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
     logger->addLogger(consoleLogger);
@@ -119,23 +138,30 @@ int main() {
     std::cout << "Running NLM Performance Benchmarks..." << std::endl;
     std::cout << std::endl;
     
-    std::vector<BenchmarkResult> results;
-    
-    // Benchmark configurations: (neuron_count, steps)
+    // Define benchmark configurations for scalability testing
+    // Tests performance across different network sizes
     std::vector<std::pair<size_t, size_t>> benchmarks = {
-        {100, 1000},      // 100 neurons, 1000 steps
-        {500, 1000},      // 500 neurons, 1000 steps
-        {1000, 500},      // 1000 neurons, 500 steps
-        {2000, 200},      // 2000 neurons, 200 steps
+        {100, 1000},      // Small network, many steps
+        {500, 1000},      // Medium network, moderate steps
+        {1000, 500},      // Large network, fewer steps
+        {2000, 200},      // Very large network, minimal steps
     };
     
+    std::vector<BenchmarkResult> results;
+    
+    // Execute all benchmark configurations
     for (const auto& [neurons, steps] : benchmarks) {
-        auto result = runBenchmark(neurons, steps);
-        results.push_back(result);
-        std::cout << std::endl;
+        try {
+            auto result = runBenchmark(neurons, steps);
+            results.push_back(result);
+            std::cout << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Benchmark failed for " << neurons << " neurons: " << e.what() << std::endl;
+            // Continue with next benchmark even if one fails
+        }
     }
     
-    // Print summary
+    // Display comprehensive benchmark summary
     printBenchmarkResults(results);
     
     std::cout << "Benchmark complete." << std::endl;

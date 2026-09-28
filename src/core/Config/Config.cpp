@@ -6,76 +6,152 @@
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+// ... existing includes ...
+
+namespace nlm {
+
+// Forward declarations for exceptions
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) : std::runtime_error(message) {}
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+class ConfigKeyNotFoundException : public ConfigException {
+public:
+    explicit ConfigKeyNotFoundException(const std::string& key) 
+        : ConfigException("Configuration key not found: " + key) {}
+};
+
+class ConfigFileError : public ConfigException {
+public:
+    explicit ConfigFileError(const std::string& filepath, const std::string& reason)
+        : ConfigException("Configuration file error: " + filepath + " - " + reason) {}
+};
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+    bool validateOnSet = true;
+    bool failOnMissingKeys = false;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Enable validation by default
+    pImpl->validateOnSet = true;
+    pImpl->failOnMissingKeys = false;
+}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw ConfigFileError(filepath, "Cannot open file");
     }
     
     std::string line;
+    int lineNumber = 0;
+    bool success = true;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with better validation
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            // Warn but don't fail for malformed lines
+            std::cerr << "Warning: Invalid configuration line " << lineNumber 
+                      << ": no '=' found in '" << line << "'" << std::endl;
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Basic validation of key
+        if (key.empty()) {
+            std::cerr << "Warning: Empty key in line " << lineNumber << std::endl;
+            continue;
+        }
+        
+        try {
+            set(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Failed to parse configuration line " << lineNumber 
+                      << ": " << e.what() << std::endl;
+            success = false;
+        }
+    }
+    
+    if (!success) {
+        throw ConfigFileError(filepath, "Some configuration lines could not be parsed");
     }
     
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true; // No arguments, nothing to do
+    }
+    
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    std::cerr << "Warning: Failed to parse command line argument " 
+                              << "--" << key << "=" << value << ": " << e.what() << std::endl;
+                    success = false;
+                }
+            } else {
+                std::cerr << "Warning: Command line argument without '=': " << arg << std::endl;
+                success = false;
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        } else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                std::cerr << "Warning: Failed to parse command line argument "
+                          << "-" << key << " " << value << ": " << e.what() << std::endl;
+                success = false;
+            }
+        } else {
+            std::cerr << "Warning: Unrecognized command line argument: " << arg << std::endl;
+            success = false;
         }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -98,6 +174,9 @@ std::optional<T> Config::get(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        if (pImpl->failOnMissingKeys) {
+            throw ConfigKeyNotFoundException(key);
+        }
         return std::nullopt;
     }
     
@@ -115,6 +194,18 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw ConfigException("Configuration key cannot be empty");
+    }
+    
+    // Basic key validation
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            throw ConfigException("Invalid character in configuration key: " + key);
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
