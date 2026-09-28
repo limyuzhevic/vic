@@ -38,12 +38,18 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 Neuron::~Neuron() = default;
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    if (pImpl == nullptr) {
+        other.pImpl = nullptr;
+    } else {
+        other.pImpl = nullptr;
+    }
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl != nullptr) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -51,26 +57,32 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
 }
 
 void Neuron::setType(NeuronType type) {
+    if (pImpl == nullptr) return;
     pImpl->type = type;
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
+    if (pImpl == nullptr) return;
     pImpl->state.membranePotential = potential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    if (pImpl == nullptr) return;
     pImpl->state.membranePotential += delta;
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
+    if (pImpl == nullptr) return;
     pImpl->state.threshold = threshold;
 }
 
 void Neuron::setFiringState(FiringState state) {
+    if (pImpl == nullptr) return;
     pImpl->state.firingState = state;
 }
 
 void Neuron::decrementRefractory() {
+    if (pImpl == nullptr) return;
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         if (pImpl->state.refractoryRemaining == 0) {
@@ -80,42 +92,52 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
+    if (pImpl == nullptr) return;
     pImpl->state.firingRate = rate;
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
+    if (pImpl == nullptr) return;
     pImpl->state.leakConductance = conductance;
 }
 
 MembranePotential Neuron::getLeakConductance() const {
+    if (pImpl == nullptr) return 0.0f;
     return pImpl->state.leakConductance;
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
+    if (pImpl == nullptr) return;
     pImpl->state.refractoryPeriod = steps;
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
+    if (pImpl == nullptr) return 0;
     return pImpl->state.refractoryPeriod;
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
+    if (pImpl == nullptr) return;
     pImpl->state.restingPotential = potential;
 }
 
 MembranePotential Neuron::getRestingPotential() const {
+    if (pImpl == nullptr) return 0.0f;
     return pImpl->state.restingPotential;
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
+    if (pImpl == nullptr) return;
     pImpl->state.resetPotential = potential;
 }
 
 bool Neuron::checkThreshold() const {
+    if (pImpl == nullptr) return false;
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 float Neuron::getLastSpikeTime() const {
+    if (pImpl == nullptr) return -1.0f;
     return pImpl->state.lastSpikeTime;
 }
 
@@ -144,10 +166,12 @@ void Neuron::injectCurrent(MembranePotential current) {
 }
 
 void Neuron::clearTotalCurrent() {
+    if (pImpl == nullptr) return;
     pImpl->synapticInput = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    if (pImpl == nullptr) return;
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
@@ -155,40 +179,55 @@ void Neuron::recordSpike(Timestamp timestamp) {
 }
 
 void Neuron::clearSpikeHistory() {
+    if (pImpl == nullptr) return;
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    if (pImpl == nullptr) return;
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    if (pImpl == nullptr) return;
     pImpl->outgoingSynapses.push_back(handle);
 }
 
 NeuronState& Neuron::getState() {
+    if (pImpl == nullptr) {
+        static NeuronState empty;
+        return empty;
+    }
     return pImpl->state;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
+    if (pImpl == nullptr) {
+        static PlasticityFlags empty;
+        return empty;
+    }
     return pImpl->plasticityFlags;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    if (pImpl == nullptr) return;
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
 void Neuron::setRegionId(RegionId region) {
+    if (pImpl == nullptr) return;
     pImpl->regionId = region;
 }
 
 void Neuron::setPopulationId(PopulationId population) {
+    if (pImpl == nullptr) return;
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    if (pImpl == nullptr) return;
     bool fired = false;
     
     // Handle refractory period
@@ -266,6 +305,7 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    if (pImpl == nullptr) return;
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();

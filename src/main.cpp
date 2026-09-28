@@ -373,23 +373,52 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Neuron parameters
+    config->set("neuron.membrane_capacitance", 1.0f, ConfigSource::Default);
+    config->set("neuron.time_constant", 20.0f, ConfigSource::Default);
+    config->set("neuron.max_spike_history", 100, ConfigSource::Default);
+    config->set("neuron.simulation_timestep", 0.001, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Synapse parameters
+    config->set("synapse.min_weight", -1.0f, ConfigSource::Default);
+    config->set("synapse.max_weight", 1.0f, ConfigSource::Default);
+    config->set("synapse.stp_facilitation_tau", 100.0f, ConfigSource::Default);
+    config->set("synapse.stp_depression_tau", 200.0f, ConfigSource::Default);
+    config->set("synapse.stp_u_max", 1.0f, ConfigSource::Default);
+    config->set("synapse.max_spike_history", 100, ConfigSource::Default);
+    config->set("synapse.eligibility_trace_decay", 0.001f, ConfigSource::Default);
+    
+    // Neuron parameters
+    config->set("neuron.membrane_capacitance", 1.0f, ConfigSource::Default);
+    config->set("neuron.time_constant", 20.0f, ConfigSource::Default);
+    config->set("neuron.max_spike_history", 100, ConfigSource::Default);
+    config->set("neuron.simulation_timestep", 0.001, ConfigSource::Default);
+    
+    // Synapse parameters
+    config->set("synapse.min_weight", -1.0f, ConfigSource::Default);
+    config->set("synapse.max_weight", 1.0f, ConfigSource::Default);
+    config->set("synapse.stp_facilitation_tau", 100.0f, ConfigSource::Default);
+    config->set("synapse.stp_depression_tau", 200.0f, ConfigSource::Default);
+    config->set("synapse.stp_u_max", 1.0f, ConfigSource::Default);
+    config->set("synapse.max_spike_history", 100, ConfigSource::Default);
+    config->set("synapse.eligibility_trace_decay", 0.001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("Configuration Summary:");
+    NLM_LOG_INFO("  Neuron Parameters:");
+    NLM_LOG_INFO("    membrane_capacitance: " + std::to_string(config->getOr<float>("neuron.membrane_capacitance", 1.0f)));
+    NLM_LOG_INFO("    time_constant: " + std::to_string(config->getOr<float>("neuron.time_constant", 20.0f)) + "ms");
+    NLM_LOG_INFO("    max_spike_history: " + std::to_string(config->getOr<size_t>("neuron.max_spike_history", 100)));
+    NLM_LOG_INFO("    simulation_timestep: " + std::to_string(config->getOr<double>("neuron.simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  Synapse Parameters:");
+    NLM_LOG_INFO("    min_weight: " + std::to_string(config->getOr<float>("synapse.min_weight", -1.0f)));
+    NLM_LOG_INFO("    max_weight: " + std::to_string(config->getOr<float>("synapse.max_weight", 1.0f)));
+    NLM_LOG_INFO("    stp_facilitation_tau: " + std::to_string(config->getOr<float>("synapse.stp_facilitation_tau", 100.0f)) + "ms");
+    NLM_LOG_INFO("    stp_depression_tau: " + std::to_string(config->getOr<float>("synapse.stp_depression_tau", 200.0f)) + "ms");
+    NLM_LOG_INFO("    stp_u_max: " + std::to_string(config->getOr<float>("synapse.stp_u_max", 1.0f)));
+    NLM_LOG_INFO("    max_spike_history: " + std::to_string(config->getOr<size_t>("synapse.max_spike_history", 100)));
+    NLM_LOG_INFO("    eligibility_trace_decay: " + std::to_string(config->getOr<float>("synapse.eligibility_trace_decay", 0.001f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
