@@ -1,10 +1,10 @@
 #include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "agent/AgentBrain.hpp"
+#include "agent/SensoryPercept.hpp"
+#include "world/SimpleWorld.hpp"
+#include "Brain.hpp"
+#include "Config.hpp"
+#include "Logger.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>

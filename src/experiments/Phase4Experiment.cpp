@@ -1,10 +1,10 @@
 #include "Phase4Experiment.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../prediction/NeuralPrediction.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../cognition/NeuralPlanner.hpp"
+#include "Logger.hpp"
+#include "prediction/NeuralPrediction.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "cognition/NeuralPlanner.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>

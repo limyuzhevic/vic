@@ -1,5 +1,5 @@
 #include "NeuralPrediction.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "Logger.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>

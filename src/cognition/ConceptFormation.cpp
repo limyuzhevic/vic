@@ -1,5 +1,5 @@
 #include "ConceptFormation.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "Logger.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>

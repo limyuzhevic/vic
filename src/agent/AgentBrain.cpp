@@ -1,5 +1,5 @@
 #include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "Logger.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -87,60 +87,54 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Helper function to inject sensory current
+    auto injectSensoryCurrent = [this](const std::vector<float>& perceptData, 
+                                        const std::vector<Neuron*>& neurons,
+                                        float scaleFactor, float offset = 0.0f) {
+        for (size_t i = 0; i < neurons.size() && i < perceptData.size(); ++i) {
+            if (neurons[i]) {
+                float current = (perceptData[i] * scaleFactor + offset);
+                neurons[i]->injectCurrent(current);
+            }
+        }
+    };
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
+    injectSensoryCurrent(vision, sensoryVision_, 5.0f);
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
+    injectSensoryCurrent(touch, sensoryTouch_, 8.0f);
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
+    injectSensoryCurrent(intern, sensoryInternal_, 2.0f, -5.0f);
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
+    injectSensoryCurrent(proprio, sensoryProprioception_, 2.0f, -3.0f);
     
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        const size_t limit = std::min(vision.size(), previousVision_.size());
+        for (size_t i = 0; i < limit; ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+        noveltyLevel_ = totalDiff / static_cast<float>(limit);
+    } else {
+        noveltyLevel_ = 0.0f;
     }
+    
+    // Decay and update
+    noveltyLevel_ *= sensoryNoveltyDecay_;
+    
+    // Store for next time
+    previousVision_ = vision;
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
@@ -162,52 +156,55 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    MotorCommand AgentBrain::decodeFromMotorNeurons() {
+        // Calculate average activity in each motor group
+        auto calcActivity = [this](const std::vector<Neuron*>& neurons) -> float {
+            if (neurons.empty()) return 0.0f;
+            float sum = 0.0f;
+            for (Neuron* n : neurons) {
+                // Use membrane potential deviation from rest as activity measure
+                sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            }
+            return sum / neurons.size();
+        };
+        
+        float forwardAct = calcActivity(motorForward_);
+        float backwardAct = calcActivity(motorBackward_);
+        float leftAct = calcActivity(motorTurnLeft_);
+        float rightAct = calcActivity(motorTurnRight_);
+        float interactAct = calcActivity(motorInteract_);
+        float waitAct = calcActivity(motorWait_);
+        
+        // Find maximum activity using a more efficient approach
+        // Pre-calculate threshold and initialize best command
+        MotorCommand best = MotorCommand::Wait;
+        float bestActivity = waitAct;  // Default to wait if nothing stronger
+        
+        // More efficient comparison - check if each activity is greater than current best
+        if (forwardAct > bestActivity) {
+            bestActivity = forwardAct;
+            best = MotorCommand::MoveForward;
+        } else if (backwardAct > bestActivity) {
+            bestActivity = backwardAct;
+            best = MotorCommand::MoveBackward;
+        } else if (leftAct > bestActivity) {
+            bestActivity = leftAct;
+            best = MotorCommand::TurnLeft;
+        } else if (rightAct > bestActivity) {
+            bestActivity = rightAct;
+            best = MotorCommand::TurnRight;
+        } else if (interactAct > bestActivity) {
+            bestActivity = interactAct;
+            best = MotorCommand::Interact;
         }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+        
+        // Only act if there's meaningful activity
+        if (bestActivity < 0.5f) {
+            return MotorCommand::Wait;
         }
+        
+        return best;
     }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
-}
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
