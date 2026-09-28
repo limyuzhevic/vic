@@ -6,16 +6,22 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Enable warnings
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Performance optimizations
+option(ENABLE_PERF_OPT "Enable performance optimizations" ON)
+if(ENABLE_PERF_OPT)
+    add_compile_options(-O3 -march=native -flto)
+endif()
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
-endif()
-
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # Source directory
@@ -97,6 +103,7 @@ add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +111,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +119,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,6 +127,7 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -125,27 +135,57 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
+
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Packaging for distribution
+include(GNUInstallDirs)
+
+# Documentation installation
+install(DIRECTORY docs/ DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+# Configuration file installation
+install(FILES configs/default.cfg DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm/conf
+    RENAME nlm.cfg.example
+)
+
+# Summary output
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  C++ Standard: C++20")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Performance Optimizations: ${ENABLE_PERF_OPT}")
+message(STATUS "  Core Library Targets: ${CMAKE_CURRENT_BINARY_DIR}/libnlm_core.a")
+message(STATUS "  Agent Library Targets: ${CMAKE_CURRENT_BINARY_DIR}/libnlm_agent.a")
+message(STATUS "  World Library Targets: ${CMAKE_CURRENT_BINARY_DIR}/libnlm_world.a")

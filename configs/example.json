@@ -1,0 +1,83 @@
+{
+  "nlm_version": "Phase 2+",
+  "experiment": {
+    "id": "example_experiment",
+    "seed": 12345,
+    "description": "Example NLM configuration using JSON format"
+  },
+  
+  "simulation": {
+    "timestep": 0.001,
+    "neuron_count": 500,
+    "region_count": 2,
+    "connection_probability": 0.1
+  },
+  
+  "neurons": {
+    "resting_potential": -70.0,
+    "threshold": -55.0,
+    "reset_potential": -70.0,
+    "refractory_period": 5
+  },
+  
+  "plasticity": {
+    "learning_rate": 0.01,
+    "stdp": {
+      "ltp_weight": 0.01,
+      "ltd_weight": 0.012,
+      "time_constant": 20.0
+    },
+    "hebbian_weight": 0.005,
+    "structural": {
+      "synaptogenesis_rate": 0.001,
+      "pruning_rate": 0.0001
+    }
+  },
+  
+  "neuromodulation": {
+    "dopamine": {
+      "baseline": 0.1,
+      "decay_rate": 0.1,
+      "release_rate": 1.0
+    },
+    "curiosity": {
+      "novelty_weight": 0.5,
+      "prediction_error_weight": 0.5,
+      "decay_rate": 0.05
+    }
+  },
+  
+  "environment": {
+    "type": "GridWorld",
+    "width": 10,
+    "height": 10,
+    "vision": {
+      "width": 8,
+      "height": 8,
+      "range": 1,
+      "angle": 90.0
+    }
+  },
+  
+  "memory": {
+    "working_memory": {
+      "capacity": 10,
+      "decay": 100.0
+    },
+    "episodic_memory": {
+      "capacity": 1000,
+      "consolidation_threshold": 0.7
+    }
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "to_file": false,
+    "filename": "nlm.json_example.log"
+  },
+  
+  "simulation_control": {
+    "max_steps": 10000,
+    "time_limit": 0.0
+  }
+}

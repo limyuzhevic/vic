@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -43,9 +46,33 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with enhanced functionality
 class Config {
 public:
+    // Configuration validation result
+    struct ValidationResult {
+        bool isValid;
+        std::string errorMessage;
+        
+        ValidationResult(bool valid, const std::string& error = "") 
+            : isValid(valid), errorMessage(error) {}
+    };
+    
+    // Configuration schema entry for validation
+    struct SchemaEntry {
+        std::string key;
+        std::type_index type;
+        ConfigSource allowedSources;
+        bool required;
+        ConfigValue defaultValue;
+        std::string description;
+        
+        SchemaEntry(const std::string& k, const std::type_index& t, ConfigSource sources = ConfigSource::File,
+                   bool req = false, const ConfigValue& defaultVal = {}, const std::string& desc = "")
+            : key(k), type(t), allowedSources(sources), required(req), 
+              defaultValue(defaultVal), description(desc) {}
+    };
+    
     Config();
     ~Config();
     
@@ -57,6 +84,9 @@ public:
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from file (JSON or YAML)
+    bool loadFromFile(const std::string& filepath, const std::string& format);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -93,6 +123,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Schema management
+    void addSchema(const SchemaEntry& schema);
+    ValidationResult validate() const;
+    bool hasSchema(const std::string& key) const;
+    
+    // Schema information
+    std::vector<std::string> getSchemaKeys() const;
+    std::string getSchemaInfo(const std::string& key) const;
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    size_t getEntryCount(ConfigSource source) const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +144,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool stringToBool(const std::string& str);
+    static ConfigValue stringToConfigValue(const std::string& str);
+    static std::string configValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm
