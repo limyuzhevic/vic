@@ -162,7 +162,44 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Advanced configuration methods
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, static_cast<int64_t>(value));
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, static_cast<double>(value));
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (bool)")
+        .def("get", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default") = "",
+           "Get configuration value as string with default")
+        .def("get", [](const Config& self, const std::string& key, int defaultValue) {
+            auto value = self.get<int64_t>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default") = 0,
+           "Get configuration value as int with default")
+        .def("get", [](const Config& self, const std::string& key, float defaultValue) {
+            auto value = self.get<double>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default") = 0.0f,
+           "Get configuration value as float with default")
+        .def("get", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value ? *value : defaultValue;
+        }, py::arg("key"), py::arg("default") = false,
+           "Get configuration value as bool with default");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
