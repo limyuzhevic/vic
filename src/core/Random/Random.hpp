@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -92,6 +93,7 @@ private:
 };
 
 // Template implementations
+
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
     std::shuffle(container.begin(), container.end(), engine());

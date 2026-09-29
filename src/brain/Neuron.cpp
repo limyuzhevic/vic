@@ -43,9 +43,10 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        // Exception-safe move assignment using swap idiom
+        Impl* temp = other.pImpl;
+        other.pImpl = pImpl;
+        pImpl = temp;
     }
     return *this;
 }
@@ -286,7 +287,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(static_cast<uint32_t>(2), static_cast<uint32_t>(10)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

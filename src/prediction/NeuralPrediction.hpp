@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
+#include "core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <deque>

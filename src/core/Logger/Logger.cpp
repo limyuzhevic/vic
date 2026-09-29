@@ -38,6 +38,17 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     oss << " " << entry.message;
     
+    // Add file and line info for errors
+    if (!entry.file.empty() && entry.line > 0) {
+        // Extract filename from full path
+        std::string filename = entry.file;
+        size_t pos = filename.find_last_of('/');
+        if (pos != std::string::npos) {
+            filename = filename.substr(pos + 1);
+        }
+        oss << " [" << filename << ":" << entry.line << "]";
+    }
+    
     std::string output = oss.str();
     
     // Console output
