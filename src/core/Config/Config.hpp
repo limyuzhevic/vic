@@ -100,6 +100,18 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format detection and parsing
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool parseJSON(const std::string& jsonStr);
+    void setValueFromString(const std::string& key, const std::string& valueStr);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // File saving
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
 };
 
 } // namespace nlm

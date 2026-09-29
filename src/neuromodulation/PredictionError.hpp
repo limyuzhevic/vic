@@ -32,6 +32,11 @@ public:
     float getMagnitude() const;
     
 private:
+    // Helper methods
+    float getPredictionConfidence() const;
+    void updateLearningFromError(float error);
+    void adjustPredictionConfidence();
+    
     struct Impl;
     Impl* pImpl;
 };

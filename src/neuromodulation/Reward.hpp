@@ -31,6 +31,12 @@ public:
     void clearHistory();
     
 private:
+    // Helper methods
+    std::vector<float> extractFeaturesFromObservation(const class Observation& observation) const;
+    float calculateDistance(const class Position& pos1, const class Position& pos2) const;
+    float computeFeatureBasedReward(const std::vector<float>& features) const;
+    float applyHistorySmoothing(float currentReward) const;
+    
     struct Impl;
     Impl* pImpl;
 };

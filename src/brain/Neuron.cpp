@@ -220,7 +220,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Convert dt from seconds to milliseconds for consistency with tau parameter
+    V = V + dt * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -228,8 +229,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential with more stable range
+    V = std::clamp(V, -80.0f, 60.0f);
     
     // Check for spike
     if (V >= threshold) {
@@ -250,7 +251,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Set appropriate state based on input level, not just Active
+        if (V > pImpl->state.restingPotential * 1.1f) {
+            pImpl->state.firingState = FiringState::Active;
+        } else {
+            pImpl->state.firingState = FiringState::Resting;
+        }
     }
     
     // Clear synaptic input for next step
