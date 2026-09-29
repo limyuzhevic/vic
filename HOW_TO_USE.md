@@ -1,13 +1,47 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+## Part 0: Introduction and Version Information
 
-## Overview
+NLM (Neural Learning Machine) is a brain-inspired spiking neural network simulator written in C++20. This document covers using the NLM Python bindings.
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+### Library Metadata
 
-This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+The NLM Python module provides several metadata attributes:
+
+```python
+import pynlm
+
+# Version information
+print(f"NLM Python Bindings: v{pynlm.__version__}")
+print(f"Description: {pynlm.__description__}")
+print(f"Authors: {pynlm.__author__}")
+```
+
+**Expected output:**
+```
+NLM Python Bindings: v0.1.0
+Description: Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework
+Authors: NLM Authors
+```
+
+### Common Constants
+
+The module also provides useful constants for working with invalid IDs:
+
+```python
+import pynlm
+
+# Invalid identifier constants (useful for initialization)
+invalid_neuron = pynlm.INVALID_NEURON_ID
+invalid_synapse = pynlm.INVALID_SYNAPSE_ID
+invalid_region = pynlm.INVALID_REGION_ID
+invalid_population = pynlm.INVALID_POPULATION_ID
+```
+
+### Best Practices for Beginners
+
+1. **Always check version**: Use `pynlm.__version__` to ensure compatibility
+2. **Initialize everything**: Call `brain.initialize()` before using a brain
+3. **Save checkpoints**: Use `brain.save()` to save progress
+4. **Handle errors**: Use try-catch blocks for production code
 
 ---
 

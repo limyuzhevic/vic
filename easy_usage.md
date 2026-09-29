@@ -12,6 +12,17 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+### Quick Reference
+
+```python
+import pynlm
+
+# Check the library version and info
+print(f"NLM Python Bindings v{pynlm.__version__}")
+print(f"Description: {pynlm.__description__}")
+print(f"Authors: {pynlm.__author__}")
+```
+
 ---
 
 ## The 3 Things You Need to Know
