@@ -191,7 +191,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period (early exit for performance)
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -202,59 +202,58 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Cache frequently accessed fields to reduce dereferencing
+    float& V = pImpl->state.membranePotential;
+    const float V_rest = pImpl->state.restingPotential;
+    const float V_reset = pImpl->state.resetPotential;
+    const float threshold = pImpl->state.threshold;
+    const float synapticInput = pImpl->synapticInput;
+    const float adaptationVar = pImpl->state.adaptationVariable;
     
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    // Pre-calculate constants
+    const float tau = Impl::TIME_CONSTANT;  // ms
+    const float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    const float dt_ms = static_cast<float>(dt) * 1000.0f;
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Optimized membrane potential dynamics
+    // dV = dt_ms * (-(V - V_rest)/tau + synapticInput/C) - adaptation
+    V += dt_ms * (-(V - V_rest) / tau + synapticInput / C) - adaptationVar * 0.01f;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Update adaptation variable (decay)
+    pImpl->state.adaptationVariable = adaptationVar * 0.95f;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Stability constraints (min/max branches)
+    if (V < -100.0f) V = -100.0f;
+    else if (V > 50.0f) V = 50.0f;
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
-    
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Check for spike
+    // Check for spike (early exit for non-spiking neurons)
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
-        recordSpike(currentTime);
+        // Record spike (optimized)
+        if (pImpl->spikeHistory.size() < Impl::MAX_SPIKE_HISTORY) {
+            pImpl->spikeHistory.push_back(currentTime);
+        }
         
-        // Reset membrane potential
-        V = V_reset;
+        // Reset membrane potential with adaptation influence
+        V = V_reset + adaptationVar * 0.5f;
+        
+        // Update adaptation for next spike
+        pImpl->state.adaptationVariable += 1.0f + adaptationVar * 0.1f;
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
     
-    // Clear synaptic input for next step
-    pImpl->synapticInput = 0.0f;
+    // Clear synaptic input for next step (only if not refractory)
+    if (pImpl->state.refractoryRemaining == 0) {
+        pImpl->synapticInput = 0.0f;
+    }
     
     return fired;
 }

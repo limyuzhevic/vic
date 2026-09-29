@@ -70,6 +70,30 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    float getShortTermFacilitation() const;
+    void setShortTermDepression(float depression);
+    void setShortTermFacilitation(float facilitation);
+    
+    // Short-term dynamics
+    float getLastPreSpikeTime() const;
+    float getLastPostSpikeTime() const;
+    void setLastPreSpikeTime(float time);
+    void setLastPostSpikeTime(float time);
+    
+    // Plasticity state
+    const PlasticityFlags& getPlasticityFlags() const;
+    PlasticityFlags& getPlasticityFlags();
+    
+    // Enable/disable plasticity rules
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    
+    // Eligibility trace (for reward-modulated learning)
+    float getEligibilityTrace() const;
+    void setEligibilityTrace(float trace);
+    void decayEligibilityTrace(float decayRate);
+    
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);

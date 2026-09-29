@@ -19,9 +19,120 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try multiple formats: JSON, YAML, then fallback to simple key=value format
+    bool success = false;
     
+    // Try JSON first
+    if (loadFromJSON(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        success = true;
+    } else if (loadFromYAML(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from YAML file: " + filepath);
+        success = true;
+    } else {
+        // Fall back to simple key=value format
+        success = loadFromSimpleFormat(filepath);
+        if (success) {
+            NLM_LOG_INFO("Loaded configuration from text file: " + filepath);
+        }
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Try to parse JSON using std::ifstream and manual parsing
+    // Since we don't want to add external dependencies, implement a minimal JSON parser
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Very basic JSON parsing - look for key: value patterns
+    // This is a simplified implementation for demonstration
+    size_t pos = 0;
+    bool foundObject = false;
+    
+    while ((pos = content.find('{', pos)) != std::string::npos) {
+        foundObject = true;
+        pos = content.find('}', pos);
+        if (pos == std::string::npos) break;
+        
+        std::string object = content.substr(content.find('{', pos) + 1, pos - content.find('{', pos) - 1);
+        
+        // Parse key-value pairs
+        size_t keyPos = 0;
+        while ((keyPos = object.find('"', keyPos)) != std::string::npos) {
+            size_t keyEnd = object.find('"', keyPos + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = object.substr(keyPos + 1, keyEnd - keyPos - 1);
+            size_t colonPos = object.find(':', keyEnd);
+            if (colonPos == std::string::npos) break;
+            
+            size_t valueStart = object.find_first_not_of(' ', colonPos + 1);
+            if (valueStart == std::string::npos) break;
+            
+            size_t valueEnd = object.find(',', valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = object.find('}', valueStart);
+            }
+            
+            if (valueEnd == std::string::npos) break;
+            
+            std::string valueStr = object.substr(valueStart, valueEnd - valueStart);
+            // Remove quotes and trim
+            valueStr = trim(valueStr);
+            if (valueStr.front() == '"' && valueStr.back() == '"') {
+                valueStr = valueStr.substr(1, valueStr.size() - 2);
+            }
+            
+            set(key, valueStr, ConfigSource::File);
+            keyPos = valueEnd;
+        }
+    }
+    
+    return foundObject;
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // Simple YAML-like parser for key: value pairs
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line.find('#') == 0) {
+            continue;
+        }
+        
+        // Parse simple key: value pairs (YAML-like syntax)
+        size_t pos = line.find(':');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
