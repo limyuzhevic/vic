@@ -13,8 +13,29 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Configuration structure for agent behavior
+    struct Configuration {
+        float curiosityThreshold = 0.3f;      // Threshold for curiosity-driven exploration
+        float explorationChance = 0.3f;      // Maximum chance of random exploration
+        float activityThreshold = 0.5f;      // Minimum neural activity for action selection
+        float noveltyDecay = 0.99f;           // Novelty level decay factor
+        float visionScaleFactor = 5.0f;      // Vision signal scaling factor
+        float touchScaleFactor = 8.0f;       // Touch signal scaling factor
+        float internalScaleFactor = 5.0f;    // Internal signal scaling factor
+        float proprioceptionScaleFactor = 3.0f; // Proprioception signal scaling factor
+        int randomSeed = 42;                 // Default random seed
+        bool validateInputs = true;          // Enable input validation
+        bool enableDebugLogging = false;     // Enable detailed debug logging
+        
+        Configuration() = default;
+    };
+
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Set configuration
+    void setConfiguration(const Configuration& config) { config_ = config; }
+    const Configuration& getConfiguration() const { return config_; }
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
@@ -76,7 +97,14 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Validate configuration
+    void validateConfiguration() const;
+    
+    // Helper functions
+    float calculateActivity(const std::vector<Neuron*>& neurons) const;
+    
     std::shared_ptr<Brain> brain_;
+    Configuration config_;  // Agent configuration
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -111,7 +139,6 @@ private:
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm

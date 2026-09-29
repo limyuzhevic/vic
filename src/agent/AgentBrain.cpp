@@ -18,8 +18,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
 {
+    validateConfiguration();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -59,9 +60,43 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    if (config_.enableDebugLogging) {
+        NLM_LOG_INFO("AgentBrain initialized with configuration: curiosity threshold=" + 
+                     std::to_string(config_.curiosityThreshold) +
+                     ", activity threshold=" + std::to_string(config_.activityThreshold));
+    }
 }
 
 AgentBrain::~AgentBrain() = default;
+
+void AgentBrain::validateConfiguration() const {
+    if (config_.validateInputs) {
+        if (config_.curiosityThreshold < 0.0f || config_.curiosityThreshold > 1.0f) {
+            NLM_LOG_WARNING("Invalid curiosity threshold " + std::to_string(config_.curiosityThreshold) + ", clamping to [0, 1]");
+        }
+        if (config_.explorationChance < 0.0f || config_.explorationChance > 1.0f) {
+            NLM_LOG_WARNING("Invalid exploration chance " + std::to_string(config_.explorationChance) + ", clamping to [0, 1]");
+        }
+        if (config_.activityThreshold < 0.0f || config_.activityThreshold > 1.0f) {
+            NLM_LOG_WARNING("Invalid activity threshold " + std::to_string(config_.activityThreshold) + ", clamping to [0, 1]");
+        }
+        if (config_.noveltyDecay < 0.0f || config_.noveltyDecay > 1.0f) {
+            NLM_LOG_WARNING("Invalid novelty decay " + std::to_string(config_.noveltyDecay) + ", clamping to [0, 1]");
+        }
+    }
+}
+
+float AgentBrain::calculateActivity(const std::vector<Neuron*>& neurons) const {
+    if (neurons.empty()) return 0.0f;
+    float sum = 0.0f;
+    for (Neuron* n : neurons) {
+        if (n) {
+            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+        }
+    }
+    return sum / neurons.size();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -84,6 +119,16 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
+size_t AgentBrain::getSensoryInputSize() const {
+    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
+    return 256 + 8 + 4 + 6;
+}
+
+size_t AgentBrain::getMotorOutputSize() const {
+    // One motor neuron per action
+    return 6;
+}
+
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
@@ -91,8 +136,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Inject current proportional to vision intensity with configurable scale factor
+            float current = vision[i] * config_.visionScaleFactor;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -101,7 +146,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& touch = percept.getTouch();
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * config_.touchScaleFactor;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -110,7 +155,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            float current = (intern[i] * 2.0f - 1.0f) * config_.internalScaleFactor;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -119,7 +164,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            float current = (proprio[i] * 2.0f - 1.0f) * config_.proprioceptionScaleFactor;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -135,8 +180,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Normalize
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Apply configurable decay and update
+        noveltyLevel_ *= config_.noveltyDecay;
         
         // Store for next time
         previousVision_ = vision;
@@ -154,8 +199,8 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    // Apply curiosity-based exploration (only if enabled)
+    if (curiosityEnabled_ && curiosityLevel_ > config_.curiosityThreshold) {
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -201,8 +246,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
     }
     
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    // Use configurable activity threshold
+    if (bestActivity < config_.activityThreshold) {
         return MotorCommand::Wait;
     }
     
@@ -210,10 +255,10 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+// Exploration: occasionally choose random action when curiosity is high
+    if (curiosityLevel_ > config_.curiosityThreshold) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * config_.explorationChance;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
@@ -227,12 +272,13 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Wait;
             }
         }
     }
     
     return defaultCmd;
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {

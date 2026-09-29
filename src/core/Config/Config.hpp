@@ -5,13 +5,16 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <limits>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
+// Configuration value types with additional precision
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -20,7 +23,9 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    std::map<std::string, double>,  // For structured parameters
+    std::vector<std::pair<std::string, double>>  // Key-value pairs
 >;
 
 // Configuration source
@@ -31,16 +36,56 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration category for better organization
+enum class ConfigCategory {
+    Core,
+    Brain,
+    Agent,
+    World,
+    Memory,
+    Plasticity,
+    Neuromodulation,
+    Development,
+    Sensory,
+    Motor,
+    Performance,
+    Debug,
+    Experiment,
+    User
+};
+
+// Configuration metadata for better documentation and validation
+struct ConfigMetadata {
+    std::string description;
+    std::string unit;
+    std::string category;
+    std::function<bool(const ConfigValue&)> validator;
+    std::function<std::string(const ConfigValue&)> formatter;
+    std::function<std::string(const ConfigValue&)> parser;
+    bool isRequired = false;
+    double minValue = std::numeric_limits<double>::lowest();
+    double maxValue = std::numeric_limits<double>::max();
+    std::vector<std::string> allowedValues;
+    
+    ConfigMetadata() = default;
+    ConfigMetadata(const std::string& desc, const std::string& cat)
+        : description(desc), category(cat) {}
+};
+
+// Enhanced Configuration entry
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    ConfigCategory category;
+    ConfigMetadata metadata;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), category(ConfigCategory::Core) {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), category(ConfigCategory::Core) {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc, ConfigCategory cat)
+        : key(k), value(v), source(s), description(desc), category(cat) {}
 };
 
 // Main configuration class
@@ -55,7 +100,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports multiple formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -77,6 +122,8 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -86,6 +133,7 @@ public:
     
     // Get all keys
     std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeys(ConfigCategory category) const;
     
     // Clear all
     void clear();
