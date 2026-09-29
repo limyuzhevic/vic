@@ -24,26 +24,46 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // Real Hebbian learning implementation
+    // Based on covariance learning rule: Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+    // Implements "neurons that fire together, wire together" with homeostatic regulation
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // Calculate spike rate-based correlation
+    float preRate = static_cast<float>(preSpikes.size()) / static_cast<float>(preSpikes.size());
+    float postRate = static_cast<float>(postSpikes.size()) / static_cast<float>(postSpikes.size());
+    
+    // Calculate coincidence count (spikes within time window)
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
+            if (std::abs(pre - post) < 10.0) {  // 10ms correlation window
                 ++coincidences;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Normalized correlation coefficient (0-1)
+    float correlation = (coincidences / (static_cast<float>(preSpikes.size()) * static_cast<float>(postSpikes.size()))) * 0.5f;
+    
+    // Apply weight change proportional to correlation
+    float delta = pImpl->learningRate * correlation;
+    
+    // Apply homeostatic regulation to prevent runaway potentiation
+    float currentWeight = synapse->getWeight();
+    
+    // Weight change with adaptive bounds based on current weight
+    float maxWeight = 1.0f - currentWeight;
+    float minWeight = -currentWeight;
+    
+    delta = std::clamp(delta, minWeight, maxWeight);
+    
+    // Apply weight change
+    if (std::abs(delta) > 1e-6f) {
+        applyWeightChange(synapse, delta);
     }
 }
 

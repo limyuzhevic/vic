@@ -53,27 +53,71 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// Implement real HH dynamics with ion channel modeling
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    HodgkinHuxleyDynamics();
+    ~HodgkinHuxleyDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // Ion channel parameters
+    float getSodiumReversal() const;
+    void setSodiumReversal(float reversal);
+    
+    float getPotassiumReversal() const;
+    void setPotassiumReversal(float reversal);
+    
+    float getLeakReversal() const;
+    void setLeakReversal(float reversal);
+    
+    float getSodiumConductance() const;
+    void setSodiumConductance(float conductance);
+    
+    float getPotassiumConductance() const;
+    void setPotassiumConductance(float conductance);
+    
+    float getLeakConductance() const;
+    void setLeakConductance(float conductance);
+    
+    float getCapacitance() const;
+    void setCapacitance(float capacitance);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitable model)
+// Implement real FHN dynamics capturing spike generation with recovery
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    FitzHughNagumoDynamics();
+    ~FitzHughNagumoDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // FHN model parameters
+    void setA(float a);
+    float getA() const;
+    
+    void setB(float b);
+    float getB() const;
+    
+    void setTau(float tau);
+    float getTau() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
