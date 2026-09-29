@@ -66,6 +66,20 @@ public:
     void setEligibilityTrace(float trace);
     void decayEligibilityTrace(float decayRate);
     
+    // Eligibility trace (for reward-modulated learning)
+    float getEligibilityTrace() const;
+    void setEligibilityTrace(float trace);
+    void decayEligibilityTrace(float decayRate);
+    
+    // Predicted reward for reward-modulated learning
+    float getPredictedReward() const;
+    void updatePredictedReward(float reward);
+    
+    // Plasticity tag for protein synthesis-dependent plasticity
+    float getPlasticityTag() const;
+    void setPlasticityTag(float tag);
+    void decayPlasticityTag();
+    
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
     void setEfficacy(float efficacy);

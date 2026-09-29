@@ -99,6 +99,13 @@ public:
     float getLastSpikeTime() const;
     
     // LIF step function - returns true if neuron fired
+    // Implements detailed Leaky Integrate-and-Fire dynamics with:
+    // - Membrane potential integration using exponential Euler
+    // - Synaptic input processing
+    // - Spike detection and reset
+    // - Refractory period handling
+    // - Spike-frequency adaptation
+    // - Error checking and validation
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
     // Incoming signals (post-synaptic potentials)
@@ -134,7 +141,12 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Implements Leaky Integrate-and-Fire (LIF) dynamics with:
+    // - Membrane potential integration
+    // - Synaptic input processing
+    // - Spike detection and reset
+    // - Refractory period handling
+    // - Spike-frequency adaptation
     void step(Timestamp currentTime);
     
     // Reset to initial state

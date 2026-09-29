@@ -39,10 +39,13 @@ add_library(nlm_core STATIC
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
     # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
+    src/plasticity/Hebbian.cpp
     src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/plasticity/TripletSTDP.cpp
+    src/plasticity/PlasticityFactory.cpp
+    src/plasticity/PlasticityParameters.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp

@@ -34,6 +34,12 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
+    // Predicted reward for reward-modulated learning
+    float predictedReward;
+    
+    // Plasticity tag for protein synthesis-dependent plasticity
+    float plasticityTag;
+    
     // Weight bounds
     static constexpr float MIN_WEIGHT = -1.0f;
     static constexpr float MAX_WEIGHT = 1.0f;
@@ -42,6 +48,10 @@ struct Synapse::Impl {
     static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
     static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    
+    // Reward and plasticity parameters
+    static constexpr float REWARD_DECAY_RATE = 0.001f;  // Fast decay
+    static constexpr float PLASTICITY_TAG_DECAY = 0.01f; // Decay rate for plasticity tags
     
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
@@ -56,6 +66,8 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->predictedReward = 0.0f;     // Initialize predicted reward
+    pImpl->plasticityTag = 0.0f;       // Initialize plasticity tag
     pImpl->shortTermDepression = 1.0f;
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
@@ -132,6 +144,7 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
+    pImpl->lastPreSpikeTime = static_cast<float>(timestamp);
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
@@ -139,6 +152,7 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
     }
+    pImpl->lastPostSpikeTime = static_cast<float>(timestamp);
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
@@ -152,6 +166,12 @@ const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
 void Synapse::clearHistory() {
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
+}
+
+const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -161,11 +181,7 @@ PlasticityFlags& Synapse::getPlasticityFlags() {
 void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
+    pImpl->plasticityFlags.rewardModulated = rewardModulated;
 }
 
 float Synapse::getEligibilityTrace() const {
@@ -189,6 +205,30 @@ float Synapse::getEfficacy() const {
 
 void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+}
+
+float Synapse::getPredictedReward() const {
+    return pImpl->predictedReward;
+}
+
+void Synapse::updatePredictedReward(float reward) {
+    pImpl->predictedReward = std::max(0.0f, reward); // Rewards are non-negative
+}
+
+float Synapse::getPlasticityTag() const {
+    return pImpl->plasticityTag;
+}
+
+void Synapse::setPlasticityTag(float tag) {
+    pImpl->plasticityTag = std::max(0.0f, tag);
+}
+
+void Synapse::decayPlasticityTag() {
+    // Decay plasticity tag over time (protein synthesis-dependent plasticity)
+    pImpl->plasticityTag *= (1.0f - Impl::PLASTICITY_TAG_DECAY);
+    if (pImpl->plasticityTag < 0.001f) {
+        pImpl->plasticityTag = 0.0f;
+    }
 }
 
 void Synapse::step(Timestamp currentTime) {
@@ -228,6 +268,12 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->predictedReward = 0.0f;     // Reset predicted reward
+    pImpl->plasticityTag = 0.0f;       // Reset plasticity tag
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
@@ -256,6 +302,10 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     
     // Initialize eligibility trace to 0
     pImpl->eligibilityTrace = 0.0f;
+    // Initialize predicted reward to 0
+    pImpl->predictedReward = 0.0f;
+    // Initialize plasticity tag to 0
+    pImpl->plasticityTag = 0.0f;
     
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
