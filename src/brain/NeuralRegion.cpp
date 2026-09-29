@@ -241,55 +241,94 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
     // - Excitatory neurons -> all neurons (excitatory synapses)
     // - Inhibitory neurons -> all neurons (inhibitory synapses)
     
-    // Get all neurons
+    // Get all neurons with type information for efficient filtering
     auto neurons = getAllNeurons();
     size_t neuronCount = neurons.size();
     
-    // Create random connections
-    for (size_t i = 0; i < neuronCount; ++i) {
-        Neuron* preNeuron = neurons[i];
-        NeuronType preType = preNeuron->getType();
-        
-        // Skip if not a proper source neuron
-        if (preType == NeuronType::Modulatory) continue;
-        
-        for (size_t j = 0; j < neuronCount; ++j) {
-            if (i == j) continue;  // No self-connections
+    // Pre-filter neurons by type to improve performance
+    struct NeuronInfo {
+        Neuron* neuron;
+        NeuronType type;
+    };
+    std::vector<NeuronInfo> excitatoryNeurons;
+    std::vector<NeuronInfo> inhibitoryNeurons;
+    std::vector<NeuronInfo> modulatoryNeurons;
+    
+    for (auto* neuron : neurons) {
+        switch (neuron->getType()) {
+            case NeuronType::Excitatory:
+            case NeuronType::Sensory:
+            case NeuronType::Motor:
+            case NeuronType::Internal:
+                excitatoryNeurons.push_back({neuron, neuron->getType()});
+                break;
+            case NeuronType::Inhibitory:
+                inhibitoryNeurons.push_back({neuron, neuron->getType()});
+                break;
+            case NeuronType::Modulatory:
+                modulatoryNeurons.push_back({neuron, neuron->getType()});
+                break;
+        }
+    }
+    
+    // Create connections from excitatory neurons (major connectivity)
+    auto createConnections = [&](const std::vector<NeuronInfo>& sourceNeurons, SynapseType targetType, bool isExcitatory) {
+        for (const auto& sourceInfo : sourceNeurons) {
+            Neuron* preNeuron = sourceInfo.neuron;
+            NeuronType preType = sourceInfo.type;
             
-            Neuron* postNeuron = neurons[j];
-            
-            // Probabilistic connection
-            if (!rng.bernoulli(connectionProbability)) continue;
-            
-            // Determine synapse type based on pre-synaptic neuron type
-            SynapseType synType;
-            float weight;
-            
-            if (preType == NeuronType::Excitatory || 
-                preType == NeuronType::Sensory ||
-                preType == NeuronType::Motor ||
-                preType == NeuronType::Internal) {
-                // excitatory synapse
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
-                weight = std::max(0.01f, weight);  // Ensure positive
-            } else if (preType == NeuronType::Inhibitory) {
-                // inhibitory synapse
-                synType = SynapseType::Inhibitory;
-                weight = -(meanWeight + rng.normal(0.0f, weightVariance));
-                weight = std::min(-0.01f, weight);  // Ensure negative
-            } else {
-                synType = SynapseType::Excitatory;
-                weight = meanWeight + rng.normal(0.0f, weightVariance);
+            // Try all target neurons (could be optimized with better spatial organization)
+            for (Neuron* postNeuron : neurons) {
+                if (preNeuron->getId() == postNeuron->getId()) continue;  // No self-connections
+                
+                // Probabilistic connection
+                if (!rng.bernoulli(connectionProbability)) continue;
+                
+                // Calculate synapse weight
+                float weight = meanWeight + rng.normal(0.0f, weightVariance);
+                
+                // Ensure appropriate sign based on synapse type
+                if (isExcitatory) {
+                    weight = std::max(0.01f, weight);  // Ensure positive
+                } else {
+                    weight = std::min(-0.01f, weight);  // Ensure negative
+                }
+                
+                // Add synapse
+                SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
+                
+                // Initialize synapse properties
+                if (Synapse* syn = getSynapse(synId)) {
+                    syn->setType(targetType);
+                    syn->initializeRandom(rng);
+                }
             }
-            
-            // Add synapse
-            SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
-            
-            // Initialize random properties
-            if (Synapse* syn = getSynapse(synId)) {
-                syn->setType(synType);
-                syn->initializeRandom(rng);
+        }
+    };
+    
+    // Connect excitatory neurons to all neurons
+    createConnections(excitatoryNeurons, SynapseType::Excitatory, true);
+    
+    // Connect inhibitory neurons to all neurons  
+    createConnections(inhibitoryNeurons, SynapseType::Inhibitory, false);
+    
+    // Modulatory neurons connect to a subset (lower probability for efficiency)
+    if (!modulatoryNeurons.empty()) {
+        float modConnectionProb = connectionProbability * 0.1f;  // 10% of normal
+        for (const auto& sourceInfo : modulatoryNeurons) {
+            Neuron* preNeuron = sourceInfo.neuron;
+            for (Neuron* postNeuron : neurons) {
+                if (preNeuron->getId() == postNeuron->getId()) continue;
+                
+                if (!rng.bernoulli(modConnectionProb)) continue;
+                
+                SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), 
+                                           meanWeight * 0.5f, 1);
+                
+                if (Synapse* syn = getSynapse(synId)) {
+                    syn->setType(SynapseType::Modulatory);
+                    syn->initializeRandom(rng);
+                }
             }
         }
     }
