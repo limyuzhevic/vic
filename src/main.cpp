@@ -25,6 +25,268 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <unordered_map>
+#include <chrono>
+#include <algorithm>
+#include <optional>
+#include <variant>
+#include <filesystem>
+#include <fstream>
+
+void printAdvancedUsage() {
+    std::cout << R"(
+=== NLM Advanced Usage ===
+
+Basic Usage:
+    ./nlm --steps 1000 --timestep 0.001
+
+Configuration:
+    --config file      Load configuration from file
+    --output file      Save results to file
+    --log-file file    Write logs to file
+
+Checkpointing:
+    --checkpoint file  Enable automatic checkpointing
+    --replay file      Load from checkpoint and replay
+
+Performance:
+    --enable-performance-stats   Show detailed performance statistics
+    --timestep value    Set simulation timestep (default: 0.001)
+    --steps value       Maximum number of simulation steps
+    --enable-visualization     Enable visualization (if supported)
+
+Neural Network:
+    --neuron-count value     Number of neurons (default: 500)
+    --connection-prob value  Connection probability (default: 0.15)
+
+Plasticity:
+    --enable-hebbian rate     Hebbian learning rate
+    --stdp-ltp weight          STDP LTP weight (default: 0.02)
+    --stdp-ltd weight          STDP LTD weight (default: 0.015)
+
+Development:
+    --enable-development       Enable developmental processes (default: true)
+    --development-time value   Development timescale (default: 300.0)
+
+Neuromodulation:
+    --enable-neuromodulation    Enable neuromodulation (default: true)
+    --dopamine-baseline value   Dopamine baseline level (default: 0.1)
+
+Memory:
+    --enable-working-memory     Enable working memory (default: true)
+    --enable-episodic-memory    Enable episodic memory (default: true)
+
+Advanced Features:
+    --enable-predictive         Enable predictive modeling
+    --enable-concept            Enable concept formation
+    --enable-social             Enable social learning
+    --enable-continual          Enable continual learning
+
+Debug & Logging:
+    --enable-debug             Enable debug mode
+    --log-level level          Set log level (DEBUG, INFO, WARNING, ERROR)
+    --help                     Show this help message
+
+Examples:
+    ./nlm --steps 5000 --enable-performance-stats --enable-save-weights
+    ./nlm --config custom.cfg --neuron-count 1000 --enable-predictive
+    ./nlm --replay checkpoint.bin --enable-visualization
+
+For more advanced usage, refer to the NLM documentation in docs/
+
+=== Advanced Mode Features ===
+- Real-time monitoring and visualization
+- Checkpoint-based saving and loading
+- Performance profiling and optimization
+- Advanced neural network configuration
+- Development simulation control
+- Neuromodulation tuning
+- Memory management options
+- Experimental protocol management
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine
+Version: 0.1.0
+Phase 2: Real Neural Computation
+Built with C++20
+
+This is an experimental artificial developmental brain project.
+For more information, visit: https://github.com/nlm-project/nlm
+)" << std::endl;
+}
+
+// Advanced command-line argument parsing
+struct AdvancedConfig {
+    std::string configFile;
+    std::string outputFile;
+    std::string logFile;
+    std::string checkpointFile;
+    bool enableVisualization = false;
+    bool enableDebugMode = false;
+    bool enablePerformanceStats = false;
+    bool enableCheckpoint = false;
+    bool enableReplay = false;
+    bool enableSaveWeights = false;
+    bool enableLoadWeights = false;
+    size_t maxSteps = 1000;
+    double timestep = 0.001;
+    uint64_t randomSeed = 42;
+    std::string experimentName;
+    std::string experimentType;
+    std::string logLevel = "INFO";
+    bool help = false;
+    bool version = false;
+    
+    // Neural network parameters
+    size_t neuronCount = 500;
+    float connectionProbability = 0.15f;
+    float synapticWeightRange = 1.0f;
+    
+    // Plasticity parameters
+    float hebbianLearningRate = 0.01f;
+    float stdpLTPWeight = 0.02f;
+    float stdpLTDWeight = 0.015f;
+    float stdpTimeConstant = 20.0f;
+    
+    // Development parameters
+    bool enableDevelopment = true;
+    bool enableStructuralPlasticity = true;
+    float developmentTimeConstant = 300.0;
+    
+    // Neuromodulation parameters
+    bool enableNeuromodulation = true;
+    float dopamineBaseline = 0.1f;
+    float curiositySensitivity = 1.0f;
+    
+    // Memory parameters
+    bool enableWorkingMemory = true;
+    bool enableEpisodicMemory = true;
+    float memoryConsolidationThreshold = 0.5f;
+    
+    // Advanced features
+    bool enablePredictiveModeling = false;
+    bool enableConceptFormation = false;
+    bool enableSocialLearning = false;
+    bool enableContinualLearning = false;
+};
+
+// Advanced command-line parser
+AdvancedConfig parseAdvancedArgs(int argc, char** argv) {
+    AdvancedConfig config;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            config.help = true;
+        } else if (arg == "--version") {
+            config.version = true;
+        } else if (arg == "--config" || arg == "-c") {
+            if (i + 1 < argc) {
+                config.configFile = argv[++i];
+            }
+        } else if (arg == "--output" || arg == "-o") {
+            if (i + 1 < argc) {
+                config.outputFile = argv[++i];
+            }
+        } else if (arg == "--log-file") {
+            if (i + 1 < argc) {
+                config.logFile = argv[++i];
+            }
+        } else if (arg == "--checkpoint") {
+            config.enableCheckpoint = true;
+            if (i + 1 < argc) {
+                config.checkpointFile = argv[++i];
+            } else {
+                config.checkpointFile = "brain_checkpoint.bin";
+            }
+        } else if (arg == "--replay") {
+            config.enableReplay = true;
+            if (i + 1 < argc) {
+                config.checkpointFile = argv[++i];
+            }
+        } else if (arg == "--timestep" || arg == "-dt") {
+            if (i + 1 < argc) {
+                config.timestep = std::stod(argv[++i]);
+            }
+        } else if (arg == "--steps" || arg == "-s") {
+            if (i + 1 < argc) {
+                config.maxSteps = static_cast<size_t>(std::stoul(argv[++i]));
+            }
+        } else if (arg == "--seed" || arg == "-seed") {
+            if (i + 1 < argc) {
+                config.randomSeed = static_cast<uint64_t>(std::stoull(argv[++i]));
+            }
+        } else if (arg == "--neuron-count") {
+            if (i + 1 < argc) {
+                config.neuronCount = static_cast<size_t>(std::stoul(argv[++i]));
+            }
+        } else if (arg == "--connection-prob") {
+            if (i + 1 < argc) {
+                config.connectionProbability = std::stof(argv[++i]);
+            }
+        } else if (arg == "--enable-visualization" || arg == "-viz") {
+            config.enableVisualization = true;
+        } else if (arg == "--enable-debug" || arg == "-debug") {
+            config.enableDebugMode = true;
+        } else if (arg == "--enable-performance-stats") {
+            config.enablePerformanceStats = true;
+        } else if (arg == "--enable-save-weights") {
+            config.enableSaveWeights = true;
+        } else if (arg == "--enable-load-weights") {
+            config.enableLoadWeights = true;
+        } else if (arg == "--experiment-name") {
+            if (i + 1 < argc) {
+                config.experimentName = argv[++i];
+            }
+        } else if (arg == "--experiment-type") {
+            if (i + 1 < argc) {
+                config.experimentType = argv[++i];
+            }
+        } else if (arg == "--log-level") {
+            if (i + 1 < argc) {
+                config.logLevel = argv[++i];
+            }
+        } else if (arg == "--enable-hebbian") {
+            config.hebbianLearningRate = std::stof(argv[++i]);
+        } else if (arg == "--stdp-ltp") {
+            if (i + 1 < argc) {
+                config.stdpLTPWeight = std::stof(argv[++i]);
+            }
+        } else if (arg == "--stdp-ltd") {
+            if (i + 1 < argc) {
+                config.stdpLTDWeight = std::stof(argv[++i]);
+            }
+        } else if (arg == "--enable-predictive") {
+            config.enablePredictiveModeling = true;
+        } else if (arg == "--enable-concept") {
+            config.enableConceptFormation = true;
+        } else if (arg == "--enable-social") {
+            config.enableSocialLearning = true;
+        } else if (arg == "--enable-continual") {
+            config.enableContinualLearning = true;
+        } else if (arg.find("=") != std::string::npos) {
+            // Handle --param=value format
+            size_t pos = arg.find("=");
+            std::string key = arg.substr(0, pos);
+            std::string value = arg.substr(pos + 1);
+            
+            if (key == "--neuron-count") {
+                config.neuronCount = static_cast<size_t>(std::stoul(value));
+            } else if (key == "--connection-prob") {
+                config.connectionProbability = std::stof(value);
+            } else if (key == "--timestep") {
+                config.timestep = std::stod(value);
+            }
+        }
+    }
+    
+    return config;
+}
 
 using namespace nlm;
 
