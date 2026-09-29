@@ -25,11 +25,11 @@ public:
     // Get motor output size expected
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
-    
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
+    
+    // Convert neural planner ActionType to MotorCommand
+    MotorCommand convertToMotorCommand(ActionType actionType);
     
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);

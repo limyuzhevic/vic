@@ -152,6 +152,39 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try to use the neural planner for action selection
+    // This provides goal-directed planning based on current state and context
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        // Get current sensory state for planning
+        auto* workingMemory = brain_->getWorkingMemory();
+        std::vector<float> currentState;
+        
+        if (workingMemory) {
+            currentState = workingMemory->retrieve();
+        }
+        
+        // If we have sensory state, use planner
+        if (!currentState.empty()) {
+            // Simple goal: approach stable state (reward = 0.5)
+            float targetReward = 0.5f;
+            
+            // Get planned action from neural planner
+            ActionType plannedAction = planner->planAction(currentState, targetReward);
+            
+            // Convert planner recommendation to MotorCommand
+            MotorCommand plannedCommand = convertToMotorCommand(plannedAction);
+            
+            // Apply curiosity-based exploration if enabled
+            if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+                plannedCommand = selectWithCuriosity(plannedCommand);
+            }
+            
+            return plannedCommand;
+        }
+    }
+    
+    // Fallback: traditional motor neuron decoding
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
@@ -160,6 +193,43 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     }
     
     return decoded;
+}
+
+// Convert ActionType from neural planner to MotorCommand for agent action selection
+MotorCommand AgentBrain::convertToMotorCommand(ActionType actionType) {
+    switch (actionType) {
+        case ActionType::MoveForward:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::MoveLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::MoveRight:
+            return MotorCommand::TurnRight;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::Look:
+            return MotorCommand::Wait; // No direct equivalent in motor commands
+        case ActionType::LookUp:
+            return MotorCommand::Wait;
+        case ActionType::LookDown:
+            return MotorCommand::Wait;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::Eat:
+            return MotorCommand::MoveForward; // Approximate as movement
+        case ActionType::Drink:
+            return MotorCommand::MoveForward;
+        case ActionType::Rest:
+            return MotorCommand::Wait;
+        case ActionType::Wait:
+            return MotorCommand::Wait;
+        case ActionType::Custom:
+        default:
+            return MotorCommand::Wait;
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {

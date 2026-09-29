@@ -88,6 +88,19 @@ public:
                             float reward,
                             SimulationStep currentTime);
 
+    // Present sensory pattern directly (extracted from working memory)
+    // This version extracts features from the pattern and tries to classify
+    size_t presentSensoryExperience(const std::vector<float>& sensoryPattern,
+                                   float reward,
+                                   SimulationStep currentTime);
+
+    // Present neural activity pattern for concept formation
+    // Converts neural activity to abstract pattern features
+    size_t presentNeuralExperience(const std::vector<float>& neuralPattern,
+                                  const std::vector<NeuronId>& activeNeurons,
+                                  float reward,
+                                  SimulationStep currentTime);
+
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
                               float similarityThreshold = 0.7f) const;
@@ -143,6 +156,9 @@ private:
     size_t createConcept(const std::vector<float>& pattern,
                         const std::vector<float>& features,
                         float reward);
+
+    // Extract features from sensory pattern
+    std::vector<float> extractFeatures(const std::vector<float>& pattern) const;
 
     // Update concept prototype using Hebbian averaging
     void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);

@@ -44,8 +44,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+        if (auto* region = brain_->getRegion(neuron.getId() / 1000)) {
+            auto neurons = region->getAllNeurons();
+            for (auto* nn : neurons) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
@@ -63,9 +64,16 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
     }
     
-    // Create maintenance connections if needed
-    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    // Create strong bidirectional recurrent connections for maintenance
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Forward connection for pattern sequence
+        if (i + 1 < memoryNeurons_.size()) {
+            createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i + 1], strength * 1.0f);
+            createRecurrentConnection(memoryNeurons_[i + 1], memoryNeurons_[i], strength * 0.8f); // Stronger reverse
+        }
+        
+        // Recurrent connection to self for persistent activity
+        createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i], strength * 0.5f);
     }
 }
 
@@ -125,15 +133,39 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             // Inject maintenance current
             brain_->injectCurrent(neuron, activation * 2.0f);
             
+            // Apply homeostatic plasticity to maintain trace strength
+            if (activation > 0.5f) {
+                // Strengthen slightly for strong traces (prevent decay)
+                activation *= 1.02f; // Small homeostatic boost
+                activation = std::min(1.0f, activation);
+            }
+            
             // Age the trace
             memoryTimestamps_[i]++;
             
             // Check if trace is too old
             if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+                activation *= (1.0f - decayRate_ * 0.5f); // Slower decay for old traces
             }
             
             memoryActivations_[i] = activation;
+        }
+    }
+    
+    // Update recurrent connections for persistent activity
+    updateRecurrentConnections();
+    
+    // Periodically replay important memory traces for consolidation
+    if (memoryNeurons_.size() > 5 && memoryTimestamps_.size() > 0) {
+        float avgAge = 0.0f;
+        for (float timestamp : memoryTimestamps_) {
+            avgAge += timestamp;
+        }
+        avgAge /= memoryTimestamps_.size();
+        
+        // Replay when memory is mature (old enough) but not too old
+        if (avgAge > 100.0f && avgAge < 500.0f) {
+            replayMemory();
         }
     }
     
@@ -197,13 +229,44 @@ float NeuralWorkingMemory::getMemoryActivity() const {
     return total / memoryActivations_.size();
 }
 
-void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
-    // Check if connection already exists
-    for (const auto& conn : pImpl->maintenanceSynapses) {
-        if (conn.first == from && conn.second == to) return;
+void NeuralWorkingMemory::replayMemory() {
+    if (memoryNeurons_.empty() || !brain_) return;
+    
+    // Replay important memory traces to strengthen them
+    // This is similar to episodic memory replay but focused on working memory
+    
+    std::vector<NeuronId> neuronsToReplay;
+    std::vector<float> activationsToReplay;
+    
+    // Select strong traces for replay
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.3f) {
+            neuronsToReplay.push_back(memoryNeurons_[i]);
+            activationsToReplay.push_back(memoryActivations_[i]);
+        }
     }
     
-    pImpl->maintenanceSynapses.emplace_back(from, to);
+    // Clear current traces and replay stronger ones
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    
+    // Replay selected traces
+    for (size_t i = 0; i < neuronsToReplay.size(); ++i) {
+        float replayActivation = activationsToReplay[i] * 1.2f; // Boost during replay
+        replayActivation = std::min(1.0f, replayActivation);
+        
+        if (i < capacity_) {
+            memoryNeurons_.push_back(neuronsToReplay[i]);
+            memoryActivations_.push_back(replayActivation);
+            memoryTimestamps_.push_back(0);
+        }
+    }
+    
+    // Create stronger recurrent connections during replay
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        createRecurrentConnection(memoryNeurons_[i], memoryNeurons_[i], 1.5f);
+    }
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
@@ -229,9 +292,28 @@ void NeuralWorkingMemory::decayWeakTraces() {
     std::vector<size_t> toRemove;
     
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        memoryActivations_[i] *= (1.0f - decayRate_);
+        float activation = memoryActivations_[i];
         
-        if (memoryActivations_[i] < 0.01f) {
+        // Apply differential decay based on activation level
+        if (activation > 0.5f) {
+            // Strong traces decay slowly
+            activation *= (1.0f - decayRate_ * 0.5f);
+        } else if (activation > 0.2f) {
+            // Medium traces decay at normal rate
+            activation *= (1.0f - decayRate_);
+        } else {
+            // Weak traces decay quickly
+            activation *= (1.0f - decayRate_ * 2.0f);
+        }
+        
+        // If trace has been active recently, protect it
+        if (memoryTimestamps_[i] < 100 && activation > 0.05f) {
+            activation = std::max(0.05f, activation); // Maintain minimum
+        }
+        
+        memoryActivations_[i] = activation;
+        
+        if (activation < 0.01f) {
             toRemove.push_back(i);
         }
     }

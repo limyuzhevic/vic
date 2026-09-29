@@ -38,6 +38,14 @@ public:
     float getPruningRate() const;
     void setPruningRate(float rate);
     
+    // Get minimum synaptic weight for scaling
+    float getMinWeight() const;
+    void setMinWeight(float weight);
+    
+    // Get maximum synaptic weight for scaling
+    float getMaxWeight() const;
+    void setMaxWeight(float weight);
+    
     // Update structural plasticity
     void update(Brain* brain, class RandomGenerator& rng);
     

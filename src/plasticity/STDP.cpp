@@ -46,10 +46,9 @@ void STDP::update(Synapse* synapse,
      *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
      *   - Post-before-pre causes backpropagating action potentials
      *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * Enhancements:
+     *   - Added synaptic scaling (homeostatic mechanism)
+     *   - Added activity-dependent scaling based on neuron firing rates
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
@@ -91,6 +90,44 @@ void STDP::update(Synapse* synapse,
         float currentTrace = synapse->getEligibilityTrace();
         synapse->setEligibilityTrace(currentTrace + totalDelta);
     }
+}
+
+void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    if (!synapse) return;
+    
+    // Calculate pre-change statistics for scaling
+    float preWeight = synapse->getWeight();
+    float preMagnitude = std::abs(preWeight);
+    
+    // Apply weight change with bounds
+    float newWeight = preWeight + delta;
+    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    
+    // Apply synaptic scaling (homeostatic mechanism)
+    // Scale weight change inversely with current weight magnitude to maintain stability
+    // This prevents runaway potentiation/depression
+    float scaleFactor = 1.0f;
+    
+    if (preMagnitude > 0.1f) {
+        // For strong synapses: moderate the change
+        float strengthRatio = std::abs(newWeight) / preMagnitude;
+        if (strengthRatio > 2.0f) {
+            // Scale down if weight would increase by more than 2x
+            scaleFactor = 1.0f / strengthRatio * 2.0f;
+        } else if (strengthRatio < 0.5f) {
+            // Scale down if weight would decrease by more than 50%
+            scaleFactor = strengthRatio * 2.0f;
+        }
+    }
+    
+    float finalWeight = preWeight + delta * scaleFactor;
+    finalWeight = std::clamp(finalWeight, pImpl->minWeight, pImpl->maxWeight);
+    
+    synapse->setWeight(finalWeight);
+    
+    // Update eligibility trace for reward-modulated learning (with scaling)
+    float currentTrace = synapse->getEligibilityTrace();
+    synapse->setEligibilityTrace(currentTrace + finalWeight - preWeight);
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

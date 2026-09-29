@@ -252,7 +252,7 @@ size_t ConceptFormation::findConceptForPattern(const std::vector<float>& pattern
 }
 
 float ConceptFormation::computeSimilarity(const std::vector<float>& a,
-                                         const std::vector<float>& b) const {
+                                        const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     // Cosine similarity
@@ -296,253 +296,115 @@ void ConceptFormation::clear() {
     nextConceptId_ = 1;
 }
 
-// SpatialRepresentation Implementation
-struct SpatialRepresentation::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
-};
+// ==================== NEW IMPLEMENTATION METHODS ====================
 
-SpatialRepresentation::SpatialRepresentation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , currentX_(0)
-    , currentY_(0)
-    , gridSpacing_(1.0f)
-{
+// Present sensory pattern directly (extracted from working memory)
+size_t ConceptFormation::presentSensoryExperience(const std::vector<float>& sensoryPattern,
+                                                 float reward,
+                                                 SimulationStep currentTime) {
+    if (sensoryPattern.empty()) return 0;
+    
+    // Extract features from sensory pattern
+    std::vector<float> features = extractFeatures(sensoryPattern);
+    
+    // Try to find matching concept
+    size_t matchingConcept = findConceptForPattern(sensoryPattern);
+    
+    if (matchingConcept > 0) {
+        // Update existing concept with new instance
+        updateConcept(matchingConcept, sensoryPattern, features, reward);
+        return matchingConcept;
+    }
+    
+    // Check if novel enough to form new concept
+    if (isNovel(sensoryPattern, formationThreshold_)) {
+        // Create new concept from sensory pattern
+        return createConcept(sensoryPattern, features, reward);
+    }
+    
+    return 0; // Not yet classifiable
 }
 
-SpatialRepresentation::~SpatialRepresentation() = default;
-
-void SpatialRepresentation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SpatialRepresentation initialized");
-}
-
-void SpatialRepresentation::recordPosition(float x, float y, const std::vector<float>& sensoryCues) {
-    currentX_ = x;
-    currentY_ = y;
-    lastSensoryCue_ = sensoryCues;
+// Present neural activity pattern for concept formation
+// Converts neural activity to abstract pattern features
+size_t ConceptFormation::presentNeuralExperience(const std::vector<float>& neuralPattern,
+                                                const std::vector<NeuronId>& activeNeurons,
+                                                float reward,
+                                                SimulationStep currentTime) {
+    if (neuralPattern.empty()) return 0;
     
-    // Check if we have a place cell near this position
-    bool hasNearbyCell = false;
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < pc.fieldRadius) {
-            hasNearbyCell = true;
-            break;
+    // Create abstract representation from neural activity
+    std::vector<float> abstractPattern = neuralPattern;
+    
+    // Normalize neural activity
+    float maxActivity = *std::max_element(abstractPattern.begin(), abstractPattern.end());
+    if (maxActivity > 0.0f) {
+        for (auto& val : abstractPattern) {
+            val /= maxActivity;
         }
     }
     
-    // Create new place cell if needed
-    if (!hasNearbyCell && brain_) {
-        PlaceCell newCell;
-        newCell.neuron = NeuronId(placeCells_.size() + 40000);
-        newCell.x = x;
-        newCell.y = y;
-        newCell.fieldRadius = 0.5f;  // Place field size
-        newCell.activation = 1.0f;
-        
-        placeCells_.push_back(newCell);
-        
-        // Inject current to activate this neuron
-        brain_->injectCurrent(newCell.neuron, 5.0f);
+    // Extract features based on active neuron distribution
+    std::vector<float> features = extractFeatures(abstractPattern);
+    
+    // Incorporate neuron density and spatial distribution information
+    // Add neuron density feature
+    features.push_back(static_cast<float>(activeNeurons.size()) / 1000.0f); // Normalized
+    
+    // Add sparsity feature
+    float sparsity = 1.0f;
+    for (float val : abstractPattern) {
+        if (val > 0.0f && val < 0.1f) sparsity += 0.1f; // Count sparse activations
     }
-}
-
-std::pair<float, float> SpatialRepresentation::getPredictedPosition() const {
-    return {currentX_, currentY_};
-}
-
-void SpatialRepresentation::integrateMovement(float dx, float dy) {
-    currentX_ += dx;
-    currentY_ += dy;
-}
-
-float SpatialRepresentation::getPositionActivation(float x, float y) const {
-    float totalActivation = 0.0f;
+    features.push_back(1.0f - sparsity); // Higher = more sparse
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        float dist = std::sqrt(dx * dx + dy * dy);
-        
-        // Gaussian place field
-        if (dist < pc.fieldRadius * 2.0f) {
-            float activation = std::exp(-dist * dist / (2.0f * pc.fieldRadius * pc.fieldRadius));
-            totalActivation += activation * pc.activation;
-        }
+    return presentSensoryExperience(abstractPattern, reward, currentTime);
+}
+
+// Extract features from sensory pattern
+std::vector<float> ConceptFormation::extractFeatures(const std::vector<float>& pattern) const {
+    std::vector<float> features;
+    
+    if (pattern.empty()) return features;
+    
+    // Basic statistical features
+    float sum = std::accumulate(pattern.begin(), pattern.end(), 0.0f);
+    float mean = sum / pattern.size();
+    
+    float sumSq = 0.0f;
+    for (float val : pattern) {
+        float diff = val - mean;
+        sumSq += diff * diff;
     }
+    float std = std::sqrt(sumSq / pattern.size());
     
-    return totalActivation;
-}
-
-std::vector<NeuronId> SpatialRepresentation::getPlaceNeuronsNear(float x, float y, float radius) const {
-    std::vector<NeuronId> result;
+    // Add basic statistical features
+    features.push_back(mean);           // Mean activation level
+    features.push_back(std);            // Standard deviation
+    features.push_back(mean / (std + 0.01f)); // Signal-to-noise ratio
     
-    for (const auto& pc : placeCells_) {
-        float dx = pc.x - x;
-        float dy = pc.y - y;
-        if (std::sqrt(dx * dx + dy * dy) < radius) {
-            result.push_back(pc.neuron);
-        }
+    // Add pattern shape features
+    float min = *std::min_element(pattern.begin(), pattern.end());
+    float max = *std::max_element(pattern.begin(), pattern.end());
+    features.push_back(max - min);     // Dynamic range
+    
+    // Add higher-order statistics
+    float skew = 0.0f, kurtosis = 0.0f;
+    for (float val : pattern) {
+        float z = (val - mean) / (std + 0.01f);
+        skew += z * z * z;
+        kurtosis += z * z * z * z;
     }
+    features.push_back(skew / pattern.size());      // Skewness
+    features.push_back(kurtosis / pattern.size());   // Kurtosis
     
-    return result;
-}
-
-void SpatialRepresentation::clear() {
-    placeCells_.clear();
-    currentX_ = 0;
-    currentY_ = 0;
-}
-
-// TemporalRelation Implementation
-struct TemporalRelation::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
-};
-
-TemporalRelation::TemporalRelation()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-{
-}
-
-TemporalRelation::~TemporalRelation() = default;
-
-void TemporalRelation::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-}
-
-void TemporalRelation::recordSequence(const std::vector<float>& eventA,
-                                      const std::vector<float>& eventB,
-                                      float reward) {
-    // Find existing link or create new
-    for (auto& link : sequences_) {
-        float simA = 0.0f, simB = 0.0f;
-        
-        // Compute similarity
-        if (link.fromEvent.size() == eventA.size() && link.toEvent.size() == eventB.size()) {
-            float dotA = 0.0f, normA = 0.0f, normB = 0.0f;
-            for (size_t i = 0; i < eventA.size(); ++i) {
-                dotA += link.fromEvent[i] * eventA[i];
-                normA += link.fromEvent[i] * link.fromEvent[i];
-                normB += eventA[i] * eventA[i];
-            }
-            if (normA > 0.0001f && normB > 0.0001f) {
-                simA = dotA / (std::sqrt(normA) * std::sqrt(normB));
-            }
-            
-            float dotB = 0.0f;
-            for (size_t i = 0; i < eventB.size(); ++i) {
-                dotB += link.toEvent[i] * eventB[i];
-            }
-            if (normB > 0.0001f) {
-                simB = dotB / normB;
-            }
-        }
-        
-        if (simA > 0.8f && simB > 0.8f) {
-            // Update existing link
-            link.strength = std::min(1.0f, link.strength + 0.1f);
-            link.observationCount++;
-            return;
-        }
+    // Add edge-like features (detect sharp transitions)
+    float edgeStrength = 0.0f;
+    for (size_t i = 1; i < pattern.size(); ++i) {
+        float diff = std::abs(pattern[i] - pattern[i-1]);
+        edgeStrength += diff * diff;
     }
+    features.push_back(std::sqrt(edgeStrength / pattern.size())); // Edge density
     
-    // Create new link
-    SequenceLink newLink;
-    newLink.fromEvent = eventA;
-    newLink.toEvent = eventB;
-    newLink.strength = 0.5f;
-    newLink.observationCount = 1;
-    
-    sequences_.push_back(newLink);
+    return features;
 }
-
-std::vector<float> TemporalRelation::predictNext(const std::vector<float>& eventA) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != eventA.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventA.size(); ++i) {
-            dot += link.fromEvent[i] * eventA[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += eventA[i] * eventA[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.toEvent;
-            }
-        }
-    }
-    
-    return bestPrediction;
-}
-
-std::vector<float> TemporalRelation::predictPrevious(const std::vector<float>& eventB) const {
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& link : sequences_) {
-        if (link.toEvent.size() != eventB.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < eventB.size(); ++i) {
-            dot += link.toEvent[i] * eventB[i];
-            normA += link.toEvent[i] * link.toEvent[i];
-            normB += eventB[i] * eventB[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > bestSim) {
-                bestSim = sim;
-                bestPrediction = link.fromEvent;
-            }
-        }
-    }
-    
-    return bestPrediction;
-}
-
-float TemporalRelation::getPredictionConfidence(const std::vector<float>& event) const {
-    size_t matchingCount = 0;
-    
-    for (const auto& link : sequences_) {
-        if (link.fromEvent.size() != event.size()) continue;
-        
-        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-        for (size_t i = 0; i < event.size(); ++i) {
-            dot += link.fromEvent[i] * event[i];
-            normA += link.fromEvent[i] * link.fromEvent[i];
-            normB += event[i] * event[i];
-        }
-        
-        if (normA > 0.0001f && normB > 0.0001f) {
-            float sim = dot / (std::sqrt(normA) * std::sqrt(normB));
-            if (sim > 0.7f) {
-                matchingCount++;
-            }
-        }
-    }
-    
-    return std::min(1.0f, static_cast<float>(matchingCount) / 3.0f);
-}
-
-void TemporalRelation::clear() {
-    sequences_.clear();
-}
-
-} // namespace nlm

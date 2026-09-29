@@ -126,6 +126,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -528,8 +531,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process neural activity patterns to form concepts
+        // Extract pattern from working memory for concept formation
+        if (pImpl->workingMemory) {
+            std::vector<float> neuralPattern = pImpl->workingMemory->retrieve();
+            if (!neuralPattern.empty()) {
+                // Convert working memory content to neural pattern
+                std::vector<NeuronId> activeNeurons;
+                for (size_t i = 0; i < std::min(size_t(50), neuralPattern.size()); ++i) {
+                    if (neuralPattern[i] > 0.3f) {
+                        // Create a dummy neuron ID based on pattern index
+                        activeNeurons.push_back(NeuronId(20000 + i));
+                    }
+                }
+                
+                // Present to concept formation system
+                pImpl->conceptFormation->presentNeuralExperience(
+                    neuralPattern, activeNeurons, pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f, currentStep);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -582,7 +602,54 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 15: Synaptic scaling (homeostatic mechanism) ==========
+    // Apply synaptic scaling to maintain network stability
+    // This prevents runaway excitation/inhibition and maintains firing rate homeostasis
+    if (currentStep % 500 == 0) {  // Scale every 500 steps (adjustable)
+        float targetFiringRate = 0.5f;  // Target firing rate (normalized)
+        float currentFiringRate = getAverageFiringRate();
+        
+        if (currentFiringRate > 0.0f) {
+            float scaleFactor = targetFiringRate / currentFiringRate;
+            
+            // Apply scaling to all synapses in all regions
+            for (auto& region : pImpl->regions) {
+                for (auto* synapse : region->getSynapses()) {
+                    // Calculate scale based on synaptic strength and target stability
+                    float currentWeight = synapse->getWeight();
+                    float weightMagnitude = std::abs(currentWeight);
+                    
+                    if (weightMagnitude > 0.01f) {
+                        // Apply conservative scaling to avoid instability
+                        float scale = 1.0f;
+                        
+                        // Scale based on weight magnitude
+                        if (weightMagnitude > 1.0f) {
+                            // Strong synapses: conservative scaling
+                            scale = std::pow(weightMagnitude, -0.1f);
+                        } else if (weightMagnitude < 0.1f) {
+                            // Weak synapses: moderate scaling
+                            scale = 1.0f + (1.0f - weightMagnitude) * 0.5f;
+                        }
+                        
+                        // Apply overall scaling factor
+                        scale *= scaleFactor;
+                        scale = std::clamp(scale, 0.8f, 1.2f);  // Conservative bounds
+                        
+                        // Apply scaling to synapse weight
+                        float newWeight = currentWeight * scale;
+                        newWeight = std::clamp(newWeight, 
+                                             pImpl->structuralPlasticity->getMinWeight(),
+                                             pImpl->structuralPlasticity->getMaxWeight());
+                        
+                        synapse->setWeight(newWeight);
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -690,7 +757,36 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
+    // Try to use the neural planner for action selection
+    // This provides goal-directed planning based on current state and context
+    auto* planner = getPlanner();
+    if (planner) {
+        // Get current sensory state for planning
+        auto* workingMemory = getWorkingMemory();
+        std::vector<float> currentState;
+        
+        if (workingMemory) {
+            currentState = workingMemory->retrieve();
+        }
+        
+        // If we have sensory state, use planner
+        if (!currentState.empty()) {
+            // Simple goal: approach average sensory activity
+            float targetReward = 0.5f;
+            
+            // Get planned action from neural planner
+            ActionType plannedAction = planner->planAction(currentState, targetReward);
+            
+            // Convert planner recommendation to Action
+            auto action = std::make_unique<Action>(plannedAction);
+            
+            // Add planning confidence as metadata
+            // In a real implementation, this would be stored in the Action object
+            return action;
+        }
+    }
+    
+    // Fallback: simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
     if (pImpl->motorNeurons.empty()) {
@@ -1057,6 +1153,18 @@ Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
 Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
@@ -1100,6 +1208,15 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
     }
     
     // Development status

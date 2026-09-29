@@ -11,6 +11,8 @@ struct StructuralPlasticity::Impl {
     float pruningRate;            // Probability of pruning per step
     float minWeightThreshold;      // Below this weight, synapse is weak
     float activityThreshold;      // Below this activity, synapse is unused
+    float minWeight;               // Minimum synaptic weight for scaling
+    float maxWeight;               // Maximum synaptic weight for scaling
     size_t maxSynapsesPerNeuron;   // Maximum outgoing synapses per neuron
     size_t maxTotalSynapses;       // Global maximum synapses
     bool useActivityDependency;    // Whether to use activity for pruning
@@ -21,6 +23,7 @@ struct StructuralPlasticity::Impl {
     
     Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
              minWeightThreshold(0.05f), activityThreshold(0.001f),
+             minWeight(-1.0f), maxWeight(1.0f),
              maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
              useActivityDependency(true),
              totalSynapsesCreated(0), totalSynapsesPruned(0) {}
@@ -124,6 +127,22 @@ float StructuralPlasticity::getPruningRate() const {
 
 void StructuralPlasticity::setPruningRate(float rate) {
     pImpl->pruningRate = std::clamp(rate, 0.0f, 0.01f);
+}
+
+float StructuralPlasticity::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
+void StructuralPlasticity::setMinWeight(float weight) {
+    pImpl->minWeight = std::clamp(weight, -2.0f, 0.0f);  // Negative for inhibition
+}
+
+float StructuralPlasticity::getMaxWeight() const {
+    return pImpl->maxWeight;
+}
+
+void StructuralPlasticity::setMaxWeight(float weight) {
+    pImpl->maxWeight = std::clamp(weight, 0.0f, 2.0f);  // Positive for excitation
 }
 
 void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
