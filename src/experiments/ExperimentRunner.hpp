@@ -8,44 +8,66 @@
 
 namespace nlm {
 
-// ExperimentRunner: Runs experiments and collects data
+// ExperimentRunner class manages and executes scientific experiments
+// Coordinates experiment setup, execution, and results collection
+// Provides batch processing capabilities for systematic investigation
 class ExperimentRunner {
 public:
+    // Default constructor
     ExperimentRunner();
+    
     ~ExperimentRunner();
     
-    // Create new experiment
+    // Disable copying for memory safety, enable moving semantics
+    ExperimentRunner(const ExperimentRunner&) = delete;
+    ExperimentRunner& operator=(const ExperimentRunner&) = delete;
+    ExperimentRunner(ExperimentRunner&&) noexcept;
+    ExperimentRunner& operator=(ExperimentRunner&&) noexcept;
+    
+    // Experiment creation and management
+    // Creates a new experiment with specified name
     std::shared_ptr<Experiment> createExperiment(const std::string& name);
     
-    // Run single experiment
+    // Single experiment execution
+    // Runs one experiment with specified brain, environment, and step limit
+    // Returns true if experiment completed successfully
     bool runExperiment(std::shared_ptr<Experiment> experiment,
                       std::shared_ptr<Brain> brain,
                       std::shared_ptr<Environment> environment,
                       SimulationStep maxSteps);
     
-    // Run batch of experiments
+    // Batch experiment execution
+    // Runs multiple experiments using template brain/environment for efficiency
+    // Returns vector of completed experiments in same order as input
     std::vector<std::shared_ptr<Experiment>> runBatch(
         const std::vector<std::shared_ptr<Experiment>>& experiments,
         std::shared_ptr<Brain> brainTemplate,
         std::shared_ptr<Environment> environmentTemplate,
         SimulationStep maxSteps);
     
-    // Get all experiments
+    // Experiment catalog management
+    // Gets all registered experiments
     const std::vector<std::shared_ptr<Experiment>>& getExperiments() const;
     
-    // Get experiment by name
+    // Experiment retrieval
+    // Gets experiment by name (returns nullptr if not found)
     std::shared_ptr<Experiment> getExperiment(const std::string& name) const;
     
-    // Clear all experiments
+    // Experiment cleanup
+    // Clears all registered experiments
     void clearExperiments();
     
-    // Set random seed for reproducibility
+    // Reproducibility control
+    // Sets global random seed for all experiments in this runner
     void setGlobalSeed(uint64_t seed);
     
-    // Save experiment results
+    // Results persistence
+    // Saves experiment results to file (format determined by file extension)
+    // Returns true if save operation succeeded
     bool saveResults(const std::string& filepath) const;
     
 private:
+    // Pimpl idiom for implementation hiding
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };

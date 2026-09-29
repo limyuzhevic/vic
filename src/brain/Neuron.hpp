@@ -41,111 +41,165 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with spike-frequency adaptation
+// This class models individual neurons with biological properties including
+// membrane potential dynamics, refractory periods, and synaptic inputs
 class Neuron {
 public:
-    // Create neuron with ID
+    // Create neuron with unique ID
     explicit Neuron(NeuronId id);
     
+    // Destructor
     ~Neuron();
     
-    // Disable copying, enable moving
+    // Disable copying for memory safety, enable moving semantics
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
+    // Identity management
+    // Returns unique neuron identifier
     NeuronId getId() const;
     
-    // Type
+    // Neuron type classification
+    // Returns neuron type (Sensory, Motor, Excitatory, Inhibitory, etc.)
     NeuronType getType() const;
+    // Sets neuron type for specialized behavior
     void setType(NeuronType type);
     
-    // State access
+    // State access methods
+    // Returns constant reference to neuron state (read-only access)
     const NeuronState& getState() const;
+    // Returns mutable reference to neuron state (allows modification)
     NeuronState& getState();
     
-    // Membrane potential
+    // Membrane potential manipulation
+    // Gets current membrane potential (mV)
     MembranePotential getMembranePotential() const;
+    // Sets absolute membrane potential (used for reset)
     void setMembranePotential(MembranePotential potential);
+    // Adds delta to membrane potential (incremental updates)
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
+    // Firing threshold management
+    // Gets current firing threshold (mV) - spike when potential exceeds this
     MembranePotential getThreshold() const;
+    // Sets new firing threshold (typically -55mV for typical neurons)
     void setThreshold(MembranePotential threshold);
     
-    // Firing state
+    // Firing state management
+    // Checks if neuron is currently firing (Active state)
     bool isFiring() const;
+    // Checks if neuron is in refractory period (cannot fire)
     bool isRefractory() const;
+    // Sets firing state for state machine control
     void setFiringState(FiringState state);
+    // Sets refractory period duration in simulation steps
     void setRefractoryPeriod(uint32_t steps);
+    // Decrements refractory counter (called each simulation step)
     void decrementRefractory();
     
-    // Firing rate (for rate-based computation)
+    // Firing rate tracking (for rate-based computations)
+    // Gets current firing rate (Hz)
     FiringRate getFiringRate() const;
+    // Sets firing rate (used for rate-based plasticity)
     void setFiringRate(FiringRate rate);
     
-    // LIF neuron parameters
+    // LIF neuron biophysical parameters
+    // Sets membrane leak conductance (nS) - determines time constant
     void setLeakConductance(MembranePotential conductance);
+    // Gets membrane leak conductance
     MembranePotential getLeakConductance() const;
+    // Gets refractory period duration in steps
     uint32_t getRefractoryPeriod() const;
+    // Sets resting potential (typical -70mV)
     void setRestingPotential(MembranePotential potential);
+    // Gets resting potential
     MembranePotential getRestingPotential() const;
+    // Sets reset potential after spike (typically -70mV)
     void setResetPotential(MembranePotential potential);
     
-    // Spike detection
+    // Spike detection and timing
+    // Checks if membrane potential has exceeded firing threshold
     bool checkThreshold() const;
+    // Gets timestamp of last spike (-1.0 if no spikes yet)
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    // LIF step function - implements discrete-time LIF dynamics
+    // Integrates membrane potential using exponential Euler method
+    // Returns true if neuron crossed threshold and fired a spike
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
-    // Incoming signals (post-synaptic potentials)
+    // Incoming synaptic signals (post-synaptic potentials)
+    // Excitatory input: depolarizes membrane (increases potential)
     void receiveExcitatoryInput(MembranePotential amplitude);
+    // Inhibitory input: hyperpolarizes membrane (decreases potential)
     void receiveInhibitoryInput(MembranePotential amplitude);
+    // Modulatory input: affects plasticity but not directly integrated
     void receiveModulatoryInput(MembranePotential amplitude);
     
-    // Current injection (from external sources)
+    // External current injection (from sensory input or external sources)
+    // Direct current injection for simulating external driving inputs
     void injectCurrent(MembranePotential current);
+    // Gets total current input this simulation step
     MembranePotential getTotalCurrent() const;
+    // Clears accumulated current for next simulation step
     void clearTotalCurrent();
     
-    // Spike history (recent spikes for STDP)
+    // Spike history for spike-timing-dependent plasticity (STDP)
+    // Records spike timestamp for synaptic plasticity calculations
     void recordSpike(Timestamp timestamp);
+    // Returns recent spike history (last ~100 spikes)
     const std::vector<Timestamp>& getSpikeHistory() const;
+    // Clears spike history (used for resetting learning)
     void clearSpikeHistory();
     
-    // Synapse management (incoming and outgoing)
+    // Synapse management for connectivity
+    // Adds incoming synapse handle for plasticity calculations
     void addIncomingSynapse(SynapseHandle handle);
+    // Adds outgoing synapse handle for spike propagation
     void addOutgoingSynapse(SynapseHandle handle);
+    // Returns list of incoming synapses for plasticity
     const std::vector<SynapseHandle>& getIncomingSynapses() const;
+    // Returns list of outgoing synapses for spike propagation
     const std::vector<SynapseHandle>& getOutgoingSynapses() const;
     
-    // Plasticity state
+    // Plasticity configuration and state
+    // Returns plasticity flags for synaptic modification rules
     const PlasticityFlags& getPlasticityFlags() const;
+    // Returns mutable plasticity flags for modification
     PlasticityFlags& getPlasticityFlags();
+    // Enables specific plasticity mechanisms
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
-    // Region/population membership
+    // Brain region and population membership
+    // Sets which brain region this neuron belongs to
     void setRegionId(RegionId region);
+    // Gets neuron region ID
     RegionId getRegionId() const;
+    // Sets which population within region this neuron belongs to
     void setPopulationId(PopulationId population);
+    // Gets neuron population ID
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Update neuron for one complete simulation step
+    // Implements full neuron dynamics including LIF integration,
+    // spike detection, refractory management, and adaptation
     void step(Timestamp currentTime);
     
-    // Reset to initial state
+    // Reset neuron to initial physiological state
+    // Clears all state variables and prepares for new simulation
     void reset();
     
-    // Initialize with random parameters
+    // Initialize neuron with biologically realistic random parameters
+    // Sets random membrane properties, thresholds, and states
     void initializeRandom(RandomGenerator& rng);
     
 private:
+    // Pimpl idiom for implementation hiding
     struct Impl;
-    Impl* pImpl;
+    Impl* pImpl;  // Pointer to implementation details
 };
 
 } // namespace nlm
