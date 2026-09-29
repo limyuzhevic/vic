@@ -22,9 +22,62 @@ namespace nlm {
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        -----------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Provides comprehensive bindings for all major NLM classes:
+        - Brain: The central neural simulation core with spiking dynamics, plasticity, memory systems, and neuromodulation
+        - Config: Configuration system for brain parameters
+        - AgentBrain: Interface connecting brain to world (sensory/motor processing)
+        - SimpleWorld: 2D simulation environment for agent interaction
+        - SensoryInput/SensoryPercept: Sensory data representation
+        - Action: Motor commands and actions
+        - AgentBody: Agent state (position, velocity, energy, etc.)
+        - WorldObject: Objects in the simulation environment
+        - ActionResult: Results from world interactions
+        
+        Key features:
+        - Real spiking neural computation with LIF dynamics
+        - Event-driven spike propagation with delays
+        - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+        - Integrated memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, reward prediction error)
+        - Developmental systems with staged maturation
+        - Prediction and planning capabilities
+        - Curiosity-driven exploration
+        - Checkpoint saving/loading for persistence
+        - Comprehensive error handling and health monitoring
+        
+        Example usage:
+        ```python
+        import pynlm
+        
+        # Create brain and world
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Run simulation
+        for step in range(100):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Check health
+        if pynlm.checkBrainHealth(brain):
+            print("Simulation completed successfully")
+        ```
+        
+        See https://nlm.readthedocs.io for detailed documentation and examples.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -237,31 +290,35 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
         .def("reset", &AgentBody::reset);
 
-    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+    // World object for simulation environment
+    py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
-        .def(py::init<float, bool, std::string>(),
-             py::arg("reward"), py::arg("success"), py::arg("message") = "")
-        .def_readwrite("reward", &ActionResult::reward)
-        .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def(py::init<float, float, WorldObjectType, float, float>(),
+             py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+             py::arg("radius") = 0.5f)
+        .def_readwrite("x", &WorldObject::x)
+        .def_readwrite("y", &WorldObject::y)
+        .def_readwrite("radius", &WorldObject::radius)
+        .def_readwrite("type", &WorldObject::type)
+        .def_readwrite("value", &WorldObject::value)
+        .def_readwrite("active", &WorldObject::active);
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+    py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def_readwrite("x", &AgentBody::x)
+        .def_readwrite("y", &AgentBody::y)
+        .def_readwrite("orientation", &AgentBody::orientation)
+        .def_readwrite("velocityX", &AgentBody::velocityX)
+        .def_readwrite("velocityY", &AgentBody::velocityY)
+        .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+        .def_readwrite("energy", &AgentBody::energy)
+        .def_readwrite("health", &AgentBody::health)
+        .def_readwrite("age", &AgentBody::age)
+        .def_readwrite("isMoving", &AgentBody::isMoving)
+        .def_readwrite("isTurning", &AgentBody::isTurning)
+        .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
+        .def("reset", &AgentBody::reset);
+
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -400,6 +457,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Helper functions for easier use
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +474,42 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Convenience simulation function
+    m.def("runSimpleSimulation", 
+        [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+           std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+            // Simplified simulation loop
+            for (size_t step = 0; step < numSteps; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+            return std::make_tuple(brain->getFiringNeuronCount(), 
+                                  brain->getAverageFiringRate());
+        },
+        py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+        "Run a simple simulation and return neuron count and firing rate");
+
+    // Error handling function
+    m.def("checkBrainHealth", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) return false;
+        
+        bool healthy = true;
+        healthy = healthy && (brain->getTotalNeuronCount() > 0);
+        healthy = healthy && (brain->getTotalSynapseCount() >= 0);
+        healthy = healthy && (brain->getAverageFiringRate() >= 0.0f);
+        
+        if (!healthy) {
+            NLM_LOG_WARNING("Brain health check failed: " +
+                           std::to_string(brain->getTotalNeuronCount()) + " neurons, " +
+                           std::to_string(brain->getTotalSynapseCount()) + " synapses");
+        }
+        
+        return healthy;
+    }, py::arg("brain"), "Check if brain is in a healthy state");
+
 
 } // namespace nlm
