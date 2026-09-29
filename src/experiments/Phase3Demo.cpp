@@ -111,6 +111,8 @@ public:
                     case MotorCommand::MoveBackward: metrics.backwardCount++; break;
                     case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
                     case MotorCommand::TurnRight: metrics.turnRightCount++; break;
+                    case MotorCommand::LookLeft: metrics.lookLeftCount++; break;
+                    case MotorCommand::LookRight: metrics.lookRightCount++; break;
                     case MotorCommand::Interact: metrics.interactCount++; break;
                     default: metrics.waitCount++; break;
                 }
@@ -148,6 +150,8 @@ public:
                       << ", bwd=" << metrics.backwardCount
                       << ", left=" << metrics.turnLeftCount
                       << ", right=" << metrics.turnRightCount
+                      << ", lookLeft=" << metrics.lookLeftCount
+                      << ", lookRight=" << metrics.lookRightCount
                       << ", interact=" << metrics.interactCount
                       << ", wait=" << metrics.waitCount
                       << "\n\n";

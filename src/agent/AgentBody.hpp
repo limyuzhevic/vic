@@ -57,12 +57,19 @@ struct AgentBody {
 enum class MotorCommand {
     MoveForward = 0,   // Propel forward
     MoveBackward = 1,  // Propel backward  
-    TurnLeft = 2,      // Rotate left
-    TurnRight = 3,     // Rotate right
-    LookLeft = 4,      // Pan sensor left
-    LookRight = 5,     // Pan sensor right
-    Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    MoveLeft = 2,      // Move left (alternative to TurnLeft)
+    MoveRight = 3,     // Move right (alternative to TurnRight)
+    TurnLeft = 4,      // Rotate left
+    TurnRight = 5,     // Rotate right
+    LookLeft = 6,      // Pan sensor left
+    LookRight = 7,     // Pan sensor right
+    LookUp = 8,        // Pan sensor up
+    LookDown = 9,      // Pan sensor down
+    Interact = 10,     // Interact with nearby object
+    Eat = 11,          // Consume food/resource
+    Drink = 12,        // Drink water
+    Rest = 13,         // Stop moving, rest
+    Wait = 14          // No movement
 };
 
 // Action result from the world's perspective

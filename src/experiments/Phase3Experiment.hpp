@@ -55,6 +55,8 @@ struct ExperimentMetrics {
     int backwardCount;
     int turnLeftCount;
     int turnRightCount;
+    int lookLeftCount;
+    int lookRightCount;
     int interactCount;
     int waitCount;
     

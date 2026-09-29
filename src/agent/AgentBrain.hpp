@@ -83,8 +83,19 @@ private:
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
+    
+    // Additional action neuron groups for advanced actions
+    std::vector<Neuron*> motorMoveLeft_;
+    std::vector<Neuron*> motorMoveRight_;
+    std::vector<Neuron*> motorLookUp_;
+    std::vector<Neuron*> motorLookDown_;
+    std::vector<Neuron*> motorEat_;
+    std::vector<Neuron*> motorDrink_;
+    std::vector<Neuron*> motorRest_;
     
     // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;

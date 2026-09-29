@@ -31,15 +31,18 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
+                                    motorLookLeft_.size() + motorLookRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 8) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 4: motorLookLeft_.push_back(n); break;
+                            case 5: motorLookRight_.push_back(n); break;
+                            case 6: motorInteract_.push_back(n); break;
+                            case 7: motorWait_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -80,8 +83,8 @@ size_t AgentBrain::getSensoryInputSize() const {
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action (all 15 motor commands)
+    return 15;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -155,6 +158,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
+    // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
     }
@@ -178,6 +182,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
     float rightAct = calcActivity(motorTurnRight_);
+    float lookLeftAct = calcActivity(motorLookLeft_);
+    float lookRightAct = calcActivity(motorLookRight_);
     float interactAct = calcActivity(motorInteract_);
     float waitAct = calcActivity(motorWait_);
     
@@ -187,6 +193,8 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookLeft, lookLeftAct},
+        {MotorCommand::LookRight, lookRightAct},
         {MotorCommand::Interact, interactAct},
         {MotorCommand::Wait, waitAct}
     };
@@ -209,30 +217,48 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
-        // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-        
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
+    if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Compute prediction error
+    predictionError_ = reward - predictedReward;
+    
+    // Update expected reward (exponential moving average)
+    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    
+    // Dopamine-like signal (based on prediction error)
+    dopamineLevel_ = predictionError_;
+    
+    // Clamp to reasonable range
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Apply to all synapses with eligibility traces
+    for (const auto& region : brain_->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            float eligibility = syn->getEligibilityTrace();
+            
+            if (std::abs(eligibility) > 0.001f) {
+                // Apply reward-modulated weight change
+                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                syn->addToWeight(delta);
+                
+                // Decay eligibility trace
+                syn->decayEligibilityTrace(0.1f);
             }
         }
     }
     
-    return defaultCmd;
+    // Modulate plasticity based on dopamine
+    // Positive dopamine increases plasticity, negative decreases
+    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    
+    // Apply to STDP
+    auto* stdp = brain_->getSTDP();
+    if (stdp) {
+        stdp->setLTPWeight(0.01f * plasticityFactor);
+        stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
