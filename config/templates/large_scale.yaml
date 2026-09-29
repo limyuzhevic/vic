@@ -1,0 +1,11 @@
+template: large_scale
+neuron_count: 100000
+max_steps: 1000000
+enable_checkpointing: true
+enable_multithreading: true
+enable_vectorization: true
+learning_rate: 0.001
+window_size: 1000
+train_on_gpu: true
+gpu_count: 4
+distributed_backend: "mpi"

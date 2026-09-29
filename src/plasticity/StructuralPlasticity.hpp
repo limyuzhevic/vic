@@ -1,9 +1,11 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../brain/Brain.hpp"
 
 namespace nlm {
+
+// Forward declaration
+class Brain;
 
 // Structural plasticity: creation and removal of synapses and neurons
 // PLACEHOLDER - Phase 2 will implement real structural plasticity

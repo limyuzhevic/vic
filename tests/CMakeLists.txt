@@ -8,12 +8,14 @@ add_executable(nlm_test
     test_main.cpp
     test_types.cpp
     test_config.cpp
+    test_config_enhanced.cpp
     test_random.cpp
     test_clock.cpp
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_performance_monitoring.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core)

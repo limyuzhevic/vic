@@ -1,0 +1,10 @@
+template: experiment
+experiment_name: test_experiment
+neuron_count: 5000
+max_steps: 5000
+enable_curiosity: true
+enable_development: true
+learning_rate: 0.01
+window_size: 500
+random_seed: 42
+output_dir: "./results"

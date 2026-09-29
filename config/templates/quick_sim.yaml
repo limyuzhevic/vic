@@ -1,0 +1,8 @@
+template: quick_simulation
+neuron_count: 1000
+max_steps: 10000
+enable_development: true
+enable_curiosity: true
+learning_rate: 0.01
+window_size: 100
+train_on_gpu: false

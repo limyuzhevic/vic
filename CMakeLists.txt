@@ -18,6 +18,19 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Configuration options
+option(NLM_USE_EXTERNAL_JSON "Use external JSON library (nlohmann/json)" OFF)
+option(NLM_USE_EXTERNAL_YAML "Use external YAML library (yaml-cpp)" OFF)
+
+# Find external dependencies if requested
+if(NLM_USE_EXTERNAL_JSON)
+    find_package(nlohmann_json REQUIRED)
+endif()
+
+if(NLM_USE_EXTERNAL_YAML)
+    find_package(yaml-cpp REQUIRED)
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -29,6 +42,11 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Performance Monitoring
+    src/core/Monitoring.cpp
+    src/core/PerformanceProfiler.cpp
+    src/core/MetricCollector.cpp
+    src/core/PerformanceReporter.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -54,14 +72,26 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
+# Memory
+		src/memory/WorkingMemory.cpp
+		src/memory/EpisodicMemory.cpp
+		src/memory/SemanticMemory.cpp
+		src/memory/ProceduralMemory.cpp
+		src/memory/AssociativeMemory.cpp
+		src/memory/NeuralWorkingMemory.cpp
+		src/memory/NeuralEpisodicMemory.cpp
+		
+		# Enhanced Working Memory System
+		src/memory/EnhancedWorkingMemory.cpp
+		src/memory/WorkingMemoryPriorityQueue.cpp
+		src/memory/WorkingMemoryPatternMatcher.cpp
+		src/memory/WorkingMemoryConsolidation.cpp
+		src/memory/WorkingMemoryIntegration.cpp
+		src/memory/WorkingMemoryReplay.cpp
+		
+		# Performance Infrastructure
+		src/performance/WorkingMemoryOptimizer.cpp
+		src/performance/WorkingMemoryProfiler.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -91,6 +121,15 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Add config-specific includes based on configuration
+if(NLM_USE_EXTERNAL_JSON)
+    target_include_directories(nlm_core PUBLIC ${nlohmann_json_INCLUDE_DIRS})
+endif()
+
+if(NLM_USE_EXTERNAL_YAML)
+    target_include_directories(nlm_core PUBLIC ${YAML_CPP_INCLUDE_DIR})
+endif()
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

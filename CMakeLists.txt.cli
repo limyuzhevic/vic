@@ -1,0 +1,64 @@
+# NLM CLI CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.10)
+project(nlm-cli VERSION 0.4.0 LANGUAGES CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Project include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/cli)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Find required packages
+find_package(Threads REQUIRED)
+
+# Collect source files
+file(GLOB_RECURSE CLI_SOURCES
+    "src/cli/*.cpp"
+    "src/cli/commands/*.cpp"
+    "src/cli/config/*.cpp"
+    "src/cli/script/*.cpp"
+    "src/cli/output/*.cpp"
+    "src/cli/monitoring/*.cpp"
+)
+
+# Create library
+add_library(nlm-cli ${CLI_SOURCES})
+
+# Target properties
+target_link_libraries(nlm-cli PUBLIC Threads::Threads)
+
+# Set output name
+set_target_properties(nlm-cli PROPERTIES OUTPUT_NAME "nlm")
+
+# Install target
+install(TARGETS nlm-cli
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+# Install headers
+install(DIRECTORY src/cli/ DESTINATION include/nlm-cli
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Create executable
+add_executable(nlm_main src/main.cpp)
+target_link_libraries(nlm_main nlm-cli)
+
+# Install executable
+install(TARGETS nlm_main DESTINATION bin)
+
+# Configuration templates
+install(DIRECTORY config/templates/ DESTINATION share/nlm-cli/templates
+    FILES_MATCHING PATTERN "*.yaml"
+)
+
+# Documentation
+install(FILES docs/CLI_REFERENCE.md docs/CLI_QUICK_START.md docs/CLI_ADVANCED_USAGE.md
+    DESTINATION share/doc/nlm-cli
+)
