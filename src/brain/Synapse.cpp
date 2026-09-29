@@ -193,25 +193,30 @@ void Synapse::setEfficacy(float efficacy) {
 
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // 1. Decay short-term plasticity state (facilitation/depression)
+    // 2. Decay eligibility trace for reward-modulated learning  
+    // 3. Update efficacy based on use-dependent modulation
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
+    // u: utilization factor (0-1), x: recovery from depression, y: facilitation
+    // dy/dt = -y/tau_y + delta(t-spike) for each pre-synaptic spike
+    // Decay: y(t) = y(t-dt) * exp(-dt/tau_y)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Recovery from depression (Tsodyks-Markram model)
+    // dx/dt = (1-x)/tau_x, where x represents readiness for release
+    // Recovery: x(t) = 1 - (1-x(t-dt)) * exp(-dt/tau_x)
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
+        // Recovery from depression toward 1.0 (fully recovered state)
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
@@ -231,33 +236,36 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
-    // Proper random initialization based on synapse type
+// Proper random initialization based on synapse type and biological constraints
     if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
+        // Excitatory synapses: small positive weights (0.1-0.4)
+        // Typical AMPA/NMDA receptor efficacy: 10-40% of maximum conductance
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
-        // Excitatory synapses have moderate initial efficacy
+        // Excitatory synapses have moderate initial efficacy (0.8-1.0)
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
-        // Inhibitory synapses: negative weights
+        // Inhibitory synapses: negative weights (-0.1 to -0.4)
+        // GABA_A receptor mediated hyperpolarization
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
-        // Other types: small random weights
+        // Other types: small random weights for modulatory/structural synapses
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    // Biological synaptic delays: AMPA ~1-2ms, NMDA ~5-10ms
     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
     
     // Initialize short-term plasticity state
-    pImpl->shortTermDepression = 1.0f;  // Fully recovered
+    pImpl->shortTermDepression = 1.0f;  // Fully recovered (ready for release)
     pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
     
-    // Initialize eligibility trace to 0
+    // Initialize eligibility trace to 0 (no recent reward prediction errors)
     pImpl->eligibilityTrace = 0.0f;
     
-    // Initialize last spike times
+    // Initialize last spike times to invalid timestamp (-1)
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
 }

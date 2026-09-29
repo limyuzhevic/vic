@@ -340,11 +340,13 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+        // Initialize config with error handling
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configFileLoaded = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -356,40 +358,89 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with proper error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configFileLoaded = true;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found or invalid: " + configFile + ". Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with command line arguments
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Validate and set default values for Phase 2 with error checking
+    try {
+        // Set default values for Phase 2
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        // Validate neuron count (reasonable range for testing)
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+        if (neuronCount < 10 || neuronCount > 100000) {
+            NLM_LOG_WARNING("Neuron count " + std::to_string(neuronCount) + " is outside typical range. Clamping to reasonable range.");
+            neuronCount = std::clamp(neuronCount, static_cast<int64_t>(10), static_cast<int64_t>(100000));
+        }
+        config->set("neuron_count", neuronCount, ConfigSource::Default);
+        
+        // Validate simulation timestep (must be positive and reasonable)
+        double timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            NLM_LOG_WARNING("Simulation timestep " + std::to_string(timestep) + " is invalid. Using default 0.001s.");
+            timestep = 0.001;
+        }
+        config->set("simulation_timestep", timestep, ConfigSource::Default);
+        
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error configuring simulation parameters: " + std::string(e.what()) + ". Using defaults.");
+    }
     
-    // STDP parameters
+    // STDP parameters with validation
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Validate STDP parameters
+    float stdpLtp = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    float stdpLtd = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    float stdpTau = config->getOr<float>("stdp_tau", 20.0f);
+    
+    if (stdpLtp < 0.0f) {
+        NLM_LOG_WARNING("STDP LTP weight negative, clamping to 0.0");
+        stdpLtp = 0.0f;
+    }
+    if (stdpLtd < 0.0f) {
+        NLM_LOG_WARNING("STDP LTD weight negative, clamping to 0.0");
+        stdpLtd = 0.0f;
+    }
+    if (stdpTau <= 0.0f) {
+        NLM_LOG_WARNING("STDP tau invalid, using default 20.0");
+        stdpTau = 20.0f;
+    }
+    
+    config->set("stdp_ltp_weight", stdpLtp, ConfigSource::Default);
+    config->set("stdp_ltd_weight", stdpLtd, ConfigSource::Default);
+    config->set("stdp_tau", stdpTau, ConfigSource::Default);
     
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Log configuration summary with validation results
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
+    NLM_LOG_INFO("  Configuration file loaded: " + std::string(configFileLoaded ? "YES" : "NO"));
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  STDP tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

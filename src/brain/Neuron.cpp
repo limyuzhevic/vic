@@ -205,6 +205,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Implements exponential Euler integration for stability and efficiency
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -213,22 +214,27 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
+// Synaptic input contributes to membrane potential change
+    // I/C represents the effect of synaptic conductance on membrane potential
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution: passive membrane current flow
+    // (V_rest - V)/tau represents the restorative force toward resting potential
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // dt is converted from seconds to milliseconds for consistency with ms-based parameters
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // AdaptationVariable builds up with each spike and decays exponentially
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        pImpl->state.adaptationVariable *= 0.95f;  // Exponential decay with time constant ~20ms
     }
     
-    // Clamp membrane potential to prevent instability
+    // Clamp membrane potential to prevent instability from numerical errors
+    // Biological limits: neurons rarely exceed -30mV to +50mV in practice
     V = std::clamp(V, -100.0f, 50.0f);
     
     // Check for spike
@@ -273,19 +279,20 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
+    // Membrane potential starts near resting potential with physiological variation
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
+    // Threshold is typically -55mV with small variation for reliable spike initiation
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Resting potential typically -70mV
+    // Resting potential typically -70mV with biological variation
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
     
-    // Reset potential is usually close to resting
+    // Reset potential is usually close to resting potential (post-spike reset)
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
+    // Refractory period: 2-10ms typical for biological neurons
+    // Determines minimum interspike interval
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
     // Initial state

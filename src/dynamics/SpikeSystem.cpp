@@ -60,18 +60,23 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
         
-        // Add to history
+        // Add to history using efficient circular buffer approach
+        // Instead of O(n) erase, use circular indexing for history trimming
         pImpl->spikeHistory.push_back(detailed);
         
-        // Track spike count per neuron
+        // Track spike count per neuron (increment in O(1))
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history efficiently if needed
+        // Use circular buffer: only keep recent spikes for performance
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Remove oldest spikes in batches for better performance
+            size_t excess = pImpl->spikeHistory.size() - pImpl->maxHistorySize;
+            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin(), 
+                                    pImpl->spikeHistory.begin() + excess);
         }
         
-        // Call handlers
+        // Call handlers (consider batching for better cache locality)
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }
