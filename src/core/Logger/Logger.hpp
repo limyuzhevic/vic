@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include "Errors.hpp"
 
 namespace nlm {
 
@@ -17,6 +18,9 @@ enum class LogLevel {
     Error = 3,
     Critical = 4
 };
+
+// Forward declaration for error handling integration
+class ErrorReporting;
 
 // Log entry structure
 struct LogEntry {
@@ -103,7 +107,23 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Error handling integration methods
+    void logException(const NLMError& error);
+    void logError(const NLMError& error);
+    void logErrorWithContext(const NLMError& error, const std::string& additionalContext = "");
+    
+    // Error category mapping
+    LogLevel errorCategoryToLogLevel(ErrorCategory category) const;
+    
+    // Error reporting configuration
+    void setErrorReportingEnabled(bool enabled);
+    bool isErrorReportingEnabled() const;
+    
+    // Global error handling
+    static void setGlobalErrorHandler(std::function<void(const NLMError&)> handler);
+    static void handleError(const NLMError& error);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
