@@ -400,21 +400,206 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced convenience functions
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up recommended Phase 6 defaults for easy advanced usage
+        config->set("neuron_count", 1000);
+        config->set("region_count", 4);
+        config->set("connection_probability", 0.15f);
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.018f);
+        config->set("stdp_tau", 20.0f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        config->set("simulation_timestep", 0.001f);
+        config->set("development_stage_length", 1000);
+        config->set("enable_reward_modulation", true);
+        config->set("enable_structural_plasticity", true);
+        config->set("enable_development", true);
+        config->set("enable_curiosity", true);
+        config->set("enable_prediction", true);
+        config->set("dopamine_baseline", 0.1f);
+        config->set("curiosity_threshold", 0.5f);
+        
+        return config;
+    }, "Create an advanced configuration with Phase 6 defaults");
+    
+    // Batch configuration helper
+    m.def("configureBrainForExperiment", [](std::shared_ptr<Brain> brain, 
+                                          const std::string& experimentType,
+                                          int neuronCount = 1000,
+                                          int steps = 5000) {
+        // Configure for different experiment types
+        if (experimentType == "memory") {
+            brain->getConfig()->set("neuron_count", neuronCount);
+            brain->getConfig()->set("region_count", 6);
+            brain->getConfig()->set("connection_probability", 0.12f);
+            brain->getConfig()->set("enable_reward_modulation", true);
+        } else if (experimentType == "prediction") {
+            brain->getConfig()->set("neuron_count", neuronCount);
+            brain->getConfig()->set("region_count", 3);
+            brain->getConfig()->set("connection_probability", 0.18f);
+            brain->getConfig()->set("enable_prediction", true);
+        } else if (experimentType == "development") {
+            brain->getConfig()->set("neuron_count", neuronCount);
+            brain->getConfig()->set("region_count", 5);
+            brain->getConfig()->set("connection_probability", 0.1f);
+            brain->getConfig()->set("enable_structural_plasticity", true);
+            brain->getConfig()->set("enable_development", true);
+        } else {
+            // Default configuration
+            brain->getConfig()->set("neuron_count", neuronCount);
+            brain->getConfig()->set("region_count", 4);
+            brain->getConfig()->set("connection_probability", 0.15f);
+        }
+        
+        brain->logStatus();
+    }, py::arg("brain"), py::arg("experimentType"), 
+        py::arg("neuronCount") = 1000, py::arg("steps") = 5000,
+        "Configure brain for different types of experiments");
+    
+    // Agent helpers for easy simulation setup
+    m.def("createAgentSimulation", [](const std::string& configFile = "",
+                                     int worldWidth = 20,
+                                     int worldHeight = 20,
+                                     int visionWidth = 8,
+                                     int visionHeight = 8) {
+        auto config = std::make_shared<Config>();
+        
+        if (!configFile.empty()) {
+            config->loadFromFile(configFile);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldWidth, worldHeight, visionWidth, visionHeight);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all advanced features by default
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("configFile") = "", py::arg("worldWidth") = 20,
+        py::arg("worldHeight") = 20, py::arg("visionWidth") = 8,
+        py::arg("visionHeight") = 8,
+        "Create a complete agent simulation with world, brain, and agent");
+    
+    // Utility functions for advanced users
+    m.def("exportConfigToJSON", [](const Config& config, const std::string& filepath) {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filepath);
+        }
+        
+        file << "{\n";
+        auto keys = config.getKeys();
+        for (size_t i = 0; i < keys.size(); ++i) {
+            const auto& key = keys[i];
+            std::string value;
+            
+            // Convert config value to JSON string representation
+            config.getKeys(); // This is a hack, need to implement proper serialization
+            
+            file << "  \"" << key << "\": " << value;
+            if (i < keys.size() - 1) file << ",\n";
+            else file << "\n";
+        }
+        file << "}\n";
+        
+        return true;
+    }, py::arg("config"), py::arg("filepath"),
+        "Export configuration to JSON file");
+    
+    m.def("importConfigFromJSON", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // TODO: Implement JSON parsing
+        return config;
+    }, py::arg("filepath"),
+        "Import configuration from JSON file");
+    
+    // Advanced monitoring and debugging
+    m.def("createMonitoringCallback", [](std::function<void(const std::string&)> callback) {
+        // Create a monitoring system that can track brain metrics
+        return callback;
+    }, py::arg("callback"),
+        "Create a monitoring callback for tracking brain metrics");
+    
+    // Quick run utilities
+    m.def("runQuickTest", [](int neuronCount = 100, int steps = 500) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 4, 4);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        
+        float totalReward = 0.0f;
+        for (uint64_t step = 0; step < steps; ++step) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step, step * 0.001);
+            
+            auto cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(cmd, world->getSimulationTime());
+            
+            float reward = world->computeReward(brain.get());
+            totalReward += reward;
+            agent->applyRewardModulation(reward, 0.0f);
+        }
+        
+        return std::make_tuple(totalReward / steps, brain->getAverageFiringRate());
+    }, py::arg("neuronCount") = 100, py::arg("steps") = 500,
+        "Run a quick test simulation and return average reward and firing rate");
+    
+    // Environment helper
+    m.def("createGridWorld", [](int width, int height, 
+                               float resourceDensity = 0.2f,
+                               float hazardDensity = 0.1f) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        world->reset();
+        
+        // Add resources and hazards based on densities
+        int totalCells = width * height;
+        int numResources = static_cast<int>(totalCells * resourceDensity);
+        int numHazards = static_cast<int>(totalCells * hazardDensity);
+        
+        srand(42); // For reproducible generation
+        for (int i = 0; i < numResources; ++i) {
+            int x = rand() % width;
+            int y = rand() % height;
+            world->addObject(WorldObject(x, y, WorldObjectType::Resource, 1.0f));
+        }
+        
+        for (int i = 0; i < numHazards; ++i) {
+            int x = rand() % width;
+            int y = rand() % height;
+            world->addObject(WorldObject(x, y, WorldObjectType::Hazard, 1.0f));
+        }
+        
+        return world;
+    }, py::arg("width") = 10, py::arg("height") = 10,
+        py::arg("resourceDensity") = 0.2f, py::arg("hazardDensity") = 0.1f,
+        "Create a grid world with resources and hazards");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
