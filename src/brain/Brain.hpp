@@ -193,6 +193,26 @@ public:
     // Logging
     void logStatus() const;
     
+    // System update methods for template method pattern
+    // These methods encapsulate the logic for each system update
+    void updateSpikedelayedSpikes();
+    void updateNeuronDynamics();
+    void detectAndQueueSpikes();
+    void processSpikes();
+    void updateWorkingMemory();
+    void updateNeuromodulation();
+    void updatePlasticity();
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttention();
+    void updateConceptFormation();
+    void updateStructuralPlasticity();
+    void replayMemories();
+    void updateDevelopment();
+    void consolidateMemories();
+    void updateCheckpointing();
+    void collectStatistics();
+    
 private:
     struct Impl;
     Impl* pImpl;

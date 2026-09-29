@@ -139,6 +139,55 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable (requires integrated experiment)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Python bindings
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(pybind11 REQUIRED)
+
+set(PYTHON_MODULE_SRCS
+    pynlm.cpp
+)
+
+pybind11_add_module(pynlm ${PYTHON_MODULE_SRCS})
+
+target_link_libraries(pynlm
+    PRIVATE
+        nlm_core
+        nlm_agent
+        nlm_world
+)
+
+# Benchmark executables
+add_executable(nlm_benchmark
+    src/benchmarks/NLMBenchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+add_executable(nlm_neural_benchmark
+    src/benchmarks/NeuralBenchmark.cpp
+)
+target_link_libraries(nlm_neural_benchmark PUBLIC nlm_core)
+
+add_executable(nlm_development_benchmark
+    src/benchmarks/DevelopmentBenchmark.cpp
+)
+target_link_libraries(nlm_development_benchmark PUBLIC nlm_core)
+
+add_executable(nlm_resource_benchmark
+    src/benchmarks/ResourceBenchmark.cpp
+)
+target_link_libraries(nlm_resource_benchmark PUBLIC nlm_core)
+
+add_executable(nlm_scalability_benchmark
+    src/benchmarks/ScalabilityBenchmark.cpp
+)
+target_link_libraries(nlm_scalability_benchmark PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
