@@ -690,28 +690,120 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Advanced action selection based on motor neuron activity patterns
+    // Implements vector-based action selection and action type classification
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
+    // Calculate comprehensive motor activity metrics
+    size_t totalMotorNeurons = pImpl->motorNeurons.size();
     size_t firingMotor = 0;
+    double totalActivity = 0.0;
+    std::vector<double> neuronActivities;
+    
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
             ++firingMotor;
         }
+        // Get neuron activation level (membrane potential deviation from rest)
+        double activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        neuronActivities.push_back(activity);
+        totalActivity += activity;
     }
     
-    // Return a simple action
+    // Normalize activity levels
+    double avgActivity = totalMotorNeurons > 0 ? totalActivity / totalMotorNeurons : 0.0;
+    
+    // Determine action based on activity patterns
     ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    std::vector<float> actionParameters;
+    
+    if (firingMotor == 0) {
+        // No motor activity - wait/rest
+        type = ActionType::Rest;
+    } else {
+        // Complex action selection based on activity patterns
+        size_t activeNeurons = 0;
+        double maxActivity = 0.0;
+        
+        for (double activity : neuronActivities) {
+            if (activity > 0.1) {  // Threshold for significant activity
+                ++activeNeurons;
+            }
+            if (activity > maxActivity) {
+                maxActivity = activity;
+            }
+        }
+        
+        // Action type classification based on activity distribution
+        if (activeNeurons <= 2 && maxActivity > 0.5) {
+            // Sparse, high-activity pattern - directional movement
+            if (avgActivity > 0.3) {
+                type = ActionType::MoveForward;
+            } else {
+                type = ActionType::TurnLeft;
+            }
+        } else if (activeNeurons >= totalMotorNeurons * 0.7) {
+            // Dense activity - generalized movement or interaction
+            if (maxActivity > 0.7) {
+                type = ActionType::Interact;
+            } else {
+                type = ActionType::MoveForward;
+            }
+        } else if (activeNeurons >= 3 && activeNeurons <= totalMotorNeurons * 0.6) {
+            // Moderate activity - nuanced movement
+            type = ActionType::MoveRight;
+        } else {
+            // Default movement action
+            type = ActionType::MoveForward;
+        }
+        
+        // Add vector-based parameters for advanced control
+        double directionX = 0.0;
+        double directionY = 0.0;
+        
+        // Calculate vector direction based on activity distribution across neurons
+        for (size_t i = 0; i < neuronActivities.size(); ++i) {
+            if (neuronActivities[i] > 0.1) {
+                directionX += std::cos(i * 0.5);  // Simplified direction calculation
+                directionY += std::sin(i * 0.5);
+            }
+        }
+        
+        // Normalize direction vector
+        double magnitude = std::sqrt(directionX * directionX + directionY * directionY);
+        if (magnitude > 0.0) {
+            directionX /= magnitude;
+            directionY /= magnitude;
+        }
+        
+        // Add action parameters for vector-based control
+        actionParameters.push_back(static_cast<float>(directionX));
+        actionParameters.push_back(static_cast<float>(directionY));
+        actionParameters.push_back(static_cast<float>(avgActivity));
+        actionParameters.push_back(static_cast<float>(firingMotor));
+        
+        // Add probabilistic action selection for exploration
+        if (pImpl->rng && pImpl->rng->bernoulli(0.1)) {  // 10% chance of exploring
+            // Random exploration action
+            int actionTypes[] = {
+                static_cast<int>(ActionType::MoveLeft),
+                static_cast<int>(ActionType::MoveRight),
+                static_cast<int>(ActionType::TurnLeft),
+                static_cast<int>(ActionType::TurnRight)
+            };
+            int randomAction = actionTypes[pImpl->rng->uniformInt(0, 3)];
+            type = static_cast<ActionType>(randomAction);
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Create action with parameters
+    auto action = std::make_unique<Action>(type, actionParameters);
+    
+    // Add additional action metadata
+    action->setExecutionTime(pImpl->currentTime);
     
     return action;
 }
