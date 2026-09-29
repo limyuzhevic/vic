@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -41,6 +43,24 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+    
+    // Helper to convert to JSON
+    nlohmann::json toJson() const;
+    
+    // Static helper to convert from JSON
+    static std::optional<ConfigEntry> fromJson(const std::string& key, const nlohmann::json& j);
+};
+
+// JSON serialization helper functions
+nlohmann::json configValueToJson(const ConfigValue& value);
+std::optional<ConfigValue> jsonToConfigValue(const nlohmann::json& j);
+
+// Configuration validation
+class ConfigValidator {
+public:
+    virtual ~ConfigValidator() = default;
+    virtual bool validate(const std::string& key, const ConfigValue& value) const = 0;
+    virtual std::string getErrorMessage(const std::string& key, const ConfigValue& value) const = 0;
 };
 
 // Main configuration class

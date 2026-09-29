@@ -2,6 +2,9 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <string>
+#include <sstream>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,6 +22,14 @@ struct NeuronId {
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Serialization
+    nlohmann::json toJson() const;
+    static NeuronId fromJson(const nlohmann::json& j);
+    std::string toString() const;
+    
+    // Factory functions
+    static NeuronId make(uint64_t value) { return NeuronId(value); }
 };
 
 // Synapse identifier
@@ -33,6 +44,14 @@ struct SynapseId {
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Serialization
+    nlohmann::json toJson() const;
+    static SynapseId fromJson(const nlohmann::json& j);
+    std::string toString() const;
+    
+    // Factory functions
+    static SynapseId make(uint64_t value) { return SynapseId(value); }
 };
 
 // Region identifier
@@ -47,6 +66,14 @@ struct RegionId {
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Serialization
+    nlohmann::json toJson() const;
+    static RegionId fromJson(const nlohmann::json& j);
+    std::string toString() const;
+    
+    // Factory functions
+    static RegionId make(uint64_t value) { return RegionId(value); }
 };
 
 // Population identifier
@@ -61,6 +88,14 @@ struct PopulationId {
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
     
     constexpr uint64_t index() const { return value; }
+    
+    // Serialization
+    nlohmann::json toJson() const;
+    static PopulationId fromJson(const nlohmann::json& j);
+    std::string toString() const;
+    
+    // Factory functions
+    static PopulationId make(uint64_t value) { return PopulationId(value); }
 };
 
 // Simulation step counter
@@ -140,6 +175,9 @@ struct SpikeEvent {
     SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
     SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
         : source_neuron(nid), timestamp(ts), step(s) {}
+    
+    nlohmann::json toJson() const;
+    static SpikeEvent fromJson(const nlohmann::json& j);
 };
 
 // Delayed spike event for synaptic transmission with delay
@@ -169,6 +207,9 @@ struct DelayedSpikeEvent {
         , timestamp(ts), delivery_time(delivery)
         , step(s), delivery_step(deliveryS)
         , is_excitatory(type == SynapseType::Excitatory) {}
+    
+    nlohmann::json toJson() const;
+    static DelayedSpikeEvent fromJson(const nlohmann::json& j);
 };
 
 // Action potential state
@@ -188,5 +229,37 @@ constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+
+// JSON serialization functions for enums
+nlohmann::json toJson(NeuronType type);
+NeuronType fromJsonNeuronType(const nlohmann::json& j);
+
+nlohmann::json toJson(SynapseType type);
+SynapseType fromJsonSynapseType(const nlohmann::json& j);
+
+nlohmann::json toJson(DevelopmentalStage stage);
+DevelopmentalStage fromJsonDevelopmentalStage(const nlohmann::json& j);
+
+nlohmann::json toJson(FiringState state);
+FiringState fromJsonFiringState(const nlohmann::json& j);
+
+// Type conversion utilities
+std::string toString(const NeuronId& id);
+std::string toString(const SynapseId& id);
+std::string toString(const RegionId& id);
+std::string toString(const PopulationId& id);
+
+// JSON serialization helper functions
+template<typename T>
+nlohmann::json toJson(const T& value);
+
+template<typename T>
+T fromJson(const nlohmann::json& j);
+
+// Factory functions
+inline NeuronId makeNeuronId(uint64_t value) { return NeuronId(value); }
+inline SynapseId makeSynapseId(uint64_t value) { return SynapseId(value); }
+inline RegionId makeRegionId(uint64_t value) { return RegionId(value); }
+inline PopulationId makePopulationId(uint64_t value) { return PopulationId(value); }
 
 } // namespace nlm
