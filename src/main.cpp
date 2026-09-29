@@ -29,23 +29,12 @@
 using namespace nlm;
 
 void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "=====================================" << std::endl;
+    std::cout << "Leaky Integrate-and-Fire (LIF) neurons" << std::endl;
+    std::cout << "Event-driven spike propagation with delays" << std::endl;
+    std::cout << "STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "Structural plasticity (synaptogenesis/pruning)" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
