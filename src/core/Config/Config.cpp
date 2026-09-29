@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,13 +20,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Try to parse as JSON first
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple JSON parser for configuration
+    // Expected format: { "key": "value", "number": 123, "boolean": true }
+    if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+        if (parseJSON(content)) {
+            return true;
+        }
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -49,6 +64,120 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::parseJSON(const std::string& json) {
+    // Simple JSON parser for configuration
+    // Remove whitespace
+    std::string cleaned;
+    for (char c : json) {
+        if (!std::isspace(static_cast<unsigned char>(c))) {
+            cleaned += c;
+        }
+    }
+    
+    if (cleaned.empty() || cleaned[0] != '{' || cleaned.back() != '}') {
+        return false;
+    }
+    
+    // Extract content between braces
+    std::string content = cleaned.substr(1, cleaned.size() - 2);
+    
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find next key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        pos = keyEnd + 1;
+        
+        // Find colon
+        size_t colonPos = content.find(':', pos);
+        if (colonPos == std::string::npos) break;
+        pos = colonPos + 1;
+        
+        // Skip whitespace
+        while (pos < content.size() && std::isspace(static_cast<unsigned char>(content[pos]))) {
+            pos++;
+        }
+        
+        // Parse value
+        ConfigValue value;
+        if (pos < content.size()) {
+            if (content[pos] == '"') {
+                // String
+                size_t valEnd = content.find('"', pos + 1);
+                if (valEnd == std::string::npos) break;
+                std::string val = content.substr(pos + 1, valEnd - pos - 1);
+                value = val;
+                pos = valEnd + 1;
+            } else if (content[pos] == 't' || content[pos] == 'f') {
+                // Boolean
+                if (content.substr(pos, 4) == "true") {
+                    value = true;
+                    pos += 4;
+                } else if (content.substr(pos, 5) == "false") {
+                    value = false;
+                    pos += 5;
+                } else {
+                    break;
+                }
+            } else if (content[pos] == 'n') {
+                // null (skip)
+                size_t nullEnd = content.find(',', pos);
+                if (nullEnd == std::string::npos) {
+                    nullEnd = content.find('}', pos);
+                }
+                if (nullEnd == std::string::npos) break;
+                pos = nullEnd;
+                continue;
+            } else if (content[pos] == '-' || std::isdigit(static_cast<unsigned char>(content[pos]))) {
+                // Number
+                size_t valEnd = content.find(',', pos);
+                if (valEnd == std::string::npos) {
+                    valEnd = content.find('}', pos);
+                }
+                if (valEnd == std::string::npos) break;
+                
+                std::string numStr = content.substr(pos, valEnd - pos);
+                // Try to parse as integer first
+                try {
+                    size_t endpos;
+                    long long intVal = std::stoll(numStr, &endpos);
+                    if (endpos == numStr.size()) {
+                        value = intVal;
+                        pos = valEnd;
+                    } else {
+                        // Try double
+                        double doubleVal = std::stod(numStr, &endpos);
+                        if (endpos == numStr.size()) {
+                            value = doubleVal;
+                            pos = valEnd;
+                        } else {
+                            break;
+                        }
+                    }
+                } catch (...) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        // Set the value
+        set(key, value, ConfigSource::File);
+        
+        // Skip comma and whitespace
+        while (pos < content.size() && (content[pos] == ',' || std::isspace(static_cast<unsigned char>(content[pos])))) {
+            pos++;
         }
     }
     
@@ -86,12 +215,46 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write the value based on its type
+        if (auto val = std::get_if<int>(&entry.value)) {
+            file << entry.key << " = " << *val << "\n";
+        } else if (auto val = std::get_if<int64_t>(&entry.value)) {
+            file << entry.key << " = " << *val << "\n";
+        } else if (auto val = std::get_if<double>(&entry.value)) {
+            file << entry.key << " = " << std::fixed << std::setprecision(6) << *val << "\n";
+        } else if (auto val = std::get_if<bool>(&entry.value)) {
+            file << entry.key << " = " << (*val ? "true" : "false") << "\n";
+        } else if (auto val = std::get_if<std::string>(&entry.value)) {
+            file << entry.key << " = \"" << *val << "\"\n";
+        } else if (auto val = std::get_if<std::vector<int>>(&entry.value)) {
+            file << entry.key << " = ";
+            for (size_t i = 0; i < val->size(); ++i) {
+                if (i > 0) file << " ";
+                file << (*val)[i];
+            }
+            file << "\n";
+        } else if (auto val = std::get_if<std::vector<double>>(&entry.value)) {
+            file << entry.key << " = ";
+            for (size_t i = 0; i < val->size(); ++i) {
+                if (i > 0) file << " ";
+                file << std::fixed << std::setprecision(6) << (*val)[i];
+            }
+            file << "\n";
+        } else if (auto val = std::get_if<std::vector<std::string>>(&entry.value)) {
+            file << entry.key << " = ";
+            for (size_t i = 0; i < val->size(); ++i) {
+                if (i > 0) file << " ";
+                file << "\"" << (*val)[i] << "\"";
+            }
+            file << "\n";
+        }
     }
     
     return true;
 }
 
+// Template function definitions
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -114,6 +277,34 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Explicit template instantiations
+
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Other Config methods implementation
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -173,43 +364,42 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
+        // Handle different value types
+        if (auto val = std::get_if<int>(&entry.value)) {
+            oss << *val;
+        } else if (auto val = std::get_if<int64_t>(&entry.value)) {
+            oss << *val;
+        } else if (auto val = std::get_if<double>(&entry.value)) {
+            oss << std::fixed << std::setprecision(6) << *val;
+        } else if (auto val = std::get_if<bool>(&entry.value)) {
+            oss << (*val ? "true" : "false");
+        } else if (auto val = std::get_if<std::string>(&entry.value)) {
+            oss << "\"" << *val << "\"";
+        } else if (auto val = std::get_if<std::vector<int>>(&entry.value)) {
+            oss << "[";
+            for (size_t i = 0; i < val->size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << (*val)[i];
             }
-        }, entry.value);
+            oss << "]";
+        } else if (auto val = std::get_if<std::vector<double>>(&entry.value)) {
+            oss << "[";
+            for (size_t i = 0; i < val->size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << std::fixed << std::setprecision(6) << (*val)[i];
+            }
+            oss << "]";
+        } else if (auto val = std::get_if<std::vector<std::string>>(&entry.value)) {
+            oss << "[";
+            for (size_t i = 0; i < val->size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "\"" << (*val)[i] << "\"";
+            }
+            oss << "]";
+        }
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

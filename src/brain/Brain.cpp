@@ -92,6 +92,25 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , checkpointManager(nullptr)
+        , sensoryNeurons()
+        , motorNeurons()
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -99,6 +118,13 @@ struct Brain::Impl {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Configure timestep from config
+        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        
+        // Configure replay and consolidation intervals
+        replayInterval = config->getOr<size_t>("replay_interval", 100);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -142,19 +168,81 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+            // Configure checkpoint system
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+        size_t checkpointMaxSaves = config->getOr<size_t>("checkpoint_max_saves", 10);
+        size_t checkpointSaveInterval = config->getOr<size_t>("checkpoint_save_interval", 10000);
+        std::string checkpointCompression = config->getOr<std::string>("checkpoint_compression", "balanced");
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        // TODO: Apply configured values to the respective systems
+        // For now, continue with the original hardcoded values in the step() method
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+
+// ========== MEMBER VARIABLE DECLARATIONS ==========
+
+// Core systems
+std::shared_ptr<Config> config;
+std::unique_ptr<RandomGenerator> rng;
+
+// Neural structures
+std::vector<std::unique_ptr<NeuralRegion>> regions;
+std::vector<InterRegionConnection> interRegionConnections;
+
+// ========== INTEGRATED MEMORY SYSTEMS ==========
+std::unique_ptr<NeuralWorkingMemory> workingMemory;
+std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+
+// ========== INTEGRATED PREDICTION SYSTEM ==========
+std::unique_ptr<PredictionSystem> predictionSystem;
+
+// ========== INTEGRATED COGNITION SYSTEMS ==========
+std::unique_ptr<NeuralPlanner> planner;
+std::unique_ptr<ConceptFormation> conceptFormation;
+std::unique_ptr<AttentionalSelection> attention;
+
+// ========== DEVELOPMENT SYSTEM ==========
+std::unique_ptr<DevelopmentSystem> developmentSystem;
+
+// ========== NEUROMODULATION SYSTEMS ==========
+std::unique_ptr<Dopamine> dopamine;
+std::unique_ptr<Curiosity> curiosity;
+std::unique_ptr<PredictionError> predictionError;
+std::unique_ptr<Novelty> novelty;
+
+// Phase 2: Real neural computation components
+std::unique_ptr<SpikeSystem> spikeSystem;
+std::unique_ptr<STDP> stdp;
+std::unique_ptr<Hebbian> hebbian;
+std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+
+// Simulation parameters
+TimestepDuration timestep;
+SimulationStep currentStep;
+Timestamp currentTime;
+
+// Statistics
+Size_t totalSpikesThisStep;
+Size_t totalSpikesTotal;
+
+// Sensory neurons for input injection
+std::vector<Neuron*> sensoryNeurons;
+std::vector<Neuron*> motorNeurons;
+
+// Integration state
+bool isResting;  // For sleep/rest cycle
+Size_t stepsSinceLastEpisode;
+Size_t replayInterval;
+Size_t consolidationInterval;
+
+// Checkpoint system
+std::unique_ptr<CheckpointManager> checkpointManager;
+
+DevelopmentalStage developmentalStage;
+RegionId nextRegionId;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}

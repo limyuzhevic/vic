@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <iomanip>
 
 namespace nlm {
 
@@ -55,13 +56,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Parse JSON content directly
+    bool parseJSON(const std::string& json);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (generates key=value format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values

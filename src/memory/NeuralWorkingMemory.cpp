@@ -14,7 +14,7 @@ struct NeuralWorkingMemory::Impl {
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
-    Impl() : brain(nullptr) {}
+    Impl() : brain(nullptr), maintenanceSynapses(), traceAges() {}
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -22,6 +22,13 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , maintenanceStrength_(2.0f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
@@ -36,22 +43,16 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
+    if (brain_ && neuron.getId() < brain_->getTotalNeuronCount()) {
+        for (auto& region : brain_->getRegions()) {
+            for (auto* nn : region->getAllNeurons()) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
                     break;
                 }
             }
         }
+    }
         
         // Update stored activation
         if (i < memoryActivations_.size()) {

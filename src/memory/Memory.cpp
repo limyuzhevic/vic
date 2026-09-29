@@ -8,7 +8,7 @@ struct WorkingMemory::Impl {
     std::vector<std::pair<NeuronId, float>> items;
     size_t capacity;
     
-    Impl(size_t cap) : capacity(cap) {}
+    Impl(size_t cap) : capacity(cap), items() {}
 };
 
 WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
@@ -69,7 +69,7 @@ struct EpisodicMemory::Impl {
     std::vector<EpisodicMemoryItem> episodes;
     size_t maxEpisodes;
     
-    Impl(size_t max) : maxEpisodes(max) {}
+    Impl(size_t max) : maxEpisodes(max), episodes() {}
 };
 
 EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
