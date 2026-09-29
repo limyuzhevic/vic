@@ -11,11 +11,15 @@ SensoryPercept::SensoryPercept()
     touch_.resize(8, 0.0f);
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
-    audio_.resize(0, 0.0f);
+    audio_.clear();  // Changed from resize(0) to clear() for better memory management
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
     std::vector<float> all;
+    
+    // Reserve space upfront for better performance
+    all.reserve(vision_.size() + touch_.size() + internal_.size() + 
+                proprioception_.size() + audio_.size());
     
     // Vision (flattened)
     all.insert(all.end(), vision_.begin(), vision_.end());

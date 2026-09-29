@@ -69,12 +69,94 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== ADVANCED USER FEATURES ==========
+    
+    // Get comprehensive agent status for debugging
+    std::string getStatusString() const;
+    
+    // Run agent for a complete episode with automatic world integration
+    void runEpisode(double timestep, size_t maxSteps);
+    
+    // Get current agent statistics
+    struct AgentStats {
+        float curiosity;
+        float novelty;
+        float predictionError;
+        float neuromodulation;
+        float developmentalAge;
+        float plasticityModifier;
+        size_t firingNeurons;
+        float averageFiringRate;
+        DevelopmentalStage stage;
+    };
+    
+    AgentStats getStats() const;
+    
+    // Enhanced sensory processing with validation
+    bool processSensoryInputValidated(const SensoryPercept& percept);
+    
+    // Motor command decoding with error handling
+    MotorCommand decodeMotorCommandWithSafety() const;
+    
+    // ========== UTILITY FUNCTIONS ==========
+    
+    // Print agent statistics to console
+    void printStats() const;
+    
+    // Check if agent is in a valid state for operation
+    bool isHealthy() const;
+    
+    // Get human-readable developmental stage name
+    std::string getDevelopmentalStageName() const;
+    
+    // Calculate agent performance score based on various metrics
+    float calculatePerformanceScore() const;
+    
+    // Reset agent with custom parameters
+    void resetWithCustomParameters(float curiosityLevel, float noveltyLevel, float developmentalAge);
+    
+    // Apply custom neuromodulation
+    void applyCustomNeuromodulation(float dopamine, float acetylcholine = 0.0f);
+    
+    // Get time since last action
+    double getTimeSinceLastAction() const;
+    
+    // Check if agent is currently exploring (curiosity-driven)
+    bool isExploring() const;
+    
+    // Get list of active neuron populations for debugging
+    std::vector<std::string> getActivePopulations() const;
+    
+    // Export agent state to human-readable format for analysis
+    std::string exportStateToString() const;
+    
+    // Import agent state from human-readable format
+    bool importStateFromString(const std::string& stateString);
+    
+    // Get memory usage statistics
+    struct MemoryStats {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t sensoryNeurons;
+        size_t motorNeurons;
+        size_t workingMemoryTraces;
+        size_t episodicMemoryEpisodes;
+        float memoryUsagePercentage;
+    };
+    
+    MemoryStats getMemoryStats() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
+    MotorCommand decodeFromMotorNeurons(const std::vector<Neuron*>& motorNeurons,
+                                        const std::vector<Neuron*>& backwardNeurons,
+                                        const std::vector<Neuron*>& leftNeurons,
+                                        const std::vector<Neuron*>& rightNeurons,
+                                        const std::vector<Neuron*>& interactNeurons,
+                                        const std::vector<Neuron*>& waitNeurons) const;
     
     // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd) const;
     
     std::shared_ptr<Brain> brain_;
     

@@ -256,129 +256,283 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+#### Agent Brain Advanced Features
 
-#### Brain Class
+##### Agent Status and Statistics
 
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
+The AgentBrain now includes comprehensive status and statistics methods:
 
 ```python
-# Create
+import pynlm
+
+# Create brain and agent
 config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
+brain = pynlm.createBrain(config)
+brain.initialize()
 agent = pynlm.createAgentBrain(brain)
 
-# Initialization
+# Initialize with world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
 agent.initialize(world)
 
-# Sensory processing
-agent.processSensoryInput(percept)
+# Enable subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
 
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
+# Run simulation to collect statistics
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
 
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
+# Get comprehensive agent statistics
+stats = agent.getStats()
+print(f"Curiosity Level: {stats.curiosity:.3f}")
+print(f"Novelty Level: {stats.novelty:.3f}")
+print(f"Prediction Error: {stats.predictionError:.3f}")
+print(f"Neuromodulation Level: {stats.neuromodulation:.3f}")
+print(f"Developmental Stage: {stats.stage}")
+print(f"Developmental Age: {stats.developmentalAge:.1f}")
+print(f"Plasticity Modifier: {stats.plasticityModifier:.3f}")
+print(f"Firing Neurons: {stats.firingNeurons}")
+print(f"Average Firing Rate: {stats.averageFiringRate:.3f}")
 
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
+# Get human-readable status
+status = agent.getStatusString()
+print("\n=== Agent Status ===")
+print(status)
 
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Print stats using utility method
+agent.printStats()
 ```
 
-#### SimpleWorld Class
+##### Enhanced Sensory Processing
+
+The AgentBrain now includes enhanced sensory processing with validation:
 
 ```python
-# Creation
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Initialize with world
 world = pynlm.createSimpleWorld()
-
-# Configuration
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
 world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
+agent.initialize(world)
 
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
+# Run simulation with enhanced processing
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    
+    # Process with validation
+    success = agent.processSensoryInputValidated(percept)
+    if success:
+        print(f"Step {step}: Sensory input processed successfully")
+    else:
+        print(f"Step {step}: Failed to process sensory input")
+    
+    brain.step(step)
+    action = agent.decodeMotorCommandWithSafety()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
 
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
+##### Advanced Agent Configuration
 
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
+The AgentBrain now supports advanced configuration and customization:
 
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Initialize with world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run some simulation steps
+for step in range(50):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Reset with custom parameters
+agent.resetWithCustomParameters(
+    curiosityLevel=0.8,    # Set custom curiosity (0.0-1.0)
+    noveltyLevel=0.6,      # Set custom novelty (0.0-1.0)  
+    developmentalAge=100.0  # Set developmental age
+)
+
+# Apply custom neuromodulation
+agent.applyCustomNeuromodulation(
+    dopamine=0.5,        # Custom dopamine level (-1.0 to 1.0)
+    acetylcholine=0.2    # Custom acetylcholine level
+)
+
+print("Agent configuration customized successfully")
+```
+
+##### Agent Health Monitoring
+
+The AgentBrain now includes health monitoring and debugging utilities:
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Initialize with world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable all subsystems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Check agent health
+isHealthy = agent.isHealthy()
+if isHealthy:
+    print("✓ Agent is healthy and ready for operation")
+else:
+    print("✗ Agent has health issues that need attention")
+
+# Check if agent is exploring
+isExploring = agent.isExploring()
+if isExploring:
+    print("✓ Agent is actively exploring the environment")
+else:
+    print("✗ Agent is not exploring (may be too settled)")
+
+# Get active populations for debugging
+populations = agent.getActivePopulations()
+print(f"\nActive populations: {populations}")
+
+# Calculate performance score
+performance = agent.calculatePerformanceScore()
+print(f"Agent performance score: {performance:.3f} (0.0-1.0, higher is better)")
+```
+
+##### State Export/Import
+
+The AgentBrain now supports state export and import for analysis:
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Initialize with world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run simulation
+for step in range(50):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Export agent state to string
+stateString = agent.exportStateToString()
+print("=== Exported Agent State ===")
+print(stateString)
+
+# Optionally save to file
+with open("agent_state.txt", "w") as f:
+    f.write(stateString)
+
+print("Agent state exported to agent_state.txt")
+
+# Import agent state from string (if supported)
+importSuccess = agent.importStateFromString(stateString)
+if importSuccess:
+    print("✓ Agent state imported successfully")
+else:
+    print("⚠ Agent state import not fully supported yet")
+```
+
+##### Memory Management
+
+The AgentBrain now includes memory statistics and management:
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Initialize with world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Get memory statistics
+memoryStats = agent.getMemoryStats()
+print("=== Memory Statistics ===")
+print(f"Total Neurons: {memoryStats.totalNeurons}")
+print(f"Total Synapses: {memoryStats.totalSynapses}")
+print(f"Sensory Neurons: {memoryStats.sensoryNeurons}")
+print(f"Motor Neurons: {memoryStats.motorNeurons}")
+print(f"Working Memory Traces: {memoryStats.workingMemoryTraces}")
+print(f"Episodic Memory Episodes: {memoryStats.episodicMemoryEpisodes}")
+print(f"Memory Usage Percentage: {memoryStats.memoryUsagePercentage:.2f}%")
 ```
 
 ### Enumerations

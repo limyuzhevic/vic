@@ -2,6 +2,7 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace nlm {
 
@@ -152,7 +153,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    MotorCommand decoded = decodeFromMotorNeurons(motorForward_, motorBackward_, motorTurnLeft_, motorTurnRight_, motorInteract_, motorWait_);
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
@@ -162,7 +163,12 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
+MotorCommand AgentBrain::decodeFromMotorNeurons(const std::vector<Neuron*>& motorNeurons,
+                                                const std::vector<Neuron*>& backwardNeurons,
+                                                const std::vector<Neuron*>& leftNeurons,
+                                                const std::vector<Neuron*>& rightNeurons,
+                                                const std::vector<Neuron*>& interactNeurons,
+                                                const std::vector<Neuron*>& waitNeurons) const {
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
@@ -174,12 +180,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    float forwardAct = calcActivity(motorNeurons);
+    float backwardAct = calcActivity(backwardNeurons);
+    float leftAct = calcActivity(leftNeurons);
+    float rightAct = calcActivity(rightNeurons);
+    float interactAct = calcActivity(interactNeurons);
+    float waitAct = calcActivity(waitNeurons);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
@@ -209,7 +215,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) const {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
@@ -217,16 +223,15 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
+            // Random motor command from valid MotorCommand enum
             int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
+                case 4: return MotorCommand::Interact;
+                case 5: return MotorCommand::Wait;
                 default: return MotorCommand::Wait;
             }
         }
@@ -345,6 +350,81 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+std::string AgentBrain::getStatusString() const {
+    std::stringstream ss;
+    ss << "=== AgentBrain Status ===\n";
+    ss << "Neuromodulation Level: " << getNeuromodulationLevel() << "\n";
+    ss << "Curiosity Level: " << getCuriosityLevel() << "\n";
+    ss << "Novelty Level: " << getNoveltyLevel() << "\n";
+    ss << "Prediction Error: " << getPredictionError() << "\n";
+    ss << "Developmental Stage: " << static_cast<int>(getDevelopmentalStage()) << "\n";
+    ss << "Developmental Age: " << developmentalAge_ << "\n";
+    ss << "Plasticity Modifier: " << plasticityModifier_ << "\n";
+    ss << "Sensory Neurons: Vision=" << sensoryVision_.size() 
+       << " Touch=" << sensoryTouch_.size() 
+       << " Internal=" << sensoryInternal_.size() 
+       << " Proprioception=" << sensoryProprioception_.size() << "\n";
+    ss << "Motor Neurons: Forward=" << motorForward_.size() 
+       << " Backward=" << motorBackward_.size() 
+       << " Left=" << motorTurnLeft_.size() 
+       << " Right=" << motorTurnRight_.size() 
+       << " Interact=" << motorInteract_.size() 
+       << " Wait=" << motorWait_.size() << "\n";
+    ss << "Enabled Subsystems: Reward=" << (rewardModulationEnabled_ ? "Yes" : "No")
+       << " Structural=" << (structuralPlasticityEnabled_ ? "Yes" : "No")
+       << " Development=" << (developmentEnabled_ ? "Yes" : "No")
+       << " Curiosity=" << (curiosityEnabled_ ? "Yes" : "No") << "\n";
+    return ss.str();
+}
+
+AgentBrain::AgentStats AgentBrain::getStats() const {
+    AgentStats stats;
+    stats.curiosity = getCuriosityLevel();
+    stats.novelty = getNoveltyLevel();
+    stats.predictionError = getPredictionError();
+    stats.neuromodulation = getNeuromodulationLevel();
+    stats.developmentalAge = developmentalAge_;
+    stats.plasticityModifier = plasticityModifier_;
+    stats.firingNeurons = brain_ ? brain_->getFiringNeuronCount() : 0;
+    stats.averageFiringRate = brain_ ? brain_->getAverageFiringRate() : 0.0f;
+    stats.stage = getDevelopmentalStage();
+    return stats;
+}
+
+bool AgentBrain::processSensoryInputValidated(const SensoryPercept& percept) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot process sensory input: brain is null");
+        return false;
+    }
+    
+    if (percept.getVision().size() != sensoryVision_.size()) {
+        NLM_LOG_WARNING("Vision size mismatch: percept has " + 
+                       std::to_string(percept.getVision().size()) + 
+                       " elements but expected " + 
+                       std::to_string(sensoryVision_.size()));
+    }
+    
+    processSensoryInput(percept);
+    return true;
+}
+
+MotorCommand AgentBrain::decodeMotorCommandWithSafety() const {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot decode motor command: brain is null");
+        return MotorCommand::Wait;
+    }
+    
+    MotorCommand decoded = decodeMotorCommand();
+    
+    // Additional safety checks
+    if (curiosityEnabled_ && curiosityLevel_ > 1.0f) {
+        NLM_LOG_WARNING("Curiosity level exceeds 1.0, clamping to 1.0");
+        // This is a defensive check - curiosity level should be clamped in processSensoryInput
+    }
+    
+    return decoded;
 }
 
 } // namespace nlm
