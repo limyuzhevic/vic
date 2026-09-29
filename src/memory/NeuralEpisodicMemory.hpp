@@ -93,32 +93,7 @@ public:
     // This allows the brain to "relive" the experience
     void replayEpisode(const EpisodicMemoryItem* episode);
 
-    // Update episode relevance based on recent use
-    void updateRelevance(SimulationStep episodeId, float relevanceDelta);
-
-    // Get episode by index
-    const EpisodicMemoryItem* getEpisode(size_t index) const;
-
-    // Get total number of episodes
-    size_t getEpisodeCount() const { return episodes_.size(); }
-
-    // Get recent episodes
-    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
-
-    // Get average reward from episodes
-    float getAverageReward() const;
-
-    // Clear old episodes
-    void consolidate(float relevanceThreshold);
-
-    // Clear all episodes
-    void clear();
-
-    // Enable/disable replay
-    void enableReplay(bool enable) { replayEnabled_ = enable; }
-    bool isReplayEnabled() const { return replayEnabled_; }
-
-    // Get episodes for replay (selection based on relevance and recency)
+        // Get episodes for replay (selection based on relevance and recency)
     std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
 
     // Replay multiple episodes (for sleep-like consolidation)
@@ -128,13 +103,6 @@ private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,
                           const EpisodicMemoryItem& episode) const;
-
-    // Check if episode matches criteria
-    bool matchesCriteria(const EpisodicMemoryItem& episode,
-                        const std::vector<float>* sensoryQuery,
-                        SimulationStep* startTime,
-                        SimulationStep* endTime,
-                        ActionType* actionQuery) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

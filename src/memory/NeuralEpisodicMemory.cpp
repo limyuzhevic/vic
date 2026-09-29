@@ -315,6 +315,8 @@ bool NeuralEpisodicMemory::matchesCriteria(
         return false;
     }
     
+    // This function was marked as TODO PHASE 2 and is no longer needed
+    // The episode retrieval system uses direct filtering instead of this criteria-based approach
     return true;
 }
 
