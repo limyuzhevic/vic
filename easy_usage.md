@@ -60,12 +60,12 @@ agent.initialize(world)
 
 # Run for 50 steps
 for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
@@ -73,225 +73,515 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Extended Basic Examples (50 lines)
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Error Handling Examples
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+def safe_brain_operation():
+    try:
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        for step in range(1000):
+            brain.step(step)
+            
+        return brain
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+brain = safe_brain_operation()
+if brain:
+    print(f"Brain created with {brain.getTotalNeuronCount()} neurons")
 ```
 
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
+### Configuration Variations
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
+import pynlm
+
+configs = {
+    "small": {"brain.neuron_count": 500},
+    "medium": {"brain.neuron_count": 1000},
+    "large": {"brain.neuron_count": 2000}
+}
+
+for name, params in configs.items():
+    config = pynlm.createDefaultConfig()
+    for key, value in params.items():
+        config.set(key, value)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    print(f"{name} brain: {brain.getTotalNeuronCount()} neurons")
+```
+
+### Progress Monitoring
+
+```python
+import pynlm
+import time
+
+def monitor_simulation(brain, steps=100):
+    start_time = time.time()
+    
+    for step in range(steps):
         brain.step(step)
         
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
+        if step % 25 == 0:
+            elapsed = time.time() - start_time
+            print(f"Step {step}/{steps} - "
+                  f"Firing: {brain.getFiringNeuronCount()}, "
+                  f"Time: {elapsed:.2f}s")
     
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+    total_time = time.time() - start_time
+    print(f"Simulation complete in {total_time:.2f}s")
+    return total_time
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+monitor_simulation(brain)
 ```
 
-### Project 3: Complete Agent
+---
+
+## Intermediate Level Examples (150 lines)
+
+### Complete Simulation with Callbacks
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+class SimulationManager:
+    def __init__(self, brain, world, agent):
+        self.brain = brain
+        self.world = world
+        self.agent = agent
+        self.callbacks = {}
+    
+    def register_callback(self, event_type, callback):
+        if event_type not in self.callbacks:
+            self.callbacks[event_type] = []
+        self.callbacks[event_type].append(callback)
+    
+    def run_episode(self, num_steps):
+        for step in range(num_steps):
+            self.world.update(0.1)
+            percept = self.world.getSensoryPercept()
+            self.agent.processSensoryInput(percept)
+            self.brain.step(step)
+            action = self.agent.decodeMotorCommand()
+            self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            self.trigger_callbacks("step_complete", {
+                "step": step,
+                "action": action
+            })
+    
+    def trigger_callbacks(self, event_type, data):
+        if event_type in self.callbacks:
+            for callback in self.callbacks[event_type]:
+                callback(data)
+
+def run_callback_simulation():
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    sim_manager = SimulationManager(brain, world, agent)
+    
+    def log_step(data):
+        print(f"Step {data['step']} completed with action {data['action']}")
+    
+    sim_manager.register_callback("step_complete", log_step)
+    sim_manager.run_episode(50)
+```
+
+### Custom Agent Behaviors
+
+```python
+import pynlm
+import random
+
+class AdaptiveAgent:
+    def __init__(self, brain):
+        self.agent = pynlm.createAgentBrain(brain)
+        self.exploration_rate = 0.5
+    
+    def adjust_exploration(self, reward_history):
+        if len(reward_history) >= 10:
+            avg_reward = sum(reward_history[-10:]) / 10
+            if avg_reward < 0.3:
+                self.exploration_rate = min(1.0, self.exploration_rate + 0.1)
+            elif avg_reward > 0.8:
+                self.exploration_rate = max(0.1, self.exploration_rate - 0.1)
+    
+    def get_action(self, world, brain, step):
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        self.agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        if self.exploration_rate > 0.7:
+            return self._random_action(world)
+        else:
+            return self.agent.decodeMotorCommand()
+    
+    def _random_action(self, world):
+        actions = list(pynlm.ActionType)
+        return random.choice(actions)
+```
+
+### Environment Customization
+
+```python
+import pynlm
+
+class CustomWorld(pynlm.SimpleWorld):
+    def update(self, dt):
+        self.weather = "rain" if random.random() < 0.1 else "clear"
+        super().update(dt)
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world = CustomWorld()
+world.configure(width=20, height=20)
 world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
+for step in range(50):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
 ```
 
 ---
 
-## Quick Reference
+## 3. Advanced Usage Examples (150 lines)
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+### Multi-agent Simulations
+
+```python
+import pynlm
+
+class MultiAgentSystem:
+    def __init__(self, num_agents, world):
+        self.agents = []
+        self.brains = []
+        self.world = world
+        
+        for i in range(num_agents):
+            brain = pynlm.createBrain(pynlm.createDefaultConfig())
+            brain.initialize()
+            
+            agent = pynlm.createAgentBrain(brain)
+            agent.initialize(world)
+            agent.enableRewardModulation(True)
+            
+            self.brains.append(brain)
+            self.agents.append(agent)
+    
+    def run_cooperative_simulation(self, num_steps):
+        for step in range(num_steps):
+            for i, (brain, agent) in enumerate(zip(self.brains, self.agents)):
+                percept = self.world.getSensoryPercept()
+                agent.processSensoryInput(percept)
+                brain.step(step + i * 0.1)
+                action = agent.decodeMotorCommand()
+                self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            if step % 50 == 0:
+                print(f"Step {step}: Cooperative simulation running")
+```
+
+### Complex World Configurations
+
+```python
+import pynlm
+import random
+
+class ComplexWorld(pynlm.SimpleWorld):
+    def setup_environment(self):
+        for _ in range(5):
+            x = random.uniform(5, self.width-5)
+            y = random.uniform(5, self.height-5)
+            self.addObject(x, y, pynlm.WorldObjectType.Resource.value, value=2.0)
+        
+        for _ in range(3):
+            x = random.uniform(10, self.width-10)
+            y = random.uniform(10, self.height-10)
+            self.addObject(x, y, pynlm.WorldObjectType.Hazard.value, value=0.0)
+    
+    def update(self, dt):
+        super().update(dt)
+        self.regenerate_resources()
+    
+    def regenerate_resources(self):
+        for obj in self.getObjects():
+            if obj.type == pynlm.WorldObjectType.Resource:
+                obj.value = min(obj.value + dt * 0.01, 5.0)
+
+world = ComplexWorld()
+world.configure(width=25, height=25)
+world.reset()
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
 
 ---
 
-## Troubleshooting
+## 4. Best Practices Section (80 lines)
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### Common Pitfalls and Solutions
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+```python
+import pynlm
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+# Pitfall 1: Not initializing the brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()  # Required!
+
+# Pitfall 2: Using uninitialized world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20)
+world.reset()  # Required!
+
+# Pitfall 3: Not enabling learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableStructuralPlasticity(True)
+
+# Pitfall 4: Wrong timestep
+for step in range(100):
+    world.update(0.1)
+
+# Pitfall 5: Not handling errors
+try:
+    brain.step(step)
+except Exception as e:
+    brain.step(step)
+```
+
+### Performance Optimization Tips
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)
+
+agent.enableRewardModulation(True)
+agent.enableCuriosity(False)
+agent.enableStructuralPlasticity(False)
+```
 
 ---
 
-## Next Steps
+## 5. API Reference Section (80 lines)
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### Main Classes and Their Methods
 
-That's it! You're now ready to use NLM.
+#### Brain Class
+
+```python
+brain = pynlm.createBrain(config)
+brain.initialize()
+brain.step(step_number)
+brain.reset()
+brain.getTotalNeuronCount()
+brain.getFiringNeuronCount()
+brain.getAverageFiringRate()
+```
+
+#### Config Class
+
+```python
+config = pynlm.createDefaultConfig()
+config.has("brain.neuron_count")
+config.set("brain.neuron_count", 1000)
+```
+
+#### AgentBrain Class
+
+```python
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.processSensoryInput(percept)
+agent.decodeMotorCommand()
+agent.getCuriosityLevel()
+agent.enableRewardModulation(True/False)
+```
+
+#### SimpleWorld Class
+
+```python
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20)
+world.reset()
+world.update(timestep)
+world.setAgentStart(x, y)
+world.addObject(x, y, object_type, value=1.0)
+world.isValidPosition(x, y)
+```
+
+---
+
+## 6. Troubleshooting Section (50 lines)
+
+### Common Error Scenarios
+
+**"Brain crashes"**
+
+```bash
+# 1. Check if you called initialize()
+# Missing: brain.initialize()
+
+# 2. Check configuration
+# Too many neurons:
+# config.set("brain.neuron_count", 5000)
+# Try: config.set("brain.neuron_count", 500)
+```
+
+**"Agent not responding"**
+
+```python
+# 1. Check initialization
+agent.initialize(world)
+
+# 2. Check agent subsystems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+```
+
+**"Slow simulation"**
+
+```python
+config.set("brain.neuron_count", 500)
+```
+
+### Solutions to Specific Problems
+
+**Problem: "Everything is 0"**
+
+```python
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for i in range(1000):
+    brain.step(i)
+```
+
+**Problem: "Agent keeps crashing"**
+
+```python
+import traceback
+
+def safe_simulation():
+    try:
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        for step in range(500):
+            try:
+                brain.step(step)
+            except:
+                brain.step(step)
+                
+        return brain
+    except Exception as e:
+        print(f"Simulation failed: {e}")
+        return None
+```
+
+---
+
+## 7. Integration Examples (40 lines)
+
+### Integrating with External Systems
+
+```python
+import pynlm
+
+class ExternalSystemIntegration:
+    def __init__(self, api_endpoint=None):
+        self.api_endpoint = api_endpoint
+        self.integration_data = []
+    
+    def save_to_external_database(self, brain, world, agent, episode_id):
+        data = {
+            'episode_id': episode_id,
+            'timestamp': time.time(),
+            'brain_stats': {
+                'total_neurons': brain.getTotalNeuronCount(),
+                'firing_neurons': brain.getFiringNeuronCount()
+            },
+            'world_stats': {
+                'agent_position': world.getAgentPosition()
+            },
+            'agent_stats': {
+                'curiosity_level': agent.getCuriosityLevel()
+            }
+        }
+        
+        self.integration_data.append(data)
+        print(f"Data sent to external system")
+    
+    def export_to_file(self, filename):
+        import json
+        with open(filename, 'w') as f:
+            json.dump(self.integration_data, f, indent=2)
+        print(f"Exported {len(self.integration_data)} records")
+
+def example_external_integration():
+    integration = ExternalSystemIntegration()
+    
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    for episode in range(3):
+        for step in range(100):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+        
+        integration.save_to_external_database(brain, world, agent, episode)
+    
+    integration.export_to_file("simulation_results.json")
+    return integration.integration_data
+```
