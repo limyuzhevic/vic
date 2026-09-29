@@ -1,237 +1,370 @@
 #include "StructuralPlasticity.hpp"
-#include "../../brain/Brain.hpp"
-#include "../../brain/NeuralRegion.hpp"
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace nlm {
 
-struct StructuralPlasticity::Impl {
-    float synaptogenesisRate;     // Probability of new synapse per step
-    float pruningRate;            // Probability of pruning per step
-    float minWeightThreshold;      // Below this weight, synapse is weak
-    float activityThreshold;      // Below this activity, synapse is unused
-    size_t maxSynapsesPerNeuron;   // Maximum outgoing synapses per neuron
-    size_t maxTotalSynapses;       // Global maximum synapses
-    bool useActivityDependency;    // Whether to use activity for pruning
+// EnhancedStructuralPlasticity implementation
+struct EnhancedStructuralPlasticity::Impl {
+    StructuralPlasticityParameters parameters;
+    float simulationTime;
+    float timeSinceLastScaling;
+    std::vector<SynapseCreationEvent> pendingCreations;
+    std::vector<PruningEvent> pendingRemovals;
+    std::vector<NeuronCreationEvent> pendingNeuronCreations;
+    std::vector<SynapseCreationEvent> completedCreations;
+    std::vector<PruningEvent> completedRemovals;
+    std::vector<NeuronCreationEvent> completedNeuronCreations;
+    size_t nextSynapseId;
+    size_t nextNeuronId;
+    float globalExcitatoryRatio;
+    size_t totalSynapseCount;
+    size_t totalNeuronCount;
+    std::unordered_map<NeuronId, float> neuronActivity;
+    std::unordered_map<SynapseId, float> synapseWeights;
     
-    // Statistics
-    size_t totalSynapsesCreated;
-    size_t totalSynapsesPruned;
-    
-    Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
-             minWeightThreshold(0.05f), activityThreshold(0.001f),
-             maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
-             useActivityDependency(true),
-             totalSynapsesCreated(0), totalSynapsesPruned(0) {}
+    Impl() : simulationTime(0.0f), timeSinceLastScaling(0.0f),
+             nextSynapseId(1), nextNeuronId(1),
+             globalExcitatoryRatio(0.5f), totalSynapseCount(0), totalNeuronCount(0) {
+        parameters = StructuralPlasticityParameters();
+    }
 };
 
-StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
+EnhancedStructuralPlasticity::EnhancedStructuralPlasticity() : pImpl(new Impl()) {}
 
-StructuralPlasticity::~StructuralPlasticity() = default;
+EnhancedStructuralPlasticity::~EnhancedStructuralPlasticity() {
+    delete pImpl;
+}
 
-SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
-                                               NeuronId destination, SynapticWeight weight) {
-    /*
-     * Create a new synapse between source and destination neurons
-     * 
-     * The synapse is added to the appropriate neural region based on
-     * which region contains the destination neuron.
-     * 
-     * Returns INVALID_SYNAPSE_ID if creation fails.
-     */
-    if (!brain) {
+SynapseId EnhancedStructuralPlasticity::createSynapse(Brain* brain, NeuronId source, NeuronId destination,
+                                                   SynapticWeight weight) {
+    if (!brain) return INVALID_SYNAPSE_ID;
+    
+    SynapseId newId = pImpl->nextSynapseId++;
+    float currentTime = pImpl->simulationTime;
+    
+    if (!brain->hasNeuron(source) || !brain->hasNeuron(destination)) {
         return INVALID_SYNAPSE_ID;
     }
     
-    // Find the region containing the destination neuron
-    for (auto& region : brain->getRegions()) {
-        auto synapsesTo = region->getSynapsesTo(destination);
-        
-        // Check if connection already exists
-        for (Synapse* syn : synapsesTo) {
-            if (syn->getSourceNeuron() == source) {
-                return INVALID_SYNAPSE_ID;  // Connection already exists
+    float distance = computeDistance(brain, source, destination);
+    if (distance > pImpl->parameters.maxDistance) {
+        weight *= (1.0f - pImpl->parameters.connectionCost);
+    }
+    
+    SynapseCreationEvent event(newId, source, destination, weight, currentTime);
+    pImpl->pendingCreations.push_back(event);
+    pImpl->totalSynapseCount++;
+    
+    return newId;
+}
+
+bool EnhancedStructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
+    if (!brain) return false;
+    
+    PruningEvent event(synapse, 0.0f, -1.0f, pImpl->simulationTime);
+    pImpl->pendingRemovals.push_back(event);
+    pImpl->totalSynapseCount--;
+    
+    return true;
+}
+
+NeuronId EnhancedStructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
+    if (!brain) return INVALID_NEURON_ID;
+    
+    NeuronId newId = pImpl->nextNeuronId++;
+    RegionId region = getOptimalRegionForNewNeuron(brain, type);
+    
+    float initialExcitability = computeInitialExcitability(type);
+    
+    NeuronCreationEvent event(newId, type, region, pImpl->simulationTime, initialExcitability);
+    pImpl->pendingNeuronCreations.push_back(event);
+    pImpl->totalNeuronCount++;
+    
+    return newId;
+}
+
+bool EnhancedStructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
+    if (!brain) return false;
+    
+    auto* region = brain->getRegion(brain->getRegionIdForNeuron(neuron));
+    if (region) {
+        for (auto& synapse : region->getSynapses()) {
+            if (synapse->getSourceNeuron() == neuron || 
+                synapse->getDestinationNeuron() == neuron) {
+                return false;
             }
         }
-        
-        // Check max synapses limit
-        if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
-            return INVALID_SYNAPSE_ID;
-        }
-        
-        // Count outgoing synapses from source in this region
-        auto synapsesFrom = region->getSynapsesFrom(source);
-        if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
-            continue;  // Try next region
-        }
-        
-        // Create the synapse
-        SynapseId synId = region->addSynapse(source, destination, weight, 1);
-        if (synId != INVALID_SYNAPSE_ID) {
-            ++pImpl->totalSynapsesCreated;
-            return synId;
+    }
+    
+    brain->removeNeuron(neuron);
+    pImpl->totalNeuronCount--;
+    
+    return true;
+}
+
+void EnhancedStructuralPlasticity::processSynapseCreations(Brain* brain, RandomGenerator& rng) {
+    for (auto& creation : pImpl->pendingCreations) {
+        if (isNeuronMature(brain, creation.source) && isNeuronMature(brain, creation.target)) {
+            brain->createSynapse(creation.source, creation.target, creation.weight);
+            
+            creation.mature = (pImpl->parameters.developmentalStage > 0.5f);
+            creation.efficacy = computeInitialEfficacy(creation.weight, creation.source, creation.target);
+            
+            pImpl->completedCreations.push_back(creation);
         }
     }
     
-    return INVALID_SYNAPSE_ID;
+    pImpl->pendingCreations.clear();
 }
 
-bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
-    if (!brain || synapse == INVALID_SYNAPSE_ID) {
-        return false;
+void EnhancedStructuralPlasticity::processSynapseRemovals(Brain* brain) {
+    for (auto& removal : pImpl->pendingRemovals) {
+        brain->removeSynapse(removal.synapseId);
+        pImpl->completedRemovals.push_back(removal);
     }
     
-    // Search all regions for the synapse
-    for (auto& region : brain->getRegions()) {
-        Synapse* syn = region->getSynapse(synapse);
-        if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
-            ++pImpl->totalSynapsesPruned;
-            return true;
+    pImpl->pendingRemovals.clear();
+}
+
+void EnhancedStructuralPlasticity::processNeuronCreations(Brain* brain, RandomGenerator& rng) {
+    for (auto& creation : pImpl->pendingNeuronCreations) {
+        if (pImpl->parameters.developmentalStage > 0.5f || 
+            rng.uniformReal(0.0f, 1.0f) < pImpl->parameters.neuronCreationRate) {
+            
+            brain->createNeuron(creation.type, creation.region, creation.initialExcitability);
+            creation.mature = false;
+            creation.maturationTime = pImpl->parameters.neuronMaturationTime;
+            
+            pImpl->completedNeuronCreations.push_back(creation);
         }
     }
     
-    return false;
+    pImpl->pendingNeuronCreations.clear();
 }
 
-NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
-    return INVALID_NEURON_ID;
-}
-
-bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
-    // Neuron removal would require removing all synapses and the neuron itself
-    // For Phase 2, we focus on synaptic structural plasticity
-    return false;
-}
-
-float StructuralPlasticity::getSynaptogenesisRate() const {
-    return pImpl->synaptogenesisRate;
-}
-
-void StructuralPlasticity::setSynaptogenesisRate(float rate) {
-    pImpl->synaptogenesisRate = std::clamp(rate, 0.0f, 0.1f);
-}
-
-float StructuralPlasticity::getPruningRate() const {
-    return pImpl->pruningRate;
-}
-
-void StructuralPlasticity::setPruningRate(float rate) {
-    pImpl->pruningRate = std::clamp(rate, 0.0f, 0.01f);
-}
-
-void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
-    /*
-     * Update structural plasticity
-     * 
-     * This implements:
-     * 1. Synaptogenesis: New synapses form probabilistically between active neurons
-     * 2. Pruning: Weak or unused synapses are removed
-     * 
-     * The process is activity-dependent:
-     * - Synapses form between neurons that are frequently co-active
-     * - Synapses that are weak or unused are pruned
-     * 
-     * Safety constraints:
-     * - Maximum total synapses per region
-     * - Maximum outgoing synapses per neuron
-     * - Minimum weight threshold for pruning
-     * - Activity threshold for usage
-     */
+void EnhancedStructuralPlasticity::processNeuronPruning(Brain* brain, RandomGenerator& rng) {
     if (!brain) return;
     
-    for (auto& region : brain->getRegions()) {
-        auto neurons = region->getAllNeurons();
-        size_t neuronCount = neurons.size();
+    std::vector<NeuronId> neuronsToPrune;
+    
+    for (RegionId regionId : brain->getRegionIds()) {
+        auto* region = brain->getRegion(regionId);
+        if (!region) continue;
         
-        if (neuronCount < 2) continue;
-        
-        // Collect activity statistics
-        struct NeuronActivity {
-            NeuronId id;
-            float activity;
-            float avgWeight;
-        };
-        std::vector<NeuronActivity> activities;
-        activities.reserve(neuronCount);
-        
-        for (auto* neuron : neurons) {
-            float activity = 0.0f;
-            float avgWeight = 0.0f;
-            size_t synCount = 0;
+        for (auto& neuron : region->getAllNeurons()) {
+            NeuronId neuronId = neuron->getId();
             
-            auto incoming = region->getSynapsesTo(neuron->getId());
-            for (auto* syn : incoming) {
-                avgWeight += std::abs(syn->getWeight());
-                ++synCount;
-            }
-            
-            // Activity based on spike history
-            const auto& spikes = neuron->getSpikeHistory();
-            if (!spikes.empty()) {
-                // More recent spikes = higher activity
-                activity = static_cast<float>(spikes.size());
-            }
-            
-            if (synCount > 0) {
-                avgWeight /= static_cast<float>(synCount);
-            }
-            
-            activities.push_back({neuron->getId(), activity, avgWeight});
-        }
-        
-        // Synaptogenesis: Create new synapses between active neurons
-        if (region->getSynapseCount() < pImpl->maxTotalSynapses) {
-            for (size_t attempt = 0; attempt < neuronCount; ++attempt) {
-                // Probabilistic synapse formation
-                if (!rng.bernoulli(pImpl->synaptogenesisRate)) continue;
-                
-                size_t idx1 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
-                size_t idx2 = rng.uniformInt(0, static_cast<int>(neuronCount) - 1);
-                
-                if (idx1 != idx2) {
-                    NeuronId src = activities[idx1].id;
-                    NeuronId dst = activities[idx2].id;
-                    
-                    // Only create if both neurons are somewhat active
-                    if (activities[idx1].activity > 0.1f || activities[idx2].activity > 0.1f) {
-                        // Initial weight based on activity
-                        float weight = 0.1f + rng.uniformReal(0.0f, 0.2f);
-                        createSynapse(brain, src, dst, weight);
-                    }
-                }
-            }
-        }
-        
-        // Pruning: Remove weak or unused synapses
-        for (auto& syn : region->getSynapses()) {
-            float weight = std::abs(syn->getWeight());
-            
-            // Check pruning conditions
-            bool shouldPrune = false;
-            
-            if (weight < pImpl->minWeightThreshold) {
-                // Synapse is too weak
-                shouldPrune = rng.bernoulli(pImpl->pruningRate);
-            } else if (pImpl->useActivityDependency) {
-                // Check if synapse has been unused (no recent weight changes)
-                float eligibility = std::abs(syn->getEligibilityTrace());
-                if (eligibility < pImpl->activityThreshold) {
-                    shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
-                }
-            }
-            
-            if (shouldPrune) {
-                removeSynapse(brain, syn->getId());
+            if (shouldPruneNeuron(brain, neuronId, rng)) {
+                neuronsToPrune.push_back(neuronId);
             }
         }
     }
+    
+    for (NeuronId neuronId : neuronsToPrune) {
+        removeNeuron(brain, neuronId);
+    }
+}
+
+float EnhancedStructuralPlasticity::computeDistance(Brain* brain, NeuronId neuron1, NeuronId neuron2) {
+    if (!brain) return 0.0f;
+    
+    auto* region1 = brain->getRegion(brain->getRegionIdForNeuron(neuron1));
+    auto* region2 = brain->getRegion(brain->getRegionIdForNeuron(neuron2));
+    
+    if (!region1 || !region2) return 1000.0f;
+    
+    auto* neuronA = region1->getNeuron(neuron1);
+    auto* neuronB = region2->getNeuron(neuron2);
+    
+    if (!neuronA || !neuronB) return 1000.0f;
+    
+    float dx = neuronA->getX() - neuronB->getX();
+    float dy = neuronA->getY() - neuronB->getY();
+    return std::sqrt(dx*dx + dy*dy);
+}
+
+RegionId EnhancedStructuralPlasticity::getOptimalRegionForNewNeuron(Brain* brain, NeuronType type) {
+    if (!brain) return INVALID_REGION_ID;
+    
+    std::vector<RegionId> regionIds = brain->getRegionIds();
+    if (!regionIds.empty()) {
+        return regionIds[0];
+    }
+    
+    return brain->addRegion();
+}
+
+float EnhancedStructuralPlasticity::computeInitialExcitability(NeuronType type) {
+    switch (type) {
+        case NeuronType::Excitatory: return 1.0f;
+        case NeuronType::Inhibitory: return 0.5f;
+        case NeuronType::Sensory: return 0.8f;
+        case NeuronType::Motor: return 0.7f;
+        case NeuronType::Internal: return 0.6f;
+        default: return 0.5f;
+    }
+}
+
+float EnhancedStructuralPlasticity::computeInitialEfficacy(SynapticWeight weight, NeuronId source, NeuronId target) {
+    float efficacy = std::abs(weight);
+    
+    if (weight > 0.0f) {
+        efficacy *= 1.2f;
+    } else {
+        efficacy *= 0.8f;
+    }
+    
+    return std::clamp(efficacy, 0.0f, 2.0f);
+}
+
+bool EnhancedStructuralPlasticity::shouldPruneNeuron(Brain* brain, NeuronId neuronId, RandomGenerator& rng) {
+    if (!brain) return false;
+    
+    float activity = getNeuronActivity(neuronId);
+    
+    if (activity < pImpl->parameters.neuronActivityThreshold) {
+        return true;
+    }
+    
+    float metabolicCost = pImpl->parameters.metabolicCost;
+    float expectedBenefit = computeNeuronExpectedBenefit(brain, neuronId);
+    
+    if (metabolicCost > expectedBenefit && rng.uniformReal(0.0f, 1.0f) < 0.3f) {
+        return true;
+    }
+    
+    return false;
+}
+
+float EnhancedStructuralPlasticity::getNeuronActivity(NeuronId neuronId) {
+    auto it = pImpl->neuronActivity.find(neuronId);
+    if (it != pImpl->neuronActivity.end()) {
+        return it->second;
+    }
+    return 0.0f;
+}
+
+float EnhancedStructuralPlasticity::computeNeuronExpectedBenefit(Brain* brain, NeuronId neuronId) {
+    float benefit = 0.0f;
+    
+    if (!brain) return benefit;
+    
+    auto* region = brain->getRegion(brain->getRegionIdForNeuron(neuronId));
+    if (!region) return benefit;
+    
+    for (auto& synapse : region->getSynapses()) {
+        if (synapse->getSourceNeuron() == neuronId || 
+            synapse->getDestinationNeuron() == neuronId) {
+            
+            float weight = synapse->getWeight();
+            float activity = getNeuronActivity(synapse->getSourceNeuron()) + 
+                           getNeuronActivity(synapse->getDestinationNeuron());
+            
+            benefit += std::abs(weight) * activity;
+        }
+    }
+    
+    return benefit;
+}
+
+bool EnhancedStructuralPlasticity::isNeuronMature(Brain* brain, NeuronId neuronId) {
+    if (!brain) return false;
+    
+    auto* region = brain->getRegion(brain->getRegionIdForNeuron(neuronId));
+    if (!region) return false;
+    
+    auto* neuron = region->getNeuron(neuronId);
+    if (!neuron) return false;
+    
+    float activity = getNeuronActivity(neuronId);
+    return activity > pImpl->parameters.activityThreshold;
+}
+
+void EnhancedStructuralPlasticity::applySynapticScaling(Brain* brain) {
+    if (!brain) return;
+    
+    float totalWeight = 0.0f;
+    size_t synapseCount = 0;
+    
+    for (RegionId regionId : brain->getRegionIds()) {
+        auto* region = brain->getRegion(regionId);
+        if (!region) continue;
+        
+        for (auto& synapse : region->getSynapses()) {
+            totalWeight += std::abs(synapse->getWeight());
+            synapseCount++;
+        }
+    }
+    
+    if (synapseCount == 0) return;
+    
+    float averageWeight = totalWeight / synapseCount;
+    
+    for (RegionId regionId : brain->getRegionIds()) {
+        auto* region = brain->getRegion(regionId);
+        if (!region) continue;
+        
+        for (auto& synapse : region->getSynapses()) {
+            float currentWeight = synapse->getWeight();
+            float scaledWeight = currentWeight + 
+                               (averageWeight - currentWeight) * 
+                               pImpl->parameters.weightNormalizationFactor;
+            
+            scaledWeight = std::clamp(scaledWeight, 
+                                     pImpl->parameters.strengthThreshold,
+                                     pImpl->parameters.redundancyThreshold);
+            
+            synapse->setWeight(scaledWeight);
+        }
+    }
+}
+
+void EnhancedStructuralPlasticity::updateNetworkStatistics(Brain* brain) {
+    if (!brain) return;
+    
+    float totalExcitatory = 0.0f;
+    float totalInhibitory = 0.0f;
+    
+    for (RegionId regionId : brain->getRegionIds()) {
+        auto* region = brain->getRegion(regionId);
+        if (!region) continue;
+        
+        for (auto& synapse : region->getSynapses()) {
+            if (synapse->isExcitatory()) {
+                totalExcitatory += std::abs(synapse->getWeight());
+            } else if (synapse->isInhibitory()) {
+                totalInhibitory += std::abs(synapse->getWeight());
+            }
+        }
+    }
+    
+    float total = totalExcitatory + totalInhibitory;
+    if (total > 0.0f) {
+        pImpl->globalExcitatoryRatio = totalExcitatory / total;
+    }
+}
+
+void EnhancedStructuralPlasticity::updateParametersForDevelopment() {
+    float stage = pImpl->parameters.developmentalStage;
+    
+    if (stage < 0.3f) {
+        pImpl->parameters.synaptogenesisRate *= (1.0f + stage * 2.0f);
+        pImpl->parameters.pruningRate *= (1.0f - stage);
+        pImpl->parameters.neuronCreationRate *= (1.0f + stage * 1.5f);
+    } else if (stage < 0.7f) {
+        pImpl->parameters.synaptogenesisRate *= 0.8f;
+        pImpl->parameters.pruningRate *= 1.2f;
+        pImpl->parameters.neuronCreationRate *= 0.8f;
+    } else {
+        pImpl->parameters.synaptogenesisRate *= 0.5f;
+        pImpl->parameters.pruningRate *= 1.5f;
+        pImpl->parameters.neuronCreationRate *= 0.5f;
+    }
+    
+    pImpl->parameters.synaptogenesisRate *= pImpl->parameters.plasticityModulation;
+    pImpl->parameters.pruningRate *= pImpl->parameters.plasticityModulation;
 }
 
 } // namespace nlm
