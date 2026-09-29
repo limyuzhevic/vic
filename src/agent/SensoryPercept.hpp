@@ -37,12 +37,54 @@ public:
     const std::vector<float>& getAudio() const { return audio_; }
     void setAudio(const std::vector<float>& a) { audio_ = a; }
     
-    // Get all signals concatenated (for brain input)
-    std::vector<float> getAllSignals() const;
+    // Enhanced validation and utility methods
+    bool validate() const;
+    bool isComplete() const;
+    void normalize() const;  // Normalize all signals to [0,1]
+    void clamp(float minVal, float maxVal); // Clamp all values
     
-    // Timestamp
-    double getTimestamp() const { return timestamp_; }
-    void setTimestamp(double t) { timestamp_ = t; }
+    // Timestamp operations
+    void updateTimestamp(); // Update to current time
+    double getAge() const;   // Get age since timestamp
+    
+    // Signal statistics
+    float getMaxValue() const;
+    float getMinValue() const;
+    float getMeanValue() const;
+    float getVariance() const;
+    
+    // Signal manipulation
+    void addNoise(float amount); // Add Gaussian noise
+    void smooth(int kernelSize); // Apply simple moving average
+    void copyTo(SensoryPercept& other) const; // Deep copy
+    
+    // Comparison and difference
+    float getDifference(const SensoryPercept& other) const;
+    bool equals(const SensoryPercept& other) const;
+    
+    // Serialization (for checkpointing)
+    void save(std::ostream& os) const;
+    void load(std::istream& is);
+    
+    // Debug and info
+    std::string toString() const;
+    void printDebug() const;
+    
+private:
+    // Enhanced validation and internal helpers
+    void validateVision() const;
+    void validateTouch() const;
+    void validateInternal() const;
+    void validateProprioception() const;
+    void validateAudio() const;
+    
+    // Signal processing helpers
+    static float computeMax(const std::vector<float>& vec);
+    static float computeMin(const std::vector<float>& vec);
+    static float computeMean(const std::vector<float>& vec);
+    static float computeVariance(const std::vector<float>& vec, float mean);
+    static void addGaussianNoise(std::vector<float>& vec, float amount);
+    static void applyMovingAverage(std::vector<float>& vec, int kernelSize);
     
 private:
     std::vector<float> vision_;

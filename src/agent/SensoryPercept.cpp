@@ -1,5 +1,3 @@
-#include "SensoryPercept.hpp"
-
 namespace nlm {
 
 SensoryPercept::SensoryPercept()
