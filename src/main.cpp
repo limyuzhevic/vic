@@ -58,9 +58,18 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0) {
+        if (!brain) {
+            NLM_LOG_ERROR("ERROR: Cannot create LearningExperiment with null brain");
+        }
+    }
     
     void recordInitialState() {
+        if (!brain) {
+            NLM_LOG_ERROR("ERROR: Cannot record initial state with null brain");
+            return;
+        }
+        
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
@@ -77,10 +86,17 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("No initial weights recorded");
         }
     }
     
     void recordFinalState() {
+        if (!brain) {
+            NLM_LOG_ERROR("ERROR: Cannot record final state with null brain");
+            return;
+        }
+        
         finalWeights.clear();
         
         // Record final weights from first region
@@ -90,7 +106,10 @@ struct LearningExperiment {
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        mostActiveNeurons.clear();
+        if (brain->getSpikeSystem()) {
+            mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -98,6 +117,8 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("No final weights recorded");
         }
     }
     
@@ -203,6 +224,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Cannot run plasticity experiment with null brain");
+        return;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -216,6 +242,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
+    } else {
+        NLM_LOG_WARNING("No region found for plasticity experiment");
+        return;
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -246,16 +275,25 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Cannot run STDP verification with null brain");
+        return;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: No region found for STDP verification");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+        NLM_LOG_WARNING("  Not enough synapses for STDP test (found: " + 
+                       std::to_string(synapses.size()) + ", needed: 5)");
         return;
     }
     
@@ -293,6 +331,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
             // Then post fires
             postNeuron->injectCurrent(60.0f);
             brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+        } else {
+            NLM_LOG_WARNING("  Could not find neurons for STDP test");
         }
     }
     
@@ -356,9 +396,12 @@ int main(int argc, char** argv) {
         }
     }
     
+    // Try to load from file if provided
+    auto configFileOpt = config->getOr<std::string>("config_file", "configs/default.cfg");
+    
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (config->loadFromFile(configFileOpt.value())) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFileOpt.value());
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
