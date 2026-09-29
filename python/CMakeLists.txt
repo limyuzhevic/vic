@@ -40,7 +40,11 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
-    ${NLM_SOURCE_DIR}/memory/Memory.cpp
+    ${NLM_SOURCE_DIR}/memory/WorkingMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/EpisodicMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/SemanticMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/ProceduralMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/AssociativeMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
@@ -69,6 +73,13 @@ set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
+set(NLM_EXPERIMENTS_SOURCES
+    ${NLM_SOURCE_DIR}/experiments/Phase3Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase4Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase5Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase6IntegratedExperiment.cpp
+)
+
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
@@ -87,16 +98,51 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+add_library(nlm_experiments STATIC ${NLM_EXPERIMENTS_SOURCES})
+target_include_directories(nlm_experiments PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(nlm_experiments PUBLIC nlm_core nlm_agent nlm_world)
+
+# Original Python bindings (for backward compatibility)
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
+# Enhanced Python bindings
+pybind11_add_module(pynlm_enhanced bindings_enhanced.cpp)
+target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world nlm_experiments)
+target_include_directories(pynlm_enhanced PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/../src/cli)
+
+# CLI executable
+add_executable(nlm_cli ${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world nlm_experiments)
+target_include_directories(nlm_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/../src/cli)
+
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm_enhanced PRIVATE /permissive-)
+    target_compile_options(nlm_cli PRIVATE /permissive-)
 endif()
 
+# Installation targets
 install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+    LIBRARY DESTINATION python/nlm
+    ARCHIVE DESTINATION python/nlm
+    RUNTIME DESTINATION python/nlm
+)
+
+install(TARGETS pynlm_enhanced
+    LIBRARY DESTINATION python/nlm_enhanced
+    ARCHIVE DESTINATION python/nlm_enhanced
+    RUNTIME DESTINATION python/nlm_enhanced
+)
+
+install(TARGETS nlm_cli
+    RUNTIME DESTINATION bin
+)
+
+# Documentation
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../python/README.md.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+    @ONLY
 )

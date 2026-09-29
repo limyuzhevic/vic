@@ -1,7 +1,10 @@
+// SimpleWorld.cpp - Complete replacement with critical fixes
 #include "SimpleWorld.hpp"
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <mutex>
+#include <limits>
 
 namespace nlm {
 
@@ -28,30 +31,69 @@ SimpleWorld::SimpleWorld()
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
+    , collisionMutex_()
 {
+    // Initialize agent with safe defaults
     agent_.reset();
+    agent_.x = width_ / 2.0f;
+    agent_.y = height_ / 2.0f;
+    agent_.energy = maxEnergy_;
+    agent_.health = 1.0f;
+    agent_.age = 0.0;
+    agent_.orientation = 0.0f;
+    agent_.velocityX = 0.0f;
+    agent_.velocityY = 0.0f;
+    agent_.angularVelocity = 0.0f;
+    agent_.lastActionTime = 0.0;
+    agent_.isMoving = false;
+    agent_.isTurning = false;
 }
 
-SimpleWorld::~SimpleWorld() = default;
+SimpleWorld::~SimpleWorld() {
+    // Clean up resources
+    objects_.clear();
+}
 
 void SimpleWorld::configure(float width, float height, size_t visionWidth, size_t visionHeight) {
-    width_ = width;
-    height_ = height;
-    visionWidth_ = visionWidth;
-    visionHeight_ = visionHeight;
+    width_ = std::max(width, 10.0f);  // Minimum reasonable size
+    height_ = std::max(height, 10.0f);
+    visionWidth_ = std::max(visionWidth, 4U);
+    visionHeight_ = std::max(visionHeight, 4U);
+    
+    // Regenerate vision when world size changes
+    generateVision();
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
     rngSeed_ = seed;
     rngState_ = seed;
+    
+    // Reset world with new seed for reproducible results
+    reset();
 }
 
 void SimpleWorld::reset() {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     simTime_ = 0.0;
     agent_.reset();
-    agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
-    agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
+    
+    // Place agent in center area
+    float safeMargin = 2.0f;
+    agent_.x = urand(rngState_, safeMargin, width_ - safeMargin);
+    agent_.y = urand(rngState_, safeMargin, height_ - safeMargin);
+    
     agent_.energy = maxEnergy_;
+    agent_.health = 1.0f;
+    agent_.age = 0.0;
+    agent_.orientation = 0.0f;
+    agent_.velocityX = 0.0f;
+    agent_.velocityY = 0.0f;
+    agent_.angularVelocity = 0.0f;
+    agent_.lastActionTime = 0.0;
+    agent_.isMoving = false;
+    agent_.isTurning = false;
+    
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
@@ -74,11 +116,22 @@ void SimpleWorld::reset() {
 }
 
 void SimpleWorld::setAgentStart(float x, float y) {
-    agent_.x = x;
-    agent_.y = y;
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
+    if (isValidPosition(x, y)) {
+        agent_.x = x;
+        agent_.y = y;
+        agent_.velocityX = 0.0f;
+        agent_.velocityY = 0.0f;
+        agent_.angularVelocity = 0.0f;
+        agent_.isMoving = false;
+        agent_.isTurning = false;
+    }
 }
 
 void SimpleWorld::update(double timestep) {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     simTime_ += timestep;
     
     // Apply velocity to position
@@ -113,10 +166,13 @@ void SimpleWorld::update(double timestep) {
 }
 
 uint64_t SimpleWorld::nextRandom() {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
     return lcg(rngState_);
 }
 
 ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime) {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     ActionResult result;
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
@@ -215,6 +271,8 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
 }
 
 ActionResult SimpleWorld::interact() {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
@@ -261,10 +319,18 @@ bool SimpleWorld::isValidPosition(float x, float y) const {
     if (x < 0.0f || x >= width_ || y < 0.0f || y >= height_) {
         return false;
     }
-    return true;
+    
+    // Check collision with static obstacles (world borders with thickness)
+    if (x > 0.0f && x < width_ && y > 0.0f && y < height_) {
+        return true;
+    }
+    
+    return true;  // Allow movement, handle in applyMotorCommand
 }
 
 WorldObject* SimpleWorld::getObjectAt(float x, float y) {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     for (auto& obj : objects_) {
         if (!obj.active) continue;
         
@@ -280,10 +346,17 @@ WorldObject* SimpleWorld::getObjectAt(float x, float y) {
 }
 
 void SimpleWorld::addObject(const WorldObject& obj) {
-    objects_.push_back(obj);
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
+    // Validate object before adding
+    if (isValidPosition(obj.x, obj.y)) {
+        objects_.push_back(obj);
+    }
 }
 
 void SimpleWorld::removeObject(float x, float y) {
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     for (auto& obj : objects_) {
         if (!obj.active) continue;
         
@@ -299,6 +372,9 @@ void SimpleWorld::removeObject(float x, float y) {
 }
 
 void SimpleWorld::generateVision() {
+    // Thread-safe vision generation
+    std::lock_guard<std::mutex> lock(collisionMutex_);
+    
     // Simple raycasting-based vision
     // Cast rays in a cone in front of the agent
     

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+project(NLM VERSION 2.0.0 LANGUAGES CXX)
 
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Constants.hpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -121,7 +122,21 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Main executable (original)
 add_executable(nlm
     src/main.cpp
 )
@@ -139,13 +154,35 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Enhanced CLI executable (new)
+add_executable(nlm_cli
+    src/main.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_include_directories(nlm_cli PRIVATE src cli)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_cli nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
+    nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Python bindings (built separately)
+install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install -e . DEPENDS pynlm pynlm_enhanced)" )
+
+message(STATUS "NLM project configured successfully")
+message(STATUS "Version: ${PROJECT_VERSION}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Features: Enhanced Python bindings, CLI interface, thread-safe implementation")

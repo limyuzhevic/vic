@@ -1,3 +1,4 @@
+// Brain.h - Complete replacement with fixes
 #pragma once
 
 #include "../core/Types/Types.hpp"
@@ -8,6 +9,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <mutex>  // Added for thread safety
 
 namespace nlm {
 
@@ -42,6 +44,115 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Brain implementation (PIMPL)
+class Brain::Impl {
+public:
+    // Configuration
+    std::shared_ptr<Config> config;
+    std::shared_ptr<RandomGenerator> randomGenerator;
+    
+    // Neural components
+    std::vector<std::unique_ptr<NeuralRegion>> regions;
+    std::unique_ptr<SpikeSystem> spikeSystem;
+    std::unique_ptr<STDP> stdp;
+    std::unique_ptr<Hebbian> hebbian;
+    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Memory systems
+    std::unique_ptr<NeuralWorkingMemory> workingMemory;
+    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    
+    // Prediction system
+    std::unique_ptr<PredictionSystem> predictionSystem;
+    
+    // Cognition systems
+    std::unique_ptr<NeuralPlanner> planner;
+    std::unique_ptr<ConceptFormation> conceptFormation;
+    std::unique_ptr<AttentionalSelection> attentionalSelection;
+    
+    // Development system
+    std::unique_ptr<DevelopmentSystem> developmentSystem;
+    
+    // Neuromodulation systems
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<PredictionError> predictionError;
+    
+    // Sensory and motor processing
+    std::vector<Neuron*> sensoryNeurons;
+    std::vector<Neuron*> motorNeurons;
+    
+    // Inter-region connections
+    std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Performance systems
+    std::unique_ptr<MemoryPool> memoryPool;
+    std::unique_ptr<EventQueue> eventQueue;
+    std::unique_ptr<CheckpointSystem> checkpointSystem;
+    
+    // Thread safety
+    mutable std::mutex stepMutex_;
+    
+    // State tracking
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    
+    // Statistics and metrics
+    size_t totalSpikesThisStep;
+    NeuralWorkingMemory::Metrics workingMemoryMetrics;
+    
+    // Development tracking
+    double developmentalAge;
+    float plasticityModifier;
+    
+    // Novelty detection
+    float noveltyScore;
+    std::vector<float> recentActivity;
+    
+    // Error handling
+    bool initializationFailed;
+    std::string lastError;
+    
+    // Configuration
+    static constexpr size_t DEFAULT_NEURON_COUNT = 500;
+    static constexpr size_t DEFAULT_REGION_COUNT = 1;
+    static constexpr float DEFAULT_CONNECTION_PROBABILITY = 0.15f;
+    static constexpr size_t MAX_SPIKE_HISTORY = 1000;
+    
+    Impl(std::shared_ptr<Config> cfg) : config(cfg),
+                                       randomGenerator(std::make_shared<RandomGenerator>(42)),
+                                       currentStep(0), currentTime(0.0),
+                                       totalSpikesThisStep(0), developmentalAge(0.0),
+                                       plasticityModifier(1.0f), noveltyScore(0.0f),
+                                       initializationFailed(false),
+                                       recentActivity(MAX_SPIKE_HISTORY, 0.0f) {}
+    
+    ~Impl() {
+        // Clean up resources
+        spikeSystem.reset();
+        stdp.reset();
+        hebbian.reset();
+        structuralPlasticity.reset();
+        workingMemory.reset();
+        episodicMemory.reset();
+        associativeMemory.reset();
+        predictionSystem.reset();
+        planner.reset();
+        conceptFormation.reset();
+        attentionalSelection.reset();
+        developmentSystem.reset();
+        dopamine.reset();
+        curiosity.reset();
+        novelty.reset();
+        predictionError.reset();
+        memoryPool.reset();
+        eventQueue.reset();
+        checkpointSystem.reset();
+    }
 };
 
 // Brain: The central coordinator of the neural system
@@ -166,7 +277,10 @@ public:
     
     // ========== DEVELOPMENT SYSTEM ==========
     
+    // Development system
     DevelopmentSystem* getDevelopmentSystem();
+    
+    // Developmental stage getter/setter
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
