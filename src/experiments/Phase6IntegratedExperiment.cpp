@@ -28,8 +28,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
+    
+    // STDP parameters - use same values as main.cpp for consistency
+    cfg->set("stdp_ltp_weight", 0.02f);
+    cfg->set("stdp_ltd_weight", 0.015f);
+    cfg->set("stdp_tau", 20.0f);
+    
+    // Structural plasticity parameters - use same values as main.cpp for consistency
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     

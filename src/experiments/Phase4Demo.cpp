@@ -53,8 +53,8 @@ int main(int argc, char* argv[]) {
     config->set("connection_probability", 0.1f);
     config->set("random_seed", uint64_t(42));
     config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    config->set("stdp_ltp_weight", 0.02f);
+    config->set("stdp_ltd_weight", 0.015f);
     
     // Create brain
     std::cout << "Initializing brain...\n";

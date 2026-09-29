@@ -207,8 +207,8 @@ private:
         config->set("connection_probability", 0.1f);
         config->set("random_seed", 42u);
         config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.015f);
         config->set("stdp_tau", 20.0f);
         config->set("synaptogenesis_rate", 0.0001f);
         config->set("pruning_rate", 0.00001f);
