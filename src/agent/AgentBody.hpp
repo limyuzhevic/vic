@@ -55,14 +55,30 @@ struct AgentBody {
 // Low-level motor commands that the brain can produce
 // These are innate muscle-like signals, not semantic actions
 enum class MotorCommand {
+    // Basic movement
     MoveForward = 0,   // Propel forward
     MoveBackward = 1,  // Propel backward  
     TurnLeft = 2,      // Rotate left
     TurnRight = 3,     // Rotate right
+    
+    // Sensor control
     LookLeft = 4,      // Pan sensor left
     LookRight = 5,     // Pan sensor right
+    
+    // Basic interaction
     Interact = 6,      // Interact with nearby object
-    Wait = 7           // No movement
+    
+    // Advanced motor commands (for expert users)
+    Attack = 7,        // Attack nearby object or enemy
+    Defend = 8,        // Defensive posture
+    UseItem = 9,       // Use held item
+    Jump = 10,         // Jump/hoop movement
+    Crouch = 11,       // Duck/avoid
+    Sprint = 12,       // Run faster
+    Walk = 13,         // Walk slowly
+    Retreat = 14,      // Flee from danger
+    Explore = 15,      // Move to unexplored areas
+    Wait = 16          // No movement
 };
 
 // Action result from the world's perspective

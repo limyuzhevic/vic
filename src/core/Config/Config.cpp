@@ -199,6 +199,109 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+bool Config::validate() const {
+    std::string errors = getValidationErrors();
+    return errors.empty();
+}
+
+std::string Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        const std::string& key = entry.key;
+        
+        // Validate specific known keys
+        if (key == "random_seed") {
+            try {
+                std::visit([&](auto&& arg) {
+                    if constexpr (std::is_integral_v<decltype(arg)>) {
+                        if (arg < 0) {
+                            errors.push_back("random_seed must be non-negative");
+                        }
+                    }
+                }, entry.value);
+            } catch (...) {
+                errors.push_back("random_seed has invalid value type");
+            }
+        } else if (key == "simulation_timestep") {
+            try {
+                std::visit([&](auto&& arg) {
+                    if constexpr (std::is_floating_point_v<decltype(arg)>) {
+                        if (arg <= 0.0) {
+                            errors.push_back("simulation_timestep must be positive");
+                        }
+                    }
+                }, entry.value);
+            } catch (...) {
+                errors.push_back("simulation_timestep has invalid value type");
+            }
+        } else if (key == "neuron_count") {
+            try {
+                std::visit([&](auto&& arg) {
+                    if constexpr (std::is_integral_v<decltype(arg)>) {
+                        if (arg <= 0) {
+                            errors.push_back("neuron_count must be positive");
+                        } else if (arg > 1000000) {
+                            errors.push_back("neuron_count should be reasonable (<= 1,000,000)");
+                        }
+                    }
+                }, entry.value);
+            } catch (...) {
+                errors.push_back("neuron_count has invalid value type");
+            }
+        } else if (key == "connection_probability") {
+            try {
+                std::visit([&](auto&& arg) {
+                    if constexpr (std::is_floating_point_v<decltype(arg)>) {
+                        if (arg < 0.0 || arg > 1.0) {
+                            errors.push_back("connection_probability must be between 0.0 and 1.0");
+                        }
+                    }
+                }, entry.value);
+            } catch (...) {
+                errors.push_back("connection_probability has invalid value type");
+            }
+        } else if (key == "plasticity_learning_rate") {
+            try {
+                std::visit([&](auto&& arg) {
+                    if constexpr (std::is_floating_point_v<decltype(arg)>) {
+                        if (arg < 0.0 || arg > 1.0) {
+                            errors.push_back("plasticity_learning_rate must be between 0.0 and 1.0");
+                        }
+                    }
+                }, entry.value);
+            } catch (...) {
+                errors.push_back("plasticity_learning_rate has invalid value type");
+            }
+        } else if (key == "environment_width" || key == "environment_height") {
+            try {
+                std::visit([&](auto&& arg) {
+                    if constexpr (std::is_integral_v<decltype(arg)>) {
+                        if (arg <= 0) {
+                            errors.push_back(key + " must be positive");
+                        } else if (arg > 1000) {
+                            errors.push_back(key + " should be reasonable (<= 1000)");
+                        }
+                    }
+                }, entry.value);
+            } catch (...) {
+                errors.push_back(key + " has invalid value type");
+            }
+        }
+    }
+    
+    return "Validation Errors:" + std::string(errors.empty() ? "\nNo errors." : ":\n" + 
+            [&]() -> std::string {
+                std::string joined;
+                for (size_t i = 0; i < errors.size(); ++i) {
+                    if (i > 0) joined += "\n";
+                    joined += errors[i];
+                }
+                return joined;
+            }());
+}
+}
+
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;

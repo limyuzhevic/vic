@@ -29,9 +29,6 @@ std::vector<float> SensoryPercept::getAllSignals() const {
     // Proprioception
     all.insert(all.end(), proprioception_.begin(), proprioception_.end());
     
-    // Audio
-    all.insert(all.end(), audio_.begin(), audio_.end());
-    
     return all;
 }
 

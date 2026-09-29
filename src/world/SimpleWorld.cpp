@@ -190,10 +190,194 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
             
         case MotorCommand::LookRight:
+            // Pan sensor (no movement)
             result.reward = 0.0f;
             result.success = true;
             break;
             
+        case MotorCommand::Attack: {
+            // Attack nearby object or enemy
+            ActionResult attackResult = interact();
+            if (attackResult.success) {
+                // Add attack-specific effects
+                result.reward = attackResult.reward * 1.5f;  // Boost attack reward
+                result.success = true;
+                result.message = "attack_success";
+            } else {
+                result.reward = -0.1f;  // Small penalty for failed attack
+                result.success = false;
+                result.message = "no_target_to_attack";
+            }
+            break;
+        }
+        
+        case MotorCommand::Defend: {
+            // Defensive posture - increase defense, reduce movement cost
+            agent_.isMoving = false;
+            agent_.isTurning = false;
+            result.reward = -0.005f;  // Small defensive cost
+            result.success = true;
+            result.message = "defend_mode_activated";
+            break;
+        }
+        
+        case MotorCommand::UseItem: {
+            // Use held item (could be resource, tool, etc.)
+            ActionResult itemResult = interact();
+            if (itemResult.success) {
+                result.reward = itemResult.reward + 0.5f;  // Bonus for using item
+                result.success = true;
+                result.message = "item_used_successfully";
+            } else {
+                result.reward = -0.1f;  // Penalty for failed item use
+                result.success = false;
+                result.message = "no_item_to_use";
+            }
+            break;
+        }
+        
+        case MotorCommand::Jump: {
+            // Jump movement - increase vertical velocity
+            float dx = std::cos(agent_.orientation) * moveSpeed * 1.5f;
+            float dy = std::sin(agent_.orientation) * moveSpeed * 1.5f + 2.0f;  // Extra jump height
+            
+            float newX = agent_.x + dx * 0.1f;
+            float newY = agent_.y + dy * 0.1f;
+            
+            if (isValidPosition(newX, newY)) {
+                agent_.x = newX;
+                agent_.y = newY;
+                agent_.isMoving = true;
+                result.reward = -0.03f;  // Jump cost
+                result.success = true;
+                result.message = "jump_success";
+            } else {
+                result.reward = -0.08f;  // Higher penalty for failed jump
+                result.success = false;
+                result.message = "jump_obstructed";
+            }
+            break;
+        }
+        
+        case MotorCommand::Crouch: {
+            // Crouch/duck to avoid obstacles or take cover
+            agent_.velocityX *= 0.5f;
+            agent_.velocityY *= 0.5f;
+            agent_.angularVelocity *= 0.5f;
+            result.reward = -0.002f;  // Small crouch cost
+            result.success = true;
+            result.message = "crouch_activated";
+            break;
+        }
+        
+        case MotorCommand::Sprint: {
+            // Sprint/run faster - increases energy consumption
+            float dx = std::cos(agent_.orientation) * moveSpeed * 2.0f;  // 2x speed
+            float dy = std::sin(agent_.orientation) * moveSpeed * 2.0f;
+            
+            float newX = agent_.x + dx * 0.1f;
+            float newY = agent_.y + dy * 0.1f;
+            
+            // Check energy cost for sprint
+            if (agent_.energy > 0.2f) {
+                if (isValidPosition(newX, newY)) {
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.isMoving = true;
+                    result.reward = -0.05f;  // Higher sprint cost
+                    result.success = true;
+                    result.message = "sprint_success";
+                } else {
+                    result.reward = -0.08f;  // Penalty for hitting wall while sprinting
+                    result.success = false;
+                    result.message = "sprint_obstructed";
+                }
+                // Reduce energy for sprint
+                agent_.energy -= 0.05f;
+            } else {
+                result.reward = -0.1f;  // Penalty for not enough energy
+                result.success = false;
+                result.message = "insufficient_energy_to_sprint";
+            }
+            break;
+        }
+        
+        case MotorCommand::Walk: {
+            // Walk slowly - reduced movement cost
+            float dx = std::cos(agent_.orientation) * moveSpeed * 0.3f;
+            float dy = std::sin(agent_.orientation) * moveSpeed * 0.3f;
+            
+            float newX = agent_.x + dx * 0.1f;
+            float newY = agent_.y + dy * 0.1f;
+            
+            if (isValidPosition(newX, newY)) {
+                agent_.x = newX;
+                agent_.y = newY;
+                agent_.isMoving = true;
+                result.reward = -0.005f;  // Small walk cost
+                result.success = true;
+                result.message = "walk_success";
+            } else {
+                result.reward = -0.03f;  // Lower penalty for failed walk
+                result.success = false;
+                result.message = "walk_obstructed";
+            }
+            break;
+        }
+        
+        case MotorCommand::Retreat: {
+            // Flee from danger - move away from hazards
+            // Simple implementation: move backward
+            float dx = -std::cos(agent_.orientation) * moveSpeed * 1.2f;
+            float dy = -std::sin(agent_.orientation) * moveSpeed * 1.2f;
+            
+            float newX = agent_.x + dx * 0.1f;
+            float newY = agent_.y + dy * 0.1f;
+            
+            if (isValidPosition(newX, newY)) {
+                agent_.x = newX;
+                agent_.y = newY;
+                agent_.isMoving = true;
+                result.reward = -0.03f;  // Retreat cost
+                result.success = true;
+                result.message = "retreat_success";
+            } else {
+                result.reward = -0.06f;  // Penalty for failed retreat
+                result.success = false;
+                result.message = "retreat_obstructed";
+            }
+            break;
+        }
+        
+        case MotorCommand::Explore: {
+            // Explore new areas - move in somewhat random direction
+            // For now, just move forward with slight turn
+            float dx = std::cos(agent_.orientation) * moveSpeed * 0.8f;
+            float dy = std::sin(agent_.orientation) * moveSpeed * 0.8f;
+            
+            // Add slight random exploration
+            float randomAngle = (agent_.nextRandom() % 100) / 100.0f * 2.0f * M_PI - M_PI;
+            dx += std::cos(randomAngle) * 0.5f;
+            dy += std::sin(randomAngle) * 0.5f;
+            
+            float newX = agent_.x + dx * 0.1f;
+            float newY = agent_.y + dy * 0.1f;
+            
+            if (isValidPosition(newX, newY)) {
+                agent_.x = newX;
+                agent_.y = newY;
+                agent_.isMoving = true;
+                result.reward = -0.02f;  // Moderate exploration cost
+                result.success = true;
+                result.message = "explore_success";
+            } else {
+                result.reward = -0.04f;  // Lower penalty for failed exploration
+                result.success = false;
+                result.message = "explore_obstructed";
+            }
+            break;
+        }
+        
         case MotorCommand::Interact:
             result = interact();
             break;
@@ -389,7 +573,6 @@ void SimpleWorld::generateVision() {
     sensory_.setProprioception(proprioception);
     
     // No audio for now
-    sensory_.setAudio({});
 }
 
 void SimpleWorld::checkCollisions() {

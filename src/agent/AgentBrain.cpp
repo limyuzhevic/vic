@@ -31,15 +31,29 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                    motorInteract_.size() + motorWait_.size() +
+                                    motorAttack_.size() + motorDefend_.size() +
+                                    motorUseItem_.size() + motorJump_.size() +
+                                    motorCrouch_.size() + motorSprint_.size() +
+                                    motorWalk_.size() + motorRetreat_.size() +
+                                    motorExplore_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 16) { // 16 for new expanded range
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
                             case 4: motorInteract_.push_back(n); break;
                             case 5: motorWait_.push_back(n); break;
+                            case 6: motorAttack_.push_back(n); break;
+                            case 7: motorDefend_.push_back(n); break;
+                            case 8: motorUseItem_.push_back(n); break;
+                            case 9: motorJump_.push_back(n); break;
+                            case 10: motorCrouch_.push_back(n); break;
+                            case 11: motorSprint_.push_back(n); break;
+                            case 12: motorWalk_.push_back(n); break;
+                            case 13: motorRetreat_.push_back(n); break;
+                            case 14: motorExplore_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -80,12 +94,20 @@ size_t AgentBrain::getSensoryInputSize() const {
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action (including advanced commands)
+    return 17;  // 0-16 for all motor commands
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot process sensory input: brain is null");
+        return;
+    }
+    
+    // Validate percept
+    if (percept.getVision().empty()) {
+        NLM_LOG_WARNING("Processing sensory input with empty vision data");
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -125,7 +147,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
         for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
@@ -136,7 +158,9 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
         // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        if (sensoryNoveltyDecay_ > 0.0f) {
+            noveltyLevel_ *= sensoryNoveltyDecay_;
+        }
         
         // Store for next time
         previousVision_ = vision;
@@ -150,7 +174,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot decode motor command: brain is null");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -211,14 +238,14 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityLevel_ > 0.5f && brain_->getRandomGenerator()) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - choose from valid motor commands (0-16)
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 16);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,8 +254,22 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 7: return MotorCommand::Attack;
+                case 8: return MotorCommand::Defend;
+                case 9: return MotorCommand::UseItem;
+                case 10: return MotorCommand::Jump;
+                case 11: return MotorCommand::Crouch;
+                case 12: return MotorCommand::Sprint;
+                case 13: return MotorCommand::Walk;
+                case 14: return MotorCommand::Retreat;
+                case 15: return MotorCommand::Explore;
+                case 16: return MotorCommand::Wait;
             }
+        }
+    }
+    
+    return defaultCmd;
+}
         }
     }
     
@@ -236,7 +277,23 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        if (!brain_) {
+            NLM_LOG_ERROR("Cannot apply reward modulation: brain is null");
+        }
+        return;
+    }
+    
+    // Validate inputs
+    if (std::isnan(reward) || std::isinf(reward)) {
+        NLM_LOG_WARNING("Invalid reward value: ", reward);
+        reward = 0.0f;
+    }
+    
+    if (std::isnan(predictedReward) || std::isinf(predictedReward)) {
+        NLM_LOG_WARNING("Invalid predicted reward value: ", predictedReward);
+        predictedReward = 0.0f;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -280,7 +337,18 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        if (!brain_) {
+            NLM_LOG_ERROR("Cannot update development: brain is null");
+        }
+        return;
+    }
+    
+    // Validate timestep
+    if (std::isnan(timestep) || std::isinf(timestep)) {
+        NLM_LOG_WARNING("Invalid timestep for development update: ", timestep);
+        timestep = 0.0;
+    }
     
     developmentalAge_ += timestep;
     

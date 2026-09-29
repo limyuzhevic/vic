@@ -33,9 +33,9 @@ public:
     const std::vector<float>& getProprioception() const { return proprioception_; }
     void setProprioception(const std::vector<float>& p) { proprioception_ = p; }
     
-    // Audio-like signals (if enabled)
-    const std::vector<float>& getAudio() const { return audio_; }
-    void setAudio(const std::vector<float>& a) { audio_ = a; }
+    // Proprioception: body position/velocity signals
+    const std::vector<float>& getProprioception() const { return proprioception_; }
+    void setProprioception(const std::vector<float>& p) { proprioception_ = p; }
     
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
@@ -51,7 +51,6 @@ private:
     std::vector<float> touch_;
     std::vector<float> internal_;
     std::vector<float> proprioception_;
-    std::vector<float> audio_;
     double timestamp_;
 };
 
