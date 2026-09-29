@@ -163,6 +163,9 @@ public:
     // Bottom-up attention (stimulus-driven)
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
 
+    // Set prediction error to modulate attention
+    void setPredictionError(float predictionError);
+
     // Reset attention
     void reset();
 

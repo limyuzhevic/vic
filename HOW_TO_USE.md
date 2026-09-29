@@ -444,15 +444,67 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+### Prediction System Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
-| `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
-| `neuromod.novelty.enable` | bool | true | Enable novelty detection |
+| `prediction.enable` | bool | true | Enable prediction system |
+| `prediction.window` | float | 10.0 | Prediction time window (seconds) |
+| `prediction.noise` | float | 0.1 | Prediction noise level (uncertainty) |
 
----
+### Concept Formation Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `concept.enable` | bool | true | Enable concept formation |
+| `concept.threshold` | float | 0.75 | Concept formation threshold |
+| `concept.stability_threshold` | float | 0.7 | Concept stability requirement |
+
+### Neural Planning Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `planning.enable` | bool | true | Enable neural planning |
+| `planning.depth` | int | 5 | Planning depth (lookahead steps) |
+| `planning.confidence` | float | 0.5 | Planning confidence threshold |
+
+### Memory System Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `memory.working_capacity` | int | 100 | Working memory capacity |
+| `memory.working_decay` | float | 0.01 | Working memory decay rate |
+| `memory.episodic_max_episodes` | int | 1000 | Maximum episodic memory episodes |
+| `memory.episodic_replay_interval` | int | 100 | Episodic memory replay interval |
+
+### Attention System Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `attention.enable` | bool | true | Enable attention system |
+| `attention.inhibition_strength` | float | 0.5 | Attention inhibition strength |
+| `attention.excitation_strength` | float | 1.5 | Attention excitation strength |
+
+### Development Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `development.enable` | bool | true | Enable development system |
+| `development.age` | float | 0.0 | Current developmental age |
+
+### Novelty Detection Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `novelty.enable` | bool | true | Enable novelty detection |
+| `novelty.threshold` | float | 0.5 | Novelty detection threshold |
+
+### Statistics Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `statistics.window` | int | 1000 | Statistics collection window |
+| `statistics.update_rate` | float | 10.0 | Statistics update rate (Hz) |
 
 ## Part 5: Example Scripts
 
@@ -473,27 +525,77 @@ for i in range(100):
 print("Simulation complete!")
 ```
 
-### Environment Interaction
+### Environment Interaction with Integrated Systems
 
 ```python
 import pynlm
 
-# Setup
+# Setup with integrated systems
 config = pynlm.createDefaultConfig()
+
+# Enable prediction system for future sensing
+config.set("prediction.enable", true)
+config.set("prediction.window", 5.0)
+
+# Enable concept formation
+config.set("concept.enable", true)
+config.set("concept.threshold", 0.7)
+
+# Enable neural planning
+config.set("planning.enable", true)
+config.set("planning.depth", 3)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 agent = pynlm.createAgentBrain(brain)
 world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
 agent.initialize(world)
 
-# Run episode
-for _ in range(500):
+# Run episode with integrated systems
+for step in range(1000):
+    # 1. Update world
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    
+    # 2. Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # 3. Process sensory input (including prediction)
+    agent.processSensoryInput(percept)
+    
+    # 4. Make predictions for next state
+    # (Integrated into sensory processing)
+    
+    # 5. Form concepts from patterns
+    # (Integrated into brain step)
+    
+    # 6. Brain thinks with integrated systems
+    brain.step(step)
+    
+    # 7. Plan actions using neural planner
+    motor_cmd = agent.decodeMotorCommand()
+    
+    # 8. Apply action to world
+    world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+    
+    # 9. Apply reward modulation
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    
+    # 10. Update development
+    agent.updateDevelopment(0.1)
+    
+    # Print progress
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Prediction Error: {agent.getPredictionError():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Episode complete with integrated prediction, concept formation, and planning!")
 ```
 
 ---

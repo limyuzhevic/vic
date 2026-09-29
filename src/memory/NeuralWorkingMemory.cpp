@@ -249,8 +249,9 @@ struct AttentionalSelection::Impl {
     // Neuron competition state
     std::vector<float> competitionStrength;
     std::vector<float> inhibitionLevel;
+    float predictionError;  // Track prediction error for attention modulation
     
-    Impl() {}
+    Impl() : predictionError(0.0f) {}
 };
 
 AttentionalSelection::AttentionalSelection()
@@ -412,6 +413,26 @@ void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salience
     } else {
         bottomUpSalience_[neuron.value] = salienceStrength;
     }
+}
+
+// Set prediction error to modulate attention
+void AttentionalSelection::setPredictionError(float predictionError) {
+    // Store prediction error in attention system
+    // This can be used to modulate attention allocation
+    // High prediction error should draw attention to novel/predictable inputs
+    
+    pImpl->predictionError = predictionError;
+    
+    // Adjust attention parameters based on prediction error
+    if (predictionError > 0.5f) {
+        // High prediction error - increase exploration
+        setCompetitionThreshold(0.3f);
+    } else if (predictionError < 0.2f) {
+        // Low prediction error - increase focus
+        setCompetitionThreshold(0.7f);
+    }
+    
+    NLM_LOG_DEBUG("AttentionalSelection: Prediction error set to = " + std::to_string(predictionError));
 }
 
 void AttentionalSelection::reset() {

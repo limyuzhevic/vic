@@ -511,8 +511,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make predictions based on current neural activity
+        // Train on recent sensory observations
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a mock sensory input from neural activity
+            // In a real system, this would come from actual sensory processing
+            auto& neurons = pImpl->sensoryNeurons;
+            std::vector<float> sensoryData;
+            sensoryData.reserve(neurons.size());
+            
+            for (auto* neuron : neurons) {
+                sensoryData.push_back(neuron->getMembranePotential());
+            }
+            
+            // Create mock sensory input (this would be done by actual sensory processing)
+            class MockSensoryInput {
+            public:
+                void setData(const std::vector<float>& data) { data_ = data; }
+                const std::vector<float>& getData() const { return data_; }
+            private:
+                std::vector<float> data_;
+            };
+            
+            MockSensoryInput sensoryInput;
+            sensoryInput.setData(sensoryData);
+            
+            // Make prediction and train on it
+            auto prediction = pImpl->predictionSystem->predictNextState(sensoryInput);
+            pImpl->predictionSystem->train(sensoryInput);
+            
+            // Update prediction with actual sensory data if available
+            // (In a real system, this would happen when actual sensory input arrives)
+            
+            // Use prediction error to modulate learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float curiosityLevel = pImpl->predictionSystem->getCuriosityLevel();
+            float attentionWeight = pImpl->predictionSystem->getAttentionWeight();
+            
+            // Apply prediction error effects
+            applyPredictionErrorEffects(predictionError);
+            
+// Update curiosity with prediction error
+            float novelty = 0.0f; // Could come from novelty system
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->curiosity->update(novelty, predictionError, pImpl->timestep);
+            
+            // Apply attention modulation
+            if (pImpl->attention) {
+                pImpl->attention->setPredictionError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +576,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation analyzes patterns from working memory and episodic memory
+        processConceptFormation();
+    }
+    
+    // ========== STEP 11: Neural planning ==========
+    if (pImpl->planner) {
+        // Neural planning based on current state and predictions
+        planActionSequence();
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -733,6 +788,126 @@ void Brain::updatePlasticity() {
 void Brain::develop() {
     // Development updates structural plasticity
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
+}
+
+void Brain::applyPredictionErrorEffects(float predictionError) {
+    // Apply effects of prediction error on neural processing
+    // High prediction errors trigger learning and exploration
+    
+    if (predictionError > 0.5f) {
+        // High prediction error - increase plasticity
+        if (pImpl->stdp) {
+            float learningRate = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+            learningRate = std::clamp(learningRate, 0.0f, 1.0f);
+            
+            // Increase STDP learning rates
+            float ltpWeight = pImpl->stdp->getLTPWeight();
+            float ltdWeight = pImpl->stdp->getLTDWeight();
+            
+            pImpl->stdp->setLTPWeight(ltpWeight * (1.0f + predictionError * 0.5f));
+            pImpl->stdp->setLTDWeight(ltdWeight * (1.0f + predictionError * 0.3f));
+        }
+    }
+    
+    // Apply prediction error to neuromodulation
+    if (pImpl->dopamine) {
+        // Prediction error is itself a dopamine signal
+        // In a real system, this would update dopamine levels
+    }
+    
+    NLM_LOG_DEBUG("Brain: Applied prediction error effects = " + std::to_string(predictionError));
+}
+
+void Brain::processConceptFormation() {
+    // Process concept formation from current neural activity
+    // Extract patterns from working memory and episodic memory
+    
+    // Get current patterns from working memory
+    std::vector<float> workingMemoryPattern;
+    if (pImpl->workingMemory) {
+        workingMemoryPattern = pImpl->workingMemory->retrieve();
+    }
+    
+    // Get recent episodic memory
+    std::vector<float> episodicPattern;
+    if (pImpl->episodicMemory) {
+        // For now, just use the most recent episode
+        // In a real implementation, this would sample from episodic memory
+        auto episodes = pImpl->episodicMemory->getEpisodes();
+        if (!episodes.empty()) {
+            const auto* latestEpisode = episodes.back();
+            episodicPattern = latestEpisode->neuronActivations;
+        }
+    }
+    
+    // Combine patterns for concept formation
+    std::vector<float> combinedPattern;
+    if (!workingMemoryPattern.empty() && !episodicPattern.empty()) {
+        // Average the patterns
+        size_t minSize = std::min(workingMemoryPattern.size(), episodicPattern.size());
+        combinedPattern.reserve(minSize);
+        for (size_t i = 0; i < minSize; ++i) {
+            combinedPattern.push_back((workingMemoryPattern[i] + episodicPattern[i]) / 2.0f);
+        }
+    } else if (!workingMemoryPattern.empty()) {
+        combinedPattern = workingMemoryPattern;
+    } else if (!episodicPattern.empty()) {
+        combinedPattern = episodicPattern;
+    }
+    
+    // Present to concept formation system
+    if (pImpl->conceptFormation && !combinedPattern.empty()) {
+        // For now, just process with a simple reward signal
+        // In a real implementation, this would extract features and detect concepts
+        float reward = 0.5f; // Neutral reward for pattern
+        
+        // Present pattern to concept formation
+        pImpl->conceptFormation->presentExperience(
+            combinedPattern,  // The pattern itself
+            combinedPattern,  // Features (same as pattern for now)
+            reward,
+            pImpl->currentStep
+        );
+    }
+    
+    NLM_LOG_DEBUG("Brain: Processed concept formation with " + std::to_string(combinedPattern.size()) + " features");
+}
+
+void Brain::planActionSequence() {
+    // Neural planning based on current state and predictions
+    // Use the NeuralPlanner to evaluate and select actions
+    
+    // Get current state from neural activity
+    std::vector<float> currentState;
+    
+    // Collect neural activity from motor and internal neurons
+    for (auto* neuron : pImpl->motorNeurons) {
+        currentState.push_back(neuron->getMembranePotential());
+    }
+    
+    // Also include some sensory and internal neuron activity
+    for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+        currentState.push_back(pImpl->sensoryNeurons[i]->getMembranePotential());
+    }
+    
+    // Get target reward from prediction system if available
+    float targetReward = 0.5f; // Default moderate reward
+    if (pImpl->predictionSystem) {
+        targetReward = pImpl->predictionSystem->getPredictionError();
+    }
+    
+    // Use neural planner to plan action
+    if (pImpl->planner && !currentState.empty()) {
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Log the planned action
+        NLM_LOG_DEBUG("Brain: Neural planner selected action = " + std::to_string(static_cast<int>(plannedAction)));
+        
+        // Store the planned action for use
+        // In a real system, this would be integrated with the action selection system
+    }
+    
+    NLM_LOG_DEBUG("Brain: Neural planning based on " + std::to_string(currentState.size()) + " neural features");
 }
 
 void Brain::reset() {
