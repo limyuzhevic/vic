@@ -12,22 +12,27 @@
 namespace nlm {
 
 // Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+    class Config;
+    class RandomGenerator;
+    class SimulationClock;
+    class Logger;
+    class NeuralWorkingMemory;
+    class NeuralEpisodicMemory;
+    class NeuralAssociativeMemory;
+    class SemanticMemory;
+    class ProceduralMemory;
+    class PredictionSystem;
+    class NeuralPlanner;
+    class ConceptFormation;
+    class AttentionalSelection;
+    class DevelopmentSystem;
+    class Dopamine;
+    class Serotonin;
+    class Norepinephrine;
+    class Acetylcholine;
+    class Curiosity;
+    class Novelty;
+    class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -145,6 +150,12 @@ public:
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
     
+    // Semantic memory - gradually acquired knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
+    
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
@@ -178,11 +189,14 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+    // Serotonin: Mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Norepinephrine: Arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine: Attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

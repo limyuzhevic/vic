@@ -14,7 +14,7 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-set(NLM_CORE_SOURCES
+NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
@@ -36,7 +36,10 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/development/Pruning.cpp
     ${NLM_SOURCE_DIR}/development/Maturation.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Dopamine.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Serotonin.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Norepinephrine.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Acetylcholine.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
