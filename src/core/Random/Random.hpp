@@ -55,6 +55,36 @@ public:
     // Exponential distribution
     double exponential(double lambda);
     
+    // Gamma distribution
+    double gamma(double shape, double scale);
+    
+    // Weibull distribution
+    double weibull(double scale, double shape);
+    
+    // Beta distribution
+    double beta(double alpha, double beta);
+    
+    // Chi-squared distribution
+    double chiSquared(double degreesOfFreedom);
+    
+    // Student's t-distribution
+    double studentT(double degreesOfFreedom);
+    
+    // F-distribution
+    double fDistribution(double numDof, double denDof);
+    
+    // Cauchy distribution
+    double cauchy(double location, double scale);
+    
+    // Laplace distribution
+    double laplace(double mu, double b);
+    
+    // Log-normal distribution
+    double logNormal(double mean, double stddev);
+    
+    // Geometric distribution
+    uint64_t geometric(double p);
+    
     // Random boolean
     bool randomBool();
     
@@ -74,6 +104,23 @@ public:
     
     // Fill range with random bytes
     void fillBytes(void* data, size_t size);
+    
+    // Convenience methods
+    // Generate random string of specified length
+    std::string randomString(size_t length, const std::string& charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+    
+    // Generate random UUID
+    std::string randomUUID();
+    
+    // Get random hex color
+    std::string randomHexColor();
+    
+    // Get random name from list
+    template<typename Container>
+    auto randomFromList(const Container& list) -> typename Container::const_reference;
+    
+    // Check if value is within confidence interval
+    bool isInConfidenceInterval(double value, double mean, double stddev, double confidence = 0.95);
     
     // Get underlying engine for advanced use
     std::mt19937_64& engine();
