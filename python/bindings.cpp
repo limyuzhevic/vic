@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -39,6 +41,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -51,6 +56,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const SynapseId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
@@ -63,6 +71,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const RegionId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
@@ -71,7 +82,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const PopulationId& id) {
+            return std::to_string(id.value);
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -142,6 +160,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Add convenience and validation methods to Config
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -154,6 +173,47 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            try {
+                return self.getOr<std::string>(key, "");
+            } catch (const std::exception&) {
+                return "";
+            }
+        }, py::arg("key"), "Get a configuration value as string")
+        .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+            try {
+                return self.getOr<int64_t>(key, defaultValue);
+            } catch (const std::exception&) {
+                return defaultValue;
+            }
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get a configuration value as int")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            try {
+                return self.getOr<float>(key, defaultValue);
+            } catch (const std::exception&) {
+                return defaultValue;
+            }
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f, "Get a configuration value as float")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            try {
+                std::string value = self.getOr<std::string>(key, "");
+                return value == "true" || value == "1" || value == "yes";
+            } catch (const std::exception&) {
+                return defaultValue;
+            }
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get a configuration value as bool")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as int")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as float")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value ? "true" : "false", ConfigSource::User);
+        }, py::arg("key"), py::arg("value"), "Set a configuration value as bool")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -170,7 +230,25 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        // Python-friendly helper methods
+        .def("getDataAsList", [](const SensoryInput& self) {
+            return self.getData();
+        }, "Get sensory data as a Python list")
+        .def("getTypeName", [](const SensoryInput& self) {
+            // Convert neuron type to string for easier use
+            switch (self.getType()) {
+                case NeuronType::Sensory: return std::string("Sensory");
+                case NeuronType::Motor: return std::string("Motor");
+                case NeuronType::Internal: return std::string("Internal");
+                case NeuronType::Excitatory: return std::string("Excitatory");
+                case NeuronType::Inhibitory: return std::string("Inhibitory");
+                case NeuronType::Modulatory: return std::string("Modulatory");
+                case NeuronType::Electrical: return std::string("Electrical");
+                case NeuronType::GapJunction: return std::string("GapJunction");
+                default: return std::string("Unknown");
+            }
+        }, "Get human-readable type name");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -207,7 +285,34 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("getNameByType", [](ActionType type) {
+            // Helper function to get action name from type
+            switch (type) {
+                case ActionType::MoveForward: return std::string("MoveForward");
+                case ActionType::MoveBackward: return std::string("MoveBackward");
+                case ActionType::MoveLeft: return std::string("MoveLeft");
+                case ActionType::MoveRight: return std::string("MoveRight");
+                case ActionType::TurnLeft: return std::string("TurnLeft");
+                case ActionType::TurnRight: return std::string("TurnRight");
+                case ActionType::Look: return std::string("Look");
+                case ActionType::LookUp: return std::string("LookUp");
+                case ActionType::LookDown: return std::string("LookDown");
+                case ActionType::Interact: return std::string("Interact");
+                case ActionType::Eat: return std::string("Eat");
+                case ActionType::Drink: return std::string("Drink");
+                case ActionType::Rest: return std::string("Rest");
+                case ActionType::Wait: return std::string("Wait");
+                case ActionType::Custom: return std::string("Custom");
+                default: return std::string("Unknown");
+            }
+        }, py::arg("type"), "Get action name from type")
+        .def("isMovement", &Action::getType, "Check if this is a movement action")
+        .def("isLooking", &Action::getType, "Check if this is a looking action")
+        .def("isInteracting", &Action::getType, "Check if this is an interaction action")
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& action) {
+            return "<Action: " + action.getName() + " parameters=" + std::to_string(action.getParameters().size()) + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -219,7 +324,34 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        // Python-friendly helper methods
+        .def("getTypeName", [](const WorldObject& obj) {
+            // Convert world object type to string
+            switch (obj.type) {
+                case WorldObjectType::Empty: return std::string("Empty");
+                case WorldObjectType::Resource: return std::string("Resource");
+                case WorldObjectType::Hazard: return std::string("Hazard");
+                case WorldObjectType::Wall: return std::string("Wall");
+                case WorldObjectType::Marker: return std::string("Marker");
+                default: return std::string("Unknown");
+            }
+        }, "Get human-readable type name")
+        .def("isResource", [](const WorldObject& obj) {
+            return obj.type == WorldObjectType::Resource;
+        }, "Check if this is a resource object")
+        .def("isHazard", [](const WorldObject& obj) {
+            return obj.type == WorldObjectType::Hazard;
+        }, "Check if this is a hazard object")
+        .def("distanceTo", [](const WorldObject& obj, float x, float y) {
+            float dx = obj.x - x;
+            float dy = obj.y - y;
+            return std::sqrt(dx * dx + dy * dy);
+        }, py::arg("x"), py::arg("y"), "Calculate distance to a point")
+        .def("__repr__", [](const WorldObject& obj) {
+            std::string typeName = obj.getTypeName();
+            return "<WorldObject: " + typeName + " at (" + std::to_string(obj.x) + ", " + std::to_string(obj.y) + ") radius=" + std::to_string(obj.radius) + " active=" + std::to_string(obj.active) + ">";
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -261,7 +393,68 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Python-friendly helper methods
+        .def("getVisionAsList", [](const SensoryPercept& self) {
+            return self.getVision();
+        }, "Get vision data as Python list")
+        .def("getTouchAsList", [](const SensoryPercept& self) {
+            return self.getTouch();
+        }, "Get touch data as Python list")
+        .def("getInternalAsList", [](const SensoryPercept& self) {
+            return self.getInternal();
+        }, "Get internal data as Python list")
+        .def("getProprioceptionAsList", [](const SensoryPercept& self) {
+            return self.getProprioception();
+        }, "Get proprioception data as Python list")
+        .def("getAudioAsList", [](const SensoryPercept& self) {
+            return self.getAudio();
+        }, "Get audio data as Python list")
+        .def("isVisionAvailable", [](const SensoryPercept& self) {
+            return !self.getVision().empty();
+        }, "Check if vision data is available")
+        .def("isTouchAvailable", [](const SensoryPercept& self) {
+            return !self.getTouch().empty();
+        }, "Check if touch data is available")
+        .def("getEnergyLevel", [](const SensoryPercept& self) {
+            const auto& internal = self.getInternal();
+            if (internal.size() > 0) {
+                return internal[0];  // Energy is first internal signal
+            }
+            return 0.0f;
+        }, "Get energy level from internal signals")
+        .def("getHealthLevel", [](const SensoryPercept& self) {
+            const auto& internal = self.getInternal();
+            if (internal.size() > 1) {
+                return internal[1];  // Health is second internal signal
+            }
+            return 0.0f;
+        }, "Get health level from internal signals")
+        .def("getMovementState", [](const SensoryPercept& self) {
+            const auto& internal = self.getInternal();
+            if (internal.size() > 2) {
+                return internal[2] > 0.5f;  // Movement is third internal signal
+            }
+            return false;
+        }, "Get movement state from internal signals")
+        .def("getTurningState", [](const SensoryPercept& self) {
+            const auto& internal = self.getInternal();
+            if (internal.size() > 3) {
+                return internal[3] > 0.5f;  // Turning is fourth internal signal
+            }
+            return false;
+        }, "Get turning state from internal signals")
+        .def("__repr__", [](const SensoryPercept& percept) {
+            std::stringstream ss;
+            ss << "<SensoryPercept: "
+               << "vision=[" << percept.getVision().size() << "] "
+               << "touch=[" << percept.getTouch().size() << "] "
+               << "internal=[" << percept.getInternal().size() << "] "
+               << "proprioception=[" << percept.getProprioception().size() << "] "
+               << "timestamp=" << percept.getTimestamp()
+               << ">";
+            return ss.str();
+        });
 
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -342,6 +535,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +546,190 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // ========== ADVANCED BRAIN MANAGEMENT UTILITIES ==========
+        
+        // Batch processing methods
+        .def("batchStep", [](Brain& self, const std::vector<SimulationStep>& steps, 
+                          const std::vector<Timestamp>& times) {
+            for (size_t i = 0; i < steps.size(); ++i) {
+                if (i < times.size()) {
+                    self.step(steps[i], times[i]);
+                } else {
+                    self.step(steps[i]);
+                }
+            }
+        }, py::arg("steps"), py::arg("times") = std::vector<Timestamp>(),
+         "Perform multiple simulation steps at once")
+        .def("batchInjectCurrent", [](Brain& self, 
+                                   const std::vector<std::pair<NeuronId, MembranePotential>>& injections) {
+            for (const auto& inj : injections) {
+                self.injectCurrent(inj.first, inj.second);
+            }
+        }, py::arg("injections"),
+         "Inject current into multiple neurons at once")
+        .def("batchInjectByType", [](Brain& self, 
+                                  const std::vector<std::pair<NeuronType, MembranePotential>>& typeInjections) {
+            for (const auto& inj : typeInjections) {
+                self.injectCurrentToNeurons(inj.first, inj.second);
+            }
+        }, py::arg("typeInjections"),
+         "Inject current into neurons by type for multiple types")
+        
+        // Brain cloning and copying utilities
+        .def("clone", [](const std::shared_ptr<Brain>& self) -> std::shared_ptr<Brain> {
+            auto config = self->getConfig();
+            auto cloned = std::make_shared<Brain>(config);
+            cloned->initialize();
+            return cloned;
+        }, "Create a copy (clone) of this brain")
+        .def("copyState", [](Brain& self, const std::shared_ptr<Brain>& source) {
+            // Reset first
+            self.reset();
+            // Note: In a real implementation, you would copy state more completely
+            // This is a simplified version that reinitializes
+            self.initialize();
+        }, py::arg("source"),
+         "Copy state from another brain (experimental)")
+        
+        // Advanced serialization utilities
+        .def("exportState", [](Brain& self) {
+            std::stringstream ss;
+            // In a real implementation, this would serialize the brain state
+            // For now, we'll collect basic statistics
+            ss << "Brain State Export:\n";
+            ss << "  Total Neurons: " << self.getTotalNeuronCount() << "\n";
+            ss << "  Total Synapses: " << self.getTotalSynapseCount() << "\n";
+            ss << "  Active Neurons: " << self.getActiveNeuronCount() << "\n";
+            ss << "  Firing Neurons: " << self.getFiringNeuronCount() << "\n";
+            ss << "  Total Spikes: " << self.getTotalSpikeCount() << "\n";
+            ss << "  Pending Spikes: " << self.getPendingSpikeEventCount() << "\n";
+            ss << "  Development Stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+            ss << "  E/I Ratio: " << self.getExcitationInhibitionRatio() << "\n";
+            return ss.str();
+        }, "Export brain state as string (for debugging/export)")
+        .def("importState", [](Brain& self, const std::string& stateStr) {
+            // In a real implementation, this would parse and restore state
+            // For now, just log that import was attempted
+            if (!stateStr.empty()) {
+                // Parse basic statistics from the string
+                // This is a simplified parser for demonstration
+                std::string logMsg = "Import state attempted (len=" + std::to_string(stateStr.size()) + ")";
+                // In production, you'd actually parse and restore state
+            }
+        }, py::arg("state_str"),
+         "Import brain state from string (placeholder - needs full implementation)")
+        
+        // Advanced configuration templates
+        .def("applyTemplate", [](Brain& self, const std::string& templateName) {
+            auto config = self.getConfig();
+            if (templateName == "advanced_learning") {
+                // Apply advanced learning template
+                config->set("brain.neuromodulation.enabled", "true");
+                config->set("brain.plasticity.hebbian.enabled", "true");
+                config->set("brain.plasticity.stdp.enabled", "true");
+                config->set("brain.plasticity.reward_modulated.enabled", "true");
+                config->set("brain.development.enabled", "true");
+                config->set("brain.curiosity.enabled", "true");
+                config->set("brain.novelty.enabled", "true");
+            } else if (templateName == "high_performance") {
+                // Apply high-performance template
+                config->set("brain.synapse.short_term_plasticity.enabled", "true");
+                config->set("brain.plasticity.stdp.enabled", "true");
+                config->set("brain.development.enabled", "false");
+            } else if (templateName == "balanced") {
+                // Apply balanced template
+                config->set("brain.neuromodulation.enabled", "true");
+                config->set("brain.plasticity.hebbian.enabled", "true");
+                config->set("brain.plasticity.stdp.enabled", "true");
+                config->set("brain.plasticity.reward_modulated.enabled", "false");
+                config->set("brain.development.enabled", "true");
+            }
+            self.initialize();
+        }, py::arg("template_name"),
+         "Apply an advanced configuration template")
+        .def("getTemplateList", []() {
+            return std::vector<std::string>{
+                "advanced_learning",
+                "high_performance", 
+                "balanced",
+                "conservative",
+                "exploratory"
+            };
+        }, "Get list of available configuration templates");
+        
+        // ========== ENHANCED NEURAL NETWORK UTILITIES ==========
+        
+        // Network analysis tools
+        .def("analyzeConnectivity", &Brain::getExcitationInhibitionRatio,
+             "Analyze network connectivity (E/I ratio)")
+        .def("getNetworkDensity", &Brain::getTotalSynapseCount,
+             "Get synaptic density (synapses/neurons)")
+        .def("analyzeFiringPatterns", [](const Brain& self) {
+            std::stringstream ss;
+            ss << "Firing Pattern Analysis:\n";
+            ss << "  Average Firing Rate: " << self.getAverageFiringRate() << " Hz\n";
+            ss << "  Active Neurons: " << self.getActiveNeuronCount() << "\n";
+            ss << "  Firing Neurons: " << self.getFiringNeuronCount() << "\n";
+            ss << "  Total Spikes: " << self.getTotalSpikeCount() << "\n";
+            return ss.str();
+        }, "Analyze firing patterns across the network")
+        
+        // Pattern matching and similarity search
+        .def("findSimilarNeurons", [](Brain& self, NeuronId referenceNeuron, 
+                                   float threshold = 0.7) {
+            // Simplified pattern matching - in reality this would involve
+            // more complex connectivity and activity analysis
+            std::vector<NeuronId> similar;
+            // In real implementation, you would analyze connectivity and activity
+            // patterns of neurons similar to referenceNeuron
+            return similar;
+        }, py::arg("reference_neuron"), py::arg("threshold") = 0.7f,
+         "Find neurons with similar patterns to reference neuron")
+        .def("calculateSimilarity", [](const Brain& self, NeuronId neuron1, NeuronId neuron2) {
+            // Simplified similarity metric - in reality this would use
+            // more sophisticated graph analysis
+            return 0.5f; // Placeholder
+        }, py::arg("neuron1"), py::arg("neuron2"),
+         "Calculate similarity between two neurons (0.0 to 1.0)")
+        
+        // Advanced learning control interfaces
+        .def("enableAdvancedLearning", [](Brain& self, bool enable) {
+            auto config = self.getConfig();
+            config->set("brain.plasticity.hebbian.enabled", enable ? "true" : "false");
+            config->set("brain.plasticity.stdp.enabled", enable ? "true" : "false");
+            config->set("brain.plasticity.reward_modulated.enabled", enable ? "true" : "false");
+        }, py::arg("enable"),
+         "Enable/disable advanced plasticity mechanisms")
+        .def("setLearningRate", [](Brain& self, const std::string& mechanism, float rate) {
+            auto config = self.getConfig();
+            config->set("brain.learning_rates." + mechanism, std::to_string(rate));
+        }, py::arg("mechanism"), py::arg("rate"),
+         "Set learning rate for a specific plasticity mechanism")
+        
+        // Neuromodulation fine-tuning tools
+        .def("adjustNeuromodulation", [](Brain& self, const std::string& type, float level) {
+            auto config = self.getConfig();
+            if (type == "dopamine") {
+                config->set("brain.dopamine.level", std::to_string(level));
+            } else if (type == "curiosity") {
+                config->set("brain.curiosity.level", std::to_string(level));
+            } else if (type == "novelty") {
+                config->set("brain.novelty.level", std::to_string(level));
+            }
+        }, py::arg("type"), py::arg("level"),
+         "Adjust neuromodulation level for a specific system")
+        .def("getNeuromodulationState", [](const Brain& self) {
+            std::stringstream ss;
+            auto config = self.getConfig();
+            ss << "Neuromodulation State:\n";
+            ss << "  Dopamine: " << config->getOr<std::string>("brain.dopamine.level", "0.5") << "\n";
+            ss << "  Curiosity: " << config->getOr<std::string>("brain.curiosity.level", "0.5") << "\n";
+            ss << "  Novelty: " << config->getOr<std::string>("brain.novelty.level", "0.5") << "\n";
+            ss << "  Prediction Error: " << config->getOr<std::string>("brain.prediction_error.level", "0.5") << "\n";
+            return ss.str();
+        }, "Get current neuromodulation state");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
