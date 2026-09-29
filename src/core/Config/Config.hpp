@@ -68,15 +68,33 @@ public:
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set vector values
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Enhanced configuration features
+    bool validate() const;
+    std::string getHelp() const;
+    std::vector<std::string> getConfigSuggestions(const std::string& partialKey) const;
+    
+    // Configuration statistics and diagnostics
+    size_t getEntryCount() const;
+    bool hasDefaultValues() const;
+    ConfigSource getHighestSource() const;
+    
+    // Advanced value access
+    template<typename T>
+    T getStrict(const std::string& key, T defaultValue = T{}) const;
+    
+    // Configuration migration and updates
+    void migrateFrom(const Config& oldConfig);
+    void applyPatch(const std::string& patchFile);
     
     // Check existence
     bool has(const std::string& key) const;
