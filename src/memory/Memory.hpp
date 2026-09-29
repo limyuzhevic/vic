@@ -80,8 +80,43 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Neural version for brain integration
 
+class NeuralSemanticMemory {
+public:
+    NeuralSemanticMemory();
+    ~NeuralSemanticMemory();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Store fact as neural pattern
+    void storeFact(const std::string& key, const std::vector<float>& pattern, float strength);
+    
+    // Retrieve fact by key - returns pattern
+    std::vector<float> retrieveFact(const std::string& key) const;
+    
+    // Check if fact exists
+    bool hasFact(const std::string& key) const;
+    
+    // Get all facts
+    std::vector<std::pair<std::string, std::vector<float>>> getAllFacts() const;
+    
+    // Clear all
+    void clear();
+    
+    // Get concept activation level
+    float getConceptActivation(const std::string& conceptName) const;
+    
+    // Update concept based on neural activity
+    void updateConcept(const std::string& conceptName, float activation, float learningRate);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// SemanticMemory - legacy interface (deprecated, use NeuralSemanticMemory instead)
 class SemanticMemory {
 public:
     SemanticMemory();
@@ -108,16 +143,46 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Neural version for brain integration
 
-struct Skill {
-    std::string name;
-    std::vector<NeuronId> neuralPattern;
-    float proficiency;
+class NeuralProceduralMemory {
+public:
+    NeuralProceduralMemory();
+    ~NeuralProceduralMemory();
     
-    Skill() : proficiency(0.0f) {}
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Learn skill as neural pattern
+    void learnSkill(const std::string& name, const std::vector<NeuronId>& neuralPattern, float initialProficiency);
+    
+    // Retrieve skill
+    Skill* getSkill(const std::string& name);
+    
+    // Get all skills
+    std::vector<Skill*> getAllSkills();
+    
+    // Update proficiency based on neural performance
+    void updateProficiency(const std::string& name, float delta, NeuronId performingNeuron);
+    
+    // Execute skill - reactivate neural pattern
+    void executeSkill(const std::string& name, float executionStrength = 1.0f);
+    
+    // Clear all skills
+    void clear();
+    
+    // Get skill proficiency
+    float getSkillProficiency(const std::string& name) const;
+    
+    // Get skill by neural activation
+    Skill* getSkillByActivation(const std::vector<NeuronId>& activeNeurons, float threshold = 0.5f);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
+// ProceduralMemory - legacy interface (deprecated, use NeuralProceduralMemory instead)
 class ProceduralMemory {
 public:
     ProceduralMemory();

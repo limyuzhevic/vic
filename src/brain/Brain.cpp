@@ -6,9 +6,10 @@
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -49,6 +50,15 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    
+    // ========== SEMANTIC MEMORY ==========
+    std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+    
+    // ========== PROCEDURAL MEMORY ==========
+    std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -129,6 +139,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -142,15 +155,11 @@ struct Brain::Impl {
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Initialize semantic memory system
+        semanticMemory = std::make_unique<NeuralSemanticMemory>();
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Initialize procedural memory system
+        proceduralMemory = std::make_unique<NeuralProceduralMemory>();
     }
     
     DevelopmentalStage developmentalStage;
@@ -242,8 +251,11 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -828,6 +840,156 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
+        // Save working memory state
+        if (pImpl->workingMemory) {
+            auto workingMemoryData = pImpl->workingMemory->exportForCheckpoint();
+            if (!writer.writeWorkingMemory(workingMemoryData)) {
+                NLM_LOG_ERROR("Failed to write working memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save episodic memory state
+        if (pImpl->episodicMemory) {
+            auto episodicMemoryData = pImpl->episodicMemory->exportForCheckpoint();
+            if (!writer.writeEpisodicMemory(episodicMemoryData)) {
+                NLM_LOG_ERROR("Failed to write episodic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save associative memory state
+        if (pImpl->associativeMemory) {
+            auto associativeMemoryData = pImpl->associativeMemory->exportForCheckpoint();
+            if (!writer.writeAssociativeMemory(associativeMemoryData)) {
+                NLM_LOG_ERROR("Failed to write associative memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save semantic memory state
+        if (pImpl->semanticMemory) {
+            auto semanticMemoryData = pImpl->semanticMemory->exportForCheckpoint();
+            if (!writer.writeSemanticMemory(semanticMemoryData)) {
+                NLM_LOG_ERROR("Failed to write semantic memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save procedural memory state
+        if (pImpl->proceduralMemory) {
+            auto proceduralMemoryData = pImpl->proceduralMemory->exportForCheckpoint();
+            if (!writer.writeProceduralMemory(proceduralMemoryData)) {
+                NLM_LOG_ERROR("Failed to write procedural memory to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save prediction system state
+        if (pImpl->predictionSystem) {
+            auto predictionData = pImpl->predictionSystem->exportForCheckpoint();
+            if (!writer.writePredictionSystem(predictionData)) {
+                NLM_LOG_ERROR("Failed to write prediction system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save attention system state
+        if (pImpl->attention) {
+            auto attentionData = pImpl->attention->exportForCheckpoint();
+            if (!writer.writeAttention(attentionData)) {
+                NLM_LOG_ERROR("Failed to write attention system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save neuromodulation system states
+        if (pImpl->dopamine) {
+            auto dopamineData = pImpl->dopamine->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("Dopamine", dopamineData)) {
+                NLM_LOG_ERROR("Failed to write dopamine to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->acetylcholine) {
+            auto acetylcholineData = pImpl->acetylcholine->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("Acetylcholine", acetylcholineData)) {
+                NLM_LOG_ERROR("Failed to write acetylcholine to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->norepinephrine) {
+            auto norepinephrineData = pImpl->norepinephrine->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("Norepinephrine", norepinephrineData)) {
+                NLM_LOG_ERROR("Failed to write norepinephrine to checkpoint");
+                return false;
+            }
+        }
+        
+        if (pImpl->serotonin) {
+            auto serotoninData = pImpl->serotonin->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("Serotonin", serotoninData)) {
+                NLM_LOG_ERROR("Failed to write serotonin to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save curiosity
+        if (pImpl->curiosity) {
+            auto curiosityData = pImpl->curiosity->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("Curiosity", curiosityData)) {
+                NLM_LOG_ERROR("Failed to write curiosity to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save novelty
+        if (pImpl->novelty) {
+            auto noveltyData = pImpl->novelty->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("Novelty", noveltyData)) {
+                NLM_LOG_ERROR("Failed to write novelty to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save prediction error
+        if (pImpl->predictionError) {
+            auto predictionErrorData = pImpl->predictionError->exportForCheckpoint();
+            if (!writer.writeNeuromodulator("PredictionError", predictionErrorData)) {
+                NLM_LOG_ERROR("Failed to write prediction error to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save development system state
+        if (pImpl->developmentSystem) {
+            auto developmentData = pImpl->developmentSystem->exportForCheckpoint();
+            if (!writer.writeDevelopment(developmentData)) {
+                NLM_LOG_ERROR("Failed to write development system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save spike system state
+        if (pImpl->spikeSystem) {
+            auto spikeData = pImpl->spikeSystem->exportForCheckpoint();
+            if (!writer.writeSpikeSystem(spikeData)) {
+                NLM_LOG_ERROR("Failed to write spike system to checkpoint");
+                return false;
+            }
+        }
+        
+        // Save checkpoint manager state
+        if (pImpl->checkpointManager) {
+            auto checkpointData = pImpl->checkpointManager->exportForCheckpoint();
+            if (!writer.writeCheckpointManager(checkpointData)) {
+                NLM_LOG_ERROR("Failed to write checkpoint manager to checkpoint");
+                return false;
+            }
+        }
+        
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -898,6 +1060,110 @@ bool Brain::load(const std::string& filepath) {
         // Apply synapse states - this is complex because we need to find matching synapses
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        
+        // Restore working memory state
+        if (pImpl->workingMemory) {
+            WorkingMemoryCheckpointData workingMemoryData;
+            if (reader.readWorkingMemory(workingMemoryData)) {
+                pImpl->workingMemory->importFromCheckpoint(workingMemoryData);
+            }
+        }
+        
+        // Restore episodic memory state
+        if (pImpl->episodicMemory) {
+            EpisodicMemoryCheckpointData episodicMemoryData;
+            if (reader.readEpisodicMemory(episodicMemoryData)) {
+                pImpl->episodicMemory->importFromCheckpoint(episodicMemoryData);
+            }
+        }
+        
+        // Restore associative memory state
+        if (pImpl->associativeMemory) {
+            AssociativeMemoryCheckpointData associativeMemoryData;
+            if (reader.readAssociativeMemory(associativeMemoryData)) {
+                pImpl->associativeMemory->importFromCheckpoint(associativeMemoryData);
+            }
+        }
+        
+        // Restore semantic memory state
+        if (pImpl->semanticMemory) {
+            SemanticMemoryCheckpointData semanticMemoryData;
+            if (reader.readSemanticMemory(semanticMemoryData)) {
+                pImpl->semanticMemory->importFromCheckpoint(semanticMemoryData);
+            }
+        }
+        
+        // Restore procedural memory state
+        if (pImpl->proceduralMemory) {
+            ProceduralMemoryCheckpointData proceduralMemoryData;
+            if (reader.readProceduralMemory(proceduralMemoryData)) {
+                pImpl->proceduralMemory->importFromCheckpoint(proceduralMemoryData);
+            }
+        }
+        
+        // Restore prediction system state
+        if (pImpl->predictionSystem) {
+            PredictionSystemCheckpointData predictionData;
+            if (reader.readPredictionSystem(predictionData)) {
+                pImpl->predictionSystem->importFromCheckpoint(predictionData);
+            }
+        }
+        
+        // Restore attention system state
+        if (pImpl->attention) {
+            AttentionCheckpointData attentionData;
+            if (reader.readAttention(attentionData)) {
+                pImpl->attention->importFromCheckpoint(attentionData);
+            }
+        }
+        
+        // Restore neuromodulation system states
+        NeuromodulatorCheckpointData neuromodData;
+        if (reader.readNeuromodulator("Dopamine", neuromodData)) {
+            if (pImpl->dopamine) pImpl->dopamine->importFromCheckpoint(neuromodData);
+        }
+        
+        if (reader.readNeuromodulator("Acetylcholine", neuromodData)) {
+            if (pImpl->acetylcholine) pImpl->acetylcholine->importFromCheckpoint(neuromodData);
+        }
+        
+        if (reader.readNeuromodulator("Norepinephrine", neuromodData)) {
+            if (pImpl->norepinephrine) pImpl->norepinephrine->importFromCheckpoint(neuromodData);
+        }
+        
+        if (reader.readNeuromodulator("Serotonin", neuromodData)) {
+            if (pImpl->serotonin) pImpl->serotonin->importFromCheckpoint(neuromodData);
+        }
+        
+        if (reader.readNeuromodulator("Curiosity", neuromodData)) {
+            if (pImpl->curiosity) pImpl->curiosity->importFromCheckpoint(neuromodData);
+        }
+        
+        if (reader.readNeuromodulator("Novelty", neuromodData)) {
+            if (pImpl->novelty) pImpl->novelty->importFromCheckpoint(neuromodData);
+        }
+        
+        if (reader.readNeuromodulator("PredictionError", neuromodData)) {
+            if (pImpl->predictionError) pImpl->predictionError->importFromCheckpoint(neuromodData);
+        }
+        
+        // Restore development system state
+        DevelopmentCheckpointData developmentData;
+        if (reader.readDevelopment(developmentData)) {
+            if (pImpl->developmentSystem) pImpl->developmentSystem->importFromCheckpoint(developmentData);
+        }
+        
+        // Restore spike system state
+        SpikeSystemCheckpointData spikeData;
+        if (reader.readSpikeSystem(spikeData)) {
+            if (pImpl->spikeSystem) pImpl->spikeSystem->importFromCheckpoint(spikeData);
+        }
+        
+        // Restore checkpoint manager state
+        CheckpointManagerCheckpointData checkpointData;
+        if (reader.readCheckpointManager(checkpointData)) {
+            if (pImpl->checkpointManager) pImpl->checkpointManager->importFromCheckpoint(checkpointData);
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
@@ -1017,7 +1283,17 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// ========== SEMANTIC MEMORY ==========
+
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// ========== PROCEDURAL MEMORY ==========
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
@@ -1069,6 +1345,18 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
@@ -1096,14 +1384,39 @@ void Brain::logStatus() const {
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
     }
+    if (pImpl->associativeMemory) {
+        // Note: NeuralAssociativeMemory doesn't have getAssociationCount() method
+        NLM_LOG_INFO("Associative memory: Active");
+    }
+    if (pImpl->semanticMemory) {
+        NLM_LOG_INFO("Semantic memory: Concepts stored");
+    }
+    if (pImpl->proceduralMemory) {
+        NLM_LOG_INFO("Procedural memory: Skills learned");
+    }
     
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
     }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionError->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine (ACh) level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine (NE) level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin (5-HT) level: " + std::to_string(pImpl->serotonin->getLevel()));
+    }
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
