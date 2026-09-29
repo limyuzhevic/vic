@@ -28,31 +28,35 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        if (n) {
+                            std::shared_ptr<Neuron> neuronPtr(n, [](Neuron*) {}); // Wrap raw ptr to weak_ptr
+                            size_t idx = motorForward_.size() + motorBackward_.size() + 
+                                        motorTurnLeft_.size() + motorTurnRight_.size() +
+                                        motorInteract_.size() + motorWait_.size();
+                            
+                            switch (idx % 6) {
+                                case 0: motorForward_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 1: motorBackward_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 2: motorTurnLeft_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 3: motorTurnRight_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 4: motorInteract_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 5: motorWait_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                            }
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        if (n) {
+                            std::shared_ptr<Neuron> neuronPtr(n, [](Neuron*) {}); // Wrap raw ptr to weak_ptr
+                            size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                                        sensoryInternal_.size() + sensoryProprioception_.size();
+                            
+                            switch (idx % 4) {
+                                case 0: sensoryVision_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 1: sensoryTouch_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 2: sensoryInternal_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                                case 3: sensoryProprioception_.push_back(std::weak_ptr<Neuron>(neuronPtr)); break;
+                            }
                         }
                     }
                 }
@@ -63,15 +67,148 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 
 AgentBrain::~AgentBrain() = default;
 
+// Helper methods to get locked neuron pointers
+std::vector<Neuron*> AgentBrain::getVisionNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : sensoryVision_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getTouchNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : sensoryTouch_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getInternalNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : sensoryInternal_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getProprioceptionNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : sensoryProprioception_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getForwardNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : motorForward_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getBackwardNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : motorBackward_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getLeftNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : motorTurnLeft_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getRightNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : motorTurnRight_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getInteractNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : motorInteract_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+std::vector<Neuron*> AgentBrain::getWaitNeurons() const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : motorWait_) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
+// Helper methods to get locked neuron pointers (using the helper function)
+std::vector<Neuron*> AgentBrain::getLockedVisionNeurons() const {
+    return getNeuronsFromVector(sensoryVision_);
+}
+
+std::vector<Neuron*> AgentBrain::getLockedTouchNeurons() const {
+    return getNeuronsFromVector(sensoryTouch_);
+}
+
+std::vector<Neuron*> AgentBrain::getLockedInternalNeurons() const {
+    return getNeuronsFromVector(sensoryInternal_);
+}
+
+std::vector<Neuron*> AgentBrain::getLockedProprioceptionNeurons() const {
+    return getNeuronsFromVector(sensoryProprioception_);
+}
+
+std::vector<Neuron*> AgentBrain::getLockedForwardNeurons() const {
+    return getNeuronsFromVector(motorForward_);
+}
+
+// Helper methods to get neurons from any weak vector
+std::vector<Neuron*> AgentBrain::getNeuronsFromVector(const std::vector<std::weak_ptr<Neuron>>& weakVec) const {
+    std::vector<Neuron*> locked;
+    for (const auto& weakPtr : weakVec) {
+        if (auto lockedPtr = weakPtr.lock()) {
+            locked.push_back(lockedPtr.get());
+        }
+    }
+    return locked;
+}
+
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+                 std::to_string(getVisionNeurons().size()) + " vision sensory neurons, " +
+                 std::to_string(getTouchNeurons().size()) + " touch sensory neurons, " +
+                 std::to_string(getInternalNeurons().size()) + " internal sensory neurons");
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -87,40 +224,46 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Get locked neuron pointers (safe access)
+    auto visionNeurons = getVisionNeurons();
+    auto touchNeurons = getTouchNeurons();
+    auto internalNeurons = getInternalNeurons();
+    auto proprioNeurons = getProprioceptionNeurons();
+    
+    // Vision input (256 values -> vision neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+    for (size_t i = 0; i < visionNeurons.size() && i < vision.size(); ++i) {
+        if (visionNeurons[i]) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+            visionNeurons[i]->injectCurrent(current);
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
+    // Touch input (8 values -> touch neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+    for (size_t i = 0; i < touchNeurons.size() && i < touch.size(); ++i) {
+        if (touchNeurons[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+            touchNeurons[i]->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
+    // Internal signals (4 values -> internal neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
+    for (size_t i = 0; i < internalNeurons.size() && i < intern.size(); ++i) {
+        if (internalNeurons[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+            internalNeurons[i]->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    // Proprioception (6 values -> proprioception neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+    for (size_t i = 0; i < proprioNeurons.size() && i < proprio.size(); ++i) {
+        if (proprioNeurons[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+            proprioNeurons[i]->injectCurrent(current);
         }
     }
     
@@ -163,6 +306,14 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Get locked neuron pointers
+    auto forwardNeurons = getLockedForwardNeurons();
+    auto backwardNeurons = getLockedNeuronsFromVector(motorBackward_);
+    auto leftNeurons = getLockedNeuronsFromVector(motorTurnLeft_);
+    auto rightNeurons = getLockedNeuronsFromVector(motorTurnRight_);
+    auto interactNeurons = getLockedNeuronsFromVector(motorInteract_);
+    auto waitNeurons = getLockedNeuronsFromVector(motorWait_);
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
@@ -174,12 +325,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    float forwardAct = calcActivity(forwardNeurons);
+    float backwardAct = calcActivity(backwardNeurons);
+    float leftAct = calcActivity(leftNeurons);
+    float rightAct = calcActivity(rightNeurons);
+    float interactAct = calcActivity(interactNeurons);
+    float waitAct = calcActivity(waitNeurons);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {

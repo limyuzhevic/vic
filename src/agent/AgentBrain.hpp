@@ -25,6 +25,34 @@ public:
     // Get motor output size expected
     size_t getMotorOutputSize() const;
     
+    // Get sensory neuron groups (returns locked pointers - check for validity before use)
+    std::vector<Neuron*> getVisionNeurons() const;
+    std::vector<Neuron*> getTouchNeurons() const;
+    std::vector<Neuron*> getInternalNeurons() const;
+    std::vector<Neuron*> getProprioceptionNeurons() const;
+    
+    // Get motor neuron groups (returns locked pointers - check for validity before use)
+    std::vector<Neuron*> getForwardNeurons() const;
+    std::vector<Neuron*> getBackwardNeurons() const;
+    std::vector<Neuron*> getLeftNeurons() const;
+    std::vector<Neuron*> getRightNeurons() const;
+    std::vector<Neuron*> getInteractNeurons() const;
+    std::vector<Neuron*> getWaitNeurons() const;
+    
+    // Helper to get neurons from any weak vector
+    std::vector<Neuron*> getNeuronsFromVector(const std::vector<std::weak_ptr<Neuron>>& weakVec) const;
+    
+    // Get motor neuron groups (returns locked pointers - check for validity before use)
+    std::vector<Neuron*> getForwardNeurons() const;
+    std::vector<Neuron*> getBackwardNeurons() const;
+    std::vector<Neuron*> getLeftNeurons() const;
+    std::vector<Neuron*> getRightNeurons() const;
+    std::vector<Neuron*> getInteractNeurons() const;
+    std::vector<Neuron*> getWaitNeurons() const;
+    
+    // Helper to get neurons from any weak vector
+    std::vector<Neuron*> getNeuronsFromVector(const std::vector<std::weak_ptr<Neuron>>& weakVec) const;
+    
     // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
     
@@ -78,19 +106,19 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups (using weak_ptr to avoid strong ownership)
+    std::vector<std::weak_ptr<Neuron>> motorForward_;
+    std::vector<std::weak_ptr<Neuron>> motorBackward_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnLeft_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnRight_;
+    std::vector<std::weak_ptr<Neuron>> motorInteract_;
+    std::vector<std::weak_ptr<Neuron>> motorWait_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron groups (using weak_ptr to avoid strong ownership)
+    std::vector<std::weak_ptr<Neuron>> sensoryVision_;
+    std::vector<std::weak_ptr<Neuron>> sensoryTouch_;
+    std::vector<std::weak_ptr<Neuron>> sensoryInternal_;
+    std::vector<std::weak_ptr<Neuron>> sensoryProprioception_;
     
     // Neuromodulation state
     float dopamineLevel_;
