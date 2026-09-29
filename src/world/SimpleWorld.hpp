@@ -2,9 +2,12 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../agent/AgentBrain.hpp"
+#include "WorldConstants.hpp"
 #include <memory>
 #include <string>
 #include <vector>
+#include <cmath>
 
 namespace nlm {
 
@@ -25,6 +28,12 @@ struct WorldObject {
     WorldObject(float px, float py, WorldObjectType t, float v = 0.0f, float r = 0.5f)
         : x(px), y(py), radius(r), type(t), value(v), active(true) {}
 };
+
+// Forward declarations
+class VisionSystem;
+class PhysicsSystem;
+class CollisionSystem;
+class Environment;
 
 // Simple 2D world for NLM development
 // Provides sensory experience without semantic labels
@@ -83,7 +92,21 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
+    // Validation and utility methods
+    bool validateConfiguration() const;
+    void validateBounds(float x, float y) const;
+    float clampToBounds(float x, float y, float value) const;
+    
 private:
+    // Initialize systems
+    void initializeSystems();
+    
+    // Update methods
+    void updatePhysics(double timestep);
+    void updateCollisions();
+    void updateEnergy(double timestep);
+    void updateAge(double timestep);
+    
     // Generate vision from current view
     void generateVision();
     
@@ -120,10 +143,14 @@ private:
     
     // Random seed
     uint64_t rngSeed_;
-    
-    // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Helper systems
+    std::unique_ptr<VisionSystem> visionSystem_;
+    std::unique_ptr<PhysicsSystem> physicsSystem_;
+    std::unique_ptr<CollisionSystem> collisionSystem_;
+    std::unique_ptr<Environment> environment_;
 };
 
 } // namespace nlm

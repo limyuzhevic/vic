@@ -1,53 +1,78 @@
 #pragma once
 
-#include "Experiment.hpp"
 #include "../brain/Brain.hpp"
-#include "../environment/Environment.hpp"
+#include "../world/SimpleWorld.hpp"
+#include "../agent/AgentBrain.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "ExperimentConstants.hpp"
 #include <memory>
-#include <vector>
 
 namespace nlm {
 
-// ExperimentRunner: Runs experiments and collects data
+/**
+ * Experiment runner and simulation executor
+ * Handles the core simulation loop and execution
+ */
 class ExperimentRunner {
 public:
-    ExperimentRunner();
-    ~ExperimentRunner();
+    ExperimentRunner() = default;
+    ~ExperimentRunner() = default;
     
-    // Create new experiment
-    std::shared_ptr<Experiment> createExperiment(const std::string& name);
+    /**
+     * Run the main simulation loop
+     */
+    bool runSimulation(std::shared_ptr<Brain> brain,
+                      std::shared_ptr<SimpleWorld> world,
+                      std::shared_ptr<AgentBrain> agent,
+                      const Phase6Config& config,
+                      float& totalReward,
+                      float& totalFiringRate,
+                      size_t& firingCount);
     
-    // Run single experiment
-    bool runExperiment(std::shared_ptr<Experiment> experiment,
-                      std::shared_ptr<Brain> brain,
-                      std::shared_ptr<Environment> environment,
-                      SimulationStep maxSteps);
+    /**
+     * Run a single step of the simulation
+     */
+    bool runSimulationStep(std::shared_ptr<Brain> brain,
+                          std::shared_ptr<SimpleWorld> world,
+                          std::shared_ptr<AgentBrain> agent,
+                          uint64_t step,
+                          const Phase6Config& config,
+                          float& stepReward,
+                          float& firingRate);
     
-    // Run batch of experiments
-    std::vector<std::shared_ptr<Experiment>> runBatch(
-        const std::vector<std::shared_ptr<Experiment>>& experiments,
-        std::shared_ptr<Brain> brainTemplate,
-        std::shared_ptr<Environment> environmentTemplate,
-        SimulationStep maxSteps);
+    /**
+     * Update development system if enabled
+     */
+    bool updateDevelopment(std::shared_ptr<AgentBrain> agent, float timeStep);
     
-    // Get all experiments
-    const std::vector<std::shared_ptr<Experiment>>& getExperiments() const;
+    /**
+     * Apply reward modulation
+     */
+    bool applyRewardModulation(std::shared_ptr<AgentBrain> agent, float reward, float novelty);
     
-    // Get experiment by name
-    std::shared_ptr<Experiment> getExperiment(const std::string& name) const;
+    /**
+     * Collect metrics from brain and agent
+     */
+    void collectMetrics(std::shared_ptr<Brain> brain,
+                       std::shared_ptr<AgentBrain> agent,
+                       float totalReward,
+                       float totalFiringRate,
+                       size_t totalSteps,
+                       float& avgFiringRate,
+                       float& avgSynapticWeight,
+                       float& memoryEpisodesStored,
+                       float& noveltyLevel,
+                       float& curiosityLevel,
+                       float& dopamineLevel);
     
-    // Clear all experiments
-    void clearExperiments();
-    
-    // Set random seed for reproducibility
-    void setGlobalSeed(uint64_t seed);
-    
-    // Save experiment results
-    bool saveResults(const std::string& filepath) const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    /**
+     * Create simulation components
+     */
+    bool createSimulationComponents(std::shared_ptr<Brain>& brain,
+                                   std::shared_ptr<SimpleWorld>& world,
+                                   std::shared_ptr<AgentBrain>& agent,
+                                   std::shared_ptr<Config>& config,
+                                   const Phase6Config& phaseConfig);
 };
 
 } // namespace nlm

@@ -96,6 +96,11 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/MotorController.cpp
+    src/agent/NeuromodulationManager.cpp
+    src/agent/DevelopmentSystem.cpp
+    src/agent/CuriositySystem.cpp
+    src/agent/NoveltyDetector.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
@@ -103,6 +108,10 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
+    src/world/VisionSystem.cpp
+    src/world/PhysicsSystem.cpp
+    src/world/CollisionSystem.cpp
+    src/world/Environment.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)

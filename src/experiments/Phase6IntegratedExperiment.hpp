@@ -15,13 +15,11 @@
  * that all systems interact properly.
  */
 
-#include "../experiments/Experiment.hpp"
-#include "../experiments/Metrics.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "ExperimentConstants.hpp"
+#include <memory>
 #include <vector>
 #include <string>
-#include <memory>
-#include <functional>
-#include <unordered_map>
 
 namespace nlm {
 
@@ -97,12 +95,29 @@ struct Phase6Config {
 };
 
 /**
+ * Forward declarations for helper classes
+ */
+class ExperimentConfig;
+class BrainInitializer;
+class ExperimentRunner;
+class MetricsCollector;
+class CheckpointManager;
+class IntegrationTester;
+class ResultsValidator;
+
+/**
  * Phase 6 integrated experiment runner
+ * Refactored to use helper classes for separation of concerns
  */
 class Phase6IntegratedExperiment {
 public:
     Phase6IntegratedExperiment();
     ~Phase6IntegratedExperiment();
+    
+    /**
+     * Initialize experiment with configuration
+     */
+    bool initialize(const Phase6Config& config);
     
     /**
      * Run the complete integration test
@@ -133,6 +148,40 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    /**
+     * Get experiment status
+     */
+    bool isInitialized() const { return isInitialized_; }
+    
+    /**
+     * Get validation errors
+     */
+    const std::vector<std::string>& getValidationErrors() const { return validationErrors_; }
+    
+private:
+    bool isInitialized_ = false;
+    std::vector<std::string> validationErrors_;
+    
+    // Helper classes for separation of concerns
+    std::unique_ptr<ExperimentConfig> experimentConfig_;
+    std::unique_ptr<BrainInitializer> brainInitializer_;
+    std::unique_ptr<ExperimentRunner> experimentRunner_;
+    std::unique_ptr<MetricsCollector> metricsCollector_;
+    std::unique_ptr<CheckpointManager> checkpointManager_;
+    std::unique_ptr<IntegrationTester> integrationTester_;
+    std::unique_ptr<ResultsValidator> resultsValidator_;
+    
+    // Initialize helper classes
+    bool initializeHelperClasses();
+    
+    // Legacy methods (for backward compatibility)
+    Phase6IntegrationResult runLegacy(const Phase6Config& config);
+    bool verifyIntegrationLegacy();
+    bool testMemoryIntegrationLegacy();
+    bool testNeuromodulationIntegrationLegacy();
+    bool testCheckpointingLegacy();
+    bool testReplayLegacy();
 };
 
 } // namespace nlm

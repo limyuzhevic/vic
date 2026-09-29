@@ -9,17 +9,165 @@
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment() : isInitialized_(false) {
+    NLM_LOG_INFO("Phase6IntegratedExperiment initialized");
+}
 
-Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
+Phase6IntegratedExperiment::~Phase6IntegratedExperiment() {
+    NLM_LOG_INFO("Phase6IntegratedExperiment destroyed");
+}
+
+bool Phase6IntegratedExperiment::initialize(const Phase6Config& config) {
+    NLM_LOG_INFO("Initializing Phase6IntegratedExperiment");
+    
+    // Initialize helper classes
+    if (!initializeHelperClasses()) {
+        NLM_LOG_ERROR("Failed to initialize helper classes");
+        return false;
+    }
+    
+    // Validate configuration using ExperimentConfig
+    if (experimentConfig_ && !experimentConfig_->initialize(config)) {
+        validationErrors_ = experimentConfig_->getValidationErrors();
+        NLM_LOG_ERROR("Configuration validation failed");
+        return false;
+    }
+    
+    isInitialized_ = true;
+    NLM_LOG_INFO("Phase6IntegratedExperiment initialized successfully");
+    return true;
+}
+
+bool Phase6IntegratedExperiment::initializeHelperClasses() {
+    try {
+        // Initialize all helper classes
+        experimentConfig_ = std::make_unique<ExperimentConfig>();
+        brainInitializer_ = std::make_unique<BrainInitializer>();
+        experimentRunner_ = std::make_unique<ExperimentRunner>();
+        metricsCollector_ = std::make_unique<MetricsCollector>();
+        checkpointManager_ = std::make_unique<CheckpointManager>();
+        integrationTester_ = std::make_unique<IntegrationTester>();
+        resultsValidator_ = std::make_unique<ResultsValidator>();
+        
+        NLM_LOG_INFO("All helper classes initialized successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to initialize helper classes: " + std::string(e.what()));
+        return false;
+    }
+}
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
+    // Use new implementation if initialized, otherwise fall back to legacy
+    if (isInitialized_) {
+        return runNewImplementation(config);
+    } else {
+        NLM_LOG_WARNING("Experiment not fully initialized, using legacy implementation");
+        return runLegacy(config);
+    }
+}
+
+Phase6IntegrationResult Phase6IntegratedExperiment::runNewImplementation(const Phase6Config& config) {
     Phase6IntegrationResult result;
     result.startTime = time(nullptr);
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
-    NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
+    NLM_LOG_INFO("=== Phase 6 Integration Experiment (New Implementation) ===");
+    NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
+                 std::to_string(config.maxSteps) + " steps");
+    
+    // Create simulation components using ExperimentRunner
+    std::shared_ptr<Brain> brain;
+    std::shared_ptr<SimpleWorld> world;
+    std::shared_ptr<AgentBrain> agent;
+    std::shared_ptr<Config> cfg;
+    
+    if (!experimentRunner_->createSimulationComponents(brain, world, agent, cfg, config)) {
+        NLM_LOG_ERROR("Failed to create simulation components");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    // Run simulation using ExperimentRunner
+    float totalReward = 0.0f;
+    float totalFiringRate = 0.0f;
+    size_t firingCount = 0;
+    
+    if (!experimentRunner_->runSimulation(brain, world, agent, config, 
+                                         totalReward, totalFiringRate, firingCount)) {
+        NLM_LOG_ERROR("Simulation failed");
+        result.endTime = time(nullptr);
+        return result;
+    }
+    
+    // Collect metrics using MetricsCollector
+    metricsCollector_->collectSimulationMetrics(brain, agent, totalReward, 
+                                               config.maxSteps, totalFiringRate, result);
+    
+    // Verify integration using IntegrationTester
+    bool systemsIntegrated = integrationTester_->testAllSystems(brain);
+    
+    // Set integration status based on test results
+    auto integrationResults = integrationTester_->getTestResults();
+    result.memoryWorkingMemoryIntegrated = integrationResults.memoryWorkingMemoryIntegrated;
+    result.memoryEpisodicMemoryIntegrated = integrationResults.memoryEpisodicMemoryIntegrated;
+    result.neuromodulationIntegrated = integrationResults.neuromodulationIntegrated;
+    result.predictionIntegrated = integrationResults.predictionIntegrated;
+    result.developmentIntegrated = integrationResults.developmentIntegrated;
+    
+    // Test checkpointing using CheckpointManager
+    if (config.enableCheckpointing) {
+        NLM_LOG_INFO("Testing checkpoint save/load...");
+        if (checkpointManager_->saveCheckpoint(brain, config.checkpointPath)) {
+            NLM_LOG_INFO("Checkpoint saved successfully");
+            
+            // Create new brain and load
+            auto brain2 = brainInitializer_->createBrain(cfg->get<int>("neuron_count"));
+            if (brain2 && checkpointManager_->loadCheckpoint(brain2, config.checkpointPath)) {
+                NLM_LOG_INFO("Checkpoint loaded successfully");
+                result.checkpointingWorks = true;
+            } else {
+                NLM_LOG_ERROR("Failed to load checkpoint");
+            }
+        } else {
+            NLM_LOG_ERROR("Failed to save checkpoint");
+        }
+    }
+    
+    // Validate results using ResultsValidator
+    resultsValidator_->validateResults(result);
+    validationErrors_ = resultsValidator_->getValidationErrors();
+    
+    // Log integration status
+    NLM_LOG_INFO("=== Integration Verification ===");
+    NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    
+    result.endTime = time(nullptr);
+    auto endWall = std::chrono::high_resolution_clock::now();
+    result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
+    
+    NLM_LOG_INFO("=== Experiment Complete ===");
+    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
+    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
+    NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
+    NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
+    
+    return result;
+}
+
+Phase6IntegrationResult Phase6IntegratedExperiment::runLegacy(const Phase6Config& config) {
+    Phase6IntegrationResult result;
+    result.startTime = time(nullptr);
+    
+    auto startWall = std::chrono::high_resolution_clock::now();
+    
+    NLM_LOG_INFO("=== Phase 6 Integration Experiment (Legacy) ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
@@ -55,7 +203,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Run simulation (legacy implementation)
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
@@ -102,7 +250,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
-    // Collect final metrics
+    // Collect final metrics (legacy implementation)
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
@@ -111,7 +259,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
+    // Verify integration (legacy implementation)
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
@@ -125,7 +273,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpointing (legacy implementation)
     if (config.enableCheckpointing) {
         NLM_LOG_INFO("Testing checkpoint save/load...");
         if (brain->save(config.checkpointPath)) {
@@ -160,6 +308,15 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 }
 
 bool Phase6IntegratedExperiment::verifyIntegration() {
+    if (!isInitialized_) {
+        NLM_LOG_ERROR("Experiment not initialized, using legacy implementation");
+        return verifyIntegrationLegacy();
+    }
+    
+    return integrationTester_->testAllSystems(brainInitializer_->createBrain(100));
+}
+
+bool Phase6IntegratedExperiment::verifyIntegrationLegacy() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
     // Create minimal brain
@@ -247,6 +404,15 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testMemoryIntegration() {
+    if (!isInitialized_) {
+        NLM_LOG_ERROR("Experiment not initialized, using legacy implementation");
+        return testMemoryIntegrationLegacy();
+    }
+    
+    return integrationTester_->testMemoryIntegration(brainInitializer_->createBrain(100));
+}
+
+bool Phase6IntegratedExperiment::testMemoryIntegrationLegacy() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
     auto cfg = std::make_shared<Config>();
@@ -287,6 +453,15 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
+    if (!isInitialized_) {
+        NLM_LOG_ERROR("Experiment not initialized, using legacy implementation");
+        return testNeuromodulationIntegrationLegacy();
+    }
+    
+    return integrationTester_->testNeuromodulationIntegration(brainInitializer_->createBrain(100));
+}
+
+bool Phase6IntegratedExperiment::testNeuromodulationIntegrationLegacy() {
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
     
     auto cfg = std::make_shared<Config>();
@@ -317,6 +492,16 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
+    if (!isInitialized_) {
+        NLM_LOG_ERROR("Experiment not initialized, using legacy implementation");
+        return testCheckpointingLegacy();
+    }
+    
+    return checkpointManager_->saveCheckpoint(brainInitializer_->createBrain(100), 
+                                             ExperimentConstants::TEMP_CHECKPOINT_PATH);
+}
+
+bool Phase6IntegratedExperiment::testCheckpointingLegacy() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
     auto cfg = std::make_shared<Config>();
@@ -338,7 +523,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    std::string path = ExperimentConstants::TEMP_CHECKPOINT_PATH;
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;

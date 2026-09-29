@@ -4,6 +4,11 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "MotorController.hpp"
+#include "NeuromodulationManager.hpp"
+#include "DevelopmentSystem.hpp"
+#include "CuriositySystem.hpp"
+#include "NoveltyDetector.hpp"
 #include <memory>
 #include <vector>
 
@@ -11,6 +16,7 @@ namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Refactored to use separate helper classes for better modularity and testability
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -70,11 +76,12 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    // Helper classes for better separation of concerns
+    MotorController motorController_;
+    NeuromodulationManager neuromodulationManager_;
+    DevelopmentSystem developmentSystem_;
+    CuriositySystem curiositySystem_;
+    NoveltyDetector noveltyDetector_;
     
     std::shared_ptr<Brain> brain_;
     
@@ -92,17 +99,6 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
-    
-    // Development state
-    double developmentalAge_;
-    float plasticityModifier_;
-    
     // Configuration flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
@@ -111,7 +107,6 @@ private:
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
-    float sensoryNoveltyDecay_;
 };
 
 } // namespace nlm
