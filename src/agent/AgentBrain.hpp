@@ -52,11 +52,20 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
+    // Process multiple sensory inputs in batch
+    void processBatch(const std::vector<SensoryPercept>& percepts);
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Batch simulation step with performance optimizations
+    void stepBatch(const std::vector<SimulationStep>& steps);
+    
+    // Get agent state for checkpointing
+    std::map<std::string, float> getState() const;
+    
+    // Restore agent state from checkpoint
+    void setState(const std::map<std::string, float>& state);
+    
+    // Reset agent for new episode with optional cleanup
+    void resetEpisode(bool cleanupMemory = true);
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

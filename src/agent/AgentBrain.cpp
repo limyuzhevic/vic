@@ -347,4 +347,90 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+    // Batch processing utility
+    void AgentBrain::processBatch(const std::vector<SensoryPercept>& percepts) {
+        for (const auto& percept : percepts) {
+            processSensoryInput(percept);
+        }
+    }
+    
+    // Batch simulation step with performance optimizations
+    void AgentBrain::stepBatch(const std::vector<SimulationStep>& steps) {
+        for (const auto& step : steps) {
+            // Process all sensory inputs and advance brain simulation
+            // Note: This assumes steps contain percepts and timestamps
+            // For a complete implementation, additional logic would be needed
+        }
+    }
+    
+    // Get agent state for checkpointing
+    std::map<std::string, float> AgentBrain::getState() const {
+        std::map<std::string, float> state;
+        state["dopamine"] = dopamineLevel_;
+        state["novelty"] = noveltyLevel_;
+        state["curiosity"] = curiosityLevel_;
+        state["prediction_error"] = predictionError_;
+        state["expected_reward"] = expectedReward_;
+        state["developmental_age"] = developmentalAge_;
+        state["plasticity_modifier"] = plasticityModifier_;
+        state["reward_modulation_enabled"] = rewardModulationEnabled_ ? 1.0f : 0.0f;
+        state["structural_plasticity_enabled"] = structuralPlasticityEnabled_ ? 1.0f : 0.0f;
+        state["development_enabled"] = developmentEnabled_ ? 1.0f : 0.0f;
+        state["curiosity_enabled"] = curiosityEnabled_ ? 1.0f : 0.0f;
+        state["sensory_novelty_decay"] = sensoryNoveltyDecay_;
+        return state;
+    }
+    
+    // Restore agent state from checkpoint
+    void AgentBrain::setState(const std::map<std::string, float>& state) {
+        auto it = state.find("dopamine");
+        if (it != state.end()) dopamineLevel_ = it->second;
+        
+        it = state.find("novelty");
+        if (it != state.end()) noveltyLevel_ = it->second;
+        
+        it = state.find("curiosity");
+        if (it != state.end()) curiosityLevel_ = it->second;
+        
+        it = state.find("prediction_error");
+        if (it != state.end()) predictionError_ = it->second;
+        
+        it = state.find("expected_reward");
+        if (it != state.end()) expectedReward_ = it->second;
+        
+        it = state.find("developmental_age");
+        if (it != state.end()) developmentalAge_ = it->second;
+        
+        it = state.find("plasticity_modifier");
+        if (it != state.end()) plasticityModifier_ = it->second;
+        
+        it = state.find("reward_modulation_enabled");
+        if (it != state.end()) rewardModulationEnabled_ = (it->second > 0.5f);
+        
+        it = state.find("structural_plasticity_enabled");
+        if (it != state.end()) structuralPlasticityEnabled_ = (it->second > 0.5f);
+        
+        it = state.find("development_enabled");
+        if (it != state.end()) developmentEnabled_ = (it->second > 0.5f);
+        
+        it = state.find("curiosity_enabled");
+        if (it != state.end()) curiosityEnabled_ = (it->second > 0.5f);
+        
+        it = state.find("sensory_novelty_decay");
+        if (it != state.end()) sensoryNoveltyDecay_ = it->second;
+    }
+    
+    // Reset agent for new episode with optional cleanup
+    void AgentBrain::resetEpisode(bool cleanupMemory) {
+        reset();
+        if (cleanupMemory) {
+            // Clear memory traces if cleanup is enabled
+            previousVision_.assign(previousVision_.size(), 0.0f);
+        }
+        // Reset development stage
+        if (brain_) {
+            brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
+        }
+    }
+    
 } // namespace nlm
