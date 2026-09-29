@@ -1,7 +1,5 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <filesystem>
 
 namespace nlm {
@@ -19,44 +17,69 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    ValidationHelper::validateNotEmpty(filepath, "Config file path cannot be empty");
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        throw FileIOError("Config file does not exist: " + filepath);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (!std::filesystem::is_regular_file(filepath)) {
+        throw FileIOError("Config path is not a regular file: " + filepath);
+    }
+    
+    if (!std::filesystem::is_readable(filepath)) {
+        throw FileIOError("Config file is not readable: " + filepath);
+    }
+    
+    try {
+        // TODO PHASE 2: Implement proper JSON/YAML parser
+        // PLACEHOLDER - Phase 1 uses a simple key=value format
+        
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            throw FileIOError("Cannot open config file for reading: " + filepath);
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
+    } catch (const std::exception& e) {
+        throw FileIOError(std::string("Error parsing config file ") + filepath + std::string(": ") + e.what());
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    NLM_VALIDATE_NON_NULL(argv, "Command line arguments pointer cannot be null");
+    ValidationHelper::validatePositive(argc, "Argument count must be positive");
+    
     for (int i = 1; i < argc; ++i) {
+        NLM_VALIDATE_NON_NULL(argv[i], "Argument pointer cannot be null");
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,13 +88,18 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                ValidationHelper::validateNotEmpty(key, "Config key cannot be empty from command line");
                 set(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
+            NLM_VALIDATE_NON_NULL(argv[i + 1], "Missing value for command line argument");
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            ValidationHelper::validateNotEmpty(key, "Config key cannot be empty from command line");
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -79,21 +107,43 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
+    ValidationHelper::validateNotEmpty(filepath, "Config save file path cannot be empty");
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw FileIOError("Cannot open config file for writing: " + filepath);
+        }
+        
+        // Create directory if it doesn't exist
+        std::filesystem::path path(filepath);
+        if (!path.parent_path().empty() && !std::filesystem::exists(path.parent_path())) {
+            std::filesystem::create_directories(path.parent_path());
+        }
+        
+        for (const auto& entry : pImpl->entries) {
+            ValidationHelper::validateNotEmpty(entry.key, "Config key cannot be empty in save");
+            file << "# " << (entry.description.empty() ? "No description" : entry.description) << "\n";
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << entry.key << " = \"" << arg << "\"\n";
+                } else {
+                    file << entry.key << " = " << arg << "\n";
+                }
+            }, entry.value);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        throw FileIOError(std::string("Error saving config to ") + filepath + std::string(": ") + e.what());
     }
-    
-    return true;
 }
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +165,23 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
+    
+    // Validate value based on type
+    std::visit([](const auto& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            ValidationHelper::validateNotEmpty(val, "Config string value cannot be empty if key is provided");
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // Boolean values are always valid
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                                   std::is_same_v<T, double>) {
+            ValidationHelper::validateRange(val, std::numeric_limits<T>::lowest(), 
+                                           std::numeric_limits<T>::max(), 
+                                           "Config numeric value out of valid range");
+        }
+    }, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,27 +194,37 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
+    ValidationHelper::validateNotEmpty(value, "Config string value cannot be empty");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
+    ValidationHelper::validateRange(value, std::numeric_limits<double>::lowest(), 
+                                   std::numeric_limits<double>::max(),
+                                   "Config double value out of valid range");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
     set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    ValidationHelper::validateNotEmpty(key, "Config key cannot be empty");
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -171,7 +248,9 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    
     for (const auto& entry : pImpl->entries) {
+        ValidationHelper::validateNotEmpty(entry.key, "Config entry key cannot be empty in summary");
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;

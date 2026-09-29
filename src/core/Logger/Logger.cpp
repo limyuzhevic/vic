@@ -12,6 +12,39 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    // Memory leak detection
+    static inline std::atomic<size_t> instances{0};
+    static inline std::atomic<size_t> peakInstances{0};
+    
+    Impl() { 
+        instances++; 
+        if (instances > peakInstances) peakInstances = instances; 
+    }
+    
+    ~Impl() { instances--; }
+    
+    static size_t getInstanceCount() { return instances.load(); }
+    static size_t getPeakInstanceCount() { return peakInstances.load(); }
+    static void resetStats() { instances = 0; peakInstances = 0; }
+};
+
+// Custom deleter for thread-safe cleanup
+struct ConsoleLogger::ImplDeleter {
+    std::mutex& getMutex;
+    
+    explicit ImplDeleter(std::mutex& mutex) : getMutex(mutex) {}
+    
+    void operator()(Impl* impl) {
+        if (impl) {
+            // Close file safely before deletion
+            if (impl->fileOut.is_open()) {
+                std::lock_guard<std::mutex> lock(getMutex);
+                impl->fileOut.close();
+            }
+            delete impl;
+        }
+    }
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -54,58 +87,133 @@ void ConsoleLogger::log(const LogEntry& entry) {
     }
 }
 
+void ConsoleLogger::log(const LogEntry& entry) {
+    if (entry.level < pImpl->level) {
+        return;
+    }
+    
+    // Thread-safe reference counting for read operations
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    std::ostringstream oss;
+    oss << "[" << levelToString(entry.level) << "] ";
+    
+    // Add timestamp
+    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    
+    oss << " " << entry.message;
+    
+    std::string output = oss.str();
+    
+    // Console output
+    if (pImpl->useColors) {
+        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+    } else {
+        std::cout << output << "\n";
+    }
+    
+    // File output if set
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut << output << "\n";
+        pImpl->fileOut.flush();
+    }
+}
+
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->fileOut.open(filepath, std::ios::app);
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
 }
 
-std::string ConsoleLogger::levelToString(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "DEBUG";
-        case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
-        case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRIT";
-        default: return "UNKNOWN";
-    }
-}
+// Global logger statistics for memory leak detection
+namespace {
+    struct LoggerStats {
+        std::atomic<size_t> instances{0};
+        std::atomic<size_t> peakInstances{0};
+        std::mutex mutex;
+        
+        void increment() {
+            std::lock_guard<std::mutex> lock(mutex);
+            instances++;
+            if (instances > peakInstances) peakInstances = instances;
+        }
+        
+        void decrement() {
+            std::lock_guard<std::mutex> lock(mutex);
+            instances--;
+        }
+        
+        size_t getInstanceCount() const {
+            std::lock_guard<std::mutex> lock(mutex);
+            return instances.load();
+        }
+        
+        size_t getPeakInstanceCount() const {
+            std::lock_guard<std::mutex> lock(mutex);
+            return peakInstances.load();
+        }
+        
+        void reset() {
+            std::lock_guard<std::mutex> lock(mutex);
+            instances = 0;
+            peakInstances = 0;
+        }
+    };
+    
+    LoggerStats loggerStats;
+}}
 
-std::string ConsoleLogger::levelToColor(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "\033[36m";    // Cyan
-        case LogLevel::Info: return "\033[32m";      // Green
-        case LogLevel::Warning: return "\033[33m";   // Yellow
-        case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
-        default: return "\033[0m";
-    }
-}
-
-// Logger class implementation
+// Logger class implementation with enhanced RAII
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    Impl() {
+        loggerStats.increment();
+    }
+    
+    ~Impl() {
+        loggerStats.decrement();
+    }
+    
+    static size_t getInstanceCount() {
+        return loggerStats.getInstanceCount();
+    }
+    
+    static size_t getPeakInstanceCount() {
+        return loggerStats.getPeakInstanceCount();
+    }
+    
+    static void resetStats() {
+        loggerStats.reset();
+    }
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -194,4 +302,24 @@ LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
-} // namespace nlm
+// Global helper functions for memory leak detection
+namespace nlm {
+    size_t getLoggerInstanceCount() {
+        return Logger::Impl::getInstanceCount();
+    }
+    
+    size_t getLoggerPeakInstanceCount() {
+        return Logger::Impl::getPeakInstanceCount();
+    }
+    
+    void resetLoggerStats() {
+        Logger::Impl::resetStats();
+    }
+    
+    void checkMemoryLeaks() {
+        if (Logger::Impl::getInstanceCount() > 0) {
+            getGlobal().warning("Memory leaks detected in Logger system: " + 
+                              std::to_string(Logger::Impl::getInstanceCount()) + " instances still active");
+        }
+    }
+}} // namespace nlm

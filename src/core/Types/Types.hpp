@@ -5,6 +5,67 @@
 
 namespace nlm {
 
+// Exception hierarchy for NLM error handling
+
+class NLMException : public std::exception {
+protected:
+    std::string message_;
+    std::string file_;
+    int line_;
+    std::string function_;
+    
+public:
+    explicit NLMException(const std::string& message) : message_(message), file_(""), line_(0), function_("") {}
+    NLMException(const std::string& message, const std::string& file, int line, const std::string& function)
+        : message_(message), file_(file), line_(line), function_(function) {}
+    
+    const char* what() const noexcept override {
+        return message_.c_str();
+    }
+    
+    const std::string& getMessage() const noexcept { return message_; }
+    const std::string& getFile() const noexcept { return file_; }
+    int getLine() const noexcept { return line_; }
+    const std::string& getFunction() const noexcept { return function_; }
+    
+    virtual ~NLMException() = default;
+};
+
+class ValidationException : public NLMException {
+public:
+    explicit ValidationException(const std::string& message) : NLMException("Validation Error: " + message) {}
+    ValidationException(const std::string& message, const std::string& file, int line, const std::string& function)
+        : NLMException("Validation Error: " + message, file, line, function) {}
+};
+
+class NullPointerException : public NLMException {
+public:
+    explicit NullPointerException(const std::string& message) : NLMException("Null Pointer Error: " + message) {}
+    NullPointerException(const std::string& message, const std::string& file, int line, const std::string& function)
+        : NLMException("Null Pointer Error: " + message, file, line, function) {}
+};
+
+class ConfigurationException : public NLMException {
+public:
+    explicit ConfigurationException(const std::string& message) : NLMException("Configuration Error: " + message) {}
+    ConfigurationException(const std::string& message, const std::string& file, int line, const std::string& function)
+        : NLMException("Configuration Error: " + message, file, line, function) {}
+};
+
+class FileIOError : public NLMException {
+public:
+    explicit FileIOError(const std::string& message) : NLMException("File I/O Error: " + message) {}
+    FileIOError(const std::string& message, const std::string& file, int line, const std::string& function)
+        : NLMException("File I/O Error: " + message, file, line, function) {}
+};
+
+class PlasticityException : public NLMException {
+public:
+    explicit PlasticityException(const std::string& message) : NLMException("Plasticity Error: " + message) {}
+    PlasticityException(const std::string& message, const std::string& file, int line, const std::string& function)
+        : NLMException("Plasticity Error: " + message, file, line, function) {}
+};
+
 // Strongly-typed identifiers for safety
 
 // Neuron identifier
