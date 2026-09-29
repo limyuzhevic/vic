@@ -254,6 +254,148 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Advanced Research Setup
+
+```python
+import pynlm
+
+# Create advanced research brain with all systems enabled
+brain = pynlm.createResearchBrain()
+
+# Create agent with world for robotics training
+agent_brain, world, agent = pynlm.createCompleteSystem("robotics_training")
+
+# Use our improved brain
+brain = agent_brain
+brain.initialize()
+
+# Run simulation with statistics
+stats = pynlm.runSimulationWithStats(brain, world, agent, 500, printProgress=True)
+
+print("Research simulation complete!")
+print(f"Total spikes: {stats[0]}")
+print(f"Firing neurons: {stats[1]}")
+print(f"Average firing rate: {stats[2]:.3f} Hz")
+print(f"E/I ratio: {stats[3]:.3f}")
+```
+
+### Project 5: Performance-Optimized Simulation
+
+```python
+import pynlm
+
+# Create quick test brain for performance testing
+test_brain = pynlm.createQuickTestBrain()
+test_world = pynlm.createSimpleWorld()
+test_world.configure(10, 10, 4, 4)
+test_world.reset()
+test_agent = pynlm.createAgentBrain(test_brain)
+test_agent.initialize(test_world)
+
+# Run performance test
+for i in range(200):
+    test_world.update(0.1)
+    test_agent.processSensoryInput(test_world.getSensoryPercept())
+    test_brain.step(i)
+    test_world.applyMotorCommand(test_agent.decodeMotorCommand(), test_world.getSimulationTime())
+
+print("Performance test complete!")
+```
+
+### Project 6: Advanced Configuration Management
+
+```python
+import pynlm
+
+# Create config with performance optimization
+config = pynlm.createConfigWithDefaults("learning_focus")
+
+# Validate config before use
+pynlm.validateBrainConfig(config)
+
+# Create brain safely
+brain = pynlm.createBrainSafe(config)
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(15, 15, 8, 8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run learning experiment
+pynlm.runBrainEpisode(brain, world, agent, 500, enableLearning=True)
+
+print("Advanced configuration complete!")
+```
+
+### Project 7: Error Handling Best Practices
+
+```python
+import pynlm
+import traceback
+
+try:
+    # Create brain with custom config
+    config = pynlm.createDefaultConfig()
+    config.set("neuron_count", 1000)
+    
+    # Safe brain creation with validation
+    brain = pynlm.createBrainSafe(config)
+    
+    # Safe world creation
+    world = pynlm.createSimpleWorld()
+    world.configure(10, 10, 4, 4)
+    world.reset()
+    
+    # Safe agent creation
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Run simulation with error handling
+    for step in range(100):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+        
+except Exception as e:
+    print(f"Simulation error: {e}")
+    traceback.print_exc()
+    print("Attempting recovery...")
+    
+    # Recovery
+    if 'brain' in locals():
+        brain.reset()
+        brain.initialize()
+    if 'agent' in locals():
+        agent.reset()
+    
+    print("Recovery complete")
+```
+
+### Project 8: Advanced Research Setup
+
+```python
+import pynlm
+
+# Setup for cognitive testing research
+brain, world, agent = pynlm.createCompleteSystem("cognitive_testing")
+
+# Optimize for memory research
+pynlm.optimizeBrainForPerformance(brain, "accuracy")
+
+# Run cognitive experiment
+stats = pynlm.runSimulationWithStats(brain, world, agent, 1000, printProgress=False)
+
+print("Cognitive testing experiment complete!")
+print(f"Results: {stats[1]} firing neurons, {stats[2]:.3f} Hz average rate")
+
+# Export for analysis
+pynlm.exportBrainForResearch(brain, "cognitive_experiment.pkl")
+```
+
 ---
 
 ## Quick Reference

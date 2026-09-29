@@ -496,6 +496,117 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
+### Advanced Configuration Management
+
+```python
+import pynlm
+
+# Create configuration with predefined settings
+config = pynlm.createConfigWithDefaults("learning_focus")
+
+# Create brain safely with validation
+brain = pynlm.createBrainSafe(config)
+
+# Create world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run episode with learning
+pynlm.runBrainEpisode(brain, world, agent, 1000, enableLearning=True)
+```
+
+### Performance Optimization
+
+```python
+import pynlm
+
+# Create research brain and optimize for performance
+brain = pynlm.createResearchBrain()
+
+# Optimize for different performance characteristics
+pynlm.optimizeBrainForPerformance(brain, "speed")      # Fast simulation
+pynlm.optimizeBrainForPerformance(brain, "memory")     # Memory-efficient
+pynlm.optimizeBrainForPerformance(brain, "accuracy")   # High accuracy
+```
+
+### Error Handling and Validation
+
+```python
+import pynlm
+import traceback
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Validate configuration
+try:
+    pynlm.validateBrainConfig(config)
+    print("Configuration is valid")
+except Exception as e:
+    print(f"Invalid configuration: {e}")
+
+# Create system with error handling
+try:
+    brain = pynlm.createBrainSafe(config)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=10, height=10, visionWidth=4, visionHeight=4)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    print("System created successfully")
+    
+except Exception as e:
+    print(f"System creation failed: {e}")
+    traceback.print_exc()
+```
+
+### Research System Setup
+
+```python
+import pynlm
+
+# Create complete system for research
+def setup_research_system(useCase="default"):
+    brain, world, agent = pynlm.createCompleteSystem(useCase)
+    return brain, world, agent
+
+# Available use cases:
+# "robotics_training" - For robot training simulations
+# "cognitive_testing" - For cognitive testing experiments
+# "memory_research" - For memory research studies
+# "default" - Balanced configuration
+
+# Example usage
+brain, world, agent = setup_research_system("robotics_training")
+
+# Run simulation with statistics
+stats = pynlm.runSimulationWithStats(brain, world, agent, 500, printProgress=True)
+
+print(f"Simulation complete: {stats[1]} firing neurons, {stats[2]:.3f} Hz rate")
+```
+
+### Advanced Brain Creation
+
+```python
+import pynlm
+
+# Quick test brain for rapid prototyping
+test_brain = pynlm.createQuickTestBrain()
+
+# Research-grade brain with all systems enabled
+research_brain = pynlm.createResearchBrain()
+
+# Brain with specific preset configuration
+preset_brain = pynlm.createBrainWithPresetConfig("medium")
+```
+
 ---
 
 ## Troubleshooting
@@ -524,6 +635,16 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+**Configuration Errors:**
+- Use `validateBrainConfig()` to check configuration before use
+- Catch exceptions when creating brains with `createBrainSafe()`
+- Use `createResearchBrain()` or `createQuickTestBrain()` for standard configurations
+
+**Simulation Errors:**
+- Use `runSimulationWithStats()` for detailed error reporting
+- Check agent subsystem status with `getNeuromodulationLevel()`, `getCuriosityLevel()`, etc.
+- Enable learning and curiosity for better exploration behavior
+
 ---
 
 ## Further Reading
@@ -531,3 +652,37 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance optimization guide
+- [SCALING.md](docs/SCALING.md) - Scaling and performance tuning
+- [FINAL_LIMITATIONS.md](docs/FINAL_LIMITATIONS.md) - Technical limitations and workarounds
+
+## Advanced Topics
+
+### Configuration Presets
+
+The following configuration presets are available:
+
+| Preset | Description | Use Case |
+|--------|-------------|----------|
+| `fast_simulation` | Optimized for speed and throughput | Large-scale simulations |
+| `learning_focus` | Optimized for plasticity and learning | Training and adaptation |
+| `memory_focus` | Optimized for memory systems | Memory research |
+| `curiosity_driven` | Optimized for exploration | Exploration and discovery |
+
+### Error Handling Patterns
+
+| Pattern | Function | When to Use |
+|---------|----------|-------------|
+| Basic validation | `validateBrainConfig()` | Before creating brain |
+| Safe creation | `createBrainSafe()` | Production systems |
+| Quick setup | `createQuickTestBrain()` | Testing and debugging |
+| Research setup | `createResearchBrain()` | Research experiments |
+| Complete system | `createCompleteSystem()` | Complex experiments |
+
+### Performance Optimization
+
+| Optimization Type | Function | Trade-off |
+|------------------|----------|-----------|
+| Speed | `optimizeBrainForPerformance(brain, "speed")` | Memory usage ↑ |
+| Memory | `optimizeBrainForPerformance(brain, "memory")` | Simulation time ↑ |
+| Accuracy | `optimizeBrainForPerformance(brain, "accuracy")` | Resource usage ↑ |
