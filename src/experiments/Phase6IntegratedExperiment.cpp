@@ -4,8 +4,12 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 
 namespace nlm {
 

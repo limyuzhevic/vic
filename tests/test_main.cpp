@@ -33,6 +33,10 @@ namespace test_stdp {
     void runAll();
 }
 
+namespace test_phase2 {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
@@ -43,6 +47,8 @@ int main() {
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Hebbian Learning" << std::endl;
+    std::cout << "  - Structural Plasticity" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -104,6 +110,15 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Phase 2 Neural Computation tests..." << std::endl;
+    try {
+        test_phase2::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
