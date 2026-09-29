@@ -12,9 +12,27 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/prediction/ActionConsequencePredictor.hpp"
+#include "../src/prediction/PredictionErrorSignal.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -245,6 +263,128 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory for temporary storage)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"),
+             "Store item in working memory")
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"),
+             "Retrieve item from working memory")
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"),
+             "Check if item exists in working memory")
+        .def("clear", &WorkingMemory::clear, "Clear all working memory items")
+        .def("getCapacity", &WorkingMemory::getCapacity, "Get working memory capacity")
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize, "Get current number of items")
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"),
+             "Decay all items with given rate");
+
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Individual episodic memory item)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("neurons", &EpisodicMemoryItem::neurons)
+        .def_readwrite("values", &EpisodicMemoryItem::values)
+        .def_readwrite("metadata", &EpisodicMemoryItem::metadata);
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory for storing events)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode in episodic memory")
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"),
+             "Retrieve an episode by index")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get most recent episodes")
+        .def("clear", &EpisodicMemory::clear, "Clear all episodes")
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Consolidate important episodes to long-term memory");
+
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory for facts and concepts)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"),
+             "Store a fact in semantic memory")
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"),
+             "Retrieve a fact by key")
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"),
+             "Check if fact exists")
+        .def("getAllFacts", &SemanticMemory::getAllFacts, "Get all facts")
+        .def("clear", &SemanticMemory::clear, "Clear all facts");
+
+    py::class_<Skill>(m, "Skill", R"pbdoc(Learned skill/procedure)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("name", &Skill::name)
+        .def_readwrite("neuralPattern", &Skill::neuralPattern)
+        .def_readwrite("proficiency", &Skill::proficiency);
+
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Procedural memory for skills)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"),
+             "Learn a new skill")
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"),
+             "Get a skill by name")
+        .def("getAllSkills", &ProceduralMemory::getAllSkills, "Get all skills")
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"),
+             "Update skill proficiency")
+        .def("clear", &ProceduralMemory::clear, "Clear all skills");
+
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory for relationships)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate, py::arg("a"), py::arg("b"), py::arg("strength"),
+             "Create association between two neurons")
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"),
+             "Get associated neurons")
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, py::arg("a"), py::arg("b"),
+             "Get association strength")
+        .def("updateAssociation", &AssociativeMemory::updateAssociation, py::arg("a"), py::arg("b"), py::arg("delta"),
+             "Update association strength")
+        .def("clear", &AssociativeMemory::clear, "Clear all associations");
+
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory using persistent activity)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize working memory with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store pattern in working memory")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store activation to specific neuron")
+        .def("retrieve", &NeuralWorkingMemory::retrieve, "Retrieve current working memory content")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if neuron is in working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation of specific neuron")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"), "Update working memory dynamics")
+        .def("clear", &NeuralWorkingMemory::clear, "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces, "Get number of active traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity, "Get memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"), "Set memory capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate, "Get decay rate")
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"), "Set decay rate")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons, "Get neurons in memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"), "Strengthen memory")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition, "Run competition between traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"), "Check if neuron is winning")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity, "Get overall memory activity");
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Neural attention through competition)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize attentional selection with brain reference")
+        .def("processCompetition", &AttentionalSelection::processCompetition, py::arg("competitors"), py::arg("globalInhibition") = 0.5f,
+             "Process competition and select winners")
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"), "Focus attention on region")
+        .def("releaseAttention", &AttentionalSelection::releaseAttention, "Release attention")
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions, "Get attended regions")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"), "Set inhibition strength")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"), "Set excitation strength")
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"), "Set competition threshold")
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"), "Get inhibition for neuron")
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"), "Get excitation for neuron")
+        .def("update", &AttentionalSelection::update, py::arg("dt"), "Update attention dynamics")
+        .def("isAttended", &AttentionalSelection::isAttended, py::arg("neuron"), "Check if neuron is attended")
+        .def("getWinners", &AttentionalSelection::getWinners, "Get current winners")
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias, py::arg("neuron"), py::arg("biasStrength"), "Apply top-down bias")
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience, py::arg("neuron"), py::arg("salienceStrength"), "Apply bottom-up salience")
+        .def("reset", &AttentionalSelection::reset, "Reset attention");
+
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -416,10 +556,185 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
 
-} // namespace nlm
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Memory system
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory for temporary storage)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"),
+             "Store item in working memory")
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"),
+             "Retrieve item from working memory")
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"),
+             "Check if item exists in working memory")
+        .def("clear", &WorkingMemory::clear, "Clear all working memory items")
+        .def("getCapacity", &WorkingMemory::getCapacity, "Get working memory capacity")
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize, "Get current number of items")
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"),
+             "Decay all items with given rate");
+
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Individual episodic memory item)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("neurons", &EpisodicMemoryItem::neurons)
+        .def_readwrite("values", &EpisodicMemoryItem::values)
+        .def_readwrite("metadata", &EpisodicMemoryItem::metadata);
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory for storing events)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode in episodic memory")
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"),
+             "Retrieve an episode by index")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get most recent episodes")
+        .def("clear", &EpisodicMemory::clear, "Clear all episodes")
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Consolidate important episodes to long-term memory");
+
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory for facts and concepts)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"),
+             "Store a fact in semantic memory")
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"),
+             "Retrieve a fact by key")
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"),
+             "Check if fact exists")
+        .def("getAllFacts", &SemanticMemory::getAllFacts, "Get all facts")
+        .def("clear", &SemanticMemory::clear, "Clear all facts");
+
+    py::class_<Skill>(m, "Skill", R"pbdoc(Learned skill/procedure)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("name", &Skill::name)
+        .def_readwrite("neuralPattern", &Skill::neuralPattern)
+        .def_readwrite("proficiency", &Skill::proficiency);
+
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Procedural memory for skills)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"),
+             "Learn a new skill")
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"),
+             "Get a skill by name")
+        .def("getAllSkills", &ProceduralMemory::getAllSkills, "Get all skills")
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"),
+             "Update skill proficiency")
+        .def("clear", &ProceduralMemory::clear, "Clear all skills");
+
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory for relationships)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate, py::arg("a"), py::arg("b"), py::arg("strength"),
+             "Create association between two neurons")
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"),
+             "Get associated neurons")
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, py::arg("a"), py::arg("b"),
+             "Get association strength")
+        .def("updateAssociation", &AssociativeMemory::updateAssociation, py::arg("a"), py::arg("b"), py::arg("delta"),
+             "Update association strength")
+        .def("clear", &AssociativeMemory::clear, "Clear all associations");
+
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory using persistent activity)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize working memory with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store pattern in working memory")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store activation to specific neuron")
+        .def("retrieve", &NeuralWorkingMemory::retrieve, "Retrieve current working memory content")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if neuron is in working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation of specific neuron")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"), "Update working memory dynamics")
+        .def("clear", &NeuralWorkingMemory::clear, "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces, "Get number of active traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity, "Get memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"), "Set memory capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate, "Get decay rate")
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"), "Set decay rate")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons, "Get neurons in memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"), "Strengthen memory")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition, "Run competition between traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"), "Check if neuron is winning")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity, "Get overall memory activity");
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Neural attention through competition)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize attentional selection with brain reference")
+        .def("processCompetition", &AttentionalSelection::processCompetition, py::arg("competitors"), py::arg("globalInhibition") = 0.5f,
+             "Process competition and select winners")
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"), "Focus attention on region")
+        .def("releaseAttention", &AttentionalSelection::releaseAttention, "Release attention")
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions, "Get attended regions")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"), "Set inhibition strength")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"), "Set excitation strength")
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"), "Set competition threshold")
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"), "Get inhibition for neuron")
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"), "Get excitation for neuron")
+        .def("update", &AttentionalSelection::update, py::arg("dt"), "Update attention dynamics")
+        .def("isAttended", &AttentionalSelection::isAttended, py::arg("neuron"), "Check if neuron is attended")
+        .def("getWinners", &AttentionalSelection::getWinners, "Get current winners")
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias, py::arg("neuron"), py::arg("biasStrength"), "Apply top-down bias")
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience, py::arg("neuron"), py::arg("salienceStrength"), "Apply bottom-up salience")
+        .def("reset", &AttentionalSelection::reset, "Reset attention");
+
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+        .def(py::init<>())
+        .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("reset", &SimpleWorld::reset)
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
+        .def("update", &SimpleWorld::update, py::arg("timestep"))
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"))
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal)
+        .def("getAgentBody", &SimpleWorld::getAgentBody,
+             py::return_value_policy::reference_internal)
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getWidth", &SimpleWorld::getWidth)
+        .def("getHeight", &SimpleWorld::getHeight)
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
