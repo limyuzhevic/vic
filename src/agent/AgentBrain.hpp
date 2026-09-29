@@ -52,6 +52,14 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Sleep/rest cycle for memory consolidation
+    void enterRestState(double restDuration);
+    bool isInRestState() const { return isInRestState_; }
+    double getRestProgress() const { return restProgress_; }
+    
+    // Trigger dream-like simulation during rest
+    void triggerDreamSimulation();
+    
     // Reset agent for new episode
     void reset();
     
