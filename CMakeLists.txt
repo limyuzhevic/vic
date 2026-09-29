@@ -121,6 +121,18 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Phase 2 experiments
+add_library(nlm_phase2 STATIC
+    src/main.cpp
+    src/main_config.cpp
+    src/main_brain.cpp
+    src/main_runner.cpp
+    src/main_learning.cpp
+    src/main_tests.cpp
+)
+target_include_directories(nlm_phase2 PUBLIC src)
+target_link_libraries(nlm_phase2 PUBLIC nlm_core)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
@@ -131,7 +143,7 @@ target_link_libraries(nlm PUBLIC nlm_core)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase2)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
@@ -144,7 +156,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase2
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
