@@ -84,7 +84,7 @@ void STDP::update(Synapse* synapse,
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
-        // Apply weight change
+        // Apply weight change - synapse->addToWeight() handles bounds clamping
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
@@ -96,10 +96,16 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
+    // Calculate new weight with delta
     float newWeight = synapse->getWeight() + delta;
+    
+    // Apply weight change with bounds - single clamping point
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);
+    
+    // Update eligibility trace for reward-modulated learning
+    float currentTrace = synapse->getEligibilityTrace();
+    synapse->setEligibilityTrace(currentTrace + delta);
 }
 
 const char* STDP::getName() const {

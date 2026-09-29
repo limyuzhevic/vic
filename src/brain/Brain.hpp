@@ -187,11 +187,37 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
+    // Development system access
+    DevelopmentSystem* getDevelopmentSystem();
+    
+    // Get current developmental stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
     // Logging
     void logStatus() const;
+    
+    // Simulation mode (for advanced configuration)
+    enum SimulationMode {
+        Standard,    // Standard accuracy/speed balance
+        Fast,        // Maximum speed, lower accuracy
+        Accurate,    // Maximum accuracy, slower speed
+        Balanced     // Balanced approach
+    };
+    
+    // Advanced metrics for simulation analysis
+    struct AdvancedMetrics {
+        size_t totalSpikes;
+        float averageWeightChange;
+        float learningEfficiency;
+        float stabilityIndex;
+        
+        AdvancedMetrics() : totalSpikes(0), averageWeightChange(0.0f),
+                           learningEfficiency(0.0f), stabilityIndex(0.0f) {}
+    };
     
 private:
     struct Impl;
