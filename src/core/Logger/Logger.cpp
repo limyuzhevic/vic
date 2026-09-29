@@ -47,10 +47,17 @@ void ConsoleLogger::log(const LogEntry& entry) {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output with improved error handling
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to write to log file: " + std::string(e.what()));
+            // Attempt to recover by closing and reopening the file
+            pImpl->fileOut.close();
+            // Note: In a real implementation, you might want to retry opening the file
+        }
     }
 }
 
@@ -71,13 +78,43 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    // Validate file path
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Invalid file path: filepath is empty");
+        return;
+    }
+    
+    try {
+        // Close existing file if open
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+        }
+        
+        // Open file with append mode and error checking
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            NLM_LOG_ERROR("Failed to open log file for writing: " + filepath);
+            return;
+        }
+        
+        // Log successful file open
+        NLM_LOG_INFO("Opened log file: " + filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception opening log file " + filepath + ": " + std::string(e.what()));
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    try {
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.flush();
+            pImpl->fileOut.close();
+            NLM_LOG_INFO("Closed log file");
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception closing log file: " + std::string(e.what()));
     }
+}
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
@@ -106,26 +143,71 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    bool initialized;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->initialized = false;
+}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    try {
+        // Clean up all loggers
+        clearLoggers();
+        pImpl->initialized = false;
+    } catch (const std::exception& e) {
+        // Log the exception during destruction
+        std::cerr << "Exception during Logger destruction: " << e.what() << std::endl;
+    }
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        NLM_LOG_ERROR("Attempted to add null logger");
+        return;
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    
+    try {
+        pImpl->loggers.push_back(logger);
+        pImpl->initialized = true;
+        NLM_LOG_INFO("Added logger to global logger");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception adding logger: " + std::string(e.what()));
+    }
 }
 
 void Logger::clearLoggers() {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
+    
+    try {
+        // Close any file handles in loggers
+        for (auto& logger : pImpl->loggers) {
+            if (auto consoleLogger = std::dynamic_pointer_cast<ConsoleLogger>(logger)) {
+                consoleLogger->closeOutputFile();
+            }
+        }
+        
+        pImpl->loggers.clear();
+        pImpl->initialized = false;
+        NLM_LOG_INFO("Cleared all loggers");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception clearing loggers: " + std::string(e.what()));
+    }
 }
 
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
+    
+    try {
+        for (auto& logger : pImpl->loggers) {
+            if (logger) {
+                logger->setLevel(level);
+            }
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception setting logger level: " + std::string(e.what()));
     }
 }
 
@@ -133,16 +215,29 @@ void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+    try {
+        LogEntry entry;
+        entry.level = level;
+        entry.message = message;
+        entry.file = file;
+        entry.line = line;
+        entry.function = function;
+        entry.timestamp = std::chrono::system_clock::now();
+        
+        // Validate log entry
+        if (entry.message.empty()) {
+            NLM_LOG_WARNING("Empty log message in " + function);
+        }
+        
+        for (auto& logger : pImpl->loggers) {
+            if (logger) {
+                logger->log(entry);
+            } else {
+                NLM_LOG_ERROR("Null logger encountered in global logger");
+            }
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception in global logger log: " + std::string(e.what()));
     }
 }
 
@@ -168,30 +263,18 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
+    
+    try {
+        for (auto& logger : pImpl->loggers) {
+            if (logger && logger->getLevel() <= level) {
+                return true;
+            }
         }
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception checking if logger is enabled: " + std::string(e.what()));
+        return false;
     }
-    return false;
-}
-
-Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
-}
-
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
-}
-
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
 } // namespace nlm
