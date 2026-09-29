@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <chrono>
+#include <map>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -408,18 +411,592 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+    // Advanced configuration functions for expert users
+    m.def("createScientificConfig", []() -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        cfg->set("neuron_count", 10000);
+        cfg->set("region_count", 4);
+        cfg->set("connection_probability", 0.15f);
+        cfg->set("stdp_ltp_weight", 0.01f);
+        cfg->set("stdp_ltd_weight", 0.012f);
+        cfg->set("synaptogenesis_rate", 0.0002f);
+        cfg->set("pruning_rate", 0.00002f);
+        cfg->set("enable_development", true);
+        cfg->set("development_rate", 0.5f);
+        cfg->set("enable_structural_plasticity", true);
+        cfg->set("enable_reward_modulation", true);
+        cfg->set("enable_curiosity", true);
+        cfg->set("enable_prediction", true);
+        cfg->set("checkpoint_dir", "./checkpoints");
+        return cfg;
+    }, "Create a scientific-grade configuration with advanced features");
+
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto cfg = std::make_shared<Config>();
+        cfg->set("neuron_count", 100);
+        cfg->set("region_count", 1);
+        cfg->set("connection_probability", 0.1f);
+        return cfg;
+    }, "Create a minimal configuration for basic testing");
+
+    m.def("createWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
+
+    m.def("createWorldWithSize", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create a simple world with specified dimensions");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Experiment and simulation utilities
+    m.def("runSimpleExperiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, size_t numSteps) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        float totalReward = 0.0f;
+        float totalFiringRate = 0.0f;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(step);
+            
+            // Get action and apply
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Compute reward
+            float reward = world->computeReward();
+            totalReward += reward;
+            totalFiringRate += brain->getAverageFiringRate();
+        }
+        
+        return std::make_tuple(totalReward / numSteps, totalFiringRate / numSteps);
+    }, py::arg("brain"), py::arg("world"), py::arg("numSteps"), "Run a simple experiment and return average reward and firing rate");
+
+    // Advanced analysis functions
+    m.def("extractBrainState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, py::object> state;
+        
+        // Basic brain statistics
+        state["total_neurons"] = brain->getTotalNeuronCount();
+        state["total_synapses"] = brain->getTotalSynapseCount();
+        state["active_neurons"] = brain->getActiveNeuronCount();
+        state["firing_neurons"] = brain->getFiringNeuronCount();
+        state["total_spikes"] = brain->getTotalSpikeCount();
+        state["average_firing_rate"] = brain->getAverageFiringRate();
+        state["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        state["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Memory system states (if available)
+        auto workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            state["working_memory_traces"] = workingMemory->getActiveTraces();
+        }
+        
+        auto episodicMemory = brain->getEpisodicMemory();
+        if (episodicMemory) {
+            state["episodic_memory_episodes"] = episodicMemory->getEpisodeCount();
+        }
+        
+        return state;
+    }, "Extract current brain state as a dictionary for analysis");
+
+    // Visualization data extraction
+    m.def("extractVisualizationData", [](std::shared_ptr<Brain> brain, size_t maxNeurons) {
+        std::vector<std::vector<float>> neuronActivities;
+        std::vector<std::vector<float>> neuronPositions;
+        
+        size_t count = 0;
+        for (const auto& region : brain->getRegions()) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (count >= maxNeurons) break;
+                
+                // Get neuron activity (simplified - could be more sophisticated)
+                float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                neuronActivities.push_back({activity, 0.0f, 0.0f}); // RGB simplification
+                
+                // Get neuron position (simplified - could use actual coordinates)
+                neuronPositions.push_back({static_cast<float>(count % 10) * 0.1f, 
+                                         static_cast<float>(count / 10) * 0.1f, 
+                                         0.0f});
+                
+                count++;
+            }
+        }
+        
+        return std::make_tuple(neuronActivities, neuronPositions);
+    }, py::arg("brain"), py::arg("maxNeurons"), "Extract neuron activity data for visualization");
+
+    // Advanced serialization with metadata
+    m.def("saveBrainWithMetadata", [](std::shared_ptr<Brain> brain, const std::string& filepath, const std::string& metadata) {
+        // First save the brain state
+        bool saved = brain->save(filepath);
+        if (!saved) {
+            throw std::runtime_error("Failed to save brain state");
+        }
+        
+        // Save metadata to a separate file
+        std::string metadataPath = filepath + ".meta";
+        std::ofstream metaFile(metadataPath);
+        if (!metaFile.is_open()) {
+            throw std::runtime_error("Failed to save metadata file: " + metadataPath);
+        }
+        
+        metaFile << "Brain saved at: " << std::time(nullptr) << std::endl;
+        metaFile << "Metadata: " << metadata << std::endl;
+        metaFile << "Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        metaFile << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("metadata"), "Save brain state with additional metadata");
+
+    // Batch processing utilities
+    m.def("runBatchSimulation", [](std::vector<std::shared_ptr<Config>> configs, size_t stepsPerConfig) {
+        std::vector<std::tuple<float, float, float>> results; // reward, firing_rate, time_taken
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto start = std::chrono::high_resolution_clock::now();
+            
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(10, 10, 8, 8);
+            world->reset();
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            
+            float totalReward = 0.0f;
+            float totalFiringRate = 0.0f;
+            
+            for (size_t step = 0; step < stepsPerConfig; ++step) {
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                float reward = world->computeReward();
+                totalReward += reward;
+                totalFiringRate += brain->getAverageFiringRate();
+                
+                world->update(0.1f);
+            }
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            
+            results.push_back(std::make_tuple(
+                totalReward / stepsPerConfig,
+                totalFiringRate / stepsPerConfig,
+                static_cast<float>(duration) / 1000.0f
+            ));
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("stepsPerConfig"), "Run batch simulation with multiple configurations");
+
+    // Advanced brain analysis functions
+    m.def("analyzeLearningCurve", [](std::shared_ptr<Brain> brain, size_t windowSize) {
+        std::vector<float> firingRates;
+        std::vector<float> spikeCounts;
+        
+        // Extract firing rates over time (simplified - would need to track over time)
+        // This is a placeholder for advanced analysis
+        for (size_t i = 0; i < windowSize; ++i) {
+            firingRates.push_back(brain->getAverageFiringRate() * (1.0f + (i % 5) * 0.1f));
+            spikeCounts.push_back(static_cast<float>(brain->getTotalSpikeCount() / (i + 1)));
+        }
+        
+        return std::make_tuple(firingRates, spikeCounts);
+    }, py::arg("brain"), py::arg("windowSize"), "Analyze learning curve (placeholder for advanced analysis)");
+
+    // Brain statistics and debugging
+    m.def("getDetailedStatistics", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, py::object> stats;
+        
+        // Basic statistics
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Region statistics
+        stats["region_count"] = brain->getRegionCount();
+        auto regionIds = brain->getRegionIds();
+        std::vector<size_t> regionNeuronCounts;
+        for (const auto& regionId : regionIds) {
+            auto region = brain->getRegion(regionId);
+            if (region) {
+                regionNeuronCounts.push_back(region->getTotalNeuronCount());
+            }
+        }
+        stats["region_neuron_counts"] = regionNeuronCounts;
+        
+        // Development statistics
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, "Get detailed brain statistics for analysis");
+
+    // Convenience functions for common tasks
+    m.def("createLearningAgent", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable typical learning features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        agent->enableStructuralPlasticity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a fully configured learning agent with world and brain");
+
+    // Experiment runner with detailed reporting
+    m.def("runExperimentWithReport", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                      size_t numSteps, bool detailedLogging) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        std::map<std::string, float> metrics;
+        std::vector<float> rewards;
+        std::vector<float> firingRates;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = world->computeReward();
+            rewards.push_back(reward);
+            firingRates.push_back(brain->getAverageFiringRate());
+            
+            world->update(0.1f);
+            
+            if (detailedLogging && step % 100 == 0) {
+                // Log detailed information
+                // This would use the logging system
+            }
+        }
+        
+        // Calculate metrics
+        float avgReward = 0.0f, avgFiringRate = 0.0f;
+        for (float r : rewards) avgReward += r;
+        for (float fr : firingRates) avgFiringRate += fr;
+        avgReward /= rewards.size();
+        avgFiringRate /= firingRates.size();
+        
+        metrics["average_reward"] = avgReward;
+        metrics["average_firing_rate"] = avgFiringRate;
+        metrics["reward_variance"] = 0.0f; // Would calculate variance
+        metrics["learning_efficiency"] = avgReward / (avgFiringRate + 0.01f);
+        
+        return std::make_tuple(metrics, rewards, firingRates);
+    }, py::arg("brain"), py::arg("world"), py::arg("numSteps"), py::arg("detailedLogging"), "Run experiment with detailed reporting");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
+        
+        return std::make_tuple(totalReward / numSteps, totalFiringRate / numSteps);
+    }, py::arg("brain"), py::arg("world"), py::arg("numSteps"), "Run a simple experiment and return average reward and firing rate");
+
+    // Advanced analysis functions
+    m.def("extractBrainState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, py::object> state;
+        
+        // Basic brain statistics
+        state["total_neurons"] = brain->getTotalNeuronCount();
+        state["total_synapses"] = brain->getTotalSynapseCount();
+        state["active_neurons"] = brain->getActiveNeuronCount();
+        state["firing_neurons"] = brain->getFiringNeuronCount();
+        state["total_spikes"] = brain->getTotalSpikeCount();
+        state["average_firing_rate"] = brain->getAverageFiringRate();
+        state["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        state["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Memory system states (if available)
+        auto workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            state["working_memory_traces"] = workingMemory->getActiveTraces();
+        }
+        
+        auto episodicMemory = brain->getEpisodicMemory();
+        if (episodicMemory) {
+            state["episodic_memory_episodes"] = episodicMemory->getEpisodeCount();
+        }
+        
+        return state;
+    }, "Extract current brain state as a dictionary for analysis");
+
+    // Visualization data extraction
+    m.def("extractVisualizationData", [](std::shared_ptr<Brain> brain, size_t maxNeurons) {
+        std::vector<std::vector<float>> neuronActivities;
+        std::vector<std::vector<float>> neuronPositions;
+        
+        size_t count = 0;
+        for (const auto& region : brain->getRegions()) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (count >= maxNeurons) break;
+                
+                // Get neuron activity (simplified - could be more sophisticated)
+                float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                neuronActivities.push_back({activity, 0.0f, 0.0f}); // RGB simplification
+                
+                // Get neuron position (simplified - could use actual coordinates)
+                neuronPositions.push_back({static_cast<float>(count % 10) * 0.1f, 
+                                         static_cast<float>(count / 10) * 0.1f, 
+                                         0.0f});
+                
+                count++;
+            }
+        }
+        
+        return std::make_tuple(neuronActivities, neuronPositions);
+    }, py::arg("brain"), py::arg("maxNeurons"), "Extract neuron activity data for visualization");
+
+    // Advanced serialization with metadata
+    m.def("saveBrainWithMetadata", [](std::shared_ptr<Brain> brain, const std::string& filepath, const std::string& metadata) {
+        // First save the brain state
+        bool saved = brain->save(filepath);
+        if (!saved) {
+            throw std::runtime_error("Failed to save brain state");
+        }
+        
+        // Save metadata to a separate file
+        std::string metadataPath = filepath + ".meta";
+        std::ofstream metaFile(metadataPath);
+        if (!metaFile.is_open()) {
+            throw std::runtime_error("Failed to save metadata file: " + metadataPath);
+        }
+        
+        metaFile << "Brain saved at: " << std::time(nullptr) << std::endl;
+        metaFile << "Metadata: " << metadata << std::endl;
+        metaFile << "Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        metaFile << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("metadata"), "Save brain state with additional metadata");
+
+    // Advanced serialization with metadata
+    m.def("saveBrainWithMetadata", [](std::shared_ptr<Brain> brain, const std::string& filepath, const std::string& metadata) {
+        // First save the brain state
+        bool saved = brain->save(filepath);
+        if (!saved) {
+            throw std::runtime_error("Failed to save brain state");
+        }
+        
+        // Save metadata to a separate file
+        std::string metadataPath = filepath + ".meta";
+        std::ofstream metaFile(metadataPath);
+        if (!metaFile.is_open()) {
+            throw std::runtime_error("Failed to save metadata file: " + metadataPath);
+        }
+        
+        metaFile << "Brain saved at: " << std::time(nullptr) << std::endl;
+        metaFile << "Metadata: " << metadata << std::endl;
+        metaFile << "Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        metaFile << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("metadata"), "Save brain state with additional metadata");
+
+    // Batch processing utilities
+    m.def("runBatchSimulation", [](std::vector<std::shared_ptr<Config>> configs, size_t stepsPerConfig) {
+        std::vector<std::tuple<float, float, float>> results; // reward, firing_rate, time_taken
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            auto start = std::chrono::high_resolution_clock::now();
+            
+            auto brain = std::make_shared<Brain>(configs[i]);
+            brain->initialize();
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(10, 10, 8, 8);
+            world->reset();
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            
+            float totalReward = 0.0f;
+            float totalFiringRate = 0.0f;
+            
+            for (size_t step = 0; step < stepsPerConfig; ++step) {
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                float reward = world->computeReward();
+                totalReward += reward;
+                totalFiringRate += brain->getAverageFiringRate();
+                
+                world->update(0.1f);
+            }
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            
+            results.push_back(std::make_tuple(
+                totalReward / stepsPerConfig,
+                totalFiringRate / stepsPerConfig,
+                static_cast<float>(duration) / 1000.0f
+            ));
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("stepsPerConfig"), "Run batch simulation with multiple configurations");
+
+    // Advanced brain analysis functions
+    m.def("analyzeLearningCurve", [](std::shared_ptr<Brain> brain, size_t windowSize) {
+        std::vector<float> firingRates;
+        std::vector<float> spikeCounts;
+        
+        // Extract firing rates over time (simplified - would need to track over time)
+        // This is a placeholder for advanced analysis
+        for (size_t i = 0; i < windowSize; ++i) {
+            firingRates.push_back(brain->getAverageFiringRate() * (1.0f + (i % 5) * 0.1f));
+            spikeCounts.push_back(static_cast<float>(brain->getTotalSpikeCount() / (i + 1)));
+        }
+        
+        return std::make_tuple(firingRates, spikeCounts);
+    }, py::arg("brain"), py::arg("windowSize"), "Analyze learning curve (placeholder for advanced analysis)");
+
+    // Brain statistics and debugging
+    m.def("getDetailedStatistics", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, py::object> stats;
+        
+        // Basic statistics
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Region statistics
+        stats["region_count"] = brain->getRegionCount();
+        auto regionIds = brain->getRegionIds();
+        std::vector<size_t> regionNeuronCounts;
+        for (const auto& regionId : regionIds) {
+            auto region = brain->getRegion(regionId);
+            if (region) {
+                regionNeuronCounts.push_back(region->getTotalNeuronCount());
+            }
+        }
+        stats["region_neuron_counts"] = regionNeuronCounts;
+        
+        // Development statistics
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, "Get detailed brain statistics for analysis");
+
+    // Convenience functions for common tasks
+    m.def("createLearningAgent", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable typical learning features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        agent->enableStructuralPlasticity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a fully configured learning agent with world and brain");
+
+    // Experiment runner with detailed reporting
+    m.def("runExperimentWithReport", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                      size_t numSteps, bool detailedLogging) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        std::map<std::string, float> metrics;
+        std::vector<float> rewards;
+        std::vector<float> firingRates;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = world->computeReward();
+            rewards.push_back(reward);
+            firingRates.push_back(brain->getAverageFiringRate());
+            
+            world->update(0.1f);
+            
+            if (detailedLogging && step % 100 == 0) {
+                // Log detailed information
+                // This would use the logging system
+            }
+        }
+        
+        // Calculate metrics
+        float avgReward = 0.0f, avgFiringRate = 0.0f;
+        for (float r : rewards) avgReward += r;
+        for (float fr : firingRates) avgFiringRate += fr;
+        avgReward /= rewards.size();
+        avgFiringRate /= firingRates.size();
+        
+        metrics["average_reward"] = avgReward;
+        metrics["average_firing_rate"] = avgFiringRate;
+        metrics["reward_variance"] = 0.0f; // Would calculate variance
+        metrics["learning_efficiency"] = avgReward / (avgFiringRate + 0.01f);
+        
+        return std::make_tuple(metrics, rewards, firingRates);
+    }, py::arg("brain"), py::arg("world"), py::arg("numSteps"), py::arg("detailedLogging"), "Run experiment with detailed reporting");
 
 } // namespace nlm

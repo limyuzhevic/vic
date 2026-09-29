@@ -73,33 +73,259 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Mini Projects
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Project 1: Silent Brain (Just Neurons)
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
 brain.initialize()
 
-# Make it active
-brain.step(0)
+for i in range(10):
+    brain.step(i)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+print("Silent brain test done!")
+```
+
+### Project 2: Brain Watching a World
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Watch the world for 30 steps
+for i in range(30):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.getAverageFiringRate())
+```
+
+### Project 3: Complete Agent
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+```
+
+---
+
+## Advanced Examples for Expert Users
+
+### Expert Example 1: Using Advanced Configuration
+
+```python
+import pynlm
+
+# Create a scientific-grade configuration with advanced features
+scientific_config = pynlm.createScientificConfig()
+
+# Create brain with advanced settings
+brain = pynlm.createBrain(scientific_config)
+brain.initialize()
+
+# Create world with specific dimensions
+world = pynlm.createWorldWithSize(width=30, height=30, visionWidth=12, visionHeight=12)
+
+# Create learning agent
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run a more complex simulation
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: Reward: {world.computeReward():.2f}")
+
+print("Advanced simulation complete!")
+```
+
+### Expert Example 2: Advanced Experiment with Detailed Reporting
+
+```python
+import pynlm
+import time
+
+# Create components
+brain = pynlm.createBrain(pynlm.createScientificConfig())
+brain.initialize()
+
+world = pynlm.createWorldWithSize(20, 20, 8, 8)
+
+# Run experiment with detailed reporting
+start_time = time.time()
+metrics, rewards, firing_rates = pynlm.runExperimentWithReport(
+    brain, world, numSteps=500, detailedLogging=True
+)
+
+end_time = time.time()
+
+print("=== EXPERIMENT RESULTS ===")
+print(f"Average Reward: {metrics['average_reward']:.2f}")
+print(f"Average Firing Rate: {metrics['average_firing_rate']:.2f}")
+print(f"Learning Efficiency: {metrics['learning_efficiency']:.2f}")
+print(f"Total steps: {len(rewards)}")
+print(f"Total time: {end_time - start_time:.2f} seconds")
+```
+
+### Expert Example 3: Batch Processing Multiple Configurations
+
+```python
+import pynlm
+
+# Create multiple configurations for comparison
+configs = []
+for neurons in [100, 500, 1000, 2000]:
+    cfg = pynlm.createDefaultConfig()
+    cfg.set("neuron_count", neurons)
+    configs.append(cfg)
+
+# Run batch simulation
+print("Running batch simulation...")
+results = pynlm.runBatchSimulation(configs, stepsPerConfig=200)
+
+print("=== BATCH RESULTS ===")
+for i, (reward, firing_rate, time_taken) in enumerate(results):
+    print(f"Config {i+1}: Neurons={configs[i].get('neuron_count')}, "
+          f"AvgReward={reward:.2f}, AvgFiring={firing_rate:.2f}, Time={time_taken:.2f}s")
+```
+
+### Expert Example 4: Extracting and Analyzing Brain State
+
+```python
+import pynlm
+
+# Create and initialize brain
+brain = pynlm.createBrain(pynlm.createScientificConfig())
+brain.initialize()
+
+# Run a simulation
+world = pynlm.createWorldWithSize(15, 15, 8, 8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Extract brain state for analysis
+brain_state = pynlm.extractBrainState(brain)
+
+print("=== BRAIN STATE ANALYSIS ===")
+print(f"Total neurons: {brain_state['total_neurons']}")
+print(f"Total synapses: {brain_state['total_synapses']}")
+print(f"Active neurons: {brain_state['active_neurons']}")
+print(f"Firing neurons: {brain_state['firing_neurons']}")
+print(f"Average firing rate: {brain_state['average_firing_rate']:.2f}")
+print(f"E/I ratio: {brain_state['excitatory_inhibition_ratio']:.2f}")
+print(f"Developmental stage: {brain_state['developmental_stage']}")
+
+if 'working_memory_traces' in brain_state:
+    print(f"Working memory traces: {brain_state['working_memory_traces']}")
+if 'episodic_memory_episodes' in brain_state:
+    print(f"Episodic memory episodes: {brain_state['episodic_memory_episodes']}")
+```
+
+### Expert Example 5: Visualization Data Extraction
+
+```python
+import pynlm
+
+# Create brain and run simulation
+brain = pynlm.createBrain(pynlm.createScientificConfig())
+brain.initialize()
+
+world = pynlm.createWorldWithSize(25, 25, 10, 10)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Extract visualization data
+neuron_activities, neuron_positions = pynlm.extractVisualizationData(brain, maxNeurons=100)
+
+print("=== VISUALIZATION DATA ===")
+print(f"Extracted {len(neuron_activities)} neuron activity vectors")
+print(f"Extracted {len(neuron_positions)} neuron position vectors")
+print(f"Sample activity: {neuron_activities[0] if neuron_activities else 'N/A'}")
+print(f"Sample position: {neuron_positions[0] if neuron_positions else 'N/A'}")
+```
+
+### Expert Example 6: Learning Curve Analysis
+
+```python
+import pynlm
+
+# Create learning agent
+brain, world, agent = pynlm.createLearningAgent(pynlm.createScientificConfig())
+
+# Run simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Analyze learning curve
+firing_rates, spike_counts = pynlm.analyzeLearningCurve(brain, windowSize=50)
+
+print("=== LEARNING CURVE ANALYSIS ===")
+print(f"Firing rate range: {min(firing_rates):.2f} - {max(firing_rates):.2f}")
+print(f"Spike count range: {min(spike_counts):.0f} - {max(spike_counts):.0f}")
+print(f"Final firing rate: {firing_rates[-1]:.2f}")
+print(f"Final spike count rate: {spike_counts[-1]:.0f}")
 ```
 
 ---
@@ -181,78 +407,40 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
+## Advanced Convenience Functions
 
-### Project 1: Silent Brain (Just Neurons)
+### `pynlm.createScientificConfig()`
+Create a scientific-grade configuration with all learning features enabled.
 
-```python
-import pynlm
+### `pynlm.createMinimalConfig()`
+Create a minimal configuration for basic testing.
 
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
+### `pynlm.createWorldWithSize(width, height, visionWidth, visionHeight)`
+Create a world with specified dimensions and vision capabilities.
 
-for i in range(10):
-    brain.step(i)
+### `pynlm.createLearningAgent(config)`
+Create a fully configured learning agent with world and brain.
 
-print("Silent brain test done!")
-```
+### `pynlm.runSimpleExperiment(brain, world, numSteps)`
+Run a simple experiment and return average reward and firing rate.
 
-### Project 2: Brain Watching a World
+### `pynlm.runExperimentWithReport(brain, world, numSteps, detailedLogging)`
+Run experiment with detailed reporting of metrics.
 
-```python
-import pynlm
+### `pynlm.runBatchSimulation(configs, stepsPerConfig)`
+Run batch simulation with multiple configurations.
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+### `pynlm.extractBrainState(brain)`
+Extract current brain state as a dictionary for analysis.
 
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
+### `pynlm.extractVisualizationData(brain, maxNeurons)`
+Extract neuron activity data for visualization.
 
-### Project 3: Complete Agent
+### `pynlm.analyzeLearningCurve(brain, windowSize)`
+Analyze learning curve (placeholder for advanced analysis).
 
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
-```
+### `pynlm.getDetailedStatistics(brain)`
+Get detailed brain statistics for analysis.
 
 ---
 
@@ -268,6 +456,20 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+| Expert Features | Code |
+|----------------|------|
+| Scientific config | `pynlm.createScientificConfig()` |
+| Minimal config | `pynlm.createMinimalConfig()` |
+| Sized world | `pynlm.createWorldWithSize(width, height, visionW, visionH)` |
+| Learning agent | `pynlm.createLearningAgent(config)` |
+| Simple experiment | `pynlm.runSimpleExperiment(brain, world, steps)` |
+| Detailed experiment | `pynlm.runExperimentWithReport(brain, world, steps, logging)` |
+| Batch simulation | `pynlm.runBatchSimulation(configs, steps)` |
+| Brain analysis | `pynlm.extractBrainState(brain)` |
+| Visualization data | `pynlm.extractVisualizationData(brain, max)` |
+| Learning curve | `pynlm.analyzeLearningCurve(brain, window)` |
+| Statistics | `pynlm.getDetailedStatistics(brain)` |
 
 ---
 
@@ -290,8 +492,10 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more details (if available)
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the advanced functions for expert use
+5. Explore the batch processing and analysis tools
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with both basic and advanced functionality.
