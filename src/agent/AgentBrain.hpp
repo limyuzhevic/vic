@@ -6,6 +6,8 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -112,6 +114,18 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Constants for better maintainability
+    static constexpr float MIN_ACTIVATION_THRESHOLD = 0.5f;
+    static constexpr float CURIOSITY_EXPLORATION_THRESHOLD = 0.3f;
+    static constexpr float HIGH_CURIOSITY_EXPLORATION_THRESHOLD = 0.5f;
+    static constexpr float EXPLORATION_CHANCE_FACTOR = 0.3f;
+    static constexpr float REWARD_EXPONENTIAL_WEIGHT = 0.95f;
+    static constexpr float REWARD_SMOOTHING_FACTOR = 0.05f;
+    static constexpr float DOPAMINE_CLAMP_MIN = -1.0f;
+    static constexpr float DOPAMINE_CLAMP_MAX = 1.0f;
+    static constexpr float PLASTICITY_BASE = 0.5f;
+    static constexpr float PLASTICITY_RANGE = 0.5f;
 };
 
 } // namespace nlm

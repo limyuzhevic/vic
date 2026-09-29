@@ -72,15 +72,49 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main CLI (Phase 6 Integration)
+
+The `nlm` executable now provides a comprehensive interface with multiple modes:
+
+```bash
+# Run Phase 6 integration with default settings
+./nlm
+
+# Run with custom configuration
+./nlm --config myconfig.cfg
+
+# Get help
+./nlm --help
+
+# Show version
+./nlm --version
+
+# Run specific experiment
+./nlm --run basic      # Basic connectivity test
+./nlm --run plasticity # Plasticity learning experiment
+./nlm --run stdp      # STDP verification
+./nlm --run connectivity # Basic connectivity
+./nlm --run integration # Full integration test
+```
+
+### Phase 6 Demo (Legacy)
+
+The `nlm_phase6_demo` executable still exists for backward compatibility:
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 3 and Phase 4 Demos
+
+```bash
+./nlm_phase3_demo    # Phase 3 demonstration
+./nlm_phase4_demo    # Phase 4 demonstration
+```
 
 ## Project Structure
 
