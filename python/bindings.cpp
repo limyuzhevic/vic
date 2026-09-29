@@ -2,9 +2,14 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/numpy.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <filesystem>
+#include <unordered_map>
+#include <variant>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,12 +17,158 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "pynlm/exceptions.h"
+#include "pynlm/type_converter.h"
+#include "pynlm/pythonic_interfaces.h"
+
+#include "../src/core/Exceptions/FileNotFoundException.hpp"
+#include "../src/core/Exceptions/FilePermissionException.hpp"
+#include "../src/core/Exceptions/FileFormatException.hpp"
+#include "../src/core/Exceptions/FileWriteException.hpp"
+#include "../src/core/Exceptions/InvalidDimensionsException.hpp"
+#include "../src/core/Exceptions/InvalidRangeException.hpp"
+#include "../src/core/Exceptions/InvalidFormatException.hpp"
+#include "../src/core/Exceptions/NullOrEmptyException.hpp"
+#include "../src/core/Exceptions/KeyNotFoundException.hpp"
+#include "../src/core/Exceptions/TypeMismatchException.hpp"
+#include "../src/core/Exceptions/NeuronNotFoundException.hpp"
+#include "../src/core/Exceptions/InvalidCurrentException.hpp"
+#include "../src/core/Exceptions/CurrentOutOfRangeException.hpp"
+#include "../src/core/Exceptions/PositionOutOfBoundsException.hpp"
+#include "../src/core/Exceptions/InvalidCommandException.hpp"
+#include "../src/core/Exceptions/InvalidDataSizeException.hpp"
+#include "../src/core/Exceptions/InvalidDataFormatException.hpp"
+#include "../src/core/Exceptions/InvalidSampleRateException.hpp"
+#include "../src/core/Exceptions/SampleRateMismatchException.hpp"
+#include "../src/core/Exceptions/AudioLengthMismatchException.hpp"
+#include "../src/core/Exceptions/InvalidActionTypeException.hpp"
+#include "../src/core/Exceptions/InvalidParameterException.hpp"
+#include "../src/core/Exceptions/ParameterOutOfRangeException.hpp"
+#include "../src/core/Exceptions/SensorInputException.hpp"
+#include "../src/core/Exceptions/MotorOutputException.hpp"
+#include "../src/core/Exceptions/MemoryAllocationException.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// Python exception translators with enhanced context
+void translate_exception(const std::exception& e) {
+    // Convert common C++ exceptions to Python exceptions
+    try {
+        throw;
+    } catch (const std::runtime_error& e) {
+        py::raise<RuntimeError>(std::string("Runtime error: ") + e.what());
+    } catch (const std::invalid_argument& e) {
+        py::raise<ValidationError>(std::string("Invalid argument: ") + e.what());
+    } catch (const std::out_of_range& e) {
+        py::raise<ValidationError>(std::string("Out of range: ") + e.what());
+    } catch (const std::length_error& e) {
+        py::raise<RuntimeError>(std::string("Length error: ") + e.what());
+    } catch (const std::bad_alloc& e) {
+        py::raise<RuntimeError>(std::string("Memory allocation error: ") + e.what());
+    } catch (...) {
+        py::raise<RuntimeError>(std::string("Unknown C++ exception"));
+    }
+}
+
+// Enhanced exception translation with error codes
+void translate_enhanced_exception(const std::exception& e) {
+    try {
+        throw;
+    } catch (const NLMException& e) {
+        // Extract error code from C++ exception
+        const char* error_code = e.getErrorCode();
+        py::raise<NLMException>(std::string("NLM Exception [") + error_code + "] " + e.what());
+    } catch (const FileNotFoundException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<FileIOException>(std::string("File not found [") + error_code + "] " + e.what());
+    } catch (const FilePermissionException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<FileIOException>(std::string("File permission error [") + error_code + "] " + e.what());
+    } catch (const FileFormatException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<FileIOException>(std::string("File format error [") + error_code + "] " + e.what());
+    } catch (const FileWriteException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<FileIOException>(std::string("File write error [") + error_code + "] " + e.what());
+    } catch (const ValidationException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ValidationError>(std::string("Validation Error [") + error_code + "] " + e.what());
+    } catch (const InvalidDimensionsException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ValidationError>(std::string("Invalid dimensions [") + error_code + "] " + e.what());
+    } catch (const InvalidRangeException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ValidationError>(std::string("Invalid range [") + error_code + "] " + e.what());
+    } catch (const InvalidFormatException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ValidationError>(std::string("Invalid format [") + error_code + "] " + e.what());
+    } catch (const NullOrEmptyException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ValidationError>(std::string("Null or empty [") + error_code + "] " + e.what());
+    } catch (const KeyNotFoundException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ConfigurationError>(std::string("Key not found [") + error_code + "] " + e.what());
+    } catch (const TypeMismatchException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ConfigurationError>(std::string("Type mismatch [") + error_code + "] " + e.what());
+    } catch (const NeuronNotFoundException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<BrainError>(std::string("Neuron not found [") + error_code + "] " + e.what());
+    } catch (const InvalidCurrentException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<BrainError>(std::string("Invalid current [") + error_code + "] " + e.what());
+    } catch (const CurrentOutOfRangeException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<BrainError>(std::string("Current out of range [") + error_code + "] " + e.what());
+    } catch (const PositionOutOfBoundsException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<WorldError>(std::string("Position out of bounds [") + error_code + "] " + e.what());
+    } catch (const InvalidCommandException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<WorldError>(std::string("Invalid command [") + error_code + "] " + e.what());
+    } catch (const InvalidDataSizeException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<SensoryError>(std::string("Invalid data size [") + error_code + "] " + e.what());
+    } catch (const InvalidDataFormatException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<SensoryError>(std::string("Invalid data format [") + error_code + "] " + e.what());
+    } catch (const InvalidSampleRateException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<AudioError>(std::string("Invalid sample rate [") + error_code + "] " + e.what());
+    } catch (const SampleRateMismatchException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<AudioError>(std::string("Sample rate mismatch [") + error_code + "] " + e.what());
+    } catch (const AudioLengthMismatchException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<AudioError>(std::string("Audio length mismatch [") + error_code + "] " + e.what());
+    } catch (const InvalidActionTypeException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ActionError>(std::string("Invalid action type [") + error_code + "] " + e.what());
+    } catch (const InvalidParameterException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ActionError>(std::string("Invalid parameter [") + error_code + "] " + e.what());
+    } catch (const ParameterOutOfRangeException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<ActionError>(std::string("Parameter out of range [") + error_code + "] " + e.what());
+    } catch (const SensorInputException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<AgentError>(std::string("Sensor input error [") + error_code + "] " + e.what());
+    } catch (const MotorOutputException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<AgentError>(std::string("Motor output error [") + error_code + "] " + e.what());
+    } catch (const MemoryAllocationException& e) {
+        const char* error_code = e.getErrorCode();
+        py::raise<RuntimeError>(std::string("Memory allocation error [") + error_code + "] " + e.what());
+    } catch (...) {
+        py::raise<RuntimeError>(std::string("Unknown enhanced C++ exception"));
+    }
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -25,21 +176,122 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Features comprehensive error handling and validation:
+        - File I/O error handling (file not found, permissions, malformed JSON)
+        - Input validation for sensory data, parameters, and boundaries
+        - Exception safety with proper exception translators
+        - Performance considerations with lazy validation
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom Python exceptions
+    py::register_exception<NLMException, py::exception<Exception>>(m, "NLMException", PyExc_RuntimeError);
+    py::register_exception<FileIOException, NLMException>(m, "FileIOException");
+    py::register_exception<ValidationError, NLMException>(m, "ValidationError");
+    py::register_exception<ConfigurationError, NLMException>(m, "ConfigurationError");
+    py::register_exception<BrainError, NLMException>(m, "BrainError");
+    py::register_exception<WorldError, NLMException>(m, "WorldError");
+    py::register_exception<SensoryError, NLMException>(m, "SensoryError");
+    py::register_exception<AudioError, NLMException>(m, "AudioError");
+    py::register_exception<ActionError, NLMException>(m, "ActionError");
+    py::register_exception<AgentError, NLMException>(m, "AgentError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+    // Register enhanced exception translator
+    py::register_exception_translator(&translate_enhanced_exception);
+
+    // Type conversion utilities for Python integration
+    m.def("to_numpy", &NumpyConverter::to_numpy,
+          py::arg("data"), py::arg("dtype") = py::arg("float32"),
+          "Convert C++ data to NumPy array with automatic type detection");
+
+    m.def("from_numpy", &NumpyConverter::from_numpy,
+          py::arg("array"), py::arg("target_shape") = py::none,
+          "Convert NumPy array to C++ compatible format");
+
+    m.def("to_string", &EnumConverter::to_string,
+          py::arg("value"),
+          "Convert enum value to human-readable string");
+
+    m.def("from_string", &EnumConverter::from_string,
+          py::arg("value"), py::arg("enum_type"),
+          "Convert string to enum value");
+
+    // Pythonic interface factory functions
+    m.def("create_pythonic_config", &create_pythonic_config,
+          py::arg("config"),
+          "Create PythonicConfig wrapper with enhanced interfaces");
+
+    m.def("create_pythonic_sensory", &create_pythonic_sensory,
+          py::arg("sensory"),
+          "Create PythonicSensoryInput wrapper with enhanced interfaces");
+
+    m.def("create_pythonic_action", &create_pythonic_action,
+          py::arg("action"),
+          "Create PythonicAction wrapper with enhanced interfaces");
+
+    m.def("create_pythonic_brain", &create_pythonic_brain,
+          py::arg("brain"),
+          "Create PythonicBrain wrapper with enhanced interfaces");
+
+    // Utility functions for Python integration
+    m.def("get_as_numpy", &get_as_numpy,
+          py::arg("data"), py::arg("dtype") = py::arg("float32"),
+          "Convert data to NumPy array for vision/audio processing");
+
+    m.def("set_from_numpy", &set_from_numpy,
+          py::arg("target"), py::arg("numpy_array"),
+          "Set target data from NumPy array");
+
+    // Configuration dictionary-based interface
+    m.def("config_to_dict", &ConfigConverter::to_config_dict,
+          py::arg("config_obj"),
+          "Convert C++ Config object to Python dictionary");
+
+    m.def("config_from_dict", &ConfigConverter::from_config_dict,
+          py::arg("config_dict"), py::arg("config_obj"),
+          "Update C++ Config object from Python dictionary");
+
+    // Lazy validation toggle for performance
+    m.def("enable_lazy_validation", [](py::object obj) {
+        if (hasattr(obj, "enable_lazy_validation")) {
+            obj.attr("enable_lazy_validation")();
+        }
+    }, py::arg("obj"),
+          "Enable lazy validation for performance-critical operations");
+
+    // Performance optimization flags
+    py::module_::get().attr("enable_numpy_support") = true;
+    py::module_::get().attr("enable_property_access") = true;
+    py::module_::get().attr("enable_context_managers") = true;
+    py::module_::get().attr("enable_enum_conversion") = true;
+
+    m.attr("enable_lazy_validation") = py::cpp_function([](py::object obj) {
+        if (hasattr(obj, "enable_lazy_validation")) {
+            obj.attr("enable_lazy_validation")();
+        }
+    }, py::arg("obj"));
+
+    m.attr("get_version") = []() {
+        return "0.1.0-enhanced";
+    };
+
+    m.attr("has_numpy") = []() {
+        try {
+            py::module::import("numpy");
+            return true;
+        } catch (...) {
+            return false;
+        }
+    };
+
+    m.attr("has_property_access") = []() {
+        return true;
+    };
+
+    m.attr("has_context_managers") = []() {
+        return true;
+    };
+
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
