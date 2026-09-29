@@ -20,14 +20,16 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
+class SpatialRepresentation;
+    class TemporalRelation;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -94,7 +96,7 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
+    // Produce motor/action output based on neural planning
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
@@ -137,6 +139,12 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
+    // Get current state for neural planning
+    std::vector<float> getCurrentState() const;
+    
+    // Update planner with current brain state
+    void updatePlanner();
+    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
@@ -161,10 +169,11 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Spatial representation for position and location
+    SpatialRepresentation* getSpatialRepresentation();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Temporal relation for temporal sequences
+    TemporalRelation* getTemporalRelation();
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
@@ -183,6 +192,15 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, behavioral inhibition, and sleep
+    Serotonin* getSerotonin();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

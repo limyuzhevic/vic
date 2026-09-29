@@ -74,6 +74,11 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // NEW: Neuromodulation integration methods
+    void setMaintenanceFactor(float factor) { maintenanceFactor_ = factor; }
+    void setEncodingFactor(float factor) { encodingFactor_ = factor; }
+    void setUpdatingFactor(float factor) { updatingFactor_ = factor; }
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
@@ -104,6 +109,11 @@ private:
     
     // Winner neurons (for competition)
     std::vector<NeuronId> winners_;
+    
+    // Neuromodulation integration
+    float maintenanceFactor_;
+    float encodingFactor_;
+    float updatingFactor_;
 };
 
 // AttentionalSelection: Neural attention through competition
@@ -166,6 +176,12 @@ public:
     // Reset attention
     void reset();
 
+    // NEW: Neuromodulation integration
+    void setSelectionBias(float bias) { selectionBias_ = bias; }
+    void setFocusWidth(float width) { focusWidth_ = width; }
+    void setNoiseFiltering(float filtering) { noiseFiltering_ = filtering; }
+    void setCompetitionIntensity(float intensity) { competitionIntensity_ = intensity; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -182,6 +198,12 @@ private:
     // Biases/salience stored by NeuronId for correct lookup in processCompetition
     std::unordered_map<uint64_t, float> topDownBias_;
     std::unordered_map<uint64_t, float> bottomUpSalience_;
+    
+    // Neuromodulation integration
+    float selectionBias_;
+    float focusWidth_;
+    float noiseFiltering_;
+    float competitionIntensity_;
 };
 
 } // namespace nlm

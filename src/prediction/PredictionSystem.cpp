@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include <algorithm>
 
 namespace nlm {
 
@@ -6,6 +7,7 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    std::vector<float> lastConsensusPattern;
     
     Impl() : predictionError(0.0f), confidence(0.5f) {}
 };
@@ -55,6 +57,36 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+}
+
+void PredictionSystem::updateWithAssociations(const std::vector<std::vector<float>>& associatedPatterns) {
+    // Use associative memory patterns to refine predictions
+    // More associated patterns = higher prediction confidence
+    float associationCount = static_cast<float>(associatedPatterns.size());
+    pImpl->confidence = std::min(1.0f, pImpl->confidence + associationCount * 0.1f);
+    
+    // Average patterns to create consensus prediction
+    if (!associatedPatterns.empty()) {
+        size_t patternSize = associatedPatterns[0].size();
+        std::vector<float> consensusPattern(patternSize, 0.0f);
+        
+        for (const auto& pattern : associatedPatterns) {
+            for (size_t i = 0; i < patternSize; ++i) {
+                consensusPattern[i] += pattern[i];
+            }
+        }
+        
+        for (size_t i = 0; i < patternSize; ++i) {
+            consensusPattern[i] /= associatedPatterns.size();
+        }
+        
+        // Store for potential use by concept formation
+        pImpl->lastConsensusPattern = consensusPattern;
+    }
+}
+
+const std::vector<float>& PredictionSystem::getLastConsensusPattern() const {
+    return pImpl->lastConsensusPattern;
 }
 
 } // namespace nlm

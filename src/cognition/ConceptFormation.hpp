@@ -113,17 +113,21 @@ public:
     // Merge two concepts (when discovered they are actually the same)
     void mergeConcepts(size_t conceptA, size_t conceptB);
 
-    // Update concept with new instance
-    void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
-
-    // Compute similarity between two patterns
-    float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
-
-    // Check if pattern is novel (doesn't belong to any existing concept)
-    bool isNovel(const std::vector<float>& pattern,
-                 float similarityThreshold = 0.7f) const;
+    void updateFromPrediction(const std::vector<float>& actualState,
+                          const std::vector<float>& predictedState,
+                          float predictionError) {
+        // Update concept formation based on prediction error
+        // Use actual/predicted states to refine concepts and learning
+        if (brain_ && !actualState.empty()) {
+            // Convert actual state to pattern for concept formation
+            size_t conceptId = presentExperience(actualState, actualState, 1.0f - predictionError, 0);
+            if (conceptId > 0) {
+                // Found or created a concept for this state
+                // Update concept with prediction error information
+                updateConcept(conceptId, actualState, actualState, 1.0f - predictionError);
+            }
+        }
+    }
 
     // Get concept for a given pattern
     size_t findConceptForPattern(const std::vector<float>& pattern) const;

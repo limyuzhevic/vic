@@ -1,0 +1,64 @@
+#pragma once
+
+#include "../core/Types/Types.hpp"
+#include <vector>
+#include <memory>
+
+namespace nlm {
+
+// Prediction system: predicts future sensory states and consequences
+// PLACEHOLDER - Phase 2 will implement real predictive coding
+
+class PredictionSystem {
+public:
+    PredictionSystem();
+    ~PredictionSystem();
+    
+    // Make prediction for next timestep
+    // TODO PHASE 2: Implement real prediction
+    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    
+    // Update predictions based on actual observation
+    void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    
+    // Get prediction error
+    float getPredictionError() const;
+    
+    // Get prediction confidence
+    float getConfidence() const;
+    
+    // Get prediction history
+    const std::vector<float>& getErrorHistory() const;
+    void clearHistory();
+    
+    // Update predictions based on associations
+    void updateWithAssociations(const std::vector<std::vector<float>>& associatedPatterns) {
+        // Use associative memory patterns to refine predictions
+        // More associated patterns = higher prediction confidence
+        float associationCount = static_cast<float>(associatedPatterns.size());
+        pImpl->confidence = std::min(1.0f, pImpl->confidence + associationCount * 0.1f);
+        
+        // Average patterns to create consensus prediction
+        if (!associatedPatterns.empty()) {
+            size_t patternSize = associatedPatterns[0].size();
+            std::vector<float> consensusPattern(patternSize, 0.0f);
+            
+            for (const auto& pattern : associatedPatterns) {
+                for (size_t i = 0; i < patternSize; ++i) {
+                    consensusPattern[i] += pattern[i];
+                }
+            }
+            
+            for (size_t i = 0; i < patternSize; ++i) {
+                consensusPattern[i] /= associatedPatterns.size();
+            }
+            
+            // Store for potential use by concept formation
+            lastConsensusPattern_ = consensusPattern;
+        }
+    }
+    
+    // Get last consensus pattern
+    const std::vector<float>& getLastConsensusPattern() const { return lastConsensusPattern_; }
+
+} // namespace nlm

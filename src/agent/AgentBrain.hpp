@@ -69,6 +69,15 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Convert ActionType to MotorCommand
+    MotorCommand convertActionToMotorCommand(class ActionType actionType) const;
+    
+    // Generate motor command from planned action
+    MotorCommand decodePlannedAction(const class Action& action);
+    
+    // Use neural planner for action selection
+    MotorCommand decodeMotorCommandWithPlanner();
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

@@ -46,10 +46,48 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // NEW: Neuromodulation integration
+    void setPlasticityModulation(float modulation) { plasticityModulation_ = modulation; }
+    void setStressImpact(float impact) { stressImpact_ = impact; }
+    void setEmotionalModulation(float modulation) { emotionalModulation_ = modulation; }
+    
+    // PUBLIC INTERFACE FOR DEVELOPMENT EFFECTS
+    
+    // Neural excitability development
+    void applyNeuralExcitabilityDevelopment(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Synaptic properties development
+    void applySynapticDevelopment(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Network topology development
+    void applyNetworkDevelopment(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Cognitive systems development
+    void applyCognitiveSystemDevelopment(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Learning rate modulation
+    void applyLearningRateModulation(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Critical period effects
+    void applyCriticalPeriodEffects(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Developmental specialization
+    void applySpecializationEffects(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
+    
+    // Neuromodulation integration
+    float plasticityModulation_;
+    float stressImpact_;
+    float emotionalModulation_;
+    
+    // Private helper functions
+    void developProcessingSpecialization(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    void optimizeForExpertise(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    void developWisdomFunctions(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
 };
 
 } // namespace nlm

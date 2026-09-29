@@ -57,33 +57,102 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Attention and memory effects
+    void signalFocus(float novelty, float importance);
+    void signalMemoryEncoding(float encodingQuality);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal and cognitive effects
+    void signalArousal(float stimulusIntensity, bool unexpected);
+    void signalWorkingMemoryLoad(float load);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Behavioral and emotional effects
+    void signalMood(float moodChange);
+    void signalBehavioralInhibition(float inhibitionLevel);
+    void signalSleepNeed(float sleepPressure);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
+
+// Integration helper functions for neuromodulation effects
+void applyMemoryEffects(
+    std::vector<std::unique_ptr<NeuralWorkingMemory>>& workingMemory,
+    std::vector<std::unique_ptr<NeuralEpisodicMemory>>& episodicMemory,
+    const Dopamine& dopamine,
+    const Acetylcholine& ach,
+    const Norepinephrine& ne,
+    const Serotonin& serotonin,
+    float timestep
+);
+
+void applyAttentionEffects(
+    std::vector<std::unique_ptr<AttentionalSelection>>& attentionSystems,
+    const Dopamine& dopamine,
+    const Acetylcholine& ach,
+    const Norepinephrine& ne,
+    const Serotonin& serotonin,
+    float timestep
+);
+
+void applyDevelopmentEffects(
+    std::vector<std::unique_ptr<DevelopmentSystem>>& developmentSystems,
+    const Dopamine& dopamine,
+    const Norepinephrine& ne,
+    const Serotonin& serotonin,
+    float timestep
+);
+
+void applyPredictionEffects(
+    std::vector<std::unique_ptr<PredictionSystem>>& predictionSystems,
+    const Dopamine& dopamine,
+    const Acetylcholine& ach,
+    float timestep
+);
 
 } // namespace nlm

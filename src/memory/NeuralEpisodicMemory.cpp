@@ -59,6 +59,14 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     for (auto& ep : episodes_) {
         ep.age++;
     }
+    
+    // INTEGRATION WITH ASSOCIATIVE MEMORY:
+    // Create associations between related episodes and patterns
+    // This helps build a connected knowledge network
+    if (brain_->getAssociativeMemory()) {
+        // Associate sensory state with resulting state (action-outcome learning)
+        brain_->getAssociativeMemory()->associateFromExperience(episode);
+    }
 }
 
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
@@ -537,6 +545,47 @@ std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
     }
     
     return activated;
+}
+
+void NeuralAssociativeMemory::updateAssociations(const std::vector<float>& currentPattern, Timestamp currentTime) {
+    // Update associations based on current neural activity patterns
+    if (brain_ && !currentPattern.empty()) {
+        // Find similar patterns in episodic memory to strengthen associations
+        auto similarEpisodes = brain_->getEpisodicMemory()->retrieveSimilar(currentPattern, 3);
+        
+        for (const auto* episode : similarEpisodes) {
+            if (episode) {
+                // Create associations between current pattern and episode patterns
+                std::vector<float> episodePattern = episode->sensoryState;
+                if (!episodePattern.empty()) {
+                    // Strengthen associations based on temporal proximity
+                    float delta = 0.1f * (1.0f / (static_cast<float>(episode->age) + 1.0f));
+                    associate(currentPattern, episodePattern, delta);
+                }
+            }
+        }
+        
+        // Update temporal associations - link patterns that occur close in time
+        updateTemporalAssociations(currentPattern, currentTime);
+    }
+}
+
+void NeuralAssociativeMemory::updateTemporalAssociations(const std::vector<float>& currentPattern, Timestamp currentTime) {
+    // Track temporal patterns and associations
+    if (brain_ && !currentPattern.empty()) {
+        // Get recent episodes for temporal context
+        auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(3);
+        
+        for (const auto* episode : recentEpisodes) {
+            if (episode && !episode->sensoryState.empty()) {
+                // Create temporal association based on sequence of patterns
+                // More recent episodes have stronger temporal associations
+                float strength = 0.5f * (1.0f / (episode->age + 1.0f));
+                
+                associate(currentPattern, episode->sensoryState, strength);
+            }
+        }
+    }
 }
 
 void NeuralAssociativeMemory::clear() {

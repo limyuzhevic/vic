@@ -45,6 +45,50 @@ size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
         return matchingConcept;
     }
     
+    // INTEGRATION WITH ASSOCIATIVE MEMORY:
+    // Use associative memory to discover related patterns before forming new concepts
+    size_t relatedConceptFromAssociation = 0;
+    
+    if (brain_ && brain_->getAssociativeMemory()) {
+        // Retrieve patterns associated with the input pattern
+        std::vector<std::vector<float>> associatedPatterns = 
+            brain_->getAssociativeMemory()->retrieve(pattern, 5);
+        
+        // Check if any associated patterns match existing concepts
+        for (const auto& assocPattern : associatedPatterns) {
+            size_t conceptFromAssoc = findConceptForPattern(assocPattern);
+            if (conceptFromAssoc > 0) {
+                relatedConceptFromAssociation = conceptFromAssoc;
+                break;
+            }
+        }
+    }
+    
+    // If we found a related concept through association, use it instead
+    if (relatedConceptFromAssociation > 0) {
+        updateConcept(relatedConceptFromAssociation, pattern, features, reward);
+        
+        // Merge with any similar concepts found through associations
+        if (brain_ && brain_->getAssociativeMemory()) {
+            // Get all associated patterns to find concept similarities
+            std::vector<std::vector<float>> associatedPatterns = 
+                brain_->getAssociativeMemory()->retrieve(pattern, 3);
+            
+            for (const auto& assocPattern : associatedPatterns) {
+                size_t conceptId = findConceptForPattern(assocPattern);
+                if (conceptId > 0 && conceptId != relatedConceptFromAssociation) {
+                    // Merge related concepts if they're highly similar
+                    float similarity = computeSimilarity(assocPattern, pattern);
+                    if (similarity > 0.6f) {
+                        mergeConcepts(relatedConceptFromAssociation, conceptId);
+                    }
+                }
+            }
+        }
+        
+        return relatedConceptFromAssociation;
+    }
+    
     // Check if this is novel enough to form a new concept
     if (isNovel(pattern, formationThreshold_)) {
         // But wait - we need a few observations before committing to a concept

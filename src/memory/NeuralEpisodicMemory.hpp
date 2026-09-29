@@ -184,6 +184,10 @@ public:
                           const std::vector<float>& patternB,
                           float delta);
 
+    // Update associations based on current neural activity patterns
+    void updateAssociations(const std::vector<float>& currentPattern,
+                           Timestamp currentTime);
+
     // Spread activation from cue pattern
     // Returns patterns that become activated through association chains
     std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern,

@@ -74,8 +74,6 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
     return 256 + 8 + 4 + 6;
 }
 
@@ -121,6 +119,16 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+        }
+    }
+    
+    // Update neural planner with new sensory input
+    if (brain_->getPlanner()) {
+        // Get current sensory state from percept
+        std::vector<float> sensoryState = percept.getAsVector();
+        if (!sensoryState.empty()) {
+            // Update planner with current sensory state and goals
+            brain_->getPlanner()->setCurrentGoal(sensoryState);
         }
     }
     
@@ -216,27 +224,6 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
-        }
-    }
-    
-    return defaultCmd;
-}
-
-void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -347,4 +334,50 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
-} // namespace nlm
+MotorCommand AgentBrain::convertActionToMotorCommand(ActionType actionType) const {
+    // Convert between ActionType (from brain) and MotorCommand (for world)
+    switch (actionType) {
+        case ActionType::MoveForward:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::LookLeft:
+            return MotorCommand::LookLeft;
+        case ActionType::LookRight:
+            return MotorCommand::LookRight;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::Wait:
+        case ActionType::Rest:
+        default:
+            return MotorCommand::Wait;
+    }
+}
+
+MotorCommand AgentBrain::decodePlannedAction(const Action& action) {
+    // Convert brain's Action object to world MotorCommand
+    ActionType actionType = action.getType();
+    return convertActionToMotorCommand(actionType);
+}
+
+MotorCommand AgentBrain::decodeMotorCommandWithPlanner() {
+    if (!brain_) return MotorCommand::Wait;
+    
+    // Get brain's planned action
+    auto plannedAction = brain_->produceAction();
+    if (!plannedAction) return MotorCommand::Wait;
+    
+    // Convert to world motor command
+    MotorCommand motorCmd = decodePlannedAction(*plannedAction);
+    
+    // Apply curiosity-based exploration if enabled
+    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+        motorCmd = selectWithCuriosity(motorCmd);
+    }
+    
+    return motorCmd;
+}

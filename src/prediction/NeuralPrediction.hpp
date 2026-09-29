@@ -93,6 +93,18 @@ private:
     // Strengthen synapses for successful predictions, weaken for errors
     void modulatePredictionSynapses(float error, float reward);
 
+    // Apply neural temporal dynamics to prediction
+    void applyTemporalDynamics(std::vector<float>& prediction, SimulationStep currentStep);
+
+    // Extrapolate prediction from recent state history
+    std::vector<float> extrapolateFromHistory(const std::vector<std::vector<float>>& history);
+
+    // Generate default prediction when no other method is available
+    std::vector<float> generateDefaultPrediction(SimulationStep currentStep);
+
+    // Compute expected state based on temporal patterns
+    float computeTemporalExpectation(const std::vector<float>& actualState) const;
+
     // Structure
     struct Impl;
     std::unique_ptr<Impl> pImpl;
