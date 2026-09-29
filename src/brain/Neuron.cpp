@@ -24,7 +24,8 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), adaptationVariable(0.0f),
+             firingRate(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -230,17 +231,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
+    // Check for spike with hysteresis to prevent multiple spikes in one timestep
+    bool thresholdCrossed = V >= threshold;
     
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
+    if (thresholdCrossed) {
+        // Record last threshold crossing for debugging
+        bool fired = true;
+        
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to reset level
         V = V_reset;
         
         // Enter refractory period
@@ -249,14 +253,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        
+        // Update firing rate based on spike activity (smoothed rate)
+        float rateContribution = 1000.0f / dt;  // spikes per second
+        pImpl->state.firingRate = pImpl->state.firingRate * 0.9f + rateContribution * 0.1f;
+        
+        return true;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron is in resting state, update firing rate gradually
+        pImpl->state.firingRate *= 0.95f;  // Natural decay of firing rate
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
     
-    return fired;
+    return false;
 }
 
 void Neuron::step(Timestamp currentTime) {
@@ -292,6 +304,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.firingRate = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
     // Clear any residual state

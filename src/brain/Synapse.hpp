@@ -70,6 +70,27 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
+    // Advanced querying methods
+    float getAverageFiringRate(float timeWindow) const;  // Average firing rate over time window
+    bool isEligibleForLearning() const;  // Check if synapse is eligible for plasticity
+    float getLearningPotential() const;  // Combined potential for various learning mechanisms
+    bool hasRecentActivity(float timeThreshold) const;  // Check for recent pre or post spikes
+    
+    // Short-term plasticity state querying
+    float getFacilitationFactor() const;  // Current facilitation state (0-1)
+    float getDepressionFactor() const;   // Current depression state (0-1)
+    float getSynapticStrength() const;   // Combined efficacy * weight for transmission
+    
+    // Eligibility trace utilities
+    bool isEligibilityTraceActive() const;  // Check if trace exceeds threshold
+    float getNormalizedTrace() const;      // Normalize trace by decay rate
+    
+    // Activity analysis
+    size_t getRecentPreSpikeCount(float timeWindow) const;  // Count pre spikes in window
+    size_t getRecentPostSpikeCount(float timeWindow) const; // Count post spikes in window
+    float getLastPreSpikeInterval() const;  // Time since last pre spike
+    float getLastPostSpikeInterval() const; // Time since last post spike
+    
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);

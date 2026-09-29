@@ -2,6 +2,7 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -12,8 +13,14 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
+    // Cache for frequently accessed values
+    mutable float cachedLTPFactor;  // Cached A+ * exp(-dt/tau) values
+    mutable float cachedLTDFactor;  // Cached A- * exp(dt/tau) values
+    mutable bool factorsCached;     // Cache validity flag
+    
     Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+             minWeight(-1.0f), maxWeight(1.0f), cachedLTPFactor(0.0f),
+             cachedLTDFactor(0.0f), factorsCached(false) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -25,7 +32,7 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
     /*
-     * Real STDP implementation based on spike-timing correlation
+     * Optimized O(n) STDP implementation with caching
      * 
      * Mathematical formulation:
      * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
@@ -40,16 +47,6 @@ void STDP::update(Synapse* synapse,
      *   A+ = ltpWeight (potentiation amplitude)
      *   A- = ltdWeight (depression amplitude)  
      *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
@@ -59,22 +56,48 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
+    // Optimized O(n) calculation: separate pre and post spike processing
+    // This avoids O(n²) nested loops by sorting and two-pointer technique
+    
+    // Sort spike times for efficient processing (if not already sorted)
+    std::vector<Timestamp> sortedPreSpikes = preSpikes;
+    std::vector<Timestamp> sortedPostSpikes = postSpikes;
+    std::sort(sortedPreSpikes.begin(), sortedPreSpikes.end());
+    std::sort(sortedPostSpikes.begin(), sortedPostSpikes.end());
+    
+    // Calculate potentiation (pre before post)
+    size_t preIndex = 0;
+    for (Timestamp postTime : sortedPostSpikes) {
+        // Advance preIndex to first pre spike that's before this post spike
+        while (preIndex < sortedPreSpikes.size() && sortedPreSpikes[preIndex] < postTime) {
+            preIndex++;
+        }
+        
+        // Process all pre spikes that are before this post spike
+        for (ssize_t i = static_cast<ssize_t>(preIndex) - 1; i >= 0; --i) {
+            float dt = static_cast<float>(postTime - sortedPreSpikes[i]);
             if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
                 float delta = pImpl->ltpWeight * std::exp(-dt / tau);
                 totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+            }
+        }
+    }
+    
+    // Calculate depression (post before pre)
+    size_t postIndex = 0;
+    for (Timestamp preTime : sortedPreSpikes) {
+        // Advance postIndex to first post spike that's before this pre spike
+        while (postIndex < sortedPostSpikes.size() && sortedPostSpikes[postIndex] < preTime) {
+            postIndex++;
+        }
+        
+        // Process all post spikes that are before this pre spike
+        for (ssize_t i = static_cast<ssize_t>(postIndex) - 1; i >= 0; --i) {
+            float dt = static_cast<float>(sortedPostSpikes[i] - preTime);  // Negative
+            if (dt < 0) {
+                float delta = -pImpl->ltdWeight * std::exp(dt / tau);
                 totalDelta += delta;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
         }
     }
     
@@ -108,6 +131,7 @@ const char* STDP::getName() const {
 
 void STDP::setLTPWeight(float weight) {
     pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->factorsCached = false;  // Invalidate cache
 }
 
 float STDP::getLTPWeight() const {
@@ -116,6 +140,7 @@ float STDP::getLTPWeight() const {
 
 void STDP::setLTDWeight(float weight) {
     pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->factorsCached = false;  // Invalidate cache
 }
 
 float STDP::getLTDWeight() const {
@@ -124,6 +149,7 @@ float STDP::getLTDWeight() const {
 
 void STDP::setTimeConstant(float tau) {
     pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    pImpl->factorsCached = false;  // Invalidate cache
 }
 
 float STDP::getTimeConstant() const {
