@@ -1,13 +1,15 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
-#include <vector>
+#include <string>
+#include <map>
 
 namespace nlm {
+
+// Exploration strategy enumeration
+enum class ExplorationStrategy {
+    Random,           // Random exploration
+    Novelty,         // Explore novel stimuli
+    Uncertainty,     // Explore uncertain predictions
+    Balanced         // Balance exploration and exploitation
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -64,12 +66,104 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Advanced configuration methods
+    void setRewardDecay(float decay) { rewardDecay_ = decay; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    void setNoveltySensitivity(float sensitivity) { noveltySensitivity_ = sensitivity; }
+    void setDevelopmentSpeed(float speed) { developmentSpeed_ = speed; }
+    void setPlasticityRange(float min, float max) { 
+        minPlasticity_ = min; 
+        maxPlasticity_ = max; 
+    }
+    
+    // Get advanced configuration
+    float getRewardDecay() const { return rewardDecay_; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExplorationRate() const { return explorationRate_; }
+    float getNoveltySensitivity() const { return noveltySensitivity_; }
+    float getDevelopmentSpeed() const { return developmentSpeed_; }
+    void getPlasticityRange(float& min, float& max) const { min = minPlasticity_; max = maxPlasticity_; }
+    
+    // Agent statistics and debugging
+    float getLearningProgress() const;
+    float getExperienceScore() const;
+    size_t getTotalExperienceTicks() const;
+    void resetExperienceStats();
+    
+    // Advanced motor control
+    MotorCommand getBestMotorCommand() const;
+    float getMotorCommandConfidence(MotorCommand cmd) const;
+    
+    // Enhanced curiosity and exploration
+    void setExplorationStrategy(ExplorationStrategy strategy) { explorationStrategy_ = strategy; }
+    void enableAdaptiveExploration(bool enable) { adaptiveExplorationEnabled_ = enable; }
+    bool isAdaptiveExplorationEnabled() const { return adaptiveExplorationEnabled_; }
+    
+    // Memory and learning tracking
+    void enableMemoryTracking(bool enable) { memoryTrackingEnabled_ = enable; }
+    void enableLearningMetrics(bool enable) { learningMetricsEnabled_ = enable; }
+    void recordExperience(float reward, float predictionError, float novelty);
+    std::string getExperienceReport() const;
+    
+    // Batch processing for advanced users
+    void processSensoryInputs(const std::vector<SensoryPercept>& percepts);
+    std::vector<MotorCommand> decodeMotorCommands(size_t steps);
+    std::vector<ActionResult> applyRewardModulations(const std::vector<std::pair<float, float>>& rewards);
+    
+    // Advanced configuration
+    struct AgentConfig {
+        // Plasticity and learning
+        float plasticityMin = 0.1f;
+        float plasticityMax = 2.0f;
+        float rewardDecay = 0.95f;
+        float learningRate = 0.01f;
+        
+        // Curiosity and exploration
+        float curiosityThreshold = 0.3f;
+        float explorationRate = 0.2f;
+        float noveltySensitivity = 2.0f;
+        ExplorationStrategy explorationStrategy = ExplorationStrategy::Balanced;
+        
+        // Development
+        float developmentSpeed = 1.0f;
+        float adultPlasticity = 0.2f;
+        float criticalPeriodEnd = 300.0;
+        
+        // Novelty and memory
+        float sensoryNoveltyDecay = 0.99f;
+        size_t noveltyHistorySize = 100;
+        
+        // Performance
+        size_t motorNeuronGroupSize = 50;
+        bool enableAdaptiveExploration = true;
+        bool enableMemoryTracking = true;
+        bool enableLearningMetrics = true;
+    };
+    
+    void setConfig(const AgentConfig& config) { config_ = config; }
+    const AgentConfig& getConfig() const { return config_; }
+    
+    // Debug and monitoring
+    struct AgentMetrics {
+        float totalExperienceScore = 0.0f;
+        size_t totalExperienceTicks = 0;
+        float averagePredictionError = 0.0f;
+        float explorationRatio = 0.0f;
+        size_t memoryUsage = 0;
+        double lastUpdateTime = 0.0;
+    };
+    
+    const AgentMetrics& getMetrics() const { return metrics_; }
+    std::string getDebugInfo() const;
     
 private:
+    // Exploration strategy enumeration
+    // (already defined above)
+    
+    // Advanced configuration methods
+    // (private members would be here)
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
@@ -109,9 +203,35 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Advanced configuration
+    float rewardDecay_;
+    float curiosityThreshold_;
+    float explorationRate_;
+    float noveltySensitivity_;
+    float developmentSpeed_;
+    float minPlasticity_;
+    float maxPlasticity_;
+    ExplorationStrategy explorationStrategy_;
+    bool adaptiveExplorationEnabled_;
+    bool memoryTrackingEnabled_;
+    bool learningMetricsEnabled_;
+    
+    // Experience tracking
+    float totalExperienceScore_;
+    size_t totalExperienceTicks_;
+    std::vector<float> experienceRewards_;
+    std::vector<float> experienceErrors_;
+    std::vector<float> experienceNovelties_;
+    std::map<size_t, float> motorCommandConfidences_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configuration and metrics
+    AgentConfig config_;
+    mutable AgentMetrics metrics_;
+    double lastExperienceRecordTime_;
 };
 
 } // namespace nlm
