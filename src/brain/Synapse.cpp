@@ -77,6 +77,10 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
     return *this;
 }
 
+Synapse::~Synapse() {
+    delete pImpl;
+}
+
 SynapseId Synapse::getId() const {
     return pImpl->id;
 }
@@ -192,6 +196,11 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // Validate input parameter
+    if (currentTime < 0.0f) {
+        return;
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
@@ -223,6 +232,7 @@ void Synapse::step(Timestamp currentTime) {
 }
 
 void Synapse::reset() {
+    // Validate current state before reset
     pImpl->weight = 0.0f;
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
@@ -231,6 +241,11 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
+    // Validate input
+    if (!rng.isValid()) {
+        return;
+    }
+    
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights

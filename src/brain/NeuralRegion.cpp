@@ -13,7 +13,10 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
     
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
+    // PERFORMANCE: Fast lookup by synapse ID (O(1))
+    std::unordered_map<SynapseId, Synapse*> synapseMap;
+    
+    explicit Impl(RegionId id) : id(id), nextSynapseId(1), synapseMap() {}
 };
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
@@ -37,6 +40,10 @@ NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     return *this;
 }
 
+NeuralRegion::~NeuralRegion() {
+    delete pImpl;
+}
+
 RegionId NeuralRegion::getId() const {
     return pImpl->id;
 }
@@ -58,16 +65,20 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    // Validate ID: must be positive and within bounds
+    if (id.index() <= 0 || id.index() > static_cast<int>(pImpl->populations.size())) {
         return nullptr;
     }
+    // Convert 1-based index to 0-based array access
     return pImpl->populations[id.index() - 1].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    // Validate ID: must be positive and within bounds
+    if (id.index() <= 0 || id.index() > static_cast<int>(pImpl->populations.size())) {
         return nullptr;
     }
+    // Convert 1-based index to 0-based array access
     return pImpl->populations[id.index() - 1].get();
 }
 
@@ -98,24 +109,28 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);
     
+    // PERFORMANCE: Add to lookup map for O(1) access
+    pImpl->synapseMap[synId] = synapse.get();
+    
     pImpl->synapses.push_back(std::move(synapse));
     return synId;
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
+    // PERFORMANCE: O(1) lookup using hash map
+    auto it = pImpl->synapseMap.find(id);
+    if (it != pImpl->synapseMap.end()) {
+        return it->second;
     }
     return nullptr;
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
+    // PERFORMANCE: O(1) lookup using hash map
+    const auto& constMap = pImpl->synapseMap;
+    auto it = constMap.find(id);
+    if (it != constMap.end()) {
+        return it->second;
     }
     return nullptr;
 }
@@ -230,6 +245,8 @@ void NeuralRegion::reset() {
     for (auto& syn : pImpl->synapses) {
         syn->reset();
     }
+    // PERFORMANCE: Clear lookup map
+    pImpl->synapseMap.clear();
 }
 
 void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,

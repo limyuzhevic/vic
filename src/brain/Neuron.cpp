@@ -24,7 +24,7 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f), adaptationVariable(0.0f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -48,6 +48,10 @@ Neuron& Neuron::operator=(Neuron&& other) noexcept {
         other.pImpl = nullptr;
     }
     return *this;
+}
+
+Neuron::~Neuron() {
+    delete pImpl;
 }
 
 void Neuron::setType(NeuronType type) {
@@ -189,6 +193,14 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate input parameters
+    if (dt <= 0.0f) {
+        return false;
+    }
+    if (currentTime < 0.0f) {
+        return false;
+    }
+    
     bool fired = false;
     
     // Handle refractory period

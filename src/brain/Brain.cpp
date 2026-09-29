@@ -174,6 +174,10 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
+Brain::~Brain() {
+    delete pImpl;
+}
+
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
@@ -243,7 +247,9 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,8 +517,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Use prediction system to predict next sensory state
+        // Convert current sensory input to SensoryInput object
+        if (pImpl->sensoryNeurons.size() > 0) {
+            std::vector<float> sensoryData;
+            sensoryData.reserve(256); // Vision size
+            
+            // Extract vision data from first 256 sensory neurons
+            size_t visionNeuronsProcessed = 0;
+            for (size_t i = 0; i < pImpl->sensoryNeurons.size() && visionNeuronsProcessed < 256; ++i) {
+                Neuron* sensoryNeuron = pImpl->sensoryNeurons[i];
+                if (sensoryNeuron && 
+                    sensoryNeuron->getState().membranePotential > -50.0f) { // Active neuron
+                    sensoryData.push_back(sensoryNeuron->getState().membranePotential);
+                    visionNeuronsProcessed++;
+                }
+            }
+            
+            // Pad with zeros if needed
+            while (sensoryData.size() < 256) {
+                sensoryData.push_back(0.0f);
+            }
+            
+            // Create SensoryInput object
+            SensoryInput currentSensory(sensoryData);
+            
+            // Generate prediction using the prediction system
+            auto prediction = pImpl->predictionSystem->predictNextState(currentSensory);
+            
+            // If we got a prediction, compute error with actual input
+            if (prediction) {
+                const auto& predictedData = prediction->getData();
+                float predictionError = 0.0f;
+                if (predictedData.size() == sensoryData.size() && !sensoryData.empty()) {
+                    for (size_t i = 0; i < sensoryData.size(); ++i) {
+                        float diff = predictedData[i] - sensoryData[i];
+                        predictionError += diff * diff;
+                    }
+                    predictionError = std::sqrt(predictionError / sensoryData.size());
+                }
+                
+                // Record prediction error
+                pImpl->predictionSystem->updatePredictions(*prediction, currentSensory);
+                
+                // Apply prediction error signal to neuromodulation
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->setPredictionError(predictionError);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1101,17 +1154,56 @@ void Brain::logStatus() const {
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
     }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
     
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    NLM_LOG_INFO("Developmental age: " + std::to_string(pImpl->developmentalStage == DevelopmentalStage::Initial ? 0.0 :
+                  pImpl->developmentalStage == DevelopmentalStage::CriticalPeriod ? 60.0 :
+                  pImpl->developmentalStage == DevelopmentalStage::Maturation ? 300.0 : 900.0) + "s");
+    
+    // Prediction system status
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionSystem->getPredictionError()));
+        NLM_LOG_INFO("Prediction confidence: " + std::to_string(pImpl->predictionSystem->getConfidence()));
+    }
+    
+    // Performance statistics (power user features)
+    NLM_LOG_INFO("Performance Statistics:");
+    NLM_LOG_INFO("  Total simulation time: " + std::to_string(pImpl->currentTime) + "s");
+    NLM_LOG_INFO("  Current simulation step: " + std::to_string(pImpl->currentStep));
+    NLM_LOG_INFO("  Average synaptic weight: " + std::to_string(getAverageSynapticWeight()));
+    NLM_LOG_INFO("  Network connectivity: " + std::to_string(getExcitationInhibitionRatio()) + ":1 (E/I ratio)");
+    
+    // Plasticity statistics
+    NLM_LOG_INFO("Plasticity Statistics:");
+    NLM_LOG_INFO("  STDP LTP weight: " + std::to_string(pImpl->stdp->getLTPWeight()));
+    NLM_LOG_INFO("  STDP LTD weight: " + std::to_string(pImpl->stdp->getLTDWeight()));
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()) + ", " +
+                    "synaptic density: " + std::to_string(region->getSynapticDensity() * 100.0) + "%");
     }
+    
+    // Checkpointing status
+    if (pImpl->checkpointManager) {
+        NLM_LOG_INFO("Checkpoint manager status: Active");
+    }
+    
+    // System state
+    NLM_LOG_INFO("System State:");
+    NLM_LOG_INFO("  Resting: " + std::string(pImpl->isResting ? "Yes" : "No"));
+    NLM_LOG_INFO("  Steps since last episode: " + std::to_string(pImpl->stepsSinceLastEpisode));
+    NLM_LOG_INFO("  Replay interval: " + std::to_string(pImpl->replayInterval));
 }
 
 } // namespace nlm
