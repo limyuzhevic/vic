@@ -32,11 +32,9 @@ public:
     size_t getCurrentSize() const;
     
     // Decay all items
-    void decay(float decayRate);
-    
-private:
+    private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Episodic memory: storage of events and experiences
@@ -71,12 +69,11 @@ public:
     // Clear all
     void clear();
     
-    // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Semantic memory: gradually acquired knowledge
@@ -99,12 +96,12 @@ public:
     // Get all facts
     std::vector<std::pair<std::string, std::string>> getAllFacts() const;
     
-    // Clear all
+// Clear all
     void clear();
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Procedural memory: learned skills and habits

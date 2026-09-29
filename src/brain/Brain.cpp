@@ -157,22 +157,13 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept = default;
 
-Brain& Brain::operator=(Brain&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
+Brain& Brain::operator=(Brain&& other) noexcept = default;
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");

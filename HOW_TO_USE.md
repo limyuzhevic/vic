@@ -50,8 +50,14 @@ After successful compilation, you will have:
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
+| `nlm_phase3` | Static Library | Phase 3 experiments |
+| `nlm_phase4` | Static Library | Phase 4 experiments |
+| `nlm_phase5` | Static Library | Phase 5 experiments (lifetime learning) |
+| `nlm_phase6` | Static Library | Phase 6 experiments (integration) |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase5_demo` | Executable | Phase 5 demonstration (lifetime learning) |
+| `nlm_phase6_demo` | Executable | Phase 6 demonstration (integration) |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options

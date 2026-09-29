@@ -75,12 +75,44 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Demos
+
+#### Phase 3 Demo (Basic World Interaction)
+```bash
+./nlm_phase3_demo [num_episodes] [steps_per_episode]
+```
+
+#### Phase 4 Demo (Emergent Cognition)
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+#### Phase 5 Demo (Lifetime Learning)
+```bash
+./nlm_phase5_demo
+```
+
+This demonstrates lifetime learning through multiple developmental phases:
+- Early Development (synapse formation)
+- Sensory Development
+- Motor Development
+- Associative Development
+- Memory Consolidation
+- Social Development
+
+#### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+#### Main Simulation
+```bash
+./nlm
+```
+
+This runs the main simulation with a default configuration.
 
 ## Project Structure
 

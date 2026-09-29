@@ -72,7 +72,7 @@ struct EpisodicMemory::Impl {
     Impl(size_t max) : maxEpisodes(max) {}
 };
 
-EpisodicMemory::EpisodicMemory() : pImpl(new Impl(1000)) {}
+EpisodicMemory::EpisodicMemory() : pImpl(std::make_unique<Impl>(1000)) {}
 
 EpisodicMemory::~EpisodicMemory() = default;
 
@@ -116,7 +116,7 @@ struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
 };
 
-SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
+SemanticMemory::SemanticMemory() : pImpl(std::make_unique<Impl>()) {}
 
 SemanticMemory::~SemanticMemory() = default;
 
@@ -214,7 +214,7 @@ struct AssociativeMemory::Impl {
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations;
 };
 
-AssociativeMemory::AssociativeMemory() : pImpl(new Impl) {}
+AssociativeMemory::AssociativeMemory() : pImpl(std::make_unique<Impl>()) {}
 
 AssociativeMemory::~AssociativeMemory() = default;
 
