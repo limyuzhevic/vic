@@ -1,17 +1,75 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - Python Usage Guide
+
+**Comprehensive guide to using NLM's Python bindings**
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM is a brain-inspired spiking neural network simulator written in C++20 with comprehensive Python bindings. The Python API provides access to the full functionality of the NLM neural simulation framework through an intuitive, Pythonic interface.
 
 This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+1. Installing the Python library
+2. Using the NLM Python API
+3. Advanced usage patterns
+4. Performance considerations
 
----
+## Part 1: Installing the Python Library
 
-## Part 1: Building the C++ Project from Source
+### Prerequisites
+
+- **Python**: 3.8+ (required for all operations)
+- **pip**: Python package installer (usually included)
+- **Build tools**: For installation from source (recommended for development)
+
+### Installation Methods
+
+#### Method 1: From Source (Recommended for Development)
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install the package
+pip install -e .
+
+# Or install in development mode (recommended for development)
+pip install -e .
+```
+
+#### Method 2: From Package Repository
+
+```bash
+# Install from PyPI (if available)
+pip install pynlm
+```
+
+#### Method 3: Using pyproject.toml (Modern Python Packaging)
+
+```bash
+# Install with scikit-build-core (used automatically by pip)
+pip install .
+
+# Build only (without installing)
+pip install build
+python -m build
+
+# Install specific build from wheel
+pip install dist/*.whl
+```
+
+### Verification
+
+After installation, verify that NLM is working:
+
+```python
+import pynlm
+
+print("NLM version:", getattr(pynlm, '__version__', 'Unknown'))
+
+# Test basic functionality
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+```
 
 ### Prerequisites
 

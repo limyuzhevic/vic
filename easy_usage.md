@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+**A gentle introduction to NLM (Neural Learning Machine)**
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -12,15 +14,11 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
----
-
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
-
----
 
 ## Quick Start (Copy & Paste)
 
