@@ -4,6 +4,7 @@
 #include <sstream>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
+#include "core/CommandLine/CommandLineParser.hpp"
 #include "brain/Brain.hpp"
 #include "agent/AgentBrain.hpp"
 #include "world/SimpleWorld.hpp"
@@ -12,7 +13,6 @@
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
@@ -37,21 +37,71 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
+    // Initialize command line parser
+    nlm::CommandLineParser parser;
+    
+    // Add standard options
+    parser.addOption("help", "Print this help message", "--help", "", false, true);
+    parser.addOption("version", "Print version information", "--version", "", false, true);
+    parser.addOption("trials", "Number of trials for experiments", "--trials N", "50", true);
+    parser.addOption("neurons", "Number of neurons in the brain", "--neurons N", "1000", true);
+    parser.addOption("regions", "Number of brain regions", "--regions N", "2", true);
+    parser.addOption("verbose", "Enable verbose logging", "--verbose", "false", false);
+    parser.addOption("seed", "Random seed for reproducibility", "--seed N", "42", true);
+    parser.addOption("config", "Load configuration from file", "--config FILE", "", true);
+    
+    parser.addPositionalArg("output", "Output file for results (optional)");
+    
+    // Parse command line
+    if (!parser.parse(argc, argv)) {
+        std::cerr << "Error parsing command line arguments" << std::endl;
+        return 1;
+    }
+    
+    // Handle special options
+    if (parser.has("help")) {
+        parser.printUsage(argv[0]);
+        std::cout << parser.getHelp() << std::endl;
+        return 0;
+    }
+    
+    if (parser.has("version")) {
+        nlm::CommandLineParser::printVersion("Phase 4");
+        return 0;
+    }
+    
+    // Get configuration
+    auto config = std::make_shared<Config>();
+    
+    // Load from config file if specified
+    if (parser.has("config")) {
+        std::string configFile = parser.getString("config");
+        if (!configFile.empty()) {
+            if (!config->loadFromFile(configFile)) {
+                std::cerr << "Warning: Could not load config file: " << configFile << std::endl;
+            }
+        }
+    }
+    
+    // Set configuration from command line
+    config->set("neuron_count", parser.getInt("neurons", 1000));
+    config->set("region_count", parser.getInt("regions", 2));
+    config->set("random_seed", parser.getInt("seed", 42));
+    
+    // Configure logging
+    Logger::getInstance().setLevel(parser.getBool("verbose") ? Logger::Level::Info : Logger::Level::Warning);
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
-    }
+    // Parse number of trials from command line
+    size_t numTrials = static_cast<size_t>(parser.getInt("trials", 50));
     
     // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
+    config->set("neuron_count", static_cast<size_t>(parser.getInt("neurons", 1000)));
+    config->set("region_count", static_cast<size_t>(parser.getInt("regions", 2)));
+    config->set("random_seed", parser.getInt("seed", 42));
     config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
     config->set("simulation_timestep", 0.001);
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);

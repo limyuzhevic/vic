@@ -19,8 +19,17 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Validate file path
+    if (filepath.empty()) {
+        return false;
+    }
+    
+    // Check if file exists (basic check)
+    std::ifstream testFile(filepath);
+    if (!testFile.good()) {
+        return false;
+    }
+    testFile.close();
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +37,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,9 +48,13 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos && pos > 0 && pos < line.size() - 1) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            if (key.empty() || value.empty()) {
+                continue; // Skip malformed entries
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -56,23 +71,36 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Validate input
+    if (!argv || argc < 1) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            continue; // Skip null pointers
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                if (!key.empty() && !value.empty()) {
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg.size() > 1 && arg[0] == '-' && i + 1 < argc && argv[i + 1]) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (!key.empty() && !value.empty()) {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;

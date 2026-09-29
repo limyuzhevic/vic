@@ -71,6 +71,89 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Usage with Configuration
+
+```python
+import pynlm
+
+# Create custom configuration
+config = pynlm.createDefaultConfig()
+
+# Configure using command-line style options
+config.set("neuron_count", 2000)           # More neurons
+config.set("region_count", 3)              # More regions  
+config.set("random_seed", 123)             # Reproducible results
+config.set("simulation_timestep", 0.0005)  # Higher resolution
+config.set("connection_probability", 0.15) # More connections
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("Advanced brain created:", brain.getTotalNeuronCount(), "neurons")
+```
+
+---
+
+## Command Line Interface (C++)
+
+For advanced users, NLM provides command-line tools to configure and run experiments without modifying code:
+
+### Phase 4 Demo Command Line
+
+```bash
+# Basic usage - run with 100 trials
+./nlm_phase4_demo 100
+
+# Advanced usage with configuration options
+./nlm_phase4_demo \
+    --trials 200 \
+    --neurons 1500 \
+    --regions 4 \
+    --seed 123 \
+    --verbose \
+    --config my_settings.cfg
+```
+
+### Available Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--trials N` | Number of trials for experiments | 50 |
+| `--neurons N` | Number of neurons in the brain | 1000 |
+| `--regions N` | Number of brain regions | 2 |
+| `--seed N` | Random seed for reproducibility | 42 |
+| `--verbose` | Enable verbose logging | false |
+| `--help` | Print help message | - |
+| `--version` | Print version information | - |
+
+### Configuration File
+
+Create a `settings.cfg` file for custom configurations:
+
+```
+# NLM Configuration File
+neuron_count = 2000
+region_count = 3
+random_seed = 123
+simulation_timestep = 0.001
+connection_probability = 0.15
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+
+# Enable/disable features
+enable_reward_modulation = true
+enable_structural_plasticity = true
+enable_development = true
+enable_curiosity = true
+```
+
+Then run with configuration:
+
+```bash
+./nlm_phase4_demo --config settings.cfg
+```
+
 ---
 
 ## Simple Analogy
@@ -254,6 +337,58 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
+### Project 4: Experiment Runner (Command Line)
+
+Save this as `experiment_runner.py` and run with:
+
+```bash
+python experiment_runner.py --trials 50 --neurons 1500 --regions 3 --seed 123 --verbose
+```
+
+```python
+#!/usr/bin/env python3
+import sys
+import pynlm
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run NLM Phase 4 experiments")
+    parser.add_argument("--trials", type=int, default=50, help="Number of trials")
+    parser.add_argument("--neurons", type=int, default=1000, help="Number of neurons")
+    parser.add_argument("--regions", type=int, default=2, help="Number of brain regions")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    
+    # Create brain with custom configuration
+    config = pynlm.createDefaultConfig()
+    config.set("neuron_count", args.neurons)
+    config.set("region_count", args.regions)
+    config.set("random_seed", args.seed)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run experiments (simplified)
+    print(f"Running NLM Phase 4 with {args.trials} trials...")
+    print(f"Brain: {args.neurons} neurons, {args.regions} regions")
+    print(f"Seed: {args.seed}, Verbose: {args.verbose}")
+    
+    # Run a simple brain loop
+    for step in range(args.trials):
+        brain.step(step)
+        if args.verbose and step % 10 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    
+    print(f"Experiment complete! Total spikes: {brain.getTotalSpikeCount()}")
+
+if __name__ == "__main__":
+    main()
+```
+
 ---
 
 ## Quick Reference
@@ -290,8 +425,13 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Explore C++ Command Line Interface**: Use `./nlm_phase4_demo --help` for options
+2. **Read `HOW_TO_USE.md`** for more details
+3. **Read `docs/ARCHITECTURE.md`** to understand how it all works
+4. **Experiment with different configurations** - try changing neuron counts, connection probabilities, etc.
+5. **Run the Phase 6 integration demo**: `./nlm_phase6_demo` to see all systems working together
+
+That's it! You're now ready to use NLM in both Python and C++!
+
+(End of file - total 487 lines)
