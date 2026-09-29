@@ -4,29 +4,55 @@
 
 namespace nlm {
 
+/// Implementation details for DevelopmentSystem
 struct DevelopmentSystem::Impl {
+    /// Current developmental stage the brain is in
     DevelopmentalStage stage;
-    SimulationStep stageStartStep;
-    SimulationStep stepsInCurrentStage;
-    double stageAge;  // Age since entering current stage
     
+    /// Simulation step when current stage began
+    SimulationStep stageStartStep;
+    
+    /// Number of steps spent in current stage
+    SimulationStep stepsInCurrentStage;
+    
+    /// Age of current developmental stage (in simulation time units)
+    double stageAge;  
+    
+    /// Initialize with default developmental stage
     Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
 };
 
-DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
+/// Constructor for DevelopmentSystem
+DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {
+    NLM_LOG_INFO("Development system initialized with initial stage");
+}
 
+/// Destructor for DevelopmentSystem
 DevelopmentSystem::~DevelopmentSystem() = default;
 
+/// Get the current developmental stage
+/// @return Current developmental stage (Initial, CriticalPeriod, Maturation, Adult, or Aging)
 DevelopmentalStage DevelopmentSystem::getStage() const {
     return pImpl->stage;
 }
 
+/// Set the developmental stage to a specific stage
+/// @param stage The developmental stage to set
 void DevelopmentSystem::setStage(DevelopmentalStage stage) {
-    pImpl->stage = stage;
-    pImpl->stageAge = 0.0;
+    if (pImpl->stage != stage) {
+        auto oldStage = pImpl->stage;
+        pImpl->stage = stage;
+        pImpl->stageAge = 0.0;
+        pImpl->stepsInCurrentStage = 0;
+        NLM_LOG_INFO("Development system advanced from " + std::string(getStageName(oldStage)) + 
+                    " to " + std::string(getStageName(stage)));
+    }
 }
 
+/// Advance to the next developmental stage in sequence
+/// Automatically progresses from Initial -> CriticalPeriod -> Maturation -> Adult -> Aging
 void DevelopmentSystem::advanceStage() {
+    auto oldStage = pImpl->stage;
     switch (pImpl->stage) {
         case DevelopmentalStage::Initial:
             pImpl->stage = DevelopmentalStage::CriticalPeriod;
@@ -41,12 +67,16 @@ void DevelopmentSystem::advanceStage() {
             pImpl->stage = DevelopmentalStage::Aging;
             break;
         case DevelopmentalStage::Aging:
-            // Already at final stage
+            // Already at final stage, no change
             break;
+        default:
+            NLM_LOG_WARNING("Unknown developmental stage, cannot advance");
+            return;
     }
+    
     pImpl->stepsInCurrentStage = 0;
     pImpl->stageAge = 0.0;
-    NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
+    NLM_LOG_INFO("Development system advanced to stage: " + std::string(getStageName()));
 }
 
 const char* DevelopmentSystem::getStageName() const {
