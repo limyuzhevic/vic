@@ -76,6 +76,9 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Initialize neural distributions
+    void distributeNeurons();
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
