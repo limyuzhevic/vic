@@ -177,13 +177,103 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
-    // Get configuration values
+    // Validate configuration before using it
+    if (!pImpl->config->validate()) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        return false;
+    }
+    
+    // Get and validate configuration values
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+    // Optimized validation with better error messages
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron count: must be positive (got " + std::to_string(neuronCount) + ")");
+        return false;
+    } else if (neuronCount > 1000000) {
+        NLM_LOG_WARNING("Very large network size (" + std::to_string(neuronCount) + ") may impact performance");
+    }
+    
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region count: must be positive (got " + std::to_string(regionCount) + ")");
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: must be between 0 and 1 (got " + std::to_string(connectionProbability) + ")");
+        return false;
+    }
+    
+    double timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: must be positive (got " + std::to_string(timestep) + "s)");
+        return false;
+    } else if (timestep > 0.1) {
+        NLM_LOG_WARNING("Large timestep may affect accuracy: " + std::to_string(timestep) + "s");
+    }
+    
+    // Optimized plasticity parameter validation
+    float ltpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f);
+    if (ltpWeight < 0.0f) {
+        NLM_LOG_ERROR("Invalid STDP LTP weight: must be non-negative (got " + std::to_string(ltpWeight) + ")");
+        return false;
+    }
+    
+    float ltdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f);
+    if (ltdWeight < 0.0f) {
+        NLM_LOG_ERROR("Invalid STDP LTD weight: must be non-negative (got " + std::to_string(ltdWeight) + ")");
+        return false;
+    }
+    
+    // Validate plasticity parameters
+    float ltpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f);
+    if (ltpWeight < 0.0f) {
+        NLM_LOG_ERROR("Invalid STDP LTP weight: must be non-negative");
+        return false;
+    }
+    
+    float ltdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f);
+    if (ltdWeight < 0.0f) {
+        NLM_LOG_ERROR("Invalid STDP LTD weight: must be non-negative");
+        return false;
+    }
+    
+    float stdpTau = pImpl->config->getOr<float>("stdp_tau", 20.0f);
+    if (stdpTau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid STDP tau: must be positive");
+        return false;
+    }
+    
+    // Validate structural plasticity rates
+    float synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    if (synaptogenesisRate < 0.0f) {
+        NLM_LOG_ERROR("Invalid synaptogenesis rate: must be non-negative");
+        return false;
+    }
+    
+    float pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+    if (pruningRate < 0.0f) {
+        NLM_LOG_ERROR("Invalid pruning rate: must be non-negative");
+        return false;
+    }
+    
+    // Validate integration intervals
+    size_t replayInterval = pImpl->config->getOr<size_t>("replay_interval", 100);
+    if (replayInterval == 0) {
+        NLM_LOG_WARNING("Replay interval is 0, setting to minimum of 1");
+        replayInterval = 1;
+    }
+    
+    size_t consolidationInterval = pImpl->config->getOr<size_t>("consolidation_interval", 1000);
+    if (consolidationInterval == 0) {
+        NLM_LOG_WARNING("Consolidation interval is 0, setting to minimum of 1");
+        consolidationInterval = 1;
+    }
+    
+    // Set validated configuration
+    pImpl->timestep = timestep;
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
