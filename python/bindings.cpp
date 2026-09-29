@@ -2,9 +2,12 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,6 +18,9 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+
+// Include enhanced bindings
+#include "enhanced_bindings.h"
 
 namespace py = pybind11;
 namespace nlm {
@@ -27,7 +33,99 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+// Expose enhanced bindings for users who want enhanced functionality
+void exposeEnhancedAPI(py::module& m) {
+    // Enhanced Config class
+    py::class_<nlm::EnhancedConfig>(m, "EnhancedConfig")
+        .def(py::init<>())
+        .def("set", (void (nlm::EnhancedConfig::*)(const std::string&, const std::string&)) &nlm::EnhancedConfig::set)
+        .def("set", (void (nlm::EnhancedConfig::*)(const std::string&, int)) &nlm::EnhancedConfig::set)
+        .def("set", (void (nlm::EnhancedConfig::*)(const std::string&, float)) &nlm::EnhancedConfig::set)
+        .def("set", (void (nlm::EnhancedConfig::*)(const std::string&, double)) &nlm::EnhancedConfig::set)
+        .def("set", (void (nlm::EnhancedConfig::*)(const std::string&, bool)) &nlm::EnhancedConfig::set)
+        .def("getString", &nlm::EnhancedConfig::getString)
+        .def("getInt", &nlm::EnhancedConfig::getInt)
+        .def("getFloat", &nlm::EnhancedConfig::getFloat)
+        .def("getBool", &nlm::EnhancedConfig::getBool)
+        .def("has", &nlm::EnhancedConfig::has)
+        .def("getKeys", &nlm::EnhancedConfig::getKeys)
+        .def("configureBrain", &nlm::EnhancedConfig::configureBrain)
+        .def("configureMemory", &nlm::EnhancedConfig::configureMemory)
+        .def("configureNeuromodulation", &nlm::EnhancedConfig::configureNeuromodulation)
+        .def("save", &nlm::EnhancedConfig::save)
+        .def("load", &nlm::EnhancedConfig::load)
+        .def("summary", &nlm::EnhancedConfig::summary)
+        .def("fromJSON", &nlm::EnhancedConfig::fromJSON)
+        .def("getConfig", &nlm::EnhancedConfig::getConfig);
+    
+    // Enhanced Brain class
+    py::class_<nlm::EnhancedBrain>(m, "EnhancedBrain")
+        .def(py::init<std::shared_ptr<nlm::Config>>())
+        .def("initialize", &nlm::EnhancedBrain::initialize)
+        .def("step", (void (nlm::EnhancedBrain::*)(size_t)) &nlm::EnhancedBrain::step)
+        .def("step", (void (nlm::EnhancedBrain::*)(size_t, double)) &nlm::EnhancedBrain::step)
+        .def("receiveSensoryInput", &nlm::EnhancedBrain::receiveSensoryInput)
+        .def("getStatistics", &nlm::EnhancedBrain::getStatistics)
+        .def("runSimulation", &nlm::EnhancedBrain::runSimulation)
+        .def("reset", &nlm::EnhancedBrain::reset)
+        .def("save", &nlm::EnhancedBrain::save)
+        .def("load", &nlm::EnhancedBrain::load)
+        .def("getRegionInfo", &nlm::EnhancedBrain::getRegionInfo)
+        .def("getAllRegions", &nlm::EnhancedBrain::getAllRegions);
+    
+    // Enhanced AgentBrain class
+    py::class_<nlm::EnhancedAgentBrain>(m, "EnhancedAgentBrain")
+        .def(py::init<std::shared_ptr<nlm::Brain>>())
+        .def("initialize", &nlm::EnhancedAgentBrain::initialize)
+        .def("processSensoryInput", &nlm::EnhancedAgentBrain::processSensoryInput)
+        .def("getAgentState", &nlm::EnhancedAgentBrain::getAgentState)
+        .def("getStatistics", &nlm::EnhancedAgentBrain::getStatistics)
+        .def("enableRewardModulation", &nlm::EnhancedAgentBrain::enableRewardModulation)
+        .def("enableCuriosity", &nlm::EnhancedAgentBrain::enableCuriosity)
+        .def("enableDevelopment", &nlm::EnhancedAgentBrain::enableDevelopment)
+        .def("enableStructuralPlasticity", &nlm::EnhancedAgentBrain::enableStructuralPlasticity)
+        .def("isRewardModulationEnabled", &nlm::EnhancedAgentBrain::isRewardModulationEnabled)
+        .def("isCuriosityEnabled", &nlm::EnhancedAgentBrain::isCuriosityEnabled)
+        .def("isDevelopmentEnabled", &nlm::EnhancedAgentBrain::isDevelopmentEnabled)
+        .def("isStructuralPlasticityEnabled", &nlm::EnhancedAgentBrain::isStructuralPlasticityEnabled)
+        .def("reset", &nlm::EnhancedAgentBrain::reset)
+        .def("getAgentBrain", &nlm::EnhancedAgentBrain::getAgentBrain)
+        .def("createEnhanced", &nlm::EnhancedAgentBrain::createEnhanced);
+    
+    // Enhanced SimpleWorld class
+    py::class_<nlm::EnhancedSimpleWorld>(m, "EnhancedSimpleWorld")
+        .def(py::init<>())
+        .def("configure", &nlm::EnhancedSimpleWorld::configure)
+        .def("setAgentStart", &nlm::EnhancedSimpleWorld::setAgentStart)
+        .def("update", &nlm::EnhancedSimpleWorld::update)
+        .def("applyMotorCommand", &nlm::EnhancedSimpleWorld::applyMotorCommand)
+        .def("getSensoryPercept", &nlm::EnhancedSimpleWorld::getSensoryPercept)
+        .def("getAgentBody", &nlm::EnhancedSimpleWorld::getAgentBody)
+        .def("reset", &nlm::EnhancedSimpleWorld::reset)
+        .def("addObject", &nlm::EnhancedSimpleWorld::addObject)
+        .def("removeObject", &nlm::EnhancedSimpleWorld::removeObject)
+        .def("isValidPosition", &nlm::EnhancedSimpleWorld::isValidPosition)
+        .def("getDimensions", &nlm::EnhancedSimpleWorld::getDimensions)
+        .def("getSimulationTime", &nlm::EnhancedSimpleWorld::getSimulationTime)
+        .def("setRandomSeed", &nlm::EnhancedSimpleWorld::setRandomSeed)
+        .def("getRandomSeed", &nlm::EnhancedSimpleWorld::getRandomSeed)
+        .def("getWorld", &nlm::EnhancedSimpleWorld::getWorld);
+    
+    // Factory functions
+    m.def("createEnhancedConfig", &nlm::createEnhancedConfig);
+    m.def("createEnhancedBrain", &nlm::createEnhancedBrain);
+    m.def("createEnhancedAgentBrain", &nlm::createEnhancedAgentBrain);
+    m.def("createEnhancedSimpleWorld", &nlm::createEnhancedSimpleWorld);
+    
+    // Convenience functions
+    m.def("runCompleteAgentSimulation", &nlm::runCompleteAgentSimulation);
+    m.def("getDefaultConfiguration", &nlm::getDefaultConfiguration);
+    m.def("generateConfigurationCode", &nlm::generateConfigurationCode);
+    
+    // Version and metadata
+    m.attr("__version__") = "2.0.0-enhanced";
+    m.attr("__description__") = "Enhanced Python API for NLM with improved error handling and type hints";
+}
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -420,6 +518,9 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Expose enhanced API for users who want enhanced functionality
+    exposeEnhancedAPI(m);
 }
 
 } // namespace nlm
