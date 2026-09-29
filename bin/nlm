@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""
+NLM Command Line Interface Entry Point
+
+This script provides a convenient command-line interface for using NLM,
+matching the examples provided in the documentation.
+"""
+
+import sys
+import os
+
+# Add the current directory to the path so we can import from the project
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from nlm_cli import main
+
+if __name__ == '__main__':
+    main()
