@@ -93,6 +93,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validate() const;
+    std::pair<bool, std::string> validateWithErrors() const;
+    bool isComplete() const;
+    
+    // Apply configuration to target (brain, world, etc.)
+    template<typename Target>
+    bool applyTo(Target& target) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

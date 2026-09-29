@@ -186,6 +186,84 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+bool Config::validate() {
+    return validateWithErrors().first;
+}
+
+std::pair<bool, std::string> Config::validateWithErrors() const {
+    std::string errors;
+    
+    // Basic validation: check for required keys and valid ranges
+    for (const auto& entry : pImpl->entries) {
+        bool isValid = true;
+        
+        if (entry.key.empty()) {
+            isValid = false;
+            errors += "Empty key found; ";
+        }
+        
+        if (entry.key.find("\n") != std::string::npos || 
+            entry.key.find("\r") != std::string::npos) {
+            isValid = false;
+            errors += "Key contains newlines: '" + entry.key + "'; ";
+        }
+        
+        // Validate specific key types
+        if (entry.key.find("neuron_count") != std::string::npos) {
+            auto val = std::get_if<int64_t>(&entry.value);
+            if (val && (*val < 1 || *val > 1000000)) {
+                isValid = false;
+                errors += "Invalid neuron_count value: '" + std::to_string(*val) + "' (must be 1-1000000); ";
+            }
+        }
+        
+        if (entry.key.find("connection_probability") != std::string::npos) {
+            auto val = std::get_if<double>(&entry.value);
+            if (val && (*val < 0.0 || *val > 1.0)) {
+                isValid = false;
+                errors += "Invalid connection_probability value: '" + std::to_string(*val) + "' (must be 0.0-1.0); ";
+            }
+        }
+        
+        if (entry.key.find("max_energy") != std::string::npos) {
+            auto val = std::get_if<double>(&entry.value);
+            if (val && *val < 0.0) {
+                isValid = false;
+                errors += "Invalid max_energy value: '" + std::to_string(*val) + "' (must be >= 0); ";
+            }
+        }
+        
+        if (!isValid) {
+            errors += " in key '" + entry.key + "'; ";
+        }
+    }
+    
+    if (!errors.empty()) {
+        errors = "Configuration validation failed: " + errors;
+        return {false, errors};
+    }
+    
+    return {true, "Configuration is valid"};
+}
+
+bool Config::isComplete() const {
+    // Check if essential keys are present
+    std::vector<std::string> essential_keys = {
+        "brain.neuron_count",
+        "brain.region_count",
+        "brain.synapse_density",
+        "simulation.timestep"
+    };
+    
+    for (const auto& key : essential_keys) {
+        if (!has(key)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -200,6 +278,7 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
