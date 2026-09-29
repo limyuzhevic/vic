@@ -1,11 +1,21 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Final Integration - Integrated Artificial Brain
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the complete integrated artificial brain with:
+// - Real LIF neuron dynamics (Phase 2)
+// - Event-driven spike propagation with synaptic delays (Phase 2)
+// - STDP and Hebbian plasticity (Phase 2)
+// - Structural plasticity (synaptogenesis/pruning) (Phase 2)
+// - Working memory, episodic memory, and associative memory (Phase 4)
+// - Neuromodulation (dopamine, curiosity, novelty) (Phase 3)
+// - Prediction system (Phase 4)
+// - Cognitive systems: planning, concept formation, attention (Phase 4)
+// - Development system affecting plasticity rates (Phase 5)
+// - Replay and consolidation during rest (Phase 4)
+// - Checkpoint save/load functionality (Phase 5)
+//
+// The Phase 6 integration connects all these systems into a coherent
+// artificial brain that learns and develops through experience.
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -25,6 +35,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <cstring>
 
 using namespace nlm;
 
@@ -35,14 +46,10 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 6: Final Integration                                ║
     ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     Integrated Artificial Brain                                ║
+    ║     All systems connected and working together.               ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
@@ -321,10 +328,124 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+// Command-line argument parser for NLM
+class CLIArguments {
+public:
+    std::string configFile = "configs/default.cfg";
+    uint64_t randomSeed = 42;
+    uint64_t neuronCount = 1000;
+    uint64_t regionCount = 2;
+    float connectionProbability = 0.1f;
+    uint64_t simulationSteps = 10000;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    bool runPhase2Tests = true;
+    bool runPhase3Tests = false;
+    bool runPhase4Tests = false;
+    bool runPhase5Tests = false;
+    bool runPhase6Tests = true;
+    std::string checkpointPath = "./brain_checkpoint.bin";
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    bool parse(int argc, char** argv) {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            
+            if (arg == "--help" || arg == "-h") {
+                printUsage();
+                return false;
+            } else if (arg == "--config") {
+                if (i + 1 < argc) configFile = argv[++i];
+            } else if (arg == "--seed") {
+                if (i + 1 < argc) randomSeed = std::stoull(argv[++i]);
+            } else if (arg == "--neurons") {
+                if (i + 1 < argc) neuronCount = std::stoull(argv[++i]);
+            } else if (arg == "--regions") {
+                if (i + 1 < argc) regionCount = std::stoull(argv[++i]);
+            } else if (arg == "--connection-prob") {
+                if (i + 1 < argc) connectionProbability = std::stof(argv[++i]);
+            } else if (arg == "--steps") {
+                if (i + 1 < argc) simulationSteps = std::stoull(argv[++i]);
+            } else if (arg == "--checkpoint") {
+                enableCheckpointing = true;
+                if (i + 1 < argc) checkpointPath = argv[++i];
+            } else if (arg == "--no-checkpoint") {
+                enableCheckpointing = false;
+            } else if (arg == "--no-replay") {
+                enableReplay = false;
+            } else if (arg == "--no-development") {
+                enableDevelopment = false;
+            } else if (arg == "--phase2") {
+                runPhase2Tests = true;
+                runPhase3Tests = runPhase4Tests = runPhase5Tests = runPhase6Tests = false;
+            } else if (arg == "--phase3") {
+                runPhase3Tests = true;
+                runPhase2Tests = runPhase4Tests = runPhase5Tests = runPhase6Tests = false;
+            } else if (arg == "--phase4") {
+                runPhase4Tests = true;
+                runPhase2Tests = runPhase3Tests = runPhase5Tests = runPhase6Tests = false;
+            } else if (arg == "--phase5") {
+                runPhase5Tests = true;
+                runPhase2Tests = runPhase3Tests = runPhase4Tests = runPhase6Tests = false;
+            } else if (arg == "--phase6") {
+                runPhase6Tests = true;
+                runPhase2Tests = runPhase3Tests = runPhase4Tests = runPhase5Tests = false;
+            } else if (arg == "--all-phases") {
+                runPhase2Tests = runPhase3Tests = runPhase4Tests = runPhase5Tests = runPhase6Tests = true;
+            } else if (arg == "--version") {
+                printVersion();
+                return false;
+            } else {
+                std::cerr << "Unknown argument: " << arg << std::endl;
+                printUsage();
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    void printUsage() const {
+        std::cout << "\n" << std::string(70, '=') << std::endl;
+        std::cout << "  NLM - Neural Learning Machine - Phase 6 Integration" << std::endl;
+        std::cout << std::string(70, '=') << std::endl;
+        std::cout << "\n";
+        std::cout << "Usage: nlm [OPTIONS]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  -h, --help                    Show this help message\n";
+        std::cout << "  --version                     Show version information\n";
+        std::cout << "\n";
+        std::cout << "Configuration:\n";
+        std::cout << "  --config FILE                 Configuration file (default: configs/default.cfg)\n";
+        std::cout << "  --seed SEED                   Random seed (default: 42)\n";
+        std::cout << "  --neurons NUM                 Number of neurons (default: 1000)\n";
+        std::cout << "  --regions NUM                 Number of regions (default: 2)\n";
+        std::cout << "  --connection-prob FLOAT       Connection probability (default: 0.1)\n";
+        std::cout << "\n";
+        std::cout << "Phase Selection:\n";
+        std::cout << "  --phase2                      Run Phase 2 neural computation tests\n";
+        std::cout << "  --phase3                      Run Phase 3 neuromodulation tests\n";
+        std::cout << "  --phase4                      Run Phase 4 cognitive tests\n";
+        std::cout << "  --phase5                      Run Phase 5 development tests\n";
+        std::cout << "  --phase6                      Run Phase 6 integration tests (default)\n";
+        std::cout << "  --all-phases                  Run all phase tests\n";
+        std::cout << "\n";
+        std::cout << "Advanced Options:\n";
+        std::cout << "  --steps NUM                   Number of simulation steps (default: 10000)\n";
+        std::cout << "  --checkpoint PATH             Enable checkpointing with save path\n";
+        std::cout << "  --no-checkpoint               Disable checkpointing\n";
+        std::cout << "  --no-replay                   Disable replay functionality\n";
+        std::cout << "  --no-development              Disable development system\n";
+        std::cout << "\n";
+        std::cout << "Example:\n";
+        std::cout << "  nlm --phase6 --neurons 500 --seed 123 --checkpoint my_brain.bin\n";
+    }
+    
+    void printVersion() const {
+        std::cout << "NLM Neural Learning Machine - Phase 6" << std::endl;
+        std::cout << "Version: 0.1.0 (Integration Build)" << std::endl;
+        std::cout << "Build: Final Integration Phase (All Systems Connected)" << std::endl;
+    }
+};
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
