@@ -78,14 +78,28 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Configuration validation
+    bool validate() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Set configuration schema for validation
+    void setSchema(const std::string& key, 
+                   const std::string& type,
+                   const std::vector<std::string>& allowedValues = {});
+    
+    // Get schema for a key
+    std::string getSchema(const std::string& key) const;
+    
+    // Check if configuration is valid for a specific use case
+    bool isValidForUseCase(const std::string& useCase) const;
+    
+    // Get configuration description
+    std::string getDescription(const std::string& key) const;
+    
+    // Set configuration description
+    void setDescription(const std::string& key, const std::string& description);
     
     // Clear all
     void clear();

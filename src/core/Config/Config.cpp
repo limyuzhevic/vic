@@ -8,6 +8,29 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // Schema for validation
+    struct Schema {
+        std::string key;
+        std::string type;
+        std::vector<std::string> allowedValues;
+        std::string description;
+    };
+    
+    std::vector<Schema> schemas;
+    
+    // Validation errors
+    std::vector<std::string> validationErrors;
+    
+    // Use case validation rules
+    struct UseCaseRule {
+        std::string useCase;
+        std::vector<std::string> requiredKeys;
+        std::vector<std::string> optionalKeys;
+        std::string description;
+    };
+    
+    std::vector<UseCaseRule> useCaseRules;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -198,8 +221,6 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
-// Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

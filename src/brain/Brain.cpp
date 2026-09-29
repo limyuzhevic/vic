@@ -601,10 +601,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
-        float normalizedValue = 0.0f;
-        if (i < values.size()) {
-            normalizedValue = static_cast<float>(values[i]) * 10.0f;
-        }
+        // FIX: Initialize with input value first, not 0.0f
+        float normalizedValue = (i < values.size()) ? 
+            static_cast<float>(values[i]) * 10.0f : 0.0f;
         
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
@@ -617,9 +616,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Improved implementation: Find neuron more efficiently
     for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
+        for (auto* n : region->getAllNeurons()) {
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
@@ -991,7 +990,20 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    // Calculate the actual count of neurons that are firing in this step
+    size_t firingCount = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                // Check if neuron is currently firing (in refractory state)
+                const auto& state = neuron->getState();
+                if (state.firingState == FiringState::Refractory) {
+                    ++firingCount;
+                }
+            }
+        }
+    }
+    return firingCount;
 }
 
 float Brain::getAverageFiringRate() const {
