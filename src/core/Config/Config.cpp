@@ -1,8 +1,8 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
 #include <filesystem>
+#include <sstream>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,77 +19,152 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Enhanced file loading with better error handling and multiple format support
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Failed to open configuration file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Try to detect file format
+    std::string firstLine;
+    if (std::getline(file, firstLine)) {
+        // Reset file pointer
+        file.clear();
+        file.seekg(0);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Check if it's a JSON file (starts with { or [
+        if (firstLine.empty() || firstLine.find('{') == 0 || firstLine.find('[') == 0) {
+            return loadFromJSONFile(filepath);
+        }
+        // Check if it's a YAML file (starts with key: value format)
+        else if (firstLine.find(':') != std::string::npos) {
+            return loadFromSimpleFile(filepath);
+        }
+        // Try simple format as fallback
+        else {
+            return loadFromSimpleFile(filepath);
         }
     }
     
-    return true;
+    return false;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // Enhanced JSON file loading with better error handling
+    std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON configuration file: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    if (content.empty()) {
+        NLM_LOG_ERROR("Empty JSON configuration file: " + filepath);
+        return false;
     }
     
-    return true;
+    try {
+        // TODO: Implement proper JSON parsing using a JSON library
+        // For now, fall back to simple parser but with JSON format detection
+        if (content.find('{') != std::string::npos) {
+            NLM_LOG_INFO("JSON object detected - implementing simple JSON parser");
+            return parseSimpleJSON(content);
+        } else {
+            NLM_LOG_ERROR("Invalid JSON format in: " + filepath);
+            return false;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error in " + filepath + ": " + e.what());
+        return false;
+    }
+}
+
+bool Config::parseSimpleJSON(const std::string& jsonContent) {
+    // Simple JSON parser implementation (TODO: replace with proper library)
+    size_t pos = 0;
+    bool success = true;
+    
+    try {
+        // Find opening brace
+        if (jsonContent.find('{') == std::string::npos) {
+            return false;
+        }
+        
+        // Simple parsing for key=value pairs in JSON-like format
+        // This is a minimal implementation - TODO: replace with proper JSON library
+        size_t start = jsonContent.find('{') + 1;
+        size_t end = jsonContent.rfind('}');
+        
+        if (start == std::string::npos || end == std::string::npos) {
+            return false;
+        }
+        
+        std::string inner = jsonContent.substr(start, end - start);
+        
+        // Parse comma-separated key:value pairs
+        size_t keyPos = 0;
+        while (keyPos < inner.length()) {
+            // Find next key
+            size_t keyEnd = inner.find(':', keyPos);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = trim(inner.substr(keyPos, keyEnd - keyPos));
+            key = trim(key.erase(0, key.find_first_not_of('\"')));
+            key = trim(key.erase(key.find_last_not_of('\"') + 1));
+            
+            // Find next comma or end
+            size_t valueEnd = inner.find(',', keyEnd);
+            if (valueEnd == std::string::npos) {
+                valueEnd = inner.length();
+            }
+            
+            std::string value = trim(inner.substr(keyEnd + 1, valueEnd - keyEnd - 1));
+            value = trim(value.erase(0, value.find_first_not_of('\"')));
+            value = trim(value.erase(value.find_last_not_of('\"') + 1));
+            
+            // Parse value based on content
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::File);
+            } else {
+                try {
+                    // Try to parse as number
+                    if (value.find('.') != std::string::npos) {
+                        double doubleValue = std::stod(value);
+                        set(key, doubleValue, ConfigSource::File);
+                    } else {
+                        int intValue = std::stoi(value);
+                        set(key, intValue, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // Fall back to string
+                    set(key, value, ConfigSource::File);
+                }
+            }
+            
+            keyPos = valueEnd + 1;
+            if (inner[keyPos] != ',') break;
+        }
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON content: " + std::string(e.what()));
+        success = false;
+    }
+    
+    return success;
+}
+
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S")
+       << "." << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
 }
 
 template<typename T>

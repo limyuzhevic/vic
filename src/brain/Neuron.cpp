@@ -259,10 +259,39 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Update firing rate based on recent activity
+    updateFiringRate(currentTime);
+    
+    // Execute the LIF dynamics
     stepLIF(currentTime, dt);
+}
+
+void Neuron::updateFiringRate(Timestamp currentTime) {
+    // Calculate firing rate based on spike history
+    if (pImpl->spikeHistory.size() < 2) {
+        pImpl->state.firingRate = 0.0f;
+        return;
+    }
+    
+    // Calculate average inter-spike interval (ISI)
+    float totalTimeSpan = 0.0f;
+    for (size_t i = 1; i < pImpl->spikeHistory.size(); ++i) {
+        float spikeInterval = static_cast<float>(pImpl->spikeHistory[i] - pImpl->spikeHistory[i-1]);
+        totalTimeSpan += spikeInterval;
+    }
+    
+    if (totalTimeSpan > 0.0f) {
+        size_t numIntervals = pImpl->spikeHistory.size() - 1;
+        float avgISI = totalTimeSpan / numIntervals;
+        
+        // Convert to firing rate in Hz (spikes per second)
+        pImpl->state.firingRate = 1000.0f / avgISI;  // 1000 ms = 1 second
+    } else {
+        pImpl->state.firingRate = 0.0f;
+    }
+    
+    // Clamp firing rate to realistic biological bounds
+    pImpl->state.firingRate = std::clamp(pImpl->state.firingRate, 0.0f, 1000.0f);
 }
 
 void Neuron::reset() {

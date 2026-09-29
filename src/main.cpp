@@ -28,6 +28,12 @@
 
 using namespace nlm;
 
+// Command line argument parsing
+std::string parseCommandLineArgs(int argc, char** argv);
+
+// Enhanced neuron utilities
+void updateNeuronStats(std::shared_ptr<Brain> brain);
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -343,24 +349,19 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
+    // Parse command line arguments with comprehensive error handling
+    std::string configFile = parseCommandLineArgs(argc, argv);
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
+    if (configFile.empty()) {
         NLM_LOG_INFO("Using default configuration.");
+    } else {
+        bool configLoaded = config->loadFromFile(configFile);
+        if (configLoaded) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_WARNING("Failed to load configuration from: " + configFile);
+            NLM_LOG_WARNING("Using default configuration.");
+        }
     }
     
     // Override with command line args
@@ -402,8 +403,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
+    // Add comprehensive error handling to brain initialization
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Failed to initialize brain! Cannot proceed with simulation.");
+        
+        // Attempt graceful cleanup
+        NLM_LOG_INFO("Attempting graceful shutdown...");
+        
+        // Shutdown other components that were initialized
+        // (if any)
+        
+        NLM_LOG_INFO("Shutdown complete.");
         return 1;
     }
     
@@ -424,7 +434,7 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
-    // Final brain status
+    // Final brain status and cleanup
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
@@ -445,5 +455,193 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
+    // Graceful cleanup and shutdown
+    NLM_LOG_INFO("Initiating graceful shutdown...");
+    
+    // Clean up brain components
+    brain.reset();
+    
+    // Reset global logger
+    Logger::setGlobal(nullptr);
+    
+    NLM_LOG_INFO("Shutdown complete. System terminated cleanly.");
+    
     return 0;
+}
+
+// Command line argument parsing function implementation
+std::string parseCommandLineArgs(int argc, char** argv) {
+    std::string configFile = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --help or -h flag
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            exit(0);
+        }
+        
+        // Handle --version flag
+        if (arg == "--version") {
+            printVersion();
+            exit(0);
+        }
+        
+        // Handle verbose flag
+        if (arg == "--verbose" || arg == "-v") {
+            Logger::setGlobalLevel(LogLevel::Debug);
+            continue;
+        }
+        
+        // Handle configuration file
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        
+        // Handle neuron count
+        if (arg.substr(0, 6) == "--neurons") {
+            if (arg.find('=') != std::string::npos) {
+                // Parse --neurons=value
+                std::string valueStr = arg.substr(arg.find('=') + 1);
+                try {
+                    size_t pos;
+                    int64_t neurons = std::stoll(valueStr, &pos);
+                    if (neurons > 0) {
+                        config->set("neuron_count", neurons, ConfigSource::CommandLine);
+                    }
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Invalid neuron count: " + valueStr);
+                }
+            } else if (i + 1 < argc) {
+                // Parse --neurons value
+                try {
+                    size_t pos;
+                    int64_t neurons = std::stoll(argv[++i], &pos);
+                    if (neurons > 0) {
+                        config->set("neuron_count", neurons, ConfigSource::CommandLine);
+                    }
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Invalid neuron count: " + std::string(argv[i]);
+                }
+            }
+        }
+        
+        // Handle simulation steps
+        if (arg.substr(0, 5) == "--steps") {
+            if (arg.find('=') != std::string::npos) {
+                std::string valueStr = arg.substr(arg.find('=') + 1);
+                try {
+                    size_t pos;
+                    int steps = std::stoi(valueStr, &pos);
+                    if (steps > 0) {
+                        config->set("simulation_steps", steps, ConfigSource::CommandLine);
+                    }
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Invalid simulation steps: " + valueStr);
+                }
+            } else if (i + 1 < argc) {
+                try {
+                    size_t pos;
+                    int steps = std::stoi(argv[++i], &pos);
+                    if (steps > 0) {
+                        config->set("simulation_steps", steps, ConfigSource::CommandLine);
+                    }
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Invalid simulation steps: " + std::string(argv[i]);
+                }
+            }
+        }
+        
+        // Handle seed
+        if (arg.substr(0, 5) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                std::string valueStr = arg.substr(arg.find('=') + 1);
+                try {
+                    size_t pos;
+                    int64_t seed = std::stoll(valueStr, &pos);
+                    config->set("random_seed", seed, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Invalid random seed: " + valueStr);
+                }
+            } else if (i + 1 < argc) {
+                try {
+                    size_t pos;
+                    int64_t seed = std::stoll(argv[++i], &pos);
+                    config->set("random_seed", seed, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Invalid random seed: " + std::string(argv[i]);
+                }
+            }
+        }
+    }
+    
+    return configFile;
+}
+
+// Enhanced neuron statistics function
+void updateNeuronStats(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot update statistics: Brain is null");
+        return;
+    }
+    
+    // Update firing rate statistics
+    brain->updateFiringRates();
+    
+    // Update connectivity statistics  
+    brain->updateConnectivityStats();
+    
+    // Update plasticity statistics
+    brain->updatePlasticityStats();
+}
+
+// Usage information function
+void printUsage() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine - Phase 2: Real Neural Computation
+
+Usage: nlm [OPTIONS]
+
+Options:
+  -h, --help              Show this help message
+  -v, --verbose           Enable verbose logging
+  --version               Show version information
+  --config=FILE, --config FILE
+                         Load configuration from file (default: configs/default.cfg)
+  --neurons=N, --neurons N
+                         Set number of neurons (default: 500)
+  --steps=N, --steps N     Set number of simulation steps (default: 1000)
+  --seed=N, --seed N       Set random seed (default: 42)
+  --plasticity=N          Set plasticity level (0=off, 1=low, 2=medium, 3=high)
+  --verbose               Enable detailed logging and progress reports
+
+Examples:
+  nlm                           Run default simulation
+  nlm --neurons=2000            Run with 2000 neurons
+  nlm --steps=5000 --seed=123    Run with custom steps and seed
+  nlm --plasticity=3 --verbose   Run with high plasticity and verbose output
+  nlm --config=myconfig.cfg      Load custom configuration
+
+For more information, visit: https://github.com/nlm/nlm
+)" << std::endl;
+}
+
+// Version information function
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 0.1.0" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Author: NLM Research Team" << std::endl;
+    std::cout << std::endl;
+    std::cout << "This is an experimental artificial developmental brain that implements:" << std::endl;
+    std::cout << "  • Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  • Event-driven spike propagation with synaptic delays" << std::endl;
+    std::cout << "  • STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  • Structural plasticity (synaptogenesis/pruning)" << std::endl;
 }

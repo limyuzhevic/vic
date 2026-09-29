@@ -74,6 +74,12 @@ public:
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
+    // Update synaptic efficacy based on use history
+    void updateSynapticEfficacy(Timestamp currentTime);
+    
+    // Update short-term plasticity state
+    void updateShortTermPlasticity(Timestamp currentTime);
+    
     // Reset to initial state
     void reset();
     

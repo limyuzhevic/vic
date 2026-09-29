@@ -916,20 +916,34 @@ RegionId Brain::addRegion(const std::string& name) {
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    if (id == INVALID_REGION_ID) {
+        NLM_LOG_ERROR("Attempted to access invalid region with ID: " + std::to_string(id));
+        return nullptr;
+    }
+    
     for (auto& region : pImpl->regions) {
-        if (region->getId() == id) {
+        if (region && region->getId() == id) {
             return region.get();
         }
     }
+    
+    NLM_LOG_ERROR("Region not found with ID: " + std::to_string(id));
     return nullptr;
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    if (id == INVALID_REGION_ID) {
+        NLM_LOG_ERROR("Attempted to access invalid region with ID: " + std::to_string(id));
+        return nullptr;
+    }
+    
     for (const auto& region : pImpl->regions) {
-        if (region->getId() == id) {
+        if (region && region->getId() == id) {
             return region.get();
         }
     }
+    
+    NLM_LOG_ERROR("Region not found with ID: " + std::to_string(id));
     return nullptr;
 }
 
