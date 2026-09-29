@@ -10,6 +10,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigJSONParser;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -92,6 +93,24 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    std::vector<std::string> validate() const;
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
+    
+    // Save to JSON string
+    std::string saveToJSON() const;
+    
+    // Get parameter schema (for validation)
+    static std::vector<std::string> getParameterSchema();
+    
+    // Set JSON parser (for dependency injection)
+    void setJSONParser(std::shared_ptr<ConfigJSONParser> parser);
+    
+    // Get JSON parser
+    std::shared_ptr<ConfigJSONParser> getJSONParser() const;
     
 private:
     struct Impl;
