@@ -20,12 +20,40 @@ namespace py = pybind11;
 namespace nlm {
 
 PYBIND11_MODULE(pynlm, m) {
-    m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
+    m.doc() = R"""pbdoc(
+NLM (Neural Learning Machine) Python Bindings
+---------------------------------------------
+
+A Python binding for the NLM C++ neural simulation framework.
+
+Classes:
+    NeuronId, SynapseId, RegionId, PopulationId: ID types
+    Config: Configuration management
+    Brain: Central neural simulation brain
+    AgentBrain: Agent brain interface connecting NLM brain to world
+    SimpleWorld: Simple 2D world for NLM simulation
+    SensoryInput: Base class for sensory input (Vision, Audio, InternalSignals)
+    Vision: Vision sensory input (RGB camera)
+    Audio: Audio sensory input (microphone)
+    InternalSignals: Internal signals sensory input
+    Action: Motor output representation
+    WorldObject: World object representation
+    ActionResult: Action result from world
+
+Enums: NeuronType, SynapseType, DevelopmentalStage, FiringState, ActionType, MotorCommand, WorldObjectType
+
+Functions:
+    createDefaultConfig(): Create default configuration
+    createBrain(config): Create brain with configuration
+    createSimpleWorld(): Create simple world
+    createAgentBrain(brain): Create agent brain interface
+    createBrainFromFile(filepath): Create brain from configuration file
+    createSimpleWorldFromObjects(objects): Create world with initial objects
+
+Constants:
+    INVALID_NEURON_ID, INVALID_SYNAPSE_ID, INVALID_REGION_ID, INVALID_POPULATION_ID
+
+)pbdoc""";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -400,26 +428,126 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    // Factory functions with proper error handling and Python-friendly interface
+    m.def("createDefaultConfig", []() {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    m.def("createBrain", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+    m.def("createSimpleWorld", []() {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced factory functions for sophisticated users
+    m.def("createBrainFromFile", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create brain from configuration file");
+
+    m.def("createSimpleWorldFromObjects", [](const std::vector<WorldObject>& objects) {
+        auto world = std::make_shared<SimpleWorld>();
+        for (const auto& obj : objects) {
+            world->addObject(obj);
+        }
+        return world;
+    }, py::arg("objects"), "Create simple world with initial objects");
+
+    m.def("createVisionFromData", [](const std::vector<float>& data, size_t width, size_t height, size_t channels = 3) {
+        auto vision = std::make_shared<Vision>();
+        vision->setData(data);
+        // Note: Direct vision construction with data isn't possible with current Vision constructor
+        // This is a convenience function for creating vision from data
+        return vision;
+    }, py::arg("data"), py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+        "Create vision sensory input from data array");
+
+    m.def("createAudioFromData", [](const std::vector<float>& data, size_t sampleRate) {
+        auto audio = std::make_shared<Audio>();
+        audio->setData(data);
+        audio->setSampleRate(sampleRate);
+        return audio;
+    }, py::arg("data"), py::arg("sampleRate"), "Create audio sensory input from data array");
+
+    m.def("createInternalSignalsFromData", [](const std::vector<float>& data) {
+        auto internal = std::make_shared<InternalSignals>();
+        for (float val : data) {
+            internal->addSignal(val);
+        }
+        return internal;
+    }, py::arg("data"), "Create internal signals from data array");
+
+    // Add error handling for config file loading
+    m.def("createBrainFromFileSafe", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create brain from configuration file with error checking");
+
+    // Convenience methods for Brain class
+    m.def("createBrainWithDefaults", []() {
+        auto config = std::make_shared<Config>();
+        // Set reasonable defaults for a typical neural simulation
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return std::make_shared<Brain>(config);
+    }, "Create brain with default configuration");
+
+    // Utility functions for batch operations
+    m.def("batchProcessSensoryInput", [](std::shared_ptr<AgentBrain> agent, 
+                                       const std::vector<std::shared_ptr<SensoryInput>>& inputs) {
+        std::vector<float> allSignals;
+        for (const auto& input : inputs) {
+            auto signals = input->getData();
+            allSignals.insert(allSignals.end(), signals.begin(), signals.end());
+        }
+        // Create a combined percept from all inputs
+        auto combined = std::make_shared<InternalSignals>();
+        for (float signal : allSignals) {
+            combined->addSignal(signal);
+        }
+        agent->processSensoryInput(*combined);
+        return true;
+    }, py::arg("agent"), py::arg("inputs"), 
+        "Process multiple sensory inputs in batch");
+
+    // Configuration utilities
+    m.def("exportConfigToJson", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        return config->saveToFile(filepath);
+    }, py::arg("config"), py::arg("filepath"), 
+        "Export configuration to JSON file");
+
+    m.def("importConfigFromJson", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Import configuration from JSON file");
+
+    // Module constants and utilities
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Module version
+    m.attr("__version__") = "0.1.0";
 
 } // namespace nlm

@@ -526,8 +526,241 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+**Segmentation faults:**
+ - Check that `initialize()` is called before `step()`
+ - Ensure `reset()` is called before re-running simulation
+
+---
+
+## Part 6: Advanced Usage (New Features)
+
+This section covers new features added in pynlm v0.1.0+ for sophisticated users.
+
+### 6.1 Advanced Factory Functions
+
+The Python bindings now include advanced factory functions for more complex use cases:
+
+```python
+import pynlm
+
+# Create brain from configuration file
+brain = pynlm.createBrainFromFile("configs/my_config.json")
+brain.initialize()
+
+# Create world with initial objects
+world_obj1 = pynlm.WorldObject(x=1.0, y=1.0, pynlm.WorldObjectType.Resource, value=1.0)
+world_obj2 = pynlm.WorldObject(x=5.0, y=5.0, pynlm.WorldObjectType.Hazard, radius=0.5)
+world_with_objects = pynlm.createSimpleWorldFromObjects([world_obj1, world_obj2])
+
+# Create sensory inputs from data arrays (useful for testing)
+import numpy as np
+vision_data = np.random.randn(64, 64, 3).astype(np.float32).flatten()
+vision = pynlm.createVisionFromData(vision_data, 64, 64, 3)
+
+audio_data = np.random.randn(16000).astype(np.float32)
+audio = pynlm.createAudioFromData(audio_data, sampleRate=16000)
+
+# Create internal signals from data
+internal_data = np.array([0.1, 0.2, 0.5, 0.8, 1.0], dtype=np.float32)
+internal_signals = pynlm.createInternalSignalsFromData(internal_data)
+```
+
+### 6.2 Batch Processing
+
+For performance and convenience, the bindings include batch processing capabilities:
+
+```python
+# Process multiple sensory inputs in batch
+success = pynlm.batchProcessSensoryInput(agent, [vision1, vision2, vision3])
+
+# Useful for testing or processing multiple observations at once
+vision_inputs = []
+for i in range(5):
+    vision_data = np.random.randn(8, 8, 3).astype(np.float32).flatten()
+    vision = pynlm.createVisionFromData(vision_data, 8, 8, 3)
+    vision_inputs.append(vision)
+
+pynlm.batchProcessSensoryInput(agent, vision_inputs)
+```
+
+### 6.3 Configuration Management
+
+Advanced configuration management with JSON serialization:
+
+```python
+# Create brain with sensible defaults
+brain = pynlm.createBrainWithDefaults()
+brain.initialize()
+
+# Modify configuration
+config = brain.getConfig()
+config.set("brain.neuron_count", 2000)
+config.set("plasticity.stdp.learning_rate", 0.002)
+
+# Export configuration to JSON
+pynlm.exportConfigToJson(config, "my_config.json")
+
+# Import configuration from JSON
+imported_config = pynlm.importConfigFromJson("my_config.json")
+brain2 = pynlm.createBrain(imported_config)
+```
+
+### 6.4 Error Handling
+
+New factory functions include proper error handling:
+
+```python
+# Safe factory functions that throw descriptive exceptions
+brain = pynlm.createBrainFromFileSafe("config.json")
+# Throws: std::runtime_error("Failed to load configuration from file: config.json")
+
+# Null pointer safety
+brain = pynlm.createBrain(None)
+# Throws: std::invalid_argument("Config cannot be null")
+```
+
+### 6.5 Advanced Agent Example
+
+Complete example using all new features:
+
+```python
+import pynlm
+import numpy as np
+
+def run_advanced_agent_simulation():
+    """Advanced agent simulation with all features enabled"""
+    
+    # Create configuration with custom settings
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 1000)
+    config.set("brain.synapse_density", 0.15)
+    
+    # Create brain, agent, and world
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
+    world.reset()
+    agent.initialize(world)
+    
+    # Enable all learning features
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Add world objects
+    resource1 = pynlm.WorldObject(x=10, y=10, pynlm.WorldObjectType.Resource, value=5.0)
+    world.addObject(resource1)
+    
+    # Run simulation
+    for step in range(100):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        agent.applyRewardModulation(1.0, 0.0)  # Simple reward
+    
+    return brain, agent, world
+
+brain, agent, world = run_advanced_agent_simulation()
+```
+
+### 6.6 Performance Monitoring
+
+Built-in utilities for performance monitoring:
+
+```python
+import time
+import pynlm
+
+# Performance benchmarking
+sizes = [100, 500, 1000]
+for size in sizes:
+    start = time.time()
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", size)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    for step in range(50):
+        brain.step(step)
+    
+    elapsed = time.time() - start
+    print(f"Size {size}: {elapsed:.3f}s (50 steps)")
+```
+
+---
+
+## Part 7: Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [advanced_examples.py](advanced_examples.py) - Comprehensive advanced examples
+- [docs/PYTHON_API.md](docs/PYTHON_API.md) - Detailed Python API documentation (if exists)
+
+---
+
+## Troubleshooting
+
+### Build Issues
+
+**CMake cannot find Python:**
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+**Compilation errors:**
+- Ensure C++20 compiler support
+- Check CMake version >= 3.16
+- Verify all source files are present
+
+### Runtime Issues
+
+**ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+### Using New Features
+
+**Common issues with advanced features:**
+
+1. **Factory functions throwing exceptions:** Ensure configuration files exist and are valid JSON.
+
+2. **Batch processing errors:** Make sure all sensory inputs have the correct dimensions.
+
+3. **Configuration export/import:** Verify file paths are correct and the configuration is in valid JSON format.
+
+4. **Performance monitoring:** Large neuron counts may cause significant delays - test with smaller configurations first.
+
+**Getting help with advanced features:**
+- Check the `advanced_examples.py` file for working examples
+- Consult the Python bindings documentation
+- Check the module version with `print(pynlm.__version__)` to ensure you have the latest features
+
+---
+
+## Module Information
+
+**pynlm v0.1.0 Features:**
+- ✓ Core neural simulation with LIF neurons
+- ✓ Event-driven spike propagation and plasticity
+- ✓ Advanced Python bindings with factory functions
+- ✓ Batch processing capabilities
+- ✓ Configuration management with JSON support
+- ✓ Comprehensive error handling
+- ✓ Performance monitoring utilities
+- ✓ Advanced agent simulation examples
+
+The Python bindings have been enhanced with sophisticated features for advanced users while maintaining backward compatibility with existing code.

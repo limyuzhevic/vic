@@ -290,8 +290,77 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details**
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works**
+3. **Read `advanced_examples.py` for advanced usage patterns**
+4. **Experiment with different configurations!**
+
+## Advanced Usage (New Features)
+
+Since v0.1.0+, the Python bindings include additional features for sophisticated users:
+
+### 1. Advanced Factory Functions
+
+```python
+import pynlm
+
+# Create brain from configuration file
+brain = pynlm.createBrainFromFile("configs/my_config.json")
+
+# Create world with initial objects
+world_obj1 = pynlm.WorldObject(x=1.0, y=1.0, pynlm.WorldObjectType.Resource, value=1.0)
+world_with_objects = pynlm.createSimpleWorldFromObjects([world_obj1])
+
+# Create sensory inputs from data arrays
+vision_data = np.random.randn(64, 64, 3).flatten()
+vision = pynlm.createVisionFromData(vision_data, 64, 64, 3)
+
+# Create internal signals
+data = np.array([0.1, 0.2, 0.5])
+internal = pynlm.createInternalSignalsFromData(data)
+```
+
+### 2. Batch Processing
+
+```python
+# Process multiple sensory inputs in one call
+vision_inputs = [vision1, vision2, vision3]
+result = pynlm.batchProcessSensoryInput(agent, vision_inputs)
+```
+
+### 3. Configuration Management
+
+```python
+# Create brain with default settings
+brain = pynlm.createBrainWithDefaults()
+
+# Export/import configurations
+pynlm.exportConfigToJson(config, "my_config.json")
+imported_config = pynlm.importConfigFromJson("my_config.json")
+```
+
+### 4. Error Handling
+
+```python
+# Safe factory functions with error checking
+brain = pynlm.createBrainFromFileSafe("config.json")
+```
+
+## Module Information
+
+- **pynlm version**: 0.1.0
+- **Build system**: scikit-build-core
+- **Python version**: 3.8+
+- **Dependencies**: No required dependencies (brain models in C++)
+
+## Getting Help
+
+For more information:
+
+- **Source code**: https://github.com/nlm-project/nlm
+- **Documentation**: https://nlm.readthedocs.io
+- **Architecture**: `docs/ARCHITECTURE.md`
+- **Advanced examples**: `advanced_examples.py`
+
+That's it! You're now ready to use NLM with all the latest features.
