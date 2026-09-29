@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <cctype>
+#include <cstring>
 
 namespace nlm {
 
@@ -19,36 +22,142 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // Supports: int, int64_t, double, bool, string, arrays of these types
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Simple JSON parser - read entire file
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    if (content.empty()) {
+        NLM_LOG_WARNING("Configuration file is empty: " + filepath);
+        return false;
+    }
+    
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Find next key (looking for "key": value pattern)
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            NLM_LOG_ERROR("Unterminated string in configuration file at position " + std::to_string(keyStart));
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        pos = keyEnd + 1;
+        
+        // Find colon
+        size_t colonPos = content.find(':', pos);
+        if (colonPos == std::string::npos) {
+            NLM_LOG_ERROR("Missing colon after key '" + key + "' in configuration file");
+            return false;
+        }
+        
+        pos = colonPos + 1;
+        
+        // Skip whitespace
+        while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+            pos++;
+        }
+        
+        // Parse value
+        std::string valueStr;
+        if (pos >= content.length()) break;
+        
+        if (content[pos] == '"') {
+            // String value
+            size_t valueEnd = content.find('"', pos + 1);
+            if (valueEnd == std::string::npos) {
+                NLM_LOG_ERROR("Unterminated string value for key '" + key + "' in configuration file");
+                return false;
+            }
+            valueStr = content.substr(pos + 1, valueEnd - pos - 1);
+            pos = valueEnd + 1;
+        } else if (content[pos] == 't' || content[pos] == 'f') {
+            // Boolean value
+            size_t valueEnd = content.find_first_of(",}\n", pos);
+            if (valueEnd == std::string::npos) {
+                NLM_LOG_ERROR("Invalid boolean value for key '" + key + "' in configuration file");
+                return false;
+            }
+            valueStr = content.substr(pos, valueEnd - pos);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Validate boolean value
+            std::string boolStr = valueStr;
+            std::transform(boolStr.begin(), boolStr.end(), boolStr.begin(), ::tolower);
+            if (boolStr != "true" && boolStr != "false") {
+                NLM_LOG_ERROR("Invalid boolean value '" + boolStr + "' for key '" + key + "' in configuration file");
+                return false;
             }
             
-            set(key, value, ConfigSource::File);
+            pos = valueEnd;
+        } else if (content[pos] == 'n') {
+            // Null value (skip)
+            size_t valueEnd = content.find_first_of(",}\n", pos);
+            if (valueEnd == std::string::npos) break;
+            pos = valueEnd;
+        } else if (isdigit(content[pos]) || content[pos] == '-' || content[pos] == '+') {
+            // Number value
+            size_t valueEnd = content.find_first_of(",}\n", pos);
+            if (valueEnd == std::string::npos) {
+                NLM_LOG_ERROR("Invalid number value for key '" + key + "' in configuration file");
+                return false;
+            }
+            valueStr = content.substr(pos, valueEnd - pos);
+            
+            // Validate number format (basic check)
+            std::string numStr = valueStr;
+            bool hasDecimal = false;
+            bool hasExponent = false;
+            for (char c : numStr) {
+                if (c == '.') hasDecimal = true;
+                else if (c == 'e' || c == 'E') hasExponent = true;
+            }
+            
+            pos = valueEnd;
+        } else if (content[pos] == '[') {
+            // Array value - simple parsing
+            int bracketCount = 1;
+            size_t valueEnd = pos;
+            while (valueEnd < content.length() && bracketCount > 0) {
+                valueEnd++;
+                if (content[valueEnd] == '[') bracketCount++;
+                else if (content[valueEnd] == ']') bracketCount--;
+            }
+            if (bracketCount != 0) {
+                NLM_LOG_ERROR("Unterminated array for key '" + key + "' in configuration file");
+                return false;
+            }
+            valueStr = content.substr(pos, valueEnd - pos + 1);
+            pos = valueEnd + 1;
+        } else {
+            // Unknown type, skip
+            size_t valueEnd = content.find_first_of(",}\n", pos);
+            if (valueEnd == std::string::npos) break;
+            valueStr = content.substr(pos, valueEnd - pos);
+            pos = valueEnd;
+        }
+        
+        // Trim whitespace from value
+        size_t start = valueStr.find_first_not_of(" \t\n\r");
+        if (start != std::string::npos) {
+            size_t end = valueStr.find_last_not_of(" \t\n\r");
+            valueStr = valueStr.substr(start, end - start + 1);
+            set(key, valueStr, ConfigSource::File);
+        }
+        
+        // Skip comma
+        if (pos < content.length() && content[pos] == ',') {
+            pos++;
         }
     }
     
@@ -84,11 +193,76 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Write JSON format configuration
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double without trailing zeros
+                file << std::fixed << std::setprecision(6) << arg;
+                // Clean up formatting
+                std::string str = std::to_string(arg);
+                if (str.find('.') != std::string::npos) {
+                    // Remove trailing zeros
+                    str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                    if (str.back() == '.') {
+                        str.pop_back();
+                    }
+                }
+                file << str;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    // Format double without trailing zeros
+                    std::string str = std::to_string(arg[j]);
+                    if (str.find('.') != std::string::npos) {
+                        str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+                        if (str.back() == '.') {
+                            str.pop_back();
+                        }
+                    }
+                    file << str;
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << "\"" << escapeString(arg[j]) << "\"";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
     
+    file << "}\n";
     return true;
 }
 
@@ -193,9 +367,29 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default:
+                if (c < 0x20 || c == 0x7f) {
+                    result += "\\u";
+                    char hex[5];
+                    snprintf(hex, sizeof(hex), "%04x", (unsigned char)c);
+                    result += hex;
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
     return result;
 }
 

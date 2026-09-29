@@ -162,6 +162,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
+    // Validate configuration
+    if (!config) {
+        NLM_LOG_ERROR("No configuration provided for integration verification");
+        return false;
+    }
+    
     // Create minimal brain
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);

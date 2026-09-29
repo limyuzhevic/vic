@@ -139,9 +139,51 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 6 demo executable (enhanced version)
+add_executable(nlm_phase6_demo
+    src/demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase4)
+
+# Test executables
+add_executable(test_runner
+    tests/test_runner.cpp
+)
+target_link_libraries(test_runner PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo)
+
+# Individual test executables (for specific test categories)
+add_executable(test_config
+    tests/test_config.cpp
+)
+target_link_libraries(test_config PUBLIC nlm_core)
+
+add_executable(test_brain
+    tests/test_brain.cpp
+)
+target_link_libraries(test_brain PUBLIC nlm_core nlm_agent nlm_world)
+
+add_executable(test_neural_connectivity
+    tests/test_neural_connectivity.cpp
+)
+target_link_libraries(test_neural_connectivity PUBLIC nlm_core nlm_agent nlm_world)
+
+add_executable(test_plasticity
+    tests/test_plasticity.cpp
+)
+target_link_libraries(test_plasticity PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+add_executable(test_stdp
+    tests/test_stdp.cpp
+)
+target_link_libraries(test_stdp PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Add test targets
+add_test(NAME test_config COMMAND test_config)
+add_test(NAME test_brain COMMAND test_brain)
+add_test(NAME test_neural_connectivity COMMAND test_neural_connectivity)
+add_test(NAME test_plasticity COMMAND test_plasticity)
+add_test(NAME test_stdp COMMAND test_stdp)
+add_test(NAME test_runner COMMAND test_runner)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo

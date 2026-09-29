@@ -96,6 +96,10 @@ const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments
 }
 
 std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& name) const {
+    if (name.empty()) {
+        return nullptr;
+    }
+    
     for (auto& exp : pImpl->experiments) {
         if (exp->getName() == name) {
             return exp;
@@ -109,11 +113,27 @@ void ExperimentRunner::clearExperiments() {
 }
 
 void ExperimentRunner::setGlobalSeed(uint64_t seed) {
+    if (seed == 0) {
+        NLM_LOG_WARNING("Setting global seed to 0 - this may produce non-deterministic results");
+    }
     pImpl->globalSeed = seed;
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
+    // TODO PHASE 2: Implement results saving with proper error handling
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot save results: empty filepath provided");
+        return false;
+    }
+    
+    if (pImpl->experiments.empty()) {
+        NLM_LOG_WARNING("No experiments to save results from");
+        return true; // Not an error, just nothing to save
+    }
+    
+    // TODO: Implement JSON/CSV output for experiment results
+    // For now, just log that this feature needs to be implemented
+    NLM_LOG_INFO("Results saving not yet implemented (filepath: " + filepath + ")");
     return false;
 }
 
