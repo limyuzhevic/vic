@@ -348,3 +348,43 @@ void AgentBrain::reset() {
 }
 
 } // namespace nlm
+
+// Helper function for validating sensory input bounds
+bool validateSensoryBounds(const std::vector<float>& data, size_t expectedSize, 
+                          const std::string& sensorName, float minVal, float maxVal) {
+    if (data.size() != expectedSize) {
+        NLM_LOG_WARNING("Sensor " + sensorName + " data size mismatch: expected " + 
+                       std::to_string(expectedSize) + ", got " + std::to_string(data.size()));
+        return false;
+    }
+    
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (data[i] < minVal || data[i] > maxVal) {
+            NLM_LOG_WARNING("Sensor " + sensorName + " value out of bounds at index " + 
+                           std::to_string(i) + ": " + std::to_string(data[i]));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Helper function for validating sensory input bounds
+bool validateSensoryBounds(const std::vector<float>& data, size_t expectedSize, 
+                          const std::string& sensorName, float minVal, float maxVal) {
+    if (data.size() != expectedSize) {
+        NLM_LOG_WARNING("Sensor " + sensorName + " data size mismatch: expected " + 
+                       std::to_string(expectedSize) + ", got " + std::to_string(data.size()));
+        return false;
+    }
+    
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (data[i] < minVal || data[i] > maxVal) {
+            NLM_LOG_WARNING("Sensor " + sensorName + " value out of bounds at index " + 
+                           std::to_string(i) + ": " + std::to_string(data[i]));
+            return false;
+        }
+    }
+    
+    return true;
+}

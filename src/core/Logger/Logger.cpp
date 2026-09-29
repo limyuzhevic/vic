@@ -194,4 +194,122 @@ LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
+// Helper functions
+std::string nlm::ConsoleLogger::levelToString(LogLevel level) const {
+    switch (level) {
+        case LogLevel::Debug: return "DEBUG";
+        case LogLevel::Info: return "INFO";
+        case LogLevel::Warning: return "WARN";
+        case LogLevel::Error: return "ERROR";
+        case LogLevel::Critical: return "CRIT";
+        default: return "UNKNOWN";
+    }
+}
+
+std::string nlm::ConsoleLogger::levelToColor(LogLevel level) const {
+    switch (level) {
+        case LogLevel::Debug: return "\033[36m";    // Cyan
+        case LogLevel::Info: return "\033[32m";      // Green
+        case LogLevel::Warning: return "\033[33m";   // Yellow
+        case LogLevel::Error: return "\033[31m";     // Red
+        case LogLevel::Critical: return "\033[35m"; // Magenta
+        default: return "\033[0m";
+    }
+}
+
+// Performance timer implementation
+nlm::PerformanceTimer::PerformanceTimer(const std::string& name) : name_(name) {
+    startTime_ = std::chrono::high_resolution_clock::now();
+}
+
+nlm::PerformanceTimer::~PerformanceTimer() {
+    if (!stopped_) {
+        stop();
+    }
+}
+
+void nlm::PerformanceTimer::stop() {
+    if (!stopped_) {
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime_);
+        durationMs_ = static_cast<double>(duration.count());
+        stopped_ = true;
+        
+        // Log the performance timing
+        Logger::getGlobal().info("Performance timer " + name_ + ": " + std::to_string(durationMs_) + " ms");
+    }
+}
+
+double nlm::PerformanceTimer::getDurationMs() const {
+    if (stopped_) {
+        return durationMs_;
+    } else {
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime_);
+        return static_cast<double>(duration.count());
+    }
+}
+
+// LogStream implementation
+LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
+    : level_(level), file_(file), line_(line), function_(function) {}
+
+LogStream::~LogStream() {
+    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+}
+
+std::string LogStream::getFormattedEntry() const {
+    std::ostringstream oss;
+    oss << "[" << nlm::Logger::getGlobal().levelToString(level_) << "] ";
+    
+    auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    
+    oss << " " << oss_.str();
+    
+    if (enableTiming_) {
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime_);
+        oss << " [" << duration.count() << " ms]";
+    }
+    
+    if (!metadata_.empty()) {
+        oss << " {";
+        bool first = true;
+        for (const auto& pair : metadata_) {
+            if (!first) oss << ", ";
+            oss << pair.first << "=" << pair.second;
+            first = false;
+        }
+        oss << "}";
+    }
+    
+    return oss.str();
+}
+
+// Global logging utilities implementation
+namespace nlm {
+    
+    void logPerformanceStats() {
+        // This would typically output performance statistics to log files
+        // For now, it's a placeholder for future implementation
+        std::cout << "Performance statistics logging not yet implemented" << std::endl;
+    }
+    
+    void exportLogs(const std::string& filepath) {
+        // This would export logs to a file
+        std::cout << "Log export not yet implemented: " << filepath << std::endl;
+    }
+    
+    void setLogRotationSize(size_t maxFileSize) {
+        // This would set up log rotation for file output
+        std::cout << "Log rotation size not yet implemented: " << maxFileSize << " bytes" << std::endl;
+    }
+    
+    void enableAsyncLogging(bool enable) {
+        // This would enable/disable asynchronous logging
+        std::cout << "Async logging " << (enable ? "enabled" : "disabled") << std::endl;
+    }
+}
+
 } // namespace nlm

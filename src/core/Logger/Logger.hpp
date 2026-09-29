@@ -128,14 +128,76 @@ public:
         return *this;
     }
     
+    // Add performance timing to log entry
+    void setTiming(bool enableTiming) {
+        enableTiming_ = enableTiming;
+        if (enableTiming_) {
+            startTime_ = std::chrono::high_resolution_clock::now();
+        }
+    }
+    
+    // Add custom metadata to log entry
+    void addMetadata(const std::string& key, const std::string& value) {
+        metadata_[key] = value;
+    }
+    
+    // Get formatted log entry with timing
+    std::string getFormattedEntry() const;
+    
 private:
     LogLevel level_;
-    std::ostringstream oss_;
+    mutable std::ostringstream oss_;
     std::string file_;
     int line_;
     std::string function_;
+    bool enableTiming_ = false;
+    std::chrono::high_resolution_clock::time_point startTime_;
+    std::map<std::string, std::string> metadata_;
 };
 
+// Advanced logging macros with timing and context
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+#define NLM_LOG_TIMED(level) nlm::LogStream(level, __FILE__, __LINE__, __func__); \
+    nlm::LogStream::setTimingHelper(__func__)
+
+// Performance timing utilities
+namespace nlm {
+    class PerformanceTimer {
+    public:
+        PerformanceTimer(const std::string& name);
+        ~PerformanceTimer();
+        void stop();
+        double getDurationMs() const;
+        
+    private:
+        std::string name_;
+        std::chrono::high_resolution_clock::time_point startTime_;
+        bool stopped_ = false;
+        double durationMs_ = 0.0;
+    };
+}
+
+// Structured logging helper
+struct LogContext {
+    std::string operation;
+    std::string component;
+    std::map<std::string, std::string> metadata;
+    
+    LogContext(const std::string& op, const std::string& comp) : operation(op), component(comp) {}
+    
+    template<typename T>
+    LogContext& with(const std::string& key, const T& value) {
+        metadata[key] = std::to_string(value);
+        return *this;
+    }
+};
+
+// Global logging utilities
+namespace nlm {
+    void logPerformanceStats();
+    void exportLogs(const std::string& filepath);
+    void setLogRotationSize(size_t maxFileSize);
+    void enableAsyncLogging(bool enable);
+}
 
 } // namespace nlm
