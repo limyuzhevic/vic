@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_core.a CMakeFiles/nlm_core.dir/src/core/Logger/Logger.cpp.o
+/usr/bin/ranlib libnlm_core.a
