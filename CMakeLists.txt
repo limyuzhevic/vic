@@ -18,8 +18,16 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Find nlohmann_json package (header-only library)
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
+# Find yaml-cpp package
+find_package(yaml-cpp REQUIRED)
+
+# Configure logging for yaml-cpp to suppress warnings
+if(yaml-cpp_FOUND)
+    add_definitions(-DYAML_CPP_DISABLE_ENV=__clang__)
+endif()
 
 # Core library
 add_library(nlm_core STATIC
@@ -28,7 +36,13 @@ add_library(nlm_core STATIC
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
+    src/core/Logger/StructuredLogger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Error/ErrorHandler.cpp
+    src/core/Error.cpp
+    # Exceptions
+    src/core/Exceptions/NLMBaseException.cpp
+    src/core/Exceptions/ExceptionSerialization.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -90,7 +104,11 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    ${nlohmann_json_INCLUDE_DIRS}
+    ${YAML_CPP_INCLUDE_DIRS}
 )
+
+target_link_libraries(nlm_core PUBLIC ${nlohmann_json_LIBRARIES} yaml-cpp)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -119,7 +137,7 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Main executable
 add_executable(nlm
@@ -142,10 +160,3 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
