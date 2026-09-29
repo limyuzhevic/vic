@@ -2,6 +2,7 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AgentBrainConfig.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>

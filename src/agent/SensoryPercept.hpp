@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AgentBody.hpp"
+#include "AgentBrainConfig.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include <memory>
 #include <vector>
