@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -25,6 +26,9 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This binding provides comprehensive access to the NLM neural simulation framework,
+        enabling both beginners and advanced users to create and experiment with artificial brains.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -142,6 +146,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Enhanced Config class with more Python-friendly methods
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -160,6 +165,103 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced Python-specific methods
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set boolean configuration value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set float configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Python);
+        }, py::arg("key"), py::arg("value"), "Set string configuration value")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get boolean value with default")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get integer value with default")
+        .def("getOr", [](const Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get float value with default")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"), "Get string value with default")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            return self.getOr<bool>(key, false);
+        }, py::arg("key"), "Get boolean value")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            return self.getOr<int>(key, 0);
+        }, py::arg("key"), "Get integer value")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            return self.getOr<float>(key, 0.0f);
+        }, py::arg("key"), "Get float value")
+        .def("getString", [](const Config& self, const std::string& key) {
+            return self.getOr<std::string>(key, "");
+        }, py::arg("key"), "Get string value")
+        // Preset configuration methods
+        .def("setDefaults", [](Config& self) {
+            // Set sensible defaults for beginners
+            self.set("random_seed", uint64_t(42), ConfigSource::Default);
+            self.set("simulation_timestep", 0.001, ConfigSource::Default);
+            self.set("neuron_count", size_t(500), ConfigSource::Default);
+            self.set("region_count", size_t(1), ConfigSource::Default);
+            self.set("connection_probability", 0.1f, ConfigSource::Default);
+            self.set("enable_reward_modulation", true, ConfigSource::Default);
+            self.set("enable_structural_plasticity", false, ConfigSource::Default);
+            self.set("enable_development", true, ConfigSource::Default);
+            self.set("enable_curiosity", true, ConfigSource::Default);
+        }, "Set default configuration for beginners")
+        .def("setBeginnerDefaults", [](Config& self) {
+            // Very simple configuration for absolute beginners
+            self.set("neuron_count", size_t(100), ConfigSource::Default);
+            self.set("region_count", size_t(1), ConfigSource::Default);
+            self.set("simulation_timestep", 0.01, ConfigSource::Default);
+            self.set("random_seed", uint64_t(42), ConfigSource::Default);
+        }, "Set beginner-friendly configuration")
+        .def("setAdvancedDefaults", [](Config& self) {
+            // More sophisticated configuration for advanced users
+            self.set("neuron_count", size_t(2000), ConfigSource::Default);
+            self.set("region_count", size_t(2), ConfigSource::Default);
+            self.set("connection_probability", 0.15f, ConfigSource::Default);
+            self.set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            self.set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            self.set("stdp_tau", 20.0f, ConfigSource::Default);
+            self.set("enable_reward_modulation", true, ConfigSource::Default);
+            self.set("enable_structural_plasticity", true, ConfigSource::Default);
+            self.set("enable_development", true, ConfigSource::Default);
+            self.set("enable_curiosity", true, ConfigSource::Default);
+            self.set("enable_novelty", true, ConfigSource::Default);
+        }, "Set advanced configuration for experienced users")
+        .def("validate", [](const Config& self) {
+            // Simple validation
+            bool isValid = true;
+            if (self.has("neuron_count")) {
+                size_t neurons = self.getOr<size_t>("neuron_count", 0);
+                if (neurons == 0) {
+                    std::cerr << "Warning: neuron_count should be greater than 0" << std::endl;
+                    isValid = false;
+                }
+            }
+            if (self.has("region_count")) {
+                size_t regions = self.getOr<size_t>("region_count", 0);
+                if (regions == 0) {
+                    std::cerr << "Warning: region_count should be greater than 0" << std::endl;
+                    isValid = false;
+                }
+            }
+            if (self.has("simulation_timestep")) {
+                double timestep = self.getOr<double>("simulation_timestep", 0.0);
+                if (timestep <= 0.0) {
+                    std::cerr << "Warning: simulation_timestep should be positive" << std::endl;
+                    isValid = false;
+                }
+            }
+            return isValid;
+        }, "Validate configuration settings")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -287,7 +389,37 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // World convenience methods
+        .def("addResource", [](SimpleWorld& world, float x, float y, float value) {
+            WorldObject obj(x, y, WorldObjectType::Resource, value);
+            world.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 10.0f, "Add a resource at position")
+        .def("addHazard", [](SimpleWorld& world, float x, float y, float value) {
+            WorldObject obj(x, y, WorldObjectType::Hazard, value);
+            world.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 5.0f, "Add a hazard at position")
+        .def("addWall", [](SimpleWorld& world, float x, float y) {
+            WorldObject obj(x, y, WorldObjectType::Wall);
+            world.addObject(obj);
+        }, py::arg("x"), py::arg("y"), "Add a wall at position")
+        .def("findNearestResource", [](SimpleWorld& world, float x, float y) {
+            float minDist = 1000.0f;
+            WorldObject* nearest = nullptr;
+            for (const auto& obj : world.getObjects()) {
+                if (obj.type == WorldObjectType::Resource) {
+                    float dist = std::sqrt(std::pow(obj.x - x, 2) + std::pow(obj.y - y, 2));
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = &const_cast<WorldObject&>(obj);
+                    }
+                }
+            }
+            if (nearest) {
+                return std::make_pair(nearest->x, nearest->y);
+            }
+            return std::make_pair(0.0f, 0.0f);
+        }, py::arg("x"), py::arg("y"), "Find nearest resource");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +483,30 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Brain convenience methods
+        .def("getMostActiveNeurons", [](Brain& self, size_t count) {
+            return self.getSpikeSystem()->getMostActiveNeurons(count);
+        }, py::arg("count") = 10, "Get most active neurons")
+        .def("simulateEpisode", [](Brain& self, size_t steps, double timestep = 0.001) {
+            for (size_t step = 0; step < steps; ++step) {
+                self.step(step, step * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep") = 0.001, "Simulate multiple steps")
+        .def("hasMemorySystems", [](Brain& self) {
+            return self.getWorkingMemory() != nullptr &&
+                   self.getEpisodicMemory() != nullptr &&
+                   self.getAssociativeMemory() != nullptr;
+        }, "Check if memory systems are available")
+        .def("hasPredictionSystem", [](Brain& self) {
+            return self.getPredictionSystem() != nullptr;
+        }, "Check if prediction system is available")
+        .def("hasNeuromodulation", [](Brain& self) {
+            return self.getDopamine() != nullptr &&
+                   self.getCuriosity() != nullptr &&
+                   self.getNovelty() != nullptr &&
+                   self.getPredictionErrorSignal() != nullptr;
+        }, "Check if neuromodulation systems are available");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -387,6 +542,33 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        // Agent brain convenience methods
+        .def("enableAllSystems", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all learning systems")
+        .def("disableAllSystems", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+        }, "Disable all learning systems")
+        .def("runEpisode", [](AgentBrain& self, SimpleWorld& world, size_t steps) {
+            float totalReward = 0.0f;
+            for (size_t step = 0; step < steps; ++step) {
+                world.update(0.01);
+                const SensoryPercept& percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                self.getBrain()->step(step);
+                MotorCommand cmd = self.decodeMotorCommand();
+                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
+                self.applyRewardModulation(result.reward, 0.0f);
+                totalReward += result.reward;
+            }
+            return totalReward;
+        }, py::arg("world"), py::arg("steps"), "Run an episode and return total reward")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -416,10 +598,93 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Global constants and utility functions
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Python-specific utility functions
+    m.def("runQuickDemo", []() {
+        auto config = std::make_shared<Config>();
+        config->setDefaults();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        // Run a few steps
+        for (size_t i = 0; i < 100; ++i) {
+            brain->step(i);
+        }
+        return brain;
+    }, "Run a quick demo and return the brain");
+
+    m.def("createDevelopmentExperiment", []() {
+        // Create a simple development experiment setup
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", size_t(200));
+        config->set("simulation_timestep", 0.001);
+        config->set("enable_development", true);
+        config->set("enable_structural_plasticity", true);
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20.0f, 20.0f, 8, 8);
+        world->setRandomSeed(42);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->initialize(*world);
+        agentBrain->enableAllSystems();
+        
+        return std::make_tuple(config, world, brain, agentBrain);
+    }, "Create a development experiment setup");
+
+    m.def("validateConfig", [](const Config& config) {
+        return config.validate();
+    }, py::arg("config"), "Validate configuration settings");
+
+    // Example experiment functions
+    m.def("exampleBeginnersExperiment", []() {
+        // A simple example for beginners
+        auto config = std::make_shared<Config>();
+        config->setBeginnerDefaults();
+        
+        if (!config->validate()) {
+            throw std::runtime_error("Invalid beginner configuration");
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run some steps
+        for (size_t i = 0; i < 50; ++i) {
+            brain->step(i);
+        }
+        
+        return std::make_pair(config, brain);
+    }, "Run a beginner example experiment");
+
+    m.def("exampleAdvancedExperiment", []() {
+        // A more complex example for advanced users
+        auto config = std::make_shared<Config>();
+        config->setAdvancedDefaults();
+        
+        if (!config->validate()) {
+            throw std::runtime_error("Invalid advanced configuration");
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run more steps with developmental changes
+        for (size_t i = 0; i < 200; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        return std::make_pair(config, brain);
+    }, "Run an advanced example experiment");
 }
 
 } // namespace nlm
