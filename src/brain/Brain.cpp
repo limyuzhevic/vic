@@ -1,4 +1,6 @@
 #include "Brain.hpp"
+#include "BrainConfig.hpp"
+#include "BrainInitializer.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -19,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <memory>
 
 namespace nlm {
 
@@ -77,6 +80,12 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Brain configuration
+    std::unique_ptr<BrainConfig> brainConfig;
+    
+    // Brain initializer
+    std::unique_ptr<BrainInitializer> brainInitializer_;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -149,12 +158,11 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    // Initialize configuration
+    brainConfig = std::make_unique<BrainConfig>();
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+    // Create BrainInitializer for use
+    brainInitializer_ = std::make_unique<BrainInitializer>();
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
