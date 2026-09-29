@@ -1,8 +1,11 @@
+// Modified Config.cpp with improved buffer overflow protection and input validation
+
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -22,22 +25,30 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    if (filepath.empty()) {
+        std::cerr << "[Config] Error: Empty file path provided" << std::endl;
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "[Config] Error: Cannot open file: " << filepath << std::endl;
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || (line.size() > 0 && (line[0] == '#' || line[0] == '/'))) {
             continue;
         }
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos && pos < line.size() - 1) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
@@ -48,7 +59,16 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate key is not empty
+            if (!key.empty()) {
+                set(key, value, ConfigSource::File);
+            } else {
+                std::cerr << "[Config] Warning: Empty key found at line " << lineNumber << std::endl;
+            }
+        } else if (pos != std::string::npos && pos >= line.size() - 1) {
+            std::cerr << "[Config] Warning: Empty value found for key at line " << lineNumber << std::endl;
+        } else if (pos == std::string::npos) {
+            std::cerr << "[Config] Warning: Invalid format (no '=' found) at line " << lineNumber << ": " << line << std::endl;
         }
     }
     
@@ -56,6 +76,10 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 0 || argv == nullptr) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -69,7 +93,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg.size() > 0 && arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
@@ -79,8 +103,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (filepath.empty()) {
+        std::cerr << "[Config] Error: Empty file path provided for saving" << std::endl;
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "[Config] Error: Cannot open file for writing: " << filepath << std::endl;
         return false;
     }
     
@@ -115,6 +145,12 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input
+    if (key.empty()) {
+        std::cerr << "[Config] Warning: Cannot set empty key" << std::endl;
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -187,6 +223,9 @@ std::string Config::summary() const {
 }
 
 std::string Config::trim(const std::string& str) {
+    if (str.empty()) {
+        return "";
+    }
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
