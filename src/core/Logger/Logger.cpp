@@ -106,11 +106,58 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    // Performance monitoring
+    struct Measurement {
+        std::string name;
+        std::chrono::steady_clock::time_point startTime;
+    };
+    std::vector<Measurement> activeMeasurements;
+    
+    // Statistics
+    std::unordered_map<std::string, Statistics::Counter> counters;
+    
+    // Error tracking
+    std::vector<ErrorTracker::ErrorInfo> errors;
+    
+    // Real-time monitoring
+    bool realTimeEnabled = false;
+    std::thread realTimeThread;
+    std::atomic<bool> realTimeRunning{false};
+    
+    // Thread pool
+    size_t threadPoolSize = 4;
+    
+    // Threshold configuration
+    Logger::ThresholdConfig thresholds;
+    
+    // Categories
+    std::unordered_map<ErrorCategory, bool> categoryEnabled;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    // Initialize categories
+    pImpl->categoryEnabled[ErrorCategory::Memory] = true;
+    pImpl->categoryEnabled[ErrorCategory::Network] = true;
+    pImpl->categoryEnabled[ErrorCategory::FileSystem] = true;
+    pImpl->categoryEnabled[ErrorCategory::Configuration] = true;
+    pImpl->categoryEnabled[ErrorCategory::Neural] = true;
+    pImpl->categoryEnabled[ErrorCategory::World] = true;
+    pImpl->categoryEnabled[ErrorCategory::Agent] = true;
+    pImpl->categoryEnabled[ErrorCategory::Performance] = true;
+    pImpl->categoryEnabled[ErrorCategory::Unknown] = true;
+    
+    // Start real-time monitoring thread
+    pImpl->realTimeRunning = true;
+    pImpl->realTimeThread = std::thread(&Logger::realTimeMonitorThread, this);
+}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    pImpl->realTimeRunning = false;
+    if (pImpl->realTimeThread.joinable()) {
+        pImpl->realTimeThread.join();
+    }
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);

@@ -354,51 +354,70 @@ PYBIND11_MODULE(pynlm, m) {
              "Log brain status");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+             "Create an agent brain interface for a neural brain")
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
+             "Initialize the agent with a world environment")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
+             "Get the expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
+             "Get the expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             "Process sensory percept from world and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+             "Apply reward-based neuromodulation to learning")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
-             "Update development system")
+             "Update development system based on age and experience")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
+             "Get the current developmental stage of the agent")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+             "Get the current neuromodulation level (dopamine)")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
+             "Get the current curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+             "Get the current novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+             "Get the current prediction error")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+             "Reset agent brain to initial state for new episode")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+             "Get the underlying neural brain object")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable reward modulation system")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable development system")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable or disable curiosity-based exploration")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development system is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity exploration is enabled")
+        .def("getMotorCommandString", &AgentBrain::getMotorCommandString,
+             py::arg("command"), "Convert motor command to human-readable string");
+    
+    // Add convenience method for getting motor command string
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

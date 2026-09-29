@@ -8,7 +8,24 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
-};
+    
+    // Validation state
+    std::vector<std::string> validationErrors;
+    std::vector<std::pair<std::string, std::string>> validationRules;
+    std::function<bool(const std::string&, const ConfigValue&)> validationCallback;
+    
+    // Configuration version for migration
+    std::string version;
+    
+    // Statistics and tracking
+    size_t totalLoads = 0;
+    size_t totalSaves = 0;
+    size_t totalValidations = 0;
+    mutable size_t totalClones = 0;
+    
+    // For change tracking
+    size_t lastHash = 0;
+};;
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -24,11 +41,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
+    NLM_LOG_INFO("Loading configuration from: " + filepath);
+    
+    size_t lineNum = 0;
     std::string line;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,11 +63,17 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+        // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
+            }
+            
+            // Validate key and value
+            if (key.empty() || key.find_first_of("\n\r\t") != std::string::npos) {
+                NLM_LOG_WARN("Invalid configuration key: " + key);
+                continue;
             }
             
             set(key, value, ConfigSource::File);
@@ -67,28 +95,72 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
             }
+            }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Loaded from command line: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARN("Ignoring unrecognized command line argument: " + arg);
         }
     }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " configuration parameters from command line");
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file for writing: " + filepath);
         return false;
     }
     
+    NLM_LOG_INFO("Saving configuration to: " + filepath);
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format the value based on its type
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (val ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    file << val[i];
+                    if (i < val.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    file << val[i];
+                    if (i < val.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    file << "\"" << val[i] << "\"";
+                    if (i < val.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << val << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
+    NLM_LOG_INFO("Saved " + std::to_string(pImpl->entries.size()) + " configuration parameters to " + filepath);
     return true;
 }
 
