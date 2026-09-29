@@ -157,12 +157,19 @@ public:
     // Get attention winners
     const std::vector<NeuronId>& getWinners() const { return winners_; }
 
-    // Top-down attention (goal-directed)
+// Top-down attention (goal-directed)
     void applyTopDownBias(NeuronId neuron, float biasStrength);
-
+    
     // Bottom-up attention (stimulus-driven)
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
-
+    
+    // Apply bottom-up salience based on prediction error
+    void applyBottomUpSalienceFromError(float errorStrength);
+    
+    // Apply concept-based biases to attention
+    void applyConceptBiases(const std::vector<float>& conceptPattern,
+                           const std::string& categoryHint = "");
+    
     // Reset attention
     void reset();
 

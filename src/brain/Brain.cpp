@@ -511,8 +511,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // This enables predictive coding and forward models
+        
+        // Get current sensory state from sensory neurons
+        std::vector<float> sensoryState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron) {
+                sensoryState.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Convert to SensoryInput format
+        auto sensoryInput = std::make_unique<SensoryInput>();
+        sensoryInput->setData(sensoryState);
+        
+        // Make prediction for next state
+        auto predicted = pImpl->predictionSystem->predictNextState(*sensoryInput);
+        
+        // Update predictions based on actual sensory input
+        pImpl->predictionSystem->updatePredictions(*predicted, *sensoryInput);
+        
+        // Use predictions for attention and planning
+        if (pImpl->attention) {
+            // Apply prediction-based attention modulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.1f) {
+                // High prediction error increases attentional focus on unexpected inputs
+                pImpl->attention->applyBottomUpSalienceFromError(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +556,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This enables the brain to discover recurring patterns and categorize experiences
+        
+        // Get current sensory state from sensory neurons
+        std::vector<float> sensoryPattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron) {
+                sensoryPattern.push_back(neuron->getState().membranePotential);
+            }
+        }
+        
+        // Get features from the neural pattern
+        std::vector<float> features = sensoryPattern;
+        if (!features.empty()) {
+            // Normalize features
+            float minVal = *std::min_element(features.begin(), features.end());
+            float maxVal = *std::max_element(features.begin(), features.end());
+            if (maxVal > minVal) {
+                for (auto& feature : features) {
+                    feature = (feature - minVal) / (maxVal - minVal);
+                }
+            }
+        }
+        
+        // Present experience to concept formation system
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f;
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            sensoryPattern, features, reward, pImpl->currentStep);
+        
+        // If a concept was found or created, use it to guide attention
+        if (pImpl->attention) {
+            if (conceptId > 0) {
+                // Concept-based attention: focus on neurons that represent this concept
+                const auto& concepts = pImpl->conceptFormation->getConcepts();
+                if (conceptId - 1 < concepts.size()) {
+                    const auto& concept = concepts[conceptId - 1];
+                    for (const auto& instance : concept.instances) {
+                        // Find and excite neurons similar to concept prototype
+                        pImpl->attention->applyConceptBiases(instance.pattern, concept.categoryHint);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -895,8 +964,35 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Apply synapse states by finding matching synapses
+        for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+            // Find matching synapse by source and destination neuron IDs
+            bool synapseFound = false;
+            for (auto& region : pImpl->regions) {
+                for (auto* syn : region->getSynapses()) {
+                    if (syn->getSourceNeuron().index() == synapseData.sourceNeuron[i] &&
+                        syn->getDestinationNeuron().index() == synapseData.destinationNeuron[i]) {
+                        
+                        // Restore synapse state
+                        syn->setWeight(synapseData.weight[i]);
+                        syn->setDelay(synapseData.delay[i]);
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                        
+                        synapseFound = true;
+                        break;
+                    }
+                }
+                if (synapseFound) break;
+            }
+            
+            if (!synapseFound) {
+                NLM_LOG_WARN("Synapse not found: source=" + 
+                            std::to_string(synapseData.sourceNeuron[i]) +
+                            " dest=" + std::to_string(synapseData.destinationNeuron[i]));
+            }
+        }
+        
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
@@ -948,6 +1044,30 @@ std::vector<RegionId> Brain::getRegionIds() const {
 
 const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
     return pImpl->regions;
+}
+
+// Get all neurons across all regions
+std::vector<Neuron*> Brain::getAllNeurons() const {
+    std::vector<Neuron*> allNeurons;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            auto neurons = pop->getNeurons();
+            allNeurons.insert(allNeurons.end(), neurons.begin(), neurons.end());
+        }
+    }
+    
+    return allNeurons;
+}
+
+// Get all motor neurons for action selection
+std::vector<Neuron*> Brain::getMotorNeurons() const {
+    return pImpl->motorNeurons;
+}
+
+// Get all sensory neurons for input processing
+std::vector<Neuron*> Brain::getSensoryNeurons() const {
+    return pImpl->sensoryNeurons;
 }
 
 void Brain::addInterRegionConnection(RegionId source, RegionId target, float weight, Delay delay) {

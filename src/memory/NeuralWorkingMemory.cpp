@@ -404,16 +404,99 @@ void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength)
     }
 }
 
-void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
-    // Store salience in map keyed by NeuronId
-    auto it = bottomUpSalience_.find(neuron.value);
-    if (it != bottomUpSalience_.end()) {
-        it->second += salienceStrength;
-    } else {
-        bottomUpSalience_[neuron.value] = salienceStrength;
+// Bottom-up attention (stimulus-driven)
+    void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
+        // Store salience in map keyed by NeuronId
+        auto it = bottomUpSalience_.find(neuron.value);
+        if (it != bottomUpSalience_.end()) {
+            it->second += salienceStrength;
+        } else {
+            bottomUpSalience_[neuron.value] = salienceStrength;
+        }
     }
-}
+    
+    // Apply bottom-up salience based on prediction error
+    void AttentionalSelection::applyBottomUpSalienceFromError(float errorStrength) {
+        if (!brain_) return;
+        
+        // Apply salience proportional to prediction error
+        // Higher prediction error = higher salience = more attention to unexpected inputs
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron) {
+                        float salience = errorStrength * 0.1f;  // Scale error to salience
+                        applyBottomUpSalience(neuron->getId(), salience);
+                    }
+                }
+            }
+        }
+    }
 
+// Apply bottom-up salience based on prediction error
+    void AttentionalSelection::applyBottomUpSalienceFromError(float errorStrength) {
+        if (!brain_) return;
+        
+        // Apply salience proportional to prediction error
+        // Higher prediction error = higher salience = more attention to unexpected inputs
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron) {
+                        float salience = errorStrength * 0.1f;  // Scale error to salience
+                        applyBottomUpSalience(neuron->getId(), salience);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply concept-based biases to attention
+    void AttentionalSelection::applyConceptBiases(const std::vector<float>& conceptPattern,
+                                                 const std::string& categoryHint) {
+        if (!brain_ || conceptPattern.empty()) return;
+        
+        // Apply concept-based top-down bias
+        // Neuronal patterns similar to concept prototype get boosted attention
+        float conceptStrength = 1.0f;
+        if (!categoryHint.empty()) {
+            // Adjust strength based on category hint (e.g., "dangerous" = higher strength)
+            if (categoryHint == "dangerous" || categoryHint == "threat") {
+                conceptStrength = 2.0f;
+            } else if (categoryHint == "reward" || categoryHint == "positive") {
+                conceptStrength = 1.5f;
+            }
+        }
+        
+        // Find neurons similar to concept prototype
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron) {
+                        // Get current neuron state
+                        const auto& state = neuron->getState();
+                        float neuronActivity = std::abs(state.membranePotential - state.restingPotential);
+                        
+                        // Apply concept-based bias based on similarity to pattern
+                        // This is a simplified implementation - real version would use
+                        // learned associations between patterns and neurons
+                        if (!conceptPattern.empty() && conceptPattern.size() > 0) {
+                            // Simple similarity check (in real implementation would use
+                            // neural pattern matching via recurrent connections)
+                            float similarity = neuronActivity / (conceptStrength * 2.0f);
+                            similarity = std::min(1.0f, std::max(0.0f, similarity));
+                            
+                            if (similarity > 0.3f) {
+                                // Apply strong top-down bias to neurons matching concept
+                                applyTopDownBias(neuron->getId(), conceptStrength * similarity);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
 void AttentionalSelection::reset() {
     winners_.clear();
     attendedRegions_.clear();

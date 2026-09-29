@@ -122,8 +122,14 @@ public:
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    // Get all neurons across all regions
+    std::vector<Neuron*> getAllNeurons() const;
+    
+    // Get all motor neurons for action selection
+    std::vector<Neuron*> getMotorNeurons() const { return pImpl->motorNeurons; }
+    
+    // Get all sensory neurons for input processing
+    std::vector<Neuron*> getSensoryNeurons() const { return pImpl->sensoryNeurons; }
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
