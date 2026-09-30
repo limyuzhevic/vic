@@ -6,13 +6,17 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/Config/Config.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+
+// Include the new system architecture
+#include "systems/BrainSystem.hpp"
 
 namespace nlm {
 
 // Forward declarations
-class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
@@ -47,6 +51,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// using a modular system architecture
 
 class Brain {
 public:
@@ -80,11 +85,46 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
+    // ========== NEW SYSTEM ARCHITECTURE ==========
+    
+    // BrainSystemFacade interface for new code
+    bool initializeSystemFacade();
+    void stepSystemFacade(SimulationStep currentStep, Timestamp currentTime);
+    bool configureSystemFacade(const std::shared_ptr<Config>& config);
+    std::string getSystemStatus() const;
+    bool isSystemFacadeInitialized() const;
+    
+    // Get specific systems from facade (new API)
+    SpikeSystem* getSpikeSystemFromFacade();
+    const SpikeSystem* getSpikeSystemFromFacade() const;
+    
+    STDP* getSTDPFromFacade();
+    Hebbian* getHebbianFromFacade();
+    StructuralPlasticity* getStructuralPlasticityFromFacade();
+    
+    NeuralWorkingMemory* getWorkingMemoryFromFacade();
+    NeuralEpisodicMemory* getEpisodicMemoryFromFacade();
+    NeuralAssociativeMemory* getAssociativeMemoryFromFacade();
+    
+    PredictionSystem* getPredictionSystemFromFacade();
+    NeuralPlanner* getPlannerFromFacade();
+    ConceptFormation* getConceptFormationFromFacade();
+    AttentionalSelection* getAttentionFromFacade();
+    
+    DevelopmentSystem* getDevelopmentSystemFromFacade();
+    
+    Dopamine* getDopamineFromFacade();
+    Curiosity* getCuriosityFromFacade();
+    Novelty* getNoveltyFromFacade();
+    PredictionError* getPredictionErrorSignalFromFacade();
+    
+    // ========== LEGACY API (for backward compatibility) ==========
+    
+    // Legacy Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
     
-    // Plasticity system access
+    // Legacy Plasticity system access
     STDP* getSTDP();
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
@@ -192,6 +232,9 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // System registry access
+    static SystemRegistry& getSystemRegistry();
     
 private:
     struct Impl;
