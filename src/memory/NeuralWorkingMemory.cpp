@@ -28,9 +28,14 @@ NeuralWorkingMemory::NeuralWorkingMemory()
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot initialize working memory with null brain pointer");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
+    NLM_LOG_INFO("NeuralWorkingMemory initialized with capacity " + std::to_string(capacity_));
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {

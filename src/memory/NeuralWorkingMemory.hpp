@@ -61,6 +61,9 @@ public:
 
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    
+    // Set memory neurons (for integration)
+    void setMemoryNeurons(const std::vector<NeuronId>& neurons) { memoryNeurons_ = neurons; }
 
     // Strengthen working memory representation (for rehearsal)
     void strengthenMemory(float factor);
