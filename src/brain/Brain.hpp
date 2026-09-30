@@ -190,12 +190,56 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // Step 1: Process pending delayed spike events (deliver synaptic input)
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
     
+    // Step 2: Update all neuron membrane potentials (LIF dynamics)
+    void updateNeuronDynamics(Timestamp currentTime);
+    
+    // Step 3: Detect spikes and schedule spike events
+    void detectAndQueueSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 4: Process immediate spikes
+    void processImmediateSpikes(SimulationStep currentStep);
+    
+    // Step 5: Update working memory (maintenance and competition)
+    void updateWorkingMemory();
+    
+    // Step 6: Apply neuromodulation effects on neural excitability
+    void applyNeuromodulationEffects();
+    
+    // Step 7: Apply plasticity rules (STDP, Hebbian)
+    void applyPlasticityRules(SimulationStep currentStep);
+    
+    // Step 8: Update episodic memory with current experience
+    void updateEpisodicMemory(SimulationStep currentStep);
+    
+    // Step 9: Update prediction system
+    void updatePredictionSystem();
+    
+    // Step 10: Update attention system
+    void updateAttentionSystem();
+    
+    // Step 11: Update concept formation
+    void updateConceptFormation();
+    
+    // Step 12: Apply structural plasticity (synaptogenesis, pruning)
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    
+    // Step 13: Replay important memories
+    void replayMemories(SimulationStep currentStep);
+    
+    // Step 14: Apply development effects
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    
+    // Step 15: Periodic memory consolidation
+    void consolidateMemory(SimulationStep currentStep);
+    
+    // Step 16: Checkpoint management
+    void manageCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+
 private:
     struct Impl;
     Impl* pImpl;
-};
 
 } // namespace nlm

@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "core/Types/Constants.hpp"
 
 #include <iostream>
 #include <memory>
@@ -368,19 +369,19 @@ int main(int argc, char** argv) {
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("simulation_timestep", nlm::DEFAULT_SIMULATION_TIMESTEP, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", nlm::STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", nlm::STDP_LTD_WEIGHT, ConfigSource::Default);
+    config->set("stdp_tau", nlm::STDP_TIME_CONSTANT, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", nlm::SYNAPTOGENESIS_RATE_INITIAL, ConfigSource::Default);
+    config->set("pruning_rate", nlm::PRUNING_RATE_INITIAL, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -390,6 +391,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", nlm::STDP_LTP_WEIGHT)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", nlm::STDP_LTD_WEIGHT)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", nlm::STDP_TIME_CONSTANT)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", nlm::SYNAPTOGENESIS_RATE_INITIAL)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", nlm::PRUNING_RATE_INITIAL)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
