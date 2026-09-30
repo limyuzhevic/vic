@@ -87,7 +87,15 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Create modular binding source file (includes all individual binding files)
+set(BINDING_SOURCES
+    bindings_new.cpp
+    ${NLM_CORE_SOURCES}
+    ${NLM_AGENT_SOURCES}
+    ${NLM_WORLD_SOURCES}
+)
+
+pybind11_add_module(pynlm ${BINDING_SOURCES})
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
