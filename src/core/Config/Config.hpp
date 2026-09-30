@@ -43,23 +43,14 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
-    
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
+// Load from file (JSON, YAML, or key=value format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlString);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -93,13 +84,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+private:
+    // Internal parsing helpers (declared here but defined in .cpp)
+    bool parseJSON(const nlohmann::json& data);
+    bool parseYAML(const YAML::Node& data);
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
+
+} // namespace nlm
 
 } // namespace nlm

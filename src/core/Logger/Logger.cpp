@@ -32,11 +32,28 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with milliseconds
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count();
     
     oss << " " << entry.message;
+    
+    // Add file and line info if available
+    if (!entry.file.empty()) {
+        oss << " (" << entry.file;
+        if (entry.line > 0) {
+            oss << ":" << entry.line;
+        }
+        oss << ")";
+    }
+    
+    // Add function name if available
+    if (!entry.function.empty()) {
+        oss << " [" << entry.function << "]";
+    }
     
     std::string output = oss.str();
     
