@@ -2,11 +2,74 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../core/Exceptions.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace nlm {
+
+// Forward declarations
+class NLMWorldException;
+class NLMValidationException;
+
+// Error checking utility functions for SimpleWorld operations
+namespace SimpleWorldValidation {
+    // Input validation for world operations
+    inline void validatePosition(float x, float y, const std::string& operation = "") {
+        if (std::isnan(x) || std::isinf(x) || std::isnan(y) || std::isinf(y)) {
+            NLM_THROW_AND_LOG(NLMValidationException,
+                             "Invalid position coordinates: (" + std::to_string(x) + ", " + 
+                             std::to_string(y) + ")",
+                             NLMException::Severity::ERROR,
+                             static_cast<int>(NLMValidationException::ValidationError::VALUE_OUT_OF_RANGE),
+                             "world_position_validation");
+        }
+    }
+    
+    inline void validateDimensions(float width, float height, const std::string& operation = "") {
+        if (width <= 0 || height <= 0) {
+            NLM_THROW_AND_LOG(NLMWorldException,
+                             "World dimensions must be positive: width=" + std::to_string(width) + 
+                             ", height=" + std::to_string(height),
+                             NLMException::Severity::ERROR,
+                             static_cast<int>(NLMWorldException::WorldError::CONFIGURATION_FAILED),
+                             "world_dimensions_validation");
+        }
+    }
+    
+    inline void validateVisionDimensions(size_t width, size_t height, const std::string& operation = "") {
+        if (width == 0 || height == 0) {
+            NLM_THROW_AND_LOG(NLMWorldException,
+                             "Vision dimensions must be positive: width=" + std::to_string(width) + 
+                             ", height=" + std::to_string(height),
+                             NLMException::Severity::ERROR,
+                             static_cast<int>(NLMWorldException::WorldError::CONFIGURATION_FAILED),
+                             "world_vision_dimensions_validation");
+        }
+    }
+    
+    inline void validateTimestep(double timestep, const std::string& operation = "") {
+        if (timestep <= 0.0) {
+            NLM_THROW_AND_LOG(NLMWorldException,
+                             "Timestep must be positive, got: " + std::to_string(timestep),
+                             NLMException::Severity::ERROR,
+                             static_cast<int>(NLMWorldException::WorldError::INVALID_TIMESTEP),
+                             "world_timestep_validation");
+        }
+    }
+    
+    inline void validateCommand(MotorCommand cmd, const std::string& operation = "") {
+        // Basic validation - motor command should be valid
+        // Additional validation can be added based on specific requirements
+    }
+    
+    inline bool isValidWorldState(const SimpleWorld& world) {
+        // Check if world is in a valid state
+        return world.getWidth() > 0 && world.getHeight() > 0;
+    }
+}
 
 // World object - represents an object in the world
 // Position and type only - no semantic labels
@@ -75,6 +138,8 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    void setResourceEnergyGain(float e) { resourceEnergyGain_ = e; }
     
     // Time
     double getSimulationTime() const { return simTime_; }

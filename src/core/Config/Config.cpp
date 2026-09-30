@@ -94,6 +94,8 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    Validation::validateKey(key, "config_get");
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -104,75 +106,120 @@ std::optional<T> Config::get(const std::string& key) const {
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+        NLM_THROW_AND_LOG(NLMConfigException, 
+                         "Type mismatch for key: " + key + ", expected " + typeid(T).name(),
+                         NLMException::Severity::ERROR,
+                         0,
+                         "config_get_type_mismatch");
     }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
+    Validation::validateKey(key, "config_getOr");
+    
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    Validation::validateKey(key, "config_set");
+    
+    // Validate based on source
+    if (source == ConfigSource::File) {
+        Validation::validateFilepath(key, "config_set_file");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_INFO("Config key updated: " + key);
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Validate the new entry
+        if (Validation::isValidConfigState(key, value)) {
+            pImpl->entries.emplace_back(key, value, source);
+            NLM_LOG_INFO("Config key added: " + key);
+        } else {
+            NLM_THROW_AND_LOG(NLMConfigException,
+                             "Invalid configuration state for key: " + key,
+                             NLMException::Severity::ERROR,
+                             static_cast<int>(NLMConfigException::ConfigError::VALIDATION_FAILED),
+                             "config_set_validation");
+        }
     }
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    Validation::validateKey(key, "config_set_string");
+    
+    // Validate the value
+    if (value.empty() && source == ConfigSource::Runtime) {
+        NLM_THROW_AND_LOG(NLMConfigException,
+                         "Empty string value cannot be used for runtime setting",
+                         NLMException::Severity::WARNING,
+                         static_cast<int>(NLMConfigException::ConfigError::VALIDATION_FAILED),
+                         "config_set_empty_value");
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    Validation::validateKey(key, "config_set_int");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    Validation::validateKey(key, "config_set_double");
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    Validation::validateKey(key, "config_set_bool");
     set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
+    Validation::validateKey(key, "config_has");
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    Validation::validateKey(key, "config_remove");
+    
+    auto newEnd = std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (newEnd != pImpl->entries.begin()) {
+        pImpl->entries.erase(newEnd, pImpl->entries.end());
+        NLM_LOG_INFO("Config key removed: " + key);
+    } else {
+        NLM_LOG_WARNING("Config key not found for removal: " + key);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
+    return std::vector<std::string>(pImpl->entries.begin(), pImpl->entries.end());
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    if (!pImpl->entries.empty()) {
+        size_t oldSize = pImpl->entries.size();
+        pImpl->entries.clear();
+        NLM_LOG_INFO("Config cleared " + std::to_string(oldSize) + " entries");
+    }
 }
 
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
+        oss << "  " << entry.key << " = ";
+        // Safe variant visitor with error handling
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
@@ -181,7 +228,7 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << " (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }

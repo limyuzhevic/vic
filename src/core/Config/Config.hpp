@@ -5,11 +5,16 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class NLMConfigException;
+
+// Include exception hierarchy
+#include "Exceptions.hpp"
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -21,7 +26,7 @@ using ConfigValue = std::variant<
     std::vector<int>,
     std::vector<double>,
     std::vector<std::string>
->;
+];
 
 // Configuration source
 enum class ConfigSource {
@@ -41,6 +46,54 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Error checking utility functions
+namespace Validation {
+    // Input validation functions
+    inline void validateKey(const std::string& key, const std::string& operation = "") {
+        if (key.empty()) {
+            throw NLMValidationException("Configuration key cannot be empty", 
+                                         NLMValidationException::ValidationError::INVALID_TYPE,
+                                         "key_validation");
+        }
+        if (key.find('=') != std::string::npos) {
+            throw NLMValidationException("Configuration key contains '=' character", 
+                                         NLMValidationException::ValidationError::INVALID_FORMAT,
+                                         "key_validation");
+        }
+    }
+    
+    inline void validateFilepath(const std::string& filepath, const std::string& operation = "") {
+        if (filepath.empty()) {
+            throw NLMValidationException("Filepath cannot be empty", 
+                                         NLMValidationException::ValidationError::INVALID_FORMAT,
+                                         "filepath_validation");
+        }
+        // Additional validation can be added here
+    }
+    
+    // Range checking functions
+    inline void validateValueRange(int value, int min, int max, const std::string& operation = "") {
+        if (value < min || value > max) {
+            throw NLMValidationException("Value out of range: " + std::to_string(value) + 
+                                         " not in [" + std::to_string(min) + ", " + std::to_string(max) + "]",
+                                         NLMValidationException::ValidationError::VALUE_OUT_OF_RANGE,
+                                         operation);
+        }
+    }
+    
+    // State validation functions
+    inline bool isValidConfigState(const std::string& key, const ConfigValue& value) {
+        // Basic validation logic
+        return !key.empty();
+    }
+    
+    // Resource availability checks
+    inline bool checkFileWriteAccess(const std::string& filepath) {
+        // Placeholder for file access checking
+        return true;
+    }
 };
 
 // Main configuration class

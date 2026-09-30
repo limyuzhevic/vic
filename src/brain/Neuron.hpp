@@ -137,11 +137,17 @@ public:
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
-    // Reset to initial state
-    void reset();
+    // Clear all historical data
+    void clearHistory();
     
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    // Minimize memory usage by shrinking vectors
+    void shrinkToFit();
+    
+    // Aggressive cleanup - reset all resources
+    void cleanupMemory();
+    
+    // Validate all neuron state for consistency
+    bool validateState() const;
     
 private:
     struct Impl;

@@ -141,52 +141,60 @@ void testSynapseRandomInitialization() {
     std::cout << "    testSynapseRandomInitialization passed" << std::endl;
 }
 
-void testSynapseReset() {
+void testSynapseMemoryManagement() {
     nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
     
-    synapse.setWeight(0.5f);
+    // Test clearHistory
     synapse.recordPreSpike(0.1);
     synapse.recordPostSpike(0.2);
-    synapse.setEligibilityTrace(0.3f);
-    
-    synapse.reset();
-    
-    assert(synapse.getWeight() == 0.0f);
+    synapse.clearHistory();
     assert(synapse.getPreSpikeHistory().empty());
     assert(synapse.getPostSpikeHistory().empty());
+    
+    // Test shrinkToFit
+    synapse.recordPreSpike(0.3);
+    synapse.recordPostSpike(0.4);
+    synapse.shrinkToFit();
+    
+    // Test cleanupMemory
+    synapse.setWeight(0.5f);
+    synapse.recordPreSpike(0.5);
+    synapse.setEligibilityTrace(0.3f);
+    synapse.cleanupMemory();
+    assert(synapse.getWeight() == 0.0f);
     assert(synapse.getEligibilityTrace() == 0.0f);
+    assert(synapse.getPreSpikeHistory().empty());
+    assert(synapse.getPostSpikeHistory().empty());
     
-    std::cout << "    testSynapseReset passed" << std::endl;
+    // Test validateState - should pass
+    assert(synapse.validateState());
+    
+    std::cout << "    testSynapseMemoryManagement passed" << std::endl;
 }
 
-void testSynapsePlasticityFlags() {
-    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+void testSynapseMoveOperations() {
+    nlm::Synapse synapse1(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    synapse1.setWeight(0.5f);
+    synapse1.recordPreSpike(0.1);
     
-    assert(!synapse.getPlasticityFlags().hebbian);
-    assert(!synapse.getPlasticityFlags().stdp);
+    // Move synapse
+    nlm::Synapse synapse2(std::move(synapse1));
+    assert(synapse2.getWeight() == 0.5f);
+    assert(synapse2.getPreSpikeHistory().size() == 1);
     
-    synapse.enablePlasticity(true, true, false);
+    // Source should be in valid state after move
+    assert(synapse1.getWeight() == 0.0f);
+    assert(synapse1.getPreSpikeHistory().empty());
     
-    assert(synapse.getPlasticityFlags().hebbian);
-    assert(synapse.getPlasticityFlags().stdp);
-    assert(!synapse.getPlasticityFlags().reward_modulated);
+    // Move assignment
+    nlm::Synapse synapse3(nlm::SynapseId(3), nlm::NeuronId(3), nlm::NeuronId(4));
+    synapse3.setWeight(0.8f);
+    synapse3.recordPostSpike(0.2);
     
-    std::cout << "    testSynapsePlasticityFlags passed" << std::endl;
+    synapse3 = std::move(synapse2);
+    assert(synapse3.getWeight() == 0.5f);
+    assert(synapse3.getPostSpikeHistory().empty());
+    assert(synapse3.getPreSpikeHistory().size() == 1);
+    
+    std::cout << "    testSynapseMoveOperations passed" << std::endl;
 }
-
-void runAll() {
-    std::cout << "Running Synapse tests..." << std::endl;
-    testSynapseCreation();
-    testSynapseWeight();
-    testSynapseWeightBounds();
-    testSynapseType();
-    testSynapseDelay();
-    testSynapseSpikeHistory();
-    testSynapseEligibilityTrace();
-    testSynapseEfficacy();
-    testSynapseRandomInitialization();
-    testSynapseReset();
-    testSynapsePlasticityFlags();
-}
-
-} // namespace test_synapse

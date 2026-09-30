@@ -6,8 +6,12 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <exception>
 
 namespace nlm {
+
+// Forward declarations
+class NLMException;
 
 // Log severity levels
 enum class LogLevel {
@@ -109,33 +113,29 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+// Exception handling helper
+void logException(const std::exception& e, const std::string& context = "");
 
-// Stream-style logging helper
-class LogStream {
-public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
-    
-    template<typename T>
-    LogStream& operator<<(const T& value) {
-        oss_ << value;
-        return *this;
-    }
-    
-private:
-    LogLevel level_;
-    std::ostringstream oss_;
-    std::string file_;
-    int line_;
-    std::string function_;
-};
+// Helper function to convert exception severity to LogLevel
+LogLevel exceptionSeverityToLogLevel(NLMException::Severity severity);
 
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+// Convenience macro for throwing and logging exceptions
+#define NLM_THROW_AND_LOG(exception_class, message, severity, error_code, context) \
+    do { \
+        exception_class ex(message, severity, error_code, context); \
+        nlm::logException(ex, "[" #exception_class "] " + context); \
+        throw ex; \
+    } while(0)
+
+// Enhanced macro that catches and logs exceptions from operations
+#define NLM_TRY_CATCH(operation, exception_class, context, error_code) \
+    do { \
+        try { \
+            operation; \
+        } catch (const std::exception& e) { \
+            NLM_THROW_AND_LOG(exception_class, std::string("Operation failed: ") + e.what(), \
+                            NLMException::Severity::ERROR, error_code, context); \
+        } \
+    } while(0)
 
 } // namespace nlm

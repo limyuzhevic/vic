@@ -38,13 +38,24 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 Neuron::~Neuron() = default;
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+    // Move incoming and outgoing synapse vectors
+    pImpl->incomingSynapses = std::move(other.pImpl->incomingSynapses);
+    pImpl->outgoingSynapses = std::move(other.pImpl->outgoingSynapses);
     other.pImpl = nullptr;
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
+        // Cleanup current resources
         delete pImpl;
+        
+        // Move data from other
         pImpl = other.pImpl;
+        
+        // Move vectors to ensure proper cleanup
+        pImpl->incomingSynapses = std::move(other.pImpl->incomingSynapses);
+        pImpl->outgoingSynapses = std::move(other.pImpl->outgoingSynapses);
+        
         other.pImpl = nullptr;
     }
     return *this;
@@ -266,9 +277,60 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    // Reset all neuron state to initial values
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
+    pImpl->plasticityFlags = PlasticityFlags();
+    
+    // Shrink vectors to free unused capacity
+    pImpl->spikeHistory.shrink_to_fit();
+    pImpl->incomingSynapses.shrink_to_fit();
+    pImpl->outgoingSynapses.shrink_to_fit();
+}
+
+void Neuron::clearHistory() {
+    // Clear all historical data
+    pImpl->spikeHistory.clear();
+    pImpl->spikeHistory.shrink_to_fit();
+}
+
+void Neuron::shrinkToFit() {
+    // Minimize memory usage by shrinking vectors
+    pImpl->spikeHistory.shrink_to_fit();
+    pImpl->incomingSynapses.shrink_to_fit();
+    pImpl->outgoingSynapses.shrink_to_fit();
+}
+
+void Neuron::cleanupMemory() {
+    // Aggressive cleanup - reset all resources
+    reset();
+    clearTotalCurrent();
+}
+
+bool Neuron::validateState() const {
+    // Validate all neuron state for consistency
+    bool isValid = true;
+    
+    // Check spike history size
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        return false;
+    }
+    
+    // Check membrane potential bounds
+    const auto& state = pImpl->state;
+    if (state.membranePotential < -100.0f || state.membranePotential > 50.0f) {
+        return false;
+    }
+    
+    // Check refractory period bounds
+    if (state.refractoryRemaining > state.refractoryPeriod) {
+        return false;
+    }
+    
+    return isValid;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {

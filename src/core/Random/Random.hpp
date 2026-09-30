@@ -1,8 +1,5 @@
-#pragma once
-
-#include <cstdint>
-#include <random>
-#include <functional>
+#include "../Exceptions.hpp"
+#include <stdexcept>
 
 namespace nlm {
 
@@ -92,19 +89,21 @@ private:
 };
 
 // Template implementations
-template<typename Container>
-void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
-}
+// template<typename Container>
+// void RandomGenerator::shuffle(Container& container) {
+//     std::shuffle(container.begin(), container.end(), engine());
+// }
 
-template<typename Container>
-auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
-    }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
-}
+// template<typename Container>
+// auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
+//     if (container.empty()) {
+//         throw NLMMemoryException("Cannot pick from empty container", 
+//                                 NLMMemoryException::MemoryError::OUT_OF_MEMORY,
+//                                 "random_pick");
+//     }
+//     auto it = container.begin();
+//     std::advance(it, pickRandomIndex(container.size()));
+//     return *it;
+// }
 
 } // namespace nlm

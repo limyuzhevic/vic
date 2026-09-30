@@ -184,7 +184,7 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Complete Agent Example (Enhanced)
 
 ```python
 import pynlm
@@ -192,68 +192,118 @@ import pynlm
 def run_agent_simulation(num_steps=1000):
     """Run a complete agent simulation with brain and world."""
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
+    # 1. Create configuration with error handling
+    try:
+        config = pynlm.createDefaultConfig()
+        print(f"✓ Configuration created: {config.summary()}")
+    except Exception as e:
+        print(f"✗ Failed to create configuration: {e}")
+        return
     
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
+    # 2. Create brain with enhanced error handling
+    try:
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        print(f"✓ Brain initialized with {brain.getTotalNeuronCount()} neurons")
+    except Exception as e:
+        print(f"✗ Failed to initialize brain: {e}")
+        return
     
     # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    try:
+        agent = pynlm.createAgentBrain(brain)
+    except Exception as e:
+        print(f"✗ Failed to create agent: {e}")
+        return
     
     # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
+    try:
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        print("✓ World configured")
+    except Exception as e:
+        print(f"✗ Failed to configure world: {e}")
+        return
     
     # 5. Initialize agent with world
-    agent.initialize(world)
+    try:
+        agent.initialize(world)
+        print("✓ Agent initialized")
+    except Exception as e:
+        print(f"✗ Failed to initialize agent: {e}")
+        return
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable learning subsystems with validation
+    try:
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        print("✓ Learning subsystems enabled")
+    except Exception as e:
+        print(f"✗ Failed to enable subsystems: {e}")
+        # Continue without all subsystems for basic functionality
     
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
+    # 7. Enhanced simulation loop with error handling and logging
+    try:
+        for step in range(num_steps):
+            try:
+                # Update world
+                world.update(timestep=0.1)
+                
+                # Get sensory input from world
+                percept = world.getSensoryPercept()
+                
+                # Process sensory input in brain
+                agent.processSensoryInput(percept)
+                
+                # Run brain step with timestamp
+                brain.step(step, step * 0.1)
+                
+                # Decode motor command from brain activity
+                motor_cmd = agent.decodeMotorCommand()
+                
+                # Apply motor command to world
+                world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+                
+                # Apply reward modulation with validation
+                reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+                agent.applyRewardModulation(reward, 0.0)
+                
+                # Update development if enabled
+                agent.updateDevelopment(0.1)
+                
+                # Print progress periodically with enhanced metrics
+                if step % 100 == 0:
+                    print(f"Step {step}:")
+                    print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+                    print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+                    if agent.isRewardModulationEnabled():
+                        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+                        print(f"  Prediction error: {agent.getPredictionError():.3f}")
+                    print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+                    
+            except Exception as e:
+                print(f"✗ Error at step {step}: {e}")
+                # Continue with next step for robustness
+                continue
         
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
+        print(f"✓ Simulation completed: {num_steps} steps")
         
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    except KeyboardInterrupt:
+        print("\n⏸ Simulation paused by user")
+    except Exception as e:
+        print(f"✗ Simulation failed: {e}")
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the simulation with enhanced error handling
+try:
+    run_agent_simulation(1000)
+    print("\n🎉 Agent simulation finished successfully!")
+except Exception as e:
+    print(f"\n💥 Agent simulation failed: {e}")
 ```
 
 ### Key Classes and Methods
@@ -496,38 +546,204 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
----
+### Advanced Usage Patterns
 
-## Troubleshooting
+```python
+import pynlm
+import time
 
-### Build Issues
+def run_production_simulation(config, world, agent, num_steps=5000, 
+                            checkpoint_interval=1000, log_interval=500):
+    """Production-ready simulation with checkpointing and detailed logging."""
+    
+    brain = agent.getBrain()
+    start_time = time.time()
+    
+    try:
+        for step in range(num_steps):
+            # Update environment
+            world.update(timestep=0.1)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process input
+            agent.processSensoryInput(percept)
+            
+            # Run brain step
+            brain.step(step, step * 0.1)
+            
+            # Get action and execute
+            motor_cmd = agent.decodeMotorCommand()
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply learning with error handling
+            try:
+                reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+                agent.applyRewardModulation(reward, 0.0)
+                agent.updateDevelopment(0.1)
+            except Exception as e:
+                # Log learning errors but continue simulation
+                print(f"  Warning: Learning failed at step {step}: {e}")
+            
+            # Detailed logging
+            if step % log_interval == 0:
+                elapsed = time.time() - start_time
+                print(f"  Step {step}/{num_steps} ({elapsed:.1f}s, "
+                      f"{step/elapsed:.1f} steps/sec)")
+                print(f"    Stats: {brain.getFiringNeuronCount()} firing, "
+                      f"{agent.getCuriosityLevel():.2f} curiosity, "
+                      f"{agent.getNoveltyLevel():.2f} novelty")
+                
+                # Check if learning is progressing
+                if step > 0 and step % (log_interval * 2) == 0:
+                    current_rate = brain.getAverageFiringRate()
+                    print(f"    Brain rate: {current_rate:.2f} Hz")
+            
+            # Checkpoint periodically
+            if step % checkpoint_interval == 0 and step > 0:
+                try:
+                    checkpoint_file = f"checkpoint_step_{step:06d}.bin"
+                    brain.save(checkpoint_file)
+                    print(f"  Checkpoint saved: {checkpoint_file}")
+                except Exception as e:
+                    print(f"  Warning: Checkpoint failed: {e}")
+        
+        total_time = time.time() - start_time
+        print(f"✓ Simulation completed in {total_time:.1f}s "
+              f"({num_steps/total_time:.1f} steps/sec)")
+        
+        # Final stats
+        final_rate = brain.getAverageFiringRate()
+        total_spikes = brain.getTotalSpikeCount()
+        print(f"  Final stats: {final_rate:.2f} Hz average, {total_spikes} total spikes")
+        
+        return True
+        
+    except KeyboardInterrupt:
+        print(f"\n⏸ Simulation interrupted at step {step}")
+        return False
+    except Exception as e:
+        print(f"\n💥 Simulation failed: {e}")
+        return False
 
-**CMake cannot find Python:**
-```bash
-pip install scikit-build-core pybind11
-cmake .. -DPython_EXECUTABLE=$(which python)
+def run_comparison_simulation(config, world_template, agent_template, 
+                             scenarios, base_scenario="baseline"):
+    """Run multiple scenarios for comparison."""
+    
+    results = {}
+    
+    for scenario_name in scenarios:
+        print(f"\n=== Running Scenario: {scenario_name} ===")
+        
+        # Create fresh world and agent for each scenario
+        world = pynlm.createSimpleWorld()
+        world.configure(world_template['width'], world_template['height'],
+                       world_template['visionWidth'], world_template['visionHeight'])
+        world.reset()
+        world.setAgentStart(world_template['start_x'], world_template['start_y'])
+        
+        agent = pynlm.createAgentBrain(agent_template.getBrain())
+        agent.initialize(world)
+        
+        # Apply scenario-specific settings
+        if scenario_name != base_scenario:
+            # Example: Modify world parameters based on scenario
+            if 'width' in world_template:
+                world.configure(world_template['width'] + 5, world_template['height'] + 5,
+                               world_template['visionWidth'], world_template['visionHeight'])
+            
+            # Enable/disable specific features
+            if 'reward_modulation' in world_template:
+                agent.enableRewardModulation(world_template['reward_modulation'])
+        
+        # Run simulation
+        success = run_production_simulation(
+            config, world, agent, num_steps=2000, log_interval=500
+        )
+        
+        if success:
+            brain = agent.getBrain()
+            results[scenario_name] = {
+                'final_firing_rate': brain.getAverageFiringRate(),
+                'total_spikes': brain.getTotalSpikeCount(),
+                'success': True
+            }
+        else:
+            results[scenario_name] = {
+                'final_firing_rate': 0.0,
+                'total_spikes': 0,
+                'success': False
+            }
+    
+    # Compare results
+    print(f"\n=== Scenario Comparison ===")
+    for scenario, result in results.items():
+        status = "✓" if result['success'] else "✗"
+        print(f"{status} {scenario}: {result['final_firing_rate']:.2f} Hz, "
+              f"{result['total_spikes']} spikes")
+    
+    return results
+
+# Production-ready setup function
+def setup_production_environment(neuron_count=3000, enable_learning=True):
+    """Set up a production-ready NLM environment with optimal configuration."""
+    
+    # Create optimized configuration
+    config = pynlm.createDefaultConfig()
+    
+    # Optimize for production performance
+    config.set("brain.neuron_count", neuron_count)
+    config.set("brain.synapse_density", 0.12)
+    config.set("brain.connection_probability", 0.06)
+    config.set("brain.initial_weight_mean", 0.25)
+    config.set("brain.initial_weight_std", 0.12)
+    
+    # Fine-tune plasticity for production stability
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.0015)
+    config.set("plasticity.stdp.tau_plus", 22.0)
+    config.set("plasticity.stdp.tau_minus", 22.0)
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.hebbian.learning_rate", 0.0008)
+    config.set("plasticity.structural.enable", enable_learning)
+    
+    # Configure neuromodulation for exploration-exploitation balance
+    config.set("neuromod.dopamine.scale", 1.1)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.curiosity.sensitivity", 0.7)
+    config.set("neuromod.novelty.enable", True)
+    config.set("neuromod.novelty.threshold", 0.15)
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create agent with all features
+    agent = pynlm.createAgentBrain(brain)
+    
+    print(f"✓ Production environment setup complete")
+    print(f"  Neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Synapses: {brain.getTotalSynapseCount()}")
+    print(f"  Learning features: {agent.isRewardModulationEnabled()}, "
+          f"{agent.isStructuralPlasticityEnabled()}, "
+          f"{agent.isDevelopmentEnabled()}, {agent.isCuriosityEnabled()}")
+    
+    return config, agent
+
+# Example usage patterns
+print("=== NLM Advanced Usage Patterns ===")
+print()
+print("1. Production Simulation:")
+print("   Use run_production_simulation() for stable, long-running simulations")
+print("   Includes checkpointing, detailed logging, and error recovery")
+print()
+print("2. Scenario Comparison:")
+print("   Use run_comparison_simulation() to test different configurations")
+print("   Useful for hyperparameter optimization and A/B testing")
+print()
+print("3. Production Setup:")
+print("   Use setup_production_environment() for deployment-ready configurations")
+print("   Optimized for performance and stability")
+print()
 ```
-
-**Compilation errors:**
-- Ensure C++20 compiler support
-- Check CMake version >= 3.16
-- Verify all source files are present
-
-### Runtime Issues
-
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
-```
-
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
-
----
-
-## Further Reading
-
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions

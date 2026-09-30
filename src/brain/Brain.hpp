@@ -106,14 +106,14 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
-    // Reset brain state
-    void reset();
+    // Validate brain state for memory consistency
+    bool validateState() const;
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    // Advanced memory management
+    void clearAllHistory();
+    void shrinkMemoryToFit();
+    void cleanupAllMemory();
+    void optimizeMemoryUsage();
     
     // Region management
     RegionId addRegion(const std::string& name = "");

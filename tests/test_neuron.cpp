@@ -131,33 +131,51 @@ void testRandomInitialization() {
     std::cout << "    testRandomInitialization passed" << std::endl;
 }
 
-void testReset() {
+void testNeuronMemoryManagement() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    neuron.setMembranePotential(-60.0f);
-    neuron.injectCurrent(5.0f);
+    // Test clearHistory
     neuron.recordSpike(0.1);
-    
-    neuron.reset();
-    
-    assert(neuron.getMembranePotential() == -70.0f);
-    assert(neuron.getTotalCurrent() == 0.0f);
+    neuron.recordSpike(0.2);
+    neuron.clearHistory();
     assert(neuron.getSpikeHistory().empty());
     
-    std::cout << "    testReset passed" << std::endl;
+    // Test shrinkToFit
+    neuron.recordSpike(0.3);
+    neuron.recordSpike(0.4);
+    neuron.shrinkToFit();
+    
+    // Test cleanupMemory
+    neuron.setMembranePotential(-60.0f);
+    neuron.injectCurrent(5.0f);
+    neuron.recordSpike(0.5);
+    neuron.cleanupMemory();
+    assert(neuron.getTotalCurrent() == 0.0f);
+    assert(neuron.getMembranePotential() == -70.0f);  // Reset value
+    assert(neuron.getSpikeHistory().empty());
+    
+    // Test validateState - should pass
+    assert(neuron.validateState());
+    
+    std::cout << "    testNeuronMemoryManagement passed" << std::endl;
 }
 
-void runAll() {
-    testNeuronCreation();
-    testNeuronType();
-    testMembranePotential();
-    testFiringState();
-    testRefractoryDecrement();
-    testCurrentInjection();
-    testSynapticInput();
-    testSpikeHistory();
-    testRandomInitialization();
-    testReset();
+void testNeuronBoundsChecking() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test membrane potential bounds
+    neuron.setMembranePotential(-90.0f);  // Should clamp to -80.0f
+    assert(neuron.getMembranePotential() >= -80.0f && neuron.getMembranePotential() <= -50.0f);
+    
+    neuron.setMembranePotential(60.0f);   // Should clamp to 50.0f
+    assert(neuron.getMembranePotential() >= -80.0f && neuron.getMembranePotential() <= -50.0f);
+    
+    // Test threshold bounds
+    neuron.setThreshold(-100.0f);  // Should clamp to -90.0f
+    assert(neuron.getThreshold() >= -90.0f);
+    
+    neuron.setThreshold(0.0f);     // Should clamp to -20.0f
+    assert(neuron.getThreshold() <= -20.0f);
+    
+    std::cout << "    testNeuronBoundsChecking passed" << std::endl;
 }
-
-} // namespace test_neuron

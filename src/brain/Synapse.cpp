@@ -65,13 +65,24 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 Synapse::~Synapse() = default;
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
+    // Move history vectors
+    pImpl->preSpikeHistory = std::move(other.pImpl->preSpikeHistory);
+    pImpl->postSpikeHistory = std::move(other.pImpl->postSpikeHistory);
     other.pImpl = nullptr;
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
+        // Cleanup current resources
         delete pImpl;
+        
+        // Move data from other
         pImpl = other.pImpl;
+        
+        // Move history vectors to ensure proper cleanup
+        pImpl->preSpikeHistory = std::move(other.pImpl->preSpikeHistory);
+        pImpl->postSpikeHistory = std::move(other.pImpl->postSpikeHistory);
+        
         other.pImpl = nullptr;
     }
     return *this;
@@ -223,11 +234,73 @@ void Synapse::step(Timestamp currentTime) {
 }
 
 void Synapse::reset() {
+    // Reset all synapse state to initial values
     pImpl->weight = 0.0f;
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->plasticityFlags = PlasticityFlags();
+    
+    // Shrink vectors to free unused capacity
+    pImpl->preSpikeHistory.shrink_to_fit();
+    pImpl->postSpikeHistory.shrink_to_fit();
+}
+
+void Synapse::clearHistory() {
+    // Clear all historical data
+    pImpl->preSpikeHistory.clear();
+    pImpl->postSpikeHistory.clear();
+    pImpl->preSpikeHistory.shrink_to_fit();
+    pImpl->postSpikeHistory.shrink_to_fit();
+}
+
+void Synapse::shrinkToFit() {
+    // Minimize memory usage by shrinking vectors
+    pImpl->preSpikeHistory.shrink_to_fit();
+    pImpl->postSpikeHistory.shrink_to_fit();
+}
+
+void Synapse::cleanupMemory() {
+    // Aggressive cleanup - reset all resources
+    reset();
+}
+
+bool Synapse::validateState() const {
+    // Validate all synapse state for consistency
+    bool isValid = true;
+    
+    // Check spike history sizes
+    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        return false;
+    }
+    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        return false;
+    }
+    
+    // Check weight bounds
+    if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+        return false;
+    }
+    
+    // Check efficacy bounds
+    if (pImpl->efficacy < 0.0f || pImpl->efficacy > 2.0f) {
+        return false;
+    }
+    
+    // Check short-term plasticity bounds
+    if (pImpl->shortTermDepression < 0.0f || pImpl->shortTermDepression > 1.0f) {
+        return false;
+    }
+    if (pImpl->shortTermFacilitation < 0.0f || pImpl->shortTermFacilitation > 1.0f) {
+        return false;
+    }
+    
+    return isValid;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
