@@ -1,11 +1,14 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: Complete Integration of All Neural Systems
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase integrates all previous components into a coherent artificial brain:
+// - Neural computation (LIF neurons, event-driven dynamics)
+// - Memory systems (working, episodic, associative)
+// - Prediction and planning
+// - Cognition (attention, planning, concept formation)
+// - Neuromodulation (dopamine, ACh, NE, serotonin, curiosity, novelty, prediction error)
+// - Development and structural plasticity
+// - Checkpoint persistence
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +21,34 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "neuromodulation/Dopamine.hpp"
+#include "neuromodulation/Acetylcholine.hpp"
+#include "neuromodulation/Norepinephrine.hpp"
+#include "neuromodulation/Serotonin.hpp"
+#include "neuromodulation/Curiosity.hpp"
+#include "neuromodulation/Novelty.hpp"
+#include "neuromodulation/PredictionError.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "prediction/PredictionSystem.hpp"
+#include "cognition/NeuralPlanner.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "cognition/AttentionalSelection.hpp"
+#include "performance/CheckpointSystem.hpp"
+#include "neuromodulation/Dopamine.hpp"
+#include "neuromodulation/Acetylcholine.hpp"
+#include "neuromodulation/Norepinephrine.hpp"
+#include "neuromodulation/Serotonin.hpp"
+#include "neuromodulation/Curiosity.hpp"
+#include "neuromodulation/Novelty.hpp"
+#include "neuromodulation/PredictionError.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "prediction/PredictionSystem.hpp"
+#include "cognition/NeuralPlanner.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "cognition/AttentionalSelection.hpp"
+#include "performance/CheckpointSystem.hpp"
 
 #include <iostream>
 #include <memory>
