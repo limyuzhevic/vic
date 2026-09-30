@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <unordered_set>
+#include <functional>
+#include <chrono>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -43,6 +49,91 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation error
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    ConfigSource source;
+    
+    ConfigValidationError(const std::string& k, const std::string& msg, ConfigSource s)
+        : key(k), message(msg), source(s) {}
+};
+
+// Configuration schema rule
+enum class ValidationRule {
+    RangeInt,
+    RangeDouble,
+    RangeFloat,
+    RangeBool,
+    StringLength,
+    StringPattern,
+    MinItems,
+    MaxItems,
+    Required,
+    Enum
+};
+
+// Schema rule for validation
+struct SchemaRule {
+    ValidationRule type;
+    std::string key;
+    std::string description;
+    
+    // Union for rule parameters
+    std::variant<
+        std::pair<double, double>,  // Range: min, max
+        size_t,                     // StringLength or MinItems or MaxItems
+        std::string,                // StringPattern or Enum
+        bool                        // Required flag (unused)
+    > parameters;
+    
+    SchemaRule() : type(ValidationRule::Required), key(), description() {}
+};
+
+// Configuration help entry
+struct ConfigHelpEntry {
+    std::string key;
+    std::string description;
+    std::string type;
+    std::string defaultValue;
+    std::string example;
+    bool isRequired;
+    
+    ConfigHelpEntry(const std::string& k, const std::string& desc, const std::string& t,
+                   const std::string& def = "", const std::string& ex = "",
+                   bool req = false)
+        : key(k), description(desc), type(t), defaultValue(def), example(ex), isRequired(req) {}
+};
+
+// Configuration inheritance
+struct ConfigInheritance {
+    std::string baseFile;
+    std::string overrideFile;
+    bool merge;  // true for merge, false for override
+    
+    ConfigInheritance(const std::string& base, const std::string& override, bool m)
+        : baseFile(base), overrideFile(override), merge(m) {}
+};
+
+// Configuration checksum
+struct ConfigChecksum {
+    std::string value;
+    std::chrono::system_clock::time_point timestamp;
+    
+    ConfigChecksum(const std::string& v) : value(v) {
+        timestamp = std::chrono::system_clock::now();
+    }
+};
+
+// File format detection
+enum class FileFormat {
+    Unknown,
+    INI,
+    JSON,
+    YAML,
+    YAML_MIXED_CASE
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,14 +146,40 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Enhanced file loading with format detection
     bool loadFromFile(const std::string& filepath);
+    bool loadFromFileWithFormat(const std::string& filepath, FileFormat format);
+    bool loadFromJSON(const std::string& content);
+    bool loadFromYAML(const std::string& content);
+    bool loadFromINI(const std::string& content);
     
-    // Load from command line arguments
+    // Configuration schema and validation
+    bool addSchemaRule(const SchemaRule& rule);
+    bool validate() const;
+    std::vector<ConfigValidationError> getValidationErrors() const;
+    
+    // Configuration inheritance
+    bool loadWithInheritance(const ConfigInheritance& inheritance);
+    
+    // Enhanced command line parsing
     bool loadFromArgs(int argc, char** argv);
+    bool loadFromArgsWithValidation(int argc, char** argv);
     
-    // Save to file
+    // Enhanced serialization
     bool saveToFile(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    bool saveToINI(const std::string& filepath) const;
+    
+    // Configuration help system
+    static std::vector<ConfigHelpEntry> getConfigurationHelp();
+    static std::string getConfigurationExamples();
+    static std::string getAvailableOptions();
+    
+    // Configuration checksum and integrity
+    ConfigChecksum computeChecksum() const;
+    bool verifyChecksum(const ConfigChecksum& checksum) const;
+    bool saveWithBackup(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -93,6 +210,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get file format from extension
+    static FileFormat detectFileFormat(const std::string& filepath);
+    
+    // Get configuration help for specific key
+    static std::string getKeyHelp(const std::string& key);
+    
+    // Validate command line arguments
+    static bool validateCommandLineArgs(int argc, char** argv);
+    
+    // Generate usage information
+    static std::string generateUsage(const std::string& programName);
+    
+    // Enhanced command line key validation
+    static bool validateCommandLineKey(const std::string& key);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +232,28 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool parseKeyValueLine(const std::string& line, std::string& key, std::string& value);
+    static std::string convertValueToString(const ConfigValue& value) const;
+    static std::string computeMD5(const std::string& input) const;
 };
+
+// Global configuration instance
+Config& getGlobalConfig();
+
+// Utility functions for configuration
+namespace config {
+    // Parse command line arguments with enhanced support
+    bool parseArgs(int argc, char** argv, std::map<std::string, std::string>& parsedArgs);
+    
+    // Generate short and long option names
+    std::string generateShortOption(const std::string& longOption);
+    
+    // Check if argument is a configuration option
+    bool isConfigOption(const std::string& arg);
+    
+    // Get configuration value from parsed arguments
+    template<typename T>
+    std::optional<T> getFromArgs(const std::map<std::string, std::string>& args, const std::string& key);
+}
 
 } // namespace nlm

@@ -3,12 +3,29 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
 
 namespace nlm {
 
 // Forward declarations
 class Synapse;
 class RandomGenerator;
+
+// Neuron constants namespace
+namespace NeuronConstants {
+    // Biological parameters
+    static constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;
+    static constexpr float DEFAULT_THRESHOLD = -55.0f;
+    static constexpr float DEFAULT_RESET_POTENTIAL = -70.0f;
+    static constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;
+    static constexpr uint32_t DEFAULT_REFECTORY_PERIOD = 5;
+    
+    // State initialization
+    static constexpr float STATE_INITIAL_MEMBRANE_POTENTIAL = -70.0f;
+    static constexpr float STATE_INITIAL_LAST_SPIKE_TIME = -1.0f;
+    static constexpr float STATE_INITIAL_ADAPTATION_VARIABLE = 0.0f;
+    static constexpr float STATE_INITIAL_FIRING_RATE = 0.0f;
+}
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -26,18 +43,18 @@ struct NeuronState {
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(NeuronConstants::STATE_INITIAL_MEMBRANE_POTENTIAL)
+        , restingPotential(NeuronConstants::DEFAULT_RESTING_POTENTIAL)
+        , threshold(NeuronConstants::DEFAULT_THRESHOLD)
+        , resetPotential(NeuronConstants::DEFAULT_RESET_POTENTIAL)
+        , leakConductance(NeuronConstants::DEFAULT_LEAK_CONDUCTANCE)
         , synapseConductance(0.0f)
-        , firingRate(0.0f)
+        , firingRate(NeuronConstants::STATE_INITIAL_FIRING_RATE)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
-        , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , refractoryPeriod(NeuronConstants::DEFAULT_REFECTORY_PERIOD)
+        , adaptationVariable(NeuronConstants::STATE_INITIAL_ADAPTATION_VARIABLE)
+        , lastSpikeTime(NeuronConstants::STATE_INITIAL_LAST_SPIKE_TIME) {}
 };
 
 // Neuron class representing a single neuron
@@ -52,8 +69,11 @@ public:
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    Neuron(Neuron&&) noexcept = default;  // unique_ptr handles move
+    Neuron& operator=(Neuron&&) noexcept = default;  // unique_ptr handles move
+    
+    // Ensure implementation is valid before access
+    void ensureImplNotNull() const;
     
     // Identity
     NeuronId getId() const;
@@ -62,7 +82,11 @@ public:
     NeuronType getType() const;
     void setType(NeuronType type);
     
-    // State access
+    // Safe access to implementation
+    Impl* getImpl() const;
+    Impl* getImpl();
+    
+    // Access implementation methods safely
     const NeuronState& getState() const;
     NeuronState& getState();
     
@@ -145,7 +169,10 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
+    
+    // Null pointer validation helper
+    void ensureImplNotNull() const;
 };
 
 } // namespace nlm
