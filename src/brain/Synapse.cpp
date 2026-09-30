@@ -192,17 +192,34 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
+    // Default step with standard parameters
+    step(currentTime, nullptr);
+}
+
+void Synapse::step(Timestamp currentTime, const class Config* config) {
+    // Real synaptic dynamics with configurable parameters
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
+    // 4. Apply configuration-based parameters
     
     TimestepDuration dt = 0.001;  // 1ms timestep
+    
+    // Get configuration parameters or use defaults
+    float facilitationTau = Impl::STP_FACILITATION_TAU;
+    float depressionTau = Impl::STP_DEPRESSION_TAU;
+    float eligibilityDecayRate = 0.001f;  // Fast decay by default
+    
+    if (config) {
+        facilitationTau = config->getOr<float>("synaptic_facilitation_tau", facilitationTau);
+        depressionTau = config->getOr<float>("synaptic_depression_tau", depressionTau);
+        eligibilityDecayRate = config->getOr<float>("eligibility_decay_rate", eligibilityDecayRate);
+    }
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / facilitationTau);
     }
     
     // Decay short-term depression
@@ -212,14 +229,53 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / depressionTau));
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    decayEligibilityTrace(eligibilityDecayRate);
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+}
+
+void Synapse::step(Timestamp currentTime, float facilitationTau, float depressionTau, 
+                   float eligibilityDecayRate) {
+    // Step with custom parameters for specialized modeling
+    // Overrides configuration-based step
+    
+    // Decay short-term facilitation (Tsodyks-Markram model)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / facilitationTau);
+    }
+    
+    // Decay short-term depression
+    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSinceActivity = std::max(
+            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
+            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
+        );
+        // Recovery from depression toward 1.0
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / depressionTau));
+    }
+    
+    // Decay eligibility trace
+    decayEligibilityTrace(eligibilityDecayRate);
+    
+    // Clamp weight bounds
+    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+}
+
+void Synapse::configure(float facilitationTimeConstant, float depressionTimeConstant,
+                       float maxUtilization, float minEfficacy, float maxEfficacy) {
+    // Configure synaptic parameters for specialized behavior
+    Impl::STP_FACILITATION_TAU = facilitationTimeConstant;
+    Impl::STP_DEPRESSION_TAU = depressionTimeConstant;
+    Impl::STP_U_MAX = maxUtilization;
+    
+    // Note: efficacy bounds are class-level, not instance-level
+    // This method is here for future extensibility
 }
 
 void Synapse::reset() {

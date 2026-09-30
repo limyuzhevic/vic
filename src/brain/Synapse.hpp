@@ -70,15 +70,22 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    // Update synapse for one simulation step with configurable parameters
+    void step(Timestamp currentTime, const class Config* config = nullptr);
+    
+    // Step with custom parameters for specialized modeling
+    void step(Timestamp currentTime, float facilitationTau, float depressionTau, 
+              float eligibilityDecayRate);
     
     // Reset to initial state
     void reset();
     
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
+    
+    // Configure synaptic parameters
+    void configure(float facilitationTimeConstant, float depressionTimeConstant,
+                   float maxUtilization, float minEfficacy, float maxEfficacy);
     
 private:
     struct Impl;

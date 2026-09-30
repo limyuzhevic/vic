@@ -260,8 +260,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
+    // Use configured timestep from neuron state or default
     TimestepDuration dt = 0.001;  // 1ms default
+    if (pImpl->state.refractoryPeriod > 0) {
+        // During refractory period, use smaller timesteps for stability
+        dt = 0.0001;  // 0.1ms during refractory
+    }
+    stepLIF(currentTime, dt);
+}
+
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    // Complete integrate-and-fire dynamics with configurable timestep
+    // Validates timestep and delegates to optimized LIF implementation
+    if (dt <= 0.0f) {
+        // Use safe default for invalid timestep
+        dt = 0.001f;
+    }
     stepLIF(currentTime, dt);
 }
 
