@@ -400,6 +400,102 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Neuromodulation systems Python bindings
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward signaling)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Dopamine::getName,
+             "Get the name of this neuromodulator")
+        .def("getLevel", &Dopamine::getLevel,
+             "Get current dopamine level")
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"),
+             "Set dopamine level")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get plasticity modulation factor")
+        .def("update", &Dopamine::update, py::arg("dt"),
+             "Update dopamine level over time")
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"),
+             "Signal reward event")
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError,
+             py::arg("error"), "Signal reward prediction error")
+        .def("reset", &Dopamine::reset,
+             "Reset dopamine level to baseline");
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration drive)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Curiosity::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Curiosity::getLevel,
+             "Get current curiosity level")
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"),
+             "Update curiosity based on novelty and prediction error")
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive,
+             "Get exploration drive level")
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"),
+             "Set weight of novelty in curiosity calculation")
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"),
+             "Set weight of prediction error in curiosity calculation")
+        .def("reset", &Curiosity::reset,
+             "Reset curiosity level to zero");
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Novelty::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getLevel", &Novelty::getLevel,
+             "Get current novelty level")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"),
+             "Set novelty level")
+        .def("detectNovelty", [](Novelty& self, const std::vector<float>& currentPattern, const std::vector<float>& previousPattern) {
+            self.detectNovelty(currentPattern, previousPattern);
+        }, py::arg("currentPattern"), py::arg("previousPattern"),
+             "Detect novelty from pattern change")
+        .def("update", &Novelty::update, py::arg("dt"),
+             "Update novelty level over time")
+        .def("getHistory", &Novelty::getHistory,
+             "Get novelty detection history")
+        .def("clearHistory", &Novelty::clearHistory,
+             "Clear novelty history")
+        .def("reset", &Novelty::reset,
+             "Reset novelty system");
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error neuromodulator for learning)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &PredictionError::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("getError", &PredictionError::getError,
+             "Get current prediction error")
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"),
+             "Compute prediction error")
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("newPrediction"),
+             "Update prediction with new value")
+        .def("getHistory", &PredictionError::getHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionError::clearHistory,
+             "Clear prediction error history")
+        .def("getMagnitude", &PredictionError::getMagnitude,
+             "Get error magnitude for neuromodulation")
+        .def("reset", &PredictionError::reset,
+             "Reset prediction error system");
+
+    py::class_<Reward>(m, "Reward", R"pbdoc(Reward signal for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue,
+             "Get current reward value")
+        .def("setValue", &Reward::setValue, py::arg("value"),
+             "Set current reward value")
+        .def("add", &Reward::add, py::arg("delta"),
+             "Add to current reward")
+        .def("reset", &Reward::reset,
+             "Reset reward to zero")
+        .def("computeReward", [](Reward& self, const Observation& observation) {
+            return self.computeReward(observation);
+        }, py::arg("observation"),
+             "Compute reward from observation")
+        .def("getHistory", &Reward::getHistory,
+             "Get reward history")
+        .def("clearHistory", &Reward::clearHistory,
+             "Clear reward history");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
