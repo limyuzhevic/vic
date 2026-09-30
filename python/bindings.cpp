@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <iostream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -16,10 +18,49 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
-namespace py = pybind11;
-namespace nlm {
+// Custom Python exception classes
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& message) : std::runtime_error(message) {}
+};
 
-PYBIND11_MODULE(pynlm, m) {
+class BrainInitializationError : public NLMError {
+public:
+    explicit BrainInitializationError(const std::string& message) 
+        : NLMError("Brain initialization failed: " + message) {}
+};
+
+class InvalidArgumentError : public NLMError {
+public:
+    explicit InvalidArgumentError(const std::string& message) 
+        : NLMError("Invalid argument: " + message) {}
+};
+
+class FileOperationError : public NLMError {
+public:
+    explicit FileOperationError(const std::string& message) 
+        : NLMError("File operation failed: " + message) {}
+};
+
+// Register exception classes with pybind11
+void registerExceptions(py::module_ &m) {
+    py::register_exception<NLMError>(m, "NLMError");
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMError& e) {
+            py::set_error(PyExc_RuntimeError, e.what());
+        } catch (const std::invalid_argument& e) {
+            py::set_error(PyExc_ValueError, e.what());
+        } catch (const std::out_of_range& e) {
+            py::set_error(PyExc_IndexError, e.what());
+        } catch (const std::runtime_error& e) {
+            py::set_error(PyExc_RuntimeError, e.what());
+        } catch (...) {
+            py::set_error(PyExc_RuntimeError, "Unknown error in NLM");
+        }
+    });
+}
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
@@ -145,17 +186,17 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Raises FileOperationError on failure.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments. Returns True on success.")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file. Raises FileOperationError on failure.")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             "Check if a configuration key exists. Returns True if the key exists, False otherwise.")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys as a list")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
@@ -163,6 +204,52 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Add improved Config convenience methods
+    .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+             auto value = self.get<int>(key);
+             return value.has_value() ? *value : defaultValue;
+         }, py::arg("key"), py::arg("defaultValue") = 0,
+         "Get an integer value from config, returns default if key doesn't exist")
+         .def("getDouble", [](const Config& self, const std::string& key, double defaultValue) {
+             auto value = self.get<double>(key);
+             return value.has_value() ? *value : defaultValue;
+         }, py::arg("key"), py::arg("defaultValue") = 0.0,
+         "Get a double value from config, returns default if key doesn't exist")
+         .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+             auto value = self.get<std::string>(key);
+             return value.has_value() ? *value : defaultValue;
+         }, py::arg("key"), py::arg("defaultValue") = "",
+         "Get a string value from config, returns default if key doesn't exist")
+         .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+             auto value = self.get<bool>(key);
+             return value.has_value() ? *value : defaultValue;
+         }, py::arg("key"), py::arg("defaultValue") = false,
+         "Get a boolean value from config, returns default if key doesn't exist")
+         .def("setInt", [](Config& self, const std::string& key, int value) {
+             self.set<int>(key, value);
+         }, py::arg("key"), py::arg("value"),
+         "Set an integer value in config")
+         .def("setDouble", [](Config& self, const std::string& key, double value) {
+             self.set<double>(key, value);
+         }, py::arg("key"), py::arg("value"),
+         "Set a double value in config")
+         .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+             self.set<std::string>(key, value);
+         }, py::arg("key"), py::arg("value"),
+         "Set a string value in config")
+         .def("setBool", [](Config& self, const std::string& key, bool value) {
+             self.set<bool>(key, value);
+         }, py::arg("key"), py::arg("value"),
+         "Set a boolean value in config")
+         .def("setVectorInt", [](Config& self, const std::string& key, const std::vector<int>& value) {
+             self.set<std::vector<int>>(key, value);
+         }, py::arg("key"), py::arg("value"),
+         "Set an integer vector value in config")
+         .def("setVectorDouble", [](Config& self, const std::string& key, const std::vector<double>& value) {
+             self.set<std::vector<double>>(key, value);
+         }, py::arg("key"), py::arg("value"),
+         "Set a double vector value in config")
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
