@@ -69,6 +69,14 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Memory management methods
+    void clearNeuronPointers();
+    void validateNeuronPointers() const;
+    
+public:
+    // Additional safety method
+    bool areNeuronPointersValid() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

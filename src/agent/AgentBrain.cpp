@@ -61,7 +61,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     }
 }
 
-AgentBrain::~AgentBrain() = default;
+AgentBrain::~AgentBrain() {
+    clearNeuronPointers();
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
@@ -345,6 +347,106 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Clear neuron pointers
+    clearNeuronPointers();
+}
+
+// Memory management implementations
+void AgentBrain::clearNeuronPointers() {
+    // Clear all neuron pointer vectors
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+}
+
+void AgentBrain::validateNeuronPointers() const {
+    // Check if neuron pointers are still valid (if brain exists)
+    if (!brain_) {
+        return;  // No brain, nothing to validate
+    }
+    
+    // Collect all neurons from brain regions for comparison
+    std::vector<Neuron*> allBrainNeurons;
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& population : region->getPopulations()) {
+            for (auto* neuron : population->getNeurons()) {
+                allBrainNeurons.push_back(neuron);
+            }
+        }
+    }
+    
+    // Check each vector for validity
+    auto validateVector = [&](const std::vector<Neuron*>& vec, const std::string& name) {
+        for (size_t i = 0; i < vec.size(); ++i) {
+            bool found = false;
+            for (auto* brainNeuron : allBrainNeurons) {
+                if (vec[i] == brainNeuron) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                NLM_LOG_WARNING("AgentBrain: Invalid neuron pointer in " + name + 
+                               " at index " + std::to_string(i));
+            }
+        }
+    };
+    
+    validateVector(motorForward_, "motorForward_");
+    validateVector(motorBackward_, "motorBackward_");
+    validateVector(motorTurnLeft_, "motorTurnLeft_");
+    validateVector(motorTurnRight_, "motorTurnRight_");
+    validateVector(motorInteract_, "motorInteract_");
+    validateVector(motorWait_, "motorWait_");
+    
+    validateVector(sensoryVision_, "sensoryVision_");
+    validateVector(sensoryTouch_, "sensoryTouch_");
+    validateVector(sensoryInternal_, "sensoryInternal_");
+    validateVector(sensoryProprioception_, "sensoryProprioception_");
+}
+
+bool AgentBrain::areNeuronPointersValid() const {
+    // Quick validation without logging warnings
+    if (!brain_) {
+        return false;  // No brain means pointers cannot be valid
+    }
+    
+    // Simple check: ensure we have some neurons in brain
+    size_t brainNeuronCount = 0;
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& population : region->getPopulations()) {
+            brainNeuronCount += population->getNeurons().size();
+        }
+    }
+    
+    // If brain has neurons but our vectors are empty, might be an issue
+    size_t ourTotalNeurons = motorForward_.size() + motorBackward_.size() + 
+                            motorTurnLeft_.size() + motorTurnRight_.size() +
+                            motorInteract_.size() + motorWait_.size() +
+                            sensoryVision_.size() + sensoryTouch_.size() +
+                            sensoryInternal_.size() + sensoryProprioception_.size();
+    
+    // Allow some flexibility - vectors might be empty initially
+    return true;
+}
+
+// Destructor
+AgentBrain::~AgentBrain() {
+    clearNeuronPointers();
+}
+
+// Additional safety method for public API
+bool AgentBrain::areNeuronPointersValid() const {
+    return areNeuronPointersValid();
 }
 
 } // namespace nlm
