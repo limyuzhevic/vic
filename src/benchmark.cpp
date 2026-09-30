@@ -49,10 +49,14 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     
     for (size_t step = 0; step < steps; ++step) {
         // Inject some random input
+        bool sensoryInjected = false;
         for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            if (brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f)) {
+                sensoryInjected = true;
+            }
         }
         
+        // If no neurons were injected, continue anyway
         brain->step(step, step * 0.001);
     }
     

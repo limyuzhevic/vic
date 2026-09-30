@@ -56,6 +56,9 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Performance monitoring
+    std::unique_ptr<PerformanceMonitor> performanceMonitor;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -93,6 +96,10 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Initialize performance monitor
+        performanceMonitor = std::make_unique<PerformanceMonitor>();
+        performanceMonitor->start();
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -628,16 +635,21 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     }
 }
 
-void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+bool Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    bool injected = false;
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
                     neuron->injectCurrent(current);
+                    injected = true;
                 }
             }
         }
     }
+    
+    return injected;
 }
 
 SpikeSystem* Brain::getSpikeSystem() {

@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class PerformanceMonitor;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -78,7 +79,7 @@ public:
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
     // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    bool injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
     SpikeSystem* getSpikeSystem();
@@ -89,16 +90,58 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
-    // Statistics
-    float getExcitationInhibitionRatio() const;
-    size_t getTotalSpikeCount() const;
-    size_t getPendingSpikeEventCount() const;
+    // Performance monitoring system
+    struct PerformanceStats {
+        // Timing statistics (in milliseconds)
+        double totalSimTime;           // Total simulation time
+        double avgStepTime;           // Average time per step
+        double maxStepTime;           // Maximum time for a single step
+        double minStepTime;           // Minimum time for a single step
+        
+        // Activity statistics
+        size_t totalSpikesGenerated;  // Total spikes generated
+        size_t activeNeuronCount;     // Number of active neurons
+        size_t firingRate;            // Current firing rate (spikes per second)
+        
+        // Memory and resource usage
+        size_t memoryUsageBytes;      // Current memory usage
+        size_t synapseCount;          // Current number of synapses
+        size_t neuronCount;           // Current number of neurons
+        
+        // Plasticity activity
+        size_t stdpUpdates;           // Number of STDP updates
+        size_t hebbianUpdates;        // Number of Hebbian updates
+        size_t structuralPlasticityEvents; // Number of structural plasticity events
+        
+        // Neuromodulation activity
+        size_t dopamineUpdates;       // Number of dopamine updates
+        size_t curiosityUpdates;      // Number of curiosity updates
+        size_t noveltyUpdates;        // Number of novelty updates
+        
+        // Performance metrics for analysis
+        double stabilityScore;        // Measure of network stability
+        double learningRate;          // Overall learning rate
+        double memoryUtilization;    // Working memory utilization
+        
+        PerformanceStats()
+            : totalSimTime(0.0), avgStepTime(0.0), maxStepTime(0.0), minStepTime(0.0)
+            , totalSpikesGenerated(0), activeNeuronCount(0), firingRate(0)
+            , memoryUsageBytes(0), synapseCount(0), neuronCount(0)
+            , stdpUpdates(0), hebbianUpdates(0), structuralPlasticityEvents(0)
+            , dopamineUpdates(0), curiosityUpdates(0), noveltyUpdates(0)
+            , stabilityScore(0.0), learningRate(0.0), memoryUtilization(0.0) {}
+    };
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Performance monitoring methods
+    PerformanceStats getPerformanceStats() const;
+    double getAverageFiringRate() const;
+    double getLearningEfficiency() const;
+    size_t getTotalActivityCount() const;
+    bool isStable() const;
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Performance monitoring system access
+    const class PerformanceMonitor* getPerformanceMonitor() const;
+    class PerformanceMonitor* getPerformanceMonitor();
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();

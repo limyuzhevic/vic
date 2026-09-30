@@ -308,8 +308,11 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     // Run some steps with sensory input
     for (int i = 0; i < 50; ++i) {
         // Inject some sensory activity
-        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
-        brain->step(i, i * 0.001);
+        if (brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f)) {
+            brain->step(i, i * 0.001);
+        } else {
+            NLM_LOG_ERROR("Failed to inject current to sensory neurons");
+        }
     }
     
     NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
