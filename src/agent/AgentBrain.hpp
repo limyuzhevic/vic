@@ -70,6 +70,10 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Helper functions for neuron distribution optimization
+    void distributeMotorNeurons(const std::vector<Neuron*>& neurons);
+    void distributeSensoryNeurons(const std::vector<Neuron*>& neurons);
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
@@ -78,19 +82,9 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Grouped neuron vectors for better cache locality and performance
+    std::vector<std::vector<Neuron*>> motorGroups_;  // Organized motor action groups
+    std::vector<std::vector<Neuron*>> sensoryGroups_; // Organized sensory processing groups
     
     // Neuromodulation state
     float dopamineLevel_;

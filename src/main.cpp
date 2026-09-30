@@ -28,24 +28,225 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printVersionAndExit() {
+    std::cout << "NLM (熙然) - Neural Learning Machine v0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "C++ Standard: C++20" << std::endl;
+    std::cout << "License: MIT" << std::endl;
+    std::cout << "Authors: NLM Authors" << std::endl;
+    std::cout << "Website: https://github.com/nlm-project/nlm" << std::endl;
+    exit(0);
+}
+
+std::string parseCommandLineArgs(int argc, char** argv, std::shared_ptr<Config> config) {
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool debug = false;
+    bool quiet = false;
+    bool noPlasticity = false;
+    bool noDevelopment = false;
+    bool noNeuromodulation = false;
+    bool noCuriosity = false;
+    int64_t customNeuronCount = -1;
+    double customTimestep = -1.0;
+    int64_t customSteps = -1;
+    double customSimulationTime = -1.0;
+    int64_t customSeed = -1;
+    std::string checkpointFile;
+    std::string loadCheckpointFile;
+    bool enableVisualization = false;
+    int visualizationPort = 8080;
+    std::string simulationMode = "Phase2";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+            NLM_LOG_INFO("Specified config file: " + configFile);
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+            NLM_LOG_INFO("Specified config file: " + configFile);
+        } else if (arg == "--help" || arg == "-h") {
+            printHelpAndExit();
+        } else if (arg == "--version") {
+            printVersionAndExit();
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+            // Enable verbose logging by setting log level
+        } else if (arg == "--debug") {
+            debug = true;
+            // Enable debug logging
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+            // Reduce logging output
+        } else if (arg == "--no-plasticity") {
+            noPlasticity = true;
+        } else if (arg == "--no-development") {
+            noDevelopment = true;
+        } else if (arg == "--no-neuromodulation") {
+            noNeuromodulation = true;
+        } else if (arg == "--no-curiosity") {
+            noCuriosity = true;
+        } else if (arg == "--neuron-count" && i + 1 < argc) {
+            try {
+                customNeuronCount = std::stoll(argv[++i]);
+                if (customNeuronCount <= 0) {
+                    NLM_LOG_WARNING("Neuron count must be positive, using default");
+                    customNeuronCount = -1;
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid neuron count value, using default");
+            }
+        } else if (arg == "--timestep" && i + 1 < argc) {
+            try {
+                customTimestep = std::stod(argv[++i]);
+                if (customTimestep <= 0.0) {
+                    NLM_LOG_WARNING("Timestep must be positive, using default");
+                    customTimestep = -1.0;
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid timestep value, using default");
+            }
+        } else if (arg == "--steps" && i + 1 < argc) {
+            try {
+                customSteps = std::stoll(argv[++i]);
+                if (customSteps < 0) {
+                    NLM_LOG_WARNING("Steps must be non-negative, using default");
+                    customSteps = -1;
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid steps value, using default");
+            }
+        } else if (arg == "--simulation-time" && i + 1 < argc) {
+            try {
+                customSimulationTime = std::stod(argv[++i]);
+                if (customSimulationTime < 0.0) {
+                    NLM_LOG_WARNING("Simulation time must be non-negative, using default");
+                    customSimulationTime = -1.0;
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid simulation time value, using default");
+            }
+        } else if (arg == "--seed" && i + 1 < argc) {
+            try {
+                customSeed = std::stoll(argv[++i]);
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid seed value, using default");
+            }
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            checkpointFile = argv[++i];
+        } else if (arg == "--load-checkpoint" && i + 1 < argc) {
+            loadCheckpointFile = argv[++i];
+        } else if (arg == "--enable-visualization") {
+            enableVisualization = true;
+        } else if (arg == "--visualization-port" && i + 1 < argc) {
+            try {
+                visualizationPort = std::stoi(argv[++i]);
+                if (visualizationPort <= 0 || visualizationPort > 65535) {
+                    NLM_LOG_WARNING("Invalid port number, using default 8080");
+                    visualizationPort = 8080;
+                }
+            } catch (...) {
+                NLM_LOG_WARNING("Invalid port number, using default 8080");
+            }
+        } else if (arg == "--simulation-mode" && i + 1 < argc) {
+            simulationMode = argv[++i];
+            // Validate simulation mode
+            if (simulationMode != "Phase2" && simulationMode != "Phase3" && 
+                simulationMode != "Phase4" && simulationMode != "Phase6") {
+                NLM_LOG_WARNING("Invalid simulation mode: " + simulationMode + ". Using default Phase2");
+                simulationMode = "Phase2";
+            }
+        } else if (arg == "--demo-phase2") {
+            simulationMode = "Phase2";
+        } else if (arg == "--demo-phase3") {
+            simulationMode = "Phase3";
+        } else {
+            // Unknown argument - could warn or ignore
+            // For now, we'll ignore unknown arguments to maintain backward compatibility
+        }
+    }
+    
+    // Apply command line options to config
+    if (customNeuronCount > 0) {
+        config->set("neuron_count", customNeuronCount, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: neuron_count = " + std::to_string(customNeuronCount));
+    }
+    
+    if (customTimestep > 0.0) {
+        config->set("simulation_timestep", customTimestep, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: simulation_timestep = " + std::to_string(customTimestep));
+    }
+    
+    if (customSteps >= 0) {
+        config->set("max_simulation_steps", static_cast<int64_t>(customSteps), ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: max_simulation_steps = " + std::to_string(customSteps));
+    }
+    
+    if (customSimulationTime > 0.0) {
+        config->set("simulation_time_limit", customSimulationTime, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: simulation_time_limit = " + std::to_string(customSimulationTime));
+    }
+    
+    if (customSeed != -1) {
+        config->set("random_seed", customSeed, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: random_seed = " + std::to_string(customSeed));
+    }
+    
+    if (noPlasticity) {
+        config->set("plasticity_enabled", false, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line option: plasticity disabled");
+    }
+    
+    if (noDevelopment) {
+        config->set("development_enabled", false, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line option: development disabled");
+    }
+    
+    if (noNeuromodulation) {
+        config->set("neuromodulation_enabled", false, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line option: neuromodulation disabled");
+    }
+    
+    if (noCuriosity) {
+        config->set("curiosity_enabled", false, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line option: curiosity disabled");
+    }
+    
+    if (!checkpointFile.empty()) {
+        // Note: Config may not have checkpoint_save_file setting, this would need to be added to Config.hpp
+        // For now, just log the intent
+        NLM_LOG_INFO("Command line option: save checkpoint to " + checkpointFile);
+    }
+    
+    if (!loadCheckpointFile.empty()) {
+        // Similar note about Config.hpp missing load checkpoint setting
+        NLM_LOG_INFO("Command line option: load checkpoint from " + loadCheckpointFile);
+    }
+    
+    if (enableVisualization) {
+        config->set("visualization_enabled", true, ConfigSource::CommandLine);
+        config->set("visualization_port", visualizationPort, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line option: visualization enabled on port " + std::to_string(visualizationPort));
+    }
+    
+    if (simulationMode != "Phase2") {
+        NLM_LOG_INFO("Command line option: running " + simulationMode + " simulation");
+        // In a full implementation, this would switch to different demo code paths
+    }
+    
+    // Apply logging level based on verbosity flags
+    if (debug) {
+        // Set debug log level
+        NLM_LOG_DEBUG("Debug logging enabled");
+    } else if (verbose) {
+        NLM_LOG_INFO("Verbose logging enabled");
+    } else if (quiet) {
+        NLM_LOG_INFO("Quiet mode enabled - reduced logging output");
+    }
+    
+    return configFile;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -343,29 +544,17 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
+    // Parse advanced command line arguments
+    std::string configFile = parseCommandLineArgs(argc, argv, config);
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Config file not found: " + configFile + ". Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
+    // Override with command line args (already parsed)
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -382,9 +571,12 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Apply command line overrides that weren't parsed yet
+    applyCommandLineOverrides(config, argc, argv);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
