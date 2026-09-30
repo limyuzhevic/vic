@@ -1,5 +1,6 @@
 // Neuron Tests
 #include "brain/Neuron.hpp"
+#include "brain/NeuralPopulation.hpp"
 #include "core/Random/Random.hpp"
 #include <cassert>
 #include <iostream>

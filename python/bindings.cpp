@@ -6,15 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/core/Random/Random.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -398,23 +391,70 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    .def("setDevelopmentEnabled", &AgentBrain::setDevelopmentEnabled,
+              py::arg("enable"))
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", 
+        R"pbdoc(Development system orchestrating neural development)pbdoc")
+        .def(py::init<>())
+        .def("getStage", &DevelopmentSystem::getStage,
+             "Get current developmental stage")
+        .def("setStage", &DevelopmentSystem::setStage, py::arg("stage"),
+             "Set developmental stage")
+        .def("advanceStage", &DevelopmentSystem::advanceStage,
+             "Advance to next developmental stage")
+        .def("getStageName", &DevelopmentSystem::getStageName,
+             "Get name of current developmental stage")
+        .def("getPlasticityModifier", &DevelopmentSystem::getPlasticityModifier,
+             "Get plasticity modifier for current developmental stage")
+        .def("isCriticalPeriod", &DevelopmentSystem::isCriticalPeriod,
+             "Check if current stage is critical period")
+        .def("getCriticalPeriodProgress", &DevelopmentSystem::getCriticalPeriodProgress,
+             "Get progress through critical period (0 to 1)")
+        .def("getDevelopmentalAge", &DevelopmentSystem::getDevelopmentalAge,
+             "Get developmental age in simulation time")
+        .def("setDevelopmentalAge", &DevelopmentSystem::setDevelopmentalAge,
+             py::arg("age"), "Set developmental age")
+        .def("__repr__", [](const DevelopmentSystem& ds) {
+            return "<DevelopmentSystem: " + std::string(ds.getStageName()) + 
+                   " (age=" + std::to_string(ds.getDevelopmentalAge()) + ")>";
+        });
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createDevelopmentSystem", []() -> std::shared_ptr<DevelopmentSystem> {
+        return std::make_shared<DevelopmentSystem>();
+    }, "Create a new development system");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("getDevelopmentalStageNames", []() {
+        std::vector<std::string> names;
+        names.push_back("Initial");
+        names.push_back("CriticalPeriod");
+        names.push_back("Maturation");
+        names.push_back("Adult");
+        names.push_back("Aging");
+        return names;
+    }, "Get list of all developmental stage names");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("getDevelopmentalStageFromName", [](const std::string& name) {
+        if (name == "Initial") return DevelopmentalStage::Initial;
+        if (name == "CriticalPeriod") return DevelopmentalStage::CriticalPeriod;
+        if (name == "Maturation") return DevelopmentalStage::Maturation;
+        if (name == "Adult") return DevelopmentalStage::Adult;
+        if (name == "Aging") return DevelopmentalStage::Aging;
+        throw std::invalid_argument("Unknown developmental stage name: " + name);
+    }, py::arg("name"), "Get developmental stage enum from string name");
+
+    m.def("getPlasticityModifierForStage", [](DevelopmentalStage stage) {
+        DevelopmentSystem ds;
+        ds.setStage(stage);
+        return ds.getPlasticityModifier();
+    }, py::arg("stage"), "Get plasticity modifier for a developmental stage");
+
+    m.def("isCriticalPeriodStage", [](DevelopmentalStage stage) {
+        DevelopmentSystem ds;
+        ds.setStage(stage);
+        return ds.isCriticalPeriod();
+    }, py::arg("stage"), "Check if a developmental stage is critical period");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

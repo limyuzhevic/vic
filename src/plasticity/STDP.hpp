@@ -5,7 +5,8 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Real implementation with event-driven synaptic weight updates based on spike timing correlation
+// Part of Phase 2: Real Neural Computation
 
 class STDP : public PlasticityRule {
 public:

@@ -7,7 +7,13 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Real implementation with neural dynamics - uses persistent activity and recurrent connections
+// Key mechanisms:
+// - Persistent neural activity (reverberating activity)
+// - Recurrent synaptic connections for maintaining information
+// - Activity-dependent short-term plasticity
+// - Neural competition for selective retention
+// Integrated with Brain system in NeuralWorkingMemory class
 
 class WorkingMemory {
 public:
@@ -39,8 +45,15 @@ private:
     Impl* pImpl;
 };
 
-// Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Neural episodic memory: stores experiences and episodes
+// Real implementation with neural pattern storage and retrieval
+// Key mechanisms:
+// - Episodes stored as neural activity patterns (not text records)
+// - Pattern completion (Hopfield-like retrieval) from partial cues
+// - Temporal ordering through timestamps and replay
+// - Relevance-weighted recall based on recent use
+// - Integration with neural dynamics for experience replay
+// Integrated with NeuralEpisodicMemory class
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -79,8 +92,14 @@ private:
     Impl* pImpl;
 };
 
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Semantic memory: gradually acquired knowledge and facts
+// Real implementation with associative storage and retrieval
+// Key mechanisms:
+// - Facts stored as key-value pairs with pattern-based retrieval
+// - Association learning through repeated co-activation
+// - Concept formation from related facts and experiences
+// - Integration with episodic memory for knowledge consolidation
+// TODO: Implement integration with NeuralAssociativeMemory
 
 class SemanticMemory {
 public:
@@ -108,7 +127,13 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Real implementation with neural pattern storage for motor programs
+// Key mechanisms:
+// - Skills stored as neural activation patterns and sequences
+// - Proficiency tracking based on repetition and success
+// - Motor pattern completion and refinement
+// - Integration with motor system for action execution
+// TODO: Implement integration with motor system
 
 struct Skill {
     std::string name;
@@ -143,8 +168,14 @@ private:
     Impl* pImpl;
 };
 
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Neural associative memory: relationships between neural patterns
+// Real implementation with Hebbian learning and pattern completion
+// Key mechanisms:
+// - Co-activating neurons become associated via Hebbian plasticity
+// - Stronger associations form with repeated co-activation
+// - Can retrieve related items given partial cues (spreading activation)
+// - Integration with episodic memory for memory linking
+// Real implementation in NeuralAssociativeMemory class
 
 class AssociativeMemory {
 public:

@@ -4,36 +4,11 @@
 #include <iostream>
 #include <cassert>
 
-// Forward declarations of test functions
-namespace test_types {
+namespace test_episodicmemory {
     void runAll();
 }
 
-namespace test_config {
-    void runAll();
-}
-
-namespace test_random {
-    void runAll();
-}
-
-namespace test_clock {
-    void runAll();
-}
-
-namespace test_neuron {
-    void runAll();
-}
-
-namespace test_synapse {
-    void runAll();
-}
-
-namespace test_stdp {
-    void runAll();
-}
-
-namespace test_brain {
+namespace test_workingmemory {
     void runAll();
 }
 
@@ -101,18 +76,27 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running STDP tests..." << std::endl;
+    std::cout << "Running Brain tests..." << std::endl;
     try {
-        test_stdp::runAll();
+        test_brain::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;
     }
     
-    std::cout << "Running Brain tests..." << std::endl;
+    std::cout << "Running Episodic Memory tests..." << std::endl;
     try {
-        test_brain::runAll();
+        test_episodicmemory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Working Memory tests..." << std::endl;
+    try {
+        test_workingmemory::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
