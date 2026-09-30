@@ -14,8 +14,9 @@ namespace nlm {
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
     
-    // Sensory state at time of experience (encoded as activity pattern)
+    // Comprehensive sensory state at time of experience (encoded as activity pattern)
     std::vector<float> sensoryState;
+    std::vector<float> sensoryFeatures;  // Feature vectors for concept formation
     
     // Location/position information
     float positionX;
@@ -24,11 +25,23 @@ struct EpisodicMemoryItem {
     
     // Action taken (if any)
     ActionType action;
+    std::vector<float> motorCommands;   // Motor commands and their effects
     
     // Internal state (energy, reward, etc.)
     float reward;
     float energy;
     float novelty;
+    
+    // Reward prediction and prediction error
+    float rewardPrediction;
+    float predictionError;
+    float predictionConfidence;
+    
+    // Neuromodulation levels (dopamine, novelty, curiosity)
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float neuromodulationIntegration;   // Integration of multiple neuromodulators
     
     // Consequence of action
     std::vector<float> resultingSensoryState;
@@ -37,15 +50,36 @@ struct EpisodicMemoryItem {
     // Associated neural activity pattern (who was firing)
     std::vector<NeuronId> activeNeurons;
     std::vector<float> neuronActivations;
+    std::vector<float> workingMemoryContent;  // Working memory content at time of experience
     
     // Time since this episode
     SimulationStep age;
+    
+    // Memory stability and relevance for consolidation
+    float stabilityScore;
+    float relevanceScore;
+    SimulationStep lastAccessed;
+    
+    // Prediction system state
+    std::vector<float> predictionState;
+    std::vector<float> predictionErrorHistory;
+    
+    // Working memory decay and retention correlation
+    float workingMemoryRetention;
+    float episodicMemoryStrength;
+    
+    // Context and feature vectors for concept formation
+    std::vector<float> contextualFeatures;
     
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0)
+        , rewardPrediction(0), predictionError(0), predictionConfidence(0)
+        , dopamineLevel(0), curiosityLevel(0), noveltyLevel(0), neuromodulationIntegration(0)
+        , stabilityScore(0), relevanceScore(0), lastAccessed(0)
+        , workingMemoryRetention(0), episodicMemoryStrength(0) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate

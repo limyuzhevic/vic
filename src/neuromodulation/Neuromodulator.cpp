@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Neuromodulator.hpp"
 #include <algorithm>
 

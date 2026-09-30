@@ -1,10 +1,10 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Comprehensive Integration Tests for All Connected Systems
 
 #include <iostream>
 #include <cassert>
 
-// Forward declarations of test functions
+// Forward declarations of existing test functions
 namespace test_types {
     void runAll();
 }
@@ -37,16 +37,65 @@ namespace test_brain {
     void runAll();
 }
 
+// Forward declarations of new integration test functions
+namespace test_workingmemory {
+    void runAll();
+}
+
+namespace test_episodicmemory {
+    void runAll();
+}
+
+namespace test_predictionsystem {
+    void runAll();
+}
+
+namespace test_neuralplanner {
+    void runAll();
+}
+
+namespace test_conceptformation {
+    void runAll();
+}
+
+namespace test_neuromodulation {
+    void runAll();
+}
+
+namespace test_sleeprest {
+    void runAll();
+}
+
+namespace test_replay {
+    void runAll();
+}
+
+namespace test_crosssystem {
+    void runAll();
+}
+
+namespace test_brainstep {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Integration Tests ===" << std::endl;
+    std::cout << "Testing Comprehensive Integration of All Brain Systems:" << std::endl;
+    std::cout << "  - Working Memory Integration" << std::endl;
+    std::cout << "  - Episodic Memory Integration" << std::endl;
+    std::cout << "  - Prediction System Integration" << std::endl;
+    std::cout << "  - Neural Planner Integration" << std::endl;
+    std::cout << "  - Concept Formation Integration" << std::endl;
+    std::cout << "  - Neuromodulation Integration" << std::endl;
+    std::cout << "  - Sleep/Rest Integration" << std::endl;
+    std::cout << "  - Replay Mechanism Integration" << std::endl;
+    std::cout << "  - Cross-System Integration" << std::endl;
+    std::cout << "  - Brain::step() Integration Validation" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
     
+    std::cout << "=== Phase 2 Core Tests ===" << std::endl;
     std::cout << "Running Types tests..." << std::endl;
     try {
         test_types::runAll();
@@ -113,6 +162,99 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    std::cout << "=== Phase 6 Integration Tests ===" << std::endl;
+    
+    std::cout << "Running Working Memory Integration tests..." << std::endl;
+    try {
+        test_workingmemory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Episodic Memory Integration tests..." << std::endl;
+    try {
+        test_episodicmemory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction System Integration tests..." << std::endl;
+    try {
+        test_predictionsystem::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neural Planner Integration tests..." << std::endl;
+    try {
+        test_neuralplanner::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Concept Formation Integration tests..." << std::endl;
+    try {
+        test_conceptformation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation Integration tests..." << std::endl;
+    try {
+        test_neuromodulation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Sleep/Rest Integration tests..." << std::endl;
+    try {
+        test_sleeprest::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Replay Mechanism Integration tests..." << std::endl;
+    try {
+        test_replay::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Cross-System Integration tests..." << std::endl;
+    try {
+        test_crosssystem::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Brain::step() Integration Validation tests..." << std::endl;
+    try {
+        test_brainstep::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -237,10 +237,6 @@ void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActi
     }
 }
 
-void NeuralPlanner::clearCache() {
-    // Clear any planning cache
-}
-
 bool NeuralPlanner::wasRecentPlanSuccessful() const {
     if (recentPlanSuccess_.empty()) return true;  // No data
     
@@ -250,6 +246,188 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
     }
     
     return successCount > recentPlanSuccess_.size() / 2;
+}
+
+// Enhanced planning with multi-system integration
+ActionType NeuralPlanner::planActionWithIntegration(const std::vector<float>& currentState,
+                                                  float targetReward,
+                                                  const std::vector<float>* workingMemoryPatterns,
+                                                  const std::vector<float>* episodicFeatures,
+                                                  float predictionConfidence,
+                                                  float neuromodulationLevel) {
+    // Integrate with working memory for action pattern completion
+    std::vector<float> integratedState = currentState;
+    
+    if (workingMemoryPatterns) {
+        // Add working memory patterns to influence planning
+        for (size_t i = 0; i < workingMemoryPatterns->size() && i < 5; ++i) {
+            integratedState.push_back((*workingMemoryPatterns)[i] * 0.5f);
+        }
+    }
+    
+    if (episodicFeatures) {
+        // Add episodic features for experience-based planning
+        for (size_t i = 0; i < episodicFeatures->size() && i < 5; ++i) {
+            integratedState.push_back((*episodicFeatures)[i] * 0.3f);
+        }
+    }
+    
+    // Integrate with prediction confidence
+    float predictionModulation = std::min(1.0f, predictionConfidence * 1.5f);
+    integratedState.push_back(predictionModulation);
+    
+    // Integrate with neuromodulation level
+    float neuromodulationMod = std::min(1.0f, neuromodulationLevel * 2.0f);
+    integratedState.push_back(neuromodulationMod);
+    
+    // Adjust planning depth based on neuromodulation
+    size_t adjustedDepth = planningDepth_;
+    if (neuromodulationLevel > 0.7f) {
+        adjustedDepth = std::min(adjustedDepth * 2, size_t(10));  // More exploration
+    } else if (neuromodulationLevel < 0.3f) {
+        adjustedDepth = std::max(adjustedDepth / 2, size_t(2));  // More exploitation
+    }
+    
+    // Generate and evaluate action sequences with adjusted depth
+    auto sequences = generateActionSequences(adjustedDepth);
+    
+    PlanningCandidate best;
+    best.expectedReward = -1000.0f;
+    
+    // Evaluate each sequence
+    for (const auto& sequence : sequences) {
+        PlanningCandidate candidate = evaluateSequence(sequence, integratedState);
+        
+        if (candidate.expectedReward > best.expectedReward) {
+            best = candidate;
+        }
+    }
+    
+    // Update confidence based on integrated factors
+    if (!sequences.empty()) {
+        planningConfidence_ = best.confidence * predictionModulation * neuromodulationMod;
+        planningConfidence_ = std::clamp(planningConfidence_, 0.1f, 1.0f);
+    }
+    
+    // Store planning metadata for integration
+    PlanningCandidate planningData;
+    planningData.actions = best.actions;
+    planningData.expectedReward = best.expectedReward;
+    planningData.confidence = planningConfidence_;
+    planningData.predictedStates = best.predictedStates;
+    
+    planningHistory_.push_back(planningData);
+    if (planningHistory_.size() > 50) {
+        planningHistory_.erase(planningHistory_.begin());
+    }
+    
+    // Return first action of best sequence
+    if (!best.actions.empty()) {
+        // Record success/failure based on whether we achieved target
+        recentPlanSuccess_.push_back(best.expectedReward >= targetReward);
+        if (recentPlanSuccess_.size() > 10) {
+            recentPlanSuccess_.pop_front();
+        }
+        
+        return best.actions[0];
+    }
+    
+    // Default: wait if no good option
+    return ActionType::Wait;
+}
+
+// Store planning results in episodic memory for learning
+void NeuralPlanner::storePlanningResults(const std::vector<ActionType>& plannedActions,
+                                        const std::vector<float>& predictedStates,
+                                        float planningConfidence,
+                                        float actualOutcome) {
+    PlanningCandidate planningResult;
+    planningResult.actions = plannedActions;
+    planningResult.predictedStates = predictedStates.empty() ? 
+        std::vector<std::vector<float>>(plannedActions.size(), std::vector<float>(10, 0.0f)) :
+        std::vector<std::vector<float>>(1, predictedStates);
+    planningResult.expectedReward = planningConfidence * actualOutcome;
+    planningResult.confidence = planningConfidence;
+    planningResult.depth = plannedActions.size();
+    
+    planningHistory_.push_back(planningResult);
+    if (planningHistory_.size() > 100) {
+        planningHistory_.erase(planningHistory_.begin());
+    }
+}
+
+// Use planning experience for future planning
+void NeuralPlanner::incorporatePlanningExperience(const std::vector<float>& planningState,
+                                                 float successOutcome,
+                                                 const std::vector<ActionType>& actions) {
+    // Update action quality based on planning success
+    for (ActionType action : actions) {
+        size_t actionIdx = static_cast<size_t>(action);
+        if (actionIdx < actionQuality_.size()) {
+            float delta = successOutcome * 0.1f; // Learn from planning success
+            actionQuality_[actionIdx] = std::clamp(actionQuality_[actionIdx] + delta, -1.0f, 1.0f);
+        }
+    }
+    
+    // Store planning state for future integration
+    std::vector<float> planningExperience;
+    planningExperience.insert(planningExperience.end(), planningState.begin(), planningState.end());
+    planningExperience.push_back(successOutcome);
+    
+    planningHistory_.push_back(PlanningCandidate());
+    planningHistory_.back().predictedStates = std::vector<std::vector<float>>(1, planningExperience);
+    if (planningHistory_.size() > 100) {
+        planningHistory_.erase(planningHistory_.begin());
+    }
+}
+
+// Get planning success probability from neuromodulation integration
+float NeuralPlanner::getPlanningSuccessProbability() const {
+    float baseSuccess = wasRecentPlanSuccessful() ? 0.7f : 0.3f;
+    
+    // Integrate with neuromodulation
+    float neuromodFactor = 0.5f + (dopamineModulation_ + curiosityModulation_ + noveltyModulation_) / 3.0f * 0.5f;
+    
+    return baseSuccess * neuromodFactor;
+}
+
+// Connect with attention system for goal maintenance
+void NeuralPlanner::integrateWithAttention(const std::vector<float>& attentionWeights) {
+    attentionWeights_ = attentionWeights;
+    
+    // Apply attention weights to action evaluation
+    for (size_t i = 0; i < std::min(attentionWeights_.size(), actionQuality_.size()); ++i) {
+        actionQuality_[i] *= attentionWeights_[i];
+    }
+}
+
+// Connect with concept formation for abstract planning
+void NeuralPlanner::integrateWithConceptFormation(const std::vector<float>& abstractGoals) {
+    abstractGoals_ = abstractGoals;
+    
+    // Update current goal with abstract concepts
+    currentGoal_.insert(currentGoal_.end(), abstractGoals_.begin(), abstractGoals_.end());
+    
+    // Limit goal size for computational efficiency
+    if (currentGoal_.size() > 20) {
+        currentGoal_.resize(20);
+    }
+}
+
+// Get integrated planning goal from episodic memory and concept formation
+std::vector<float> NeuralPlanner::getIntegratedPlanningGoal() const {
+    std::vector<float> integratedGoal = currentGoal_;
+    
+    // Add abstract goals from concept formation
+    integratedGoal.insert(integratedGoal.end(), abstractGoals_.begin(), abstractGoals_.end());
+    
+    // Add working memory influence if available
+    // (would be passed during planning in real implementation)
+    
+    // Add prediction system influence if available
+    // (would be passed during planning in real implementation)
+    
+    return integratedGoal;
 }
 
 // SelfModel Implementation
@@ -400,7 +578,7 @@ void SelfModel::clear() {
 }
 
 std::vector<float> SelfModel::findMatchingEffect(ActionType action,
-                                                const std::vector<float>& beforeState) const {
+                                                 const std::vector<float>& beforeState) const {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return {};
     

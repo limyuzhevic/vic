@@ -28,6 +28,8 @@ struct PlanningCandidate {
 // - Evaluates potential futures through simulation
 // - Selects actions leading to high-value outcomes
 // - Adapts plans based on prediction confidence
+// - Integrates with working memory, prediction system, episodic memory,
+//   neuromodulation, attention, and concept formation for comprehensive planning
 
 class NeuralPlanner {
 public:
@@ -41,6 +43,17 @@ public:
     // Returns the best action to take now
     ActionType planAction(const std::vector<float>& currentState,
                          float targetReward = 0.5f);
+
+    // Enhanced planning with multi-system integration
+    // Integrates with working memory for action pattern completion
+    // Integrates with prediction system for action outcome prediction
+    // Integrates with neuromodulation for planning confidence
+    ActionType planActionWithIntegration(const std::vector<float>& currentState,
+                                        float targetReward = 0.5f,
+                                        const std::vector<float>* workingMemoryPatterns = nullptr,
+                                        const std::vector<float>* episodicFeatures = nullptr,
+                                        float predictionConfidence = 0.5f,
+                                        float neuromodulationLevel = 0.5f);
 
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
@@ -74,6 +87,29 @@ public:
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;
 
+    // Store planning results in episodic memory for learning
+    void storePlanningResults(const std::vector<ActionType>& plannedActions,
+                            const std::vector<float>& predictedStates,
+                            float planningConfidence,
+                            float actualOutcome = 0.0f);
+
+    // Use planning experience for future planning
+    void incorporatePlanningExperience(const std::vector<float>& planningState,
+                                      float successOutcome,
+                                      const std::vector<ActionType>& actions);
+
+    // Get planning success probability from neuromodulation integration
+    float getPlanningSuccessProbability() const;
+
+    // Connect with attention system for goal maintenance
+    void integrateWithAttention(const std::vector<float>& attentionWeights);
+
+    // Connect with concept formation for abstract planning
+    void integrateWithConceptFormation(const std::vector<float>& abstractGoals);
+
+    // Get integrated planning goal from episodic memory and concept formation
+    std::vector<float> getIntegratedPlanningGoal() const;
+
 private:
     // Generate possible action sequences
     std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
@@ -88,7 +124,7 @@ private:
     size_t planningDepth_;
     float planningConfidence_;
     
-    // Current goal state
+    // Current goal state (integrated from episodic memory and concept formation)
     std::vector<float> currentGoal_;
     
     // Action quality from experience
@@ -96,6 +132,20 @@ private:
     
     // Recent plan success history
     std::deque<bool> recentPlanSuccess_;
+    
+    // Planning history for learning and integration
+    std::vector<PlanningCandidate> planningHistory_;
+    
+    // Neuromodulation factors for planning confidence
+    float dopamineModulation_;
+    float curiosityModulation_;
+    float noveltyModulation_;
+    
+    // Attention integration for goal maintenance
+    std::vector<float> attentionWeights_;
+    
+    // Concept formation integration for abstract planning
+    std::vector<float> abstractGoals_;
 };
 
 // SelfModel: Represents the agent's internal model of itself

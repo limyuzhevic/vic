@@ -72,8 +72,15 @@ struct Brain::Impl {
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
+    size_t stepsSinceRestStart;
     size_t replayInterval;
     size_t consolidationInterval;
+    size_t restThreshold;
+    size_t restDuration;
+    float consolidationBoostFactor;
+    float neuromodulationBoost;
+    bool enhancedReplay;
+    bool synapticHomeostasis;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -90,8 +97,15 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
+        , stepsSinceRestStart(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , restThreshold(1000)      // Rest threshold: 1000 steps of low activity
+        , restDuration(2000)       // Rest duration: 2000 steps
+        , consolidationBoostFactor(1.5f)  // Memory consolidation boost during rest
+        , neuromodulationBoost(1.5f)      // Neuromodulation boost during rest
+        , enhancedReplay(true)
+        , synapticHomeostasis(true)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -329,8 +343,158 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
     
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    // ========== REST/SLEEP DETECTION AND STATE MANAGEMENT ==========
+    
+    // Calculate current neural activity (firing rate / total neurons)
+    float currentActivity = 0.0f;
+    size_t activeNeurons = getActiveNeuronCount();
+    size_t totalNeurons = getTotalNeuronCount();
+    
+    if (totalNeurons > 0) {
+        currentActivity = static_cast<float>(activeNeurons) / totalNeurons;
+    }
+    
+    // Rest detection - enter resting state when activity is low for extended time
+    if (pImpl->isResting) {
+        // We're in rest mode, accumulate rest time
+        pImpl->stepsSinceRestStart++;
+        
+        // Exit rest when activity exceeds threshold for a short period
+        if (currentActivity > 0.05f) {  // Activity threshold to wake up
+            pImpl->stepsSinceRestStart = 0;
+        } else if (pImpl->stepsSinceRestStart >= pImpl->restDuration) {
+            // Force exit after max rest duration
+            pImpl->stepsSinceRestStart = 0;
+        }
+    } else {
+        // Active state - check if we should enter rest
+        if (currentActivity < 0.02f && pImpl->stepsSinceLastEpisode >= pImpl->restThreshold) {
+            // Enter resting state - enhanced consolidation phase
+            pImpl->isResting = true;
+            pImpl->stepsSinceRestStart = 0;
+            
+            // Reset activity counters for enhanced processing
+            pImpl->stepsSinceLastEpisode = 0;
+            
+            // Apply neuromodulatory boost for sleep-dependent consolidation
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * pImpl->neuromodulationBoost);
+            }
+            
+            // Enhanced replay during rest for memory consolidation
+            if (pImpl->enhancedReplay) {
+                pImpl->replayInterval = 50;  // More frequent replay during rest
+            }
+            
+            // Apply synaptic homeostasis during sleep
+            if (pImpl->synapticHomeostasis) {
+                // Synaptic downscaling - reduce weights globally
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        if (syn->getType() == SynapseType::Excitatory) {
+                            float currentWeight = syn->getWeight();
+                            if (currentWeight > 0.1f) {
+                                // Gradually weaken synapses for homeostatic balance
+                                syn->setWeight(currentWeight * 0.98f);
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Track time since last activity below threshold
+            if (currentActivity < 0.02f) {
+                pImpl->stepsSinceLastEpisode++;
+            } else {
+                pImpl->stepsSinceLastEpisode = 0;
+            }
+        }
+    }
+    
+    // Enhanced consolidation during rest with lower thresholds
+    if (pImpl->isResting) {
+        pImpl->stepsSinceLastEpisode = 0;  // Always consolidate during rest
+        
+        // Store current state as a snapshot of consolidation target
+        if (pImpl->episodicMemory) {
+            // Enhanced memory consolidation - focus on stable, important memories
+            // Lower threshold for consolidation during rest
+            pImpl->episodicMemory->consolidate(0.2f);  // Lower threshold for better retention
+            
+            // Enhanced replay during rest for systems consolidation
+            if (pImpl->enhancedReplay) {
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+                for (const auto* episode : episodesToReplay) {
+                    // Boost replay strength during rest
+                    pImpl->episodicMemory->replayEpisode(episode);
+                    
+                    // Store replay pattern in working memory for integration
+                    if (pImpl->workingMemory) {
+                        pImpl->workingMemory->strengthenMemory(episode->stabilityScore * 1.5f);
+                    }
+                }
+            }
+            
+            // Working memory consolidation and transfer to long-term
+            if (pImpl->workingMemory) {
+                // Decay working memory during rest for long-term transfer
+                pImpl->workingMemory->decay(0.02f);
+                
+                // Periodic memory transfer during rest
+                if (pImpl->stepsSinceRestStart % 500 == 0) {
+                    // Transfer stable working memory patterns to episodic memory
+                    pImpl->workingMemory->consolidateToEpisodic(this);
+                }
+            }
+        }
+        
+        // Enhanced neuromodulatory effects during rest
+        if (pImpl->dopamine) {
+            // Increase dopamine for memory consolidation and reward prediction
+            float baseDopamine = 0.3f + std::sin(pImpl->currentTime * 0.001f) * 0.2f;
+            pImpl->dopamine->setLevel(baseDopamine * pImpl->neuromodulationBoost);
+        }
+        
+        if (pImpl->curiosity) {
+            // Reduce curiosity during rest (focus on consolidation)
+            pImpl->curiosity->update(pImpl->timestep);
+        }
+        
+        if (pImpl->novelty) {
+            // Novelty detection during rest for memory prioritization
+            pImpl->novelty->update(pImpl->timestep * 0.5f);
+        }
+        
+        // Restore normal state management during rest
+        if (pImpl->stepsSinceRestStart >= pImpl->restDuration) {
+            // Enhanced wake-up with refreshed state
+            pImpl->isResting = false;
+            
+            // Neuromodulatory effects during wake-up
+            if (pImpl->dopamine) {
+                // Bursty dopamine during wake-up for attention and alert processing
+                pImpl->dopamine->setLevel(0.8f);
+            }
+            
+            if (pImpl->novelty) {
+                // Enhanced novelty detection after rest
+                pImpl->novelty->setLevel(0.9f);
+            }
+            
+            // Enhanced curiosity after rest for exploration
+            if (pImpl->curiosity) {
+                pImpl->curiosity->setLevel(0.7f);
+            }
+            
+            // Reset rest duration counter
+            pImpl->stepsSinceRestStart = 0;
+        }
+    }
+    
+    // Restore normal replay intervals when not resting
+    if (!pImpl->isResting) {
+        pImpl->replayInterval = 100;  // Normal replay frequency
+    }
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
@@ -537,16 +701,75 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
+    // ========== STEP 12: Enhanced replay system setup ==========
+    
+    // Initialize enhanced replay configuration and control mechanisms
+    if (!pImpl->replaySystemInitialized) {
+        initializeEnhancedReplaySystem();
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // Configure replay triggers and control mechanisms
+    updateReplayTriggers(currentStep);
+    
+    // ========== STEP 13: Enhanced replay execution ==========
+    
+    // Execute replay during active periods
+    if (pImpl->activeReplay) {
+        executeEnhancedReplay(currentStep);
+    }
+    
+    // ========== STEP 14: Replay learning and consolidation ==========
+    
+    // Refine prediction system predictions through replay
+    if (pImpl->predictionSystem && currentStep % pImpl->predictionRefinementInterval == 0) {
+        refinePredictionSystemThroughReplay(currentStep);
+    }
+    
+    // Consolidate concept formation through replay
+    if (pImpl->conceptFormation && currentStep % pImpl->conceptConsolidationInterval == 0) {
+        consolidateConceptsThroughReplay(currentStep);
+    }
+    
+    // Enhance planning capabilities through replay
+    if (pImpl->planner && currentStep % pImpl->planningEnhancementInterval == 0) {
+        enhancePlanningThroughReplay(currentStep);
+    }
+    
+    // ========== STEP 15: Enhanced replay mechanisms ==========
+    
+    // Execute forward replay of episodic sequences
+    if (currentStep % pImpl->forwardReplayInterval == 0) {
+        executeForwardReplay(currentStep);
+    }
+    
+    // Execute reverse replay for consolidation
+    if (currentStep % pImpl->reverseReplayInterval == 0) {
+        executeReverseReplay(currentStep);
+    }
+    
+    // Execute targeted replay of important memories
+    if (currentStep % pImpl->targetedReplayInterval == 0) {
+        executeTargetedReplay(currentStep);
+    }
+    
+    // ========== STEP 16: Replay integration with other systems ==========
+    
+    // Integrate replay with neuromodulation systems
+    integrateReplayWithNeuromodulation(currentStep);
+    
+    // Integrate replay with attention and working memory
+    integrateReplayWithWorkingMemory(currentStep);
+    
+    // Integrate replay with prediction system learning
+    integrateReplayWithPredictionSystem(currentStep);
+    
+    // Integrate replay with concept formation
+    integrateReplayWithConceptFormation(currentStep);
+    
+    // Integrate replay with planning and action selection
+    integrateReplayWithPlanningSystem(currentStep);
+    
+    // ========== STEP 17: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -560,6 +783,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 case DevelopmentalStage::Initial:
                     plasticityMod = 1.0f;  // High plasticity
                     break;
+                case DevelopmentalStage::CriticalPeriod:
+                    plasticityMod = 0.8f;
+                    break;
+                case DevelopmentalStage::Maturation:
+                    plasticityMod = 0.5f;
+                    break;
+                case DevelopmentalStage::Adult:
+                    plasticityMod = 0.2f;  // Stable
+                    break;
+            }
+            
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+    }
+    
+    // ========== STEP 18: Collect statistics ==========
+    
+    // Collect replay system statistics
+    collectReplayStatistics(currentStep);
                 case DevelopmentalStage::CriticalPeriod:
                     plasticityMod = 0.8f;
                     break;
@@ -1077,41 +1320,617 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+// Enhanced replay system implementation
+
+void Brain::initializeEnhancedReplaySystem() {
+    if (pImpl->enhancedReplaySystemInitialized) return;
     
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    NLM_LOG_INFO("Initializing enhanced replay system...");
+    
+    // Configure replay intervals and consolidation cycles
+    pImpl->forwardReplayInterval = pImpl->config->getOr<size_t>("forward_replay_interval", 50);
+    pImpl->reverseReplayInterval = pImpl->config->getOr<size_t>("reverse_replay_interval", 75);
+    pImpl->targetedReplayInterval = pImpl->config->getOr<size_t>("targeted_replay_interval", 100);
+    pImpl->predictionRefinementInterval = pImpl->config->getOr<size_t>("prediction_refinement_interval", 200);
+    pImpl->conceptConsolidationInterval = pImpl->config->getOr<size_t>("concept_consolidation_interval", 300);
+    pImpl->planningEnhancementInterval = pImpl->config->getOr<size_t>("planning_enhancement_interval", 400);
+    
+    // Configure replay triggers and control mechanisms
+    pImpl->replayEnabled = true;
+    pImpl->sleepReplayEnabled = pImpl->config->getOr<bool>("sleep_replay_enabled", true);
+    pImpl->targetedReplayEnabled = pImpl->config->getOr<bool>("targeted_replay_enabled", true);
+    pImpl->reverseReplayEnabled = pImpl->config->getOr<bool>("reverse_replay_enabled", true);
+    
+    // Configure replay integration with working memory
+    pImpl->workingMemoryIntegrationEnabled = true;
+    pImpl->workingMemoryIntegrationInterval = pImpl->config->getOr<size_t>("working_memory_integration_interval", 150);
+    
+    // Configure replay integration with attention system
+    pImpl->attentionIntegrationEnabled = true;
+    pImpl->attentionIntegrationInterval = pImpl->config->getOr<size_t>("attention_integration_interval", 125);
+    
+    // Configure replay integration with neuromodulation systems
+    pImpl->neuromodulationIntegrationEnabled = true;
+    pImpl->neuromodulationIntegrationInterval = pImpl->config->getOr<size_t>("neuromodulation_integration_interval", 175);
+    
+    // Configure replay integration with prediction system
+    pImpl->predictionIntegrationEnabled = true;
+    pImpl->predictionIntegrationInterval = pImpl->config->getOr<size_t>("prediction_integration_interval", 225);
+    
+    // Configure replay integration with concept formation
+    pImpl->conceptFormationIntegrationEnabled = true;
+    pImpl->conceptFormationIntegrationInterval = pImpl->config->getOr<size_t>("concept_formation_integration_interval", 275);
+    
+    // Configure replay integration with planning system
+    pImpl->planningIntegrationEnabled = true;
+    pImpl->planningIntegrationInterval = pImpl->config->getOr<size_t>("planning_integration_interval", 325);
+    
+    pImpl->enhancedReplaySystemInitialized = true;
+    NLM_LOG_INFO("Enhanced replay system initialized successfully");
+}
+
+void Brain::updateReplayTriggers(SimulationStep currentStep) {
+    if (!pImpl->enhancedReplay) return;
+    
+    // Check sleep triggers
+    if (currentStep % pImpl->sleepDetectionInterval == 0) {
+        detectSleepState(currentStep);
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    // Check novelty triggers
+    if (currentStep % pImpl->noveltyDetectionInterval == 0) {
+        detectNoveltyForReplay(currentStep);
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    // Check prediction error triggers
+    if (currentStep % pImpl->predictionErrorDetectionInterval == 0 && pImpl->predictionError) {
+        detectPredictionErrorForReplay(currentStep);
     }
+    
+    // Check attention triggers
+    if (currentStep % pImpl->attentionDetectionInterval == 0) {
+        detectAttentionForReplay(currentStep);
+    }
+}
+
+void Brain::detectSleepState(SimulationStep currentStep) {
+    // Calculate current neural activity
+    float currentActivity = 0.0f;
+    size_t activeNeurons = getActiveNeuronCount();
+    size_t totalNeurons = getTotalNeuronCount();
+    
+    if (totalNeurons > 0) {
+        currentActivity = static_cast<float>(activeNeurons) / totalNeurons;
+    }
+    
+    // Check if we should enter sleeping state
+    if (!pImpl->isResting && currentActivity < pImpl->lowActivityThreshold) {
+        // Enter resting state - enhanced consolidation phase
+        pImpl->isResting = true;
+        pImpl->stepsSinceRestStart = 0;
+        pImpl->stepsSinceLastEpisode = 0;
+        
+        // Apply neuromodulatory boost for sleep-dependent consolidation
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * pImpl->neuromodulationBoost);
+        }
+        
+        NLM_LOG_INFO("Brain entering resting/sleeping state for memory consolidation");
+    } else if (pImpl->isResting && currentActivity > pImpl->activityThresholdToWake) {
+        // Exit resting state
+        pImpl->isResting = false;
+        NLM_LOG_INFO("Brain exiting resting state");
+    }
+}
+
+void Brain::detectNoveltyForReplay(SimulationStep currentStep) {
+    if (!pImpl->novelty) return;
+    
+    float novelty = pImpl->novelty->getLevel();
+    
+    // If novelty is high, prioritize episodic memory storage and replay
+    if (novelty > pImpl->noveltyThresholdForReplay) {
+        NLM_LOG_INFO("High novelty detected (" + std::to_string(novelty) + "), enabling targeted replay");
+        pImpl->enableTargetedReplay = true;
+        pImpl->targetedReplayPriority = novelty;
+    }
+}
+
+void Brain::detectPredictionErrorForReplay(SimulationStep currentStep) {
+    if (!pImpl->predictionError) return;
+    
+    float predictionError = std::abs(pImpl->predictionError->getLevel());
+    
+    // If prediction error is high, prioritize learning through replay
+    if (predictionError > pImpl->predictionErrorThresholdForReplay) {
+        NLM_LOG_INFO("High prediction error detected (" + std::to_string(predictionError) + "), enabling reverse replay for learning");
+        pImpl->enableReverseReplay = true;
+        pImpl->reverseReplayLearningPriority = predictionError;
+    }
+}
+
+void Brain::detectAttentionForReplay(SimulationStep currentStep) {
+    if (!pImpl->attention) return;
+    
+    float attentionLevel = pImpl->attention->getAttentionLevel();
+    
+    // If attention is high, enable enhanced replay
+    if (attentionLevel > pImpl->attentionThresholdForReplay) {
+        NLM_LOG_INFO("High attention detected (" + std::to_string(attentionLevel) + "), enabling enhanced replay");
+        pImpl->enableAttentionEnhancedReplay = true;
+        pImpl->attentionEnhancedReplayPriority = attentionLevel;
+    }
+}
+
+void Brain::executeEnhancedReplay(SimulationStep currentStep) {
+    if (!pImpl->episodicMemory) return;
+    
+    // Execute different types of replay based on configuration
+    
+    // Forward replay during active periods
+    if (pImpl->forwardReplayEnabled && currentStep % pImpl->forwardReplayInterval == 0) {
+        executeForwardReplay(currentStep);
+    }
+    
+    // Reverse replay during learning phases
+    if (pImpl->reverseReplayEnabled && currentStep % pImpl->reverseReplayInterval == 0) {
+        executeReverseReplay(currentStep);
+    }
+    
+    // Targeted replay during novelty/attention phases
+    if (pImpl->targetedReplayEnabled && pImpl->enableTargetedReplay) {
+        executeTargetedReplay(currentStep);
+    }
+    
+    // Sleep/rest period replay
+    if (pImpl->isResting && pImpl->sleepReplayEnabled) {
+        executeSleepRestReplay(currentStep);
+    }
+}
+
+void Brain::executeForwardReplay(SimulationStep currentStep) {
+    if (!pImpl->episodicMemory) return;
+    
+    NLM_LOG_DEBUG("Executing forward replay at step " + std::to_string(currentStep));
+    
+    // Get high-relevance episodes for forward replay
+    auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(2);
+    
+    for (const auto* episode : episodesToReplay) {
+        pImpl->episodicMemory->replayEpisode(episode);
+        
+        // Strengthen working memory representations
+        if (pImpl->workingMemory && pImpl->workingMemoryIntegrationEnabled) {
+            strengthenWorkingMemoryThroughReplay(currentStep, episode);
+        }
+    }
+}
+
+void Brain::executeReverseReplay(SimulationStep currentStep) {
+    if (!pImpl->episodicMemory) return;
+    
+    NLM_LOG_DEBUG("Executing reverse replay at step " + std::to_string(currentStep));
+    
+    // Get episodes for reverse replay (learning/reinforcement)
+    auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToReplay) {
+        // Enhance prediction system through reverse replay
+        if (pImpl->predictionSystem && pImpl->predictionIntegrationEnabled) {
+            enhancePredictionSystemThroughReverseReplay(currentStep, episode);
+        }
+        
+        // Enhance concept formation through reverse replay
+        if (pImpl->conceptFormation && pImpl->conceptFormationIntegrationEnabled) {
+            enhanceConceptFormationThroughReverseReplay(currentStep, episode);
+        }
+        
+        // Enhance planning through reverse replay
+        if (pImpl->planner && pImpl->planningIntegrationEnabled) {
+            enhancePlanningThroughReverseReplay(currentStep, episode);
+        }
+        
+        // Standard replay
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+}
+
+void Brain::executeTargetedReplay(SimulationStep currentStep) {
+    if (!pImpl->episodicMemory) return;
+    
+    NLM_LOG_DEBUG("Executing targeted replay at step " + std::to_string(currentStep));
+    
+    // Get high-priority episodes for targeted replay
+    auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+    
+    for (const auto* episode : episodesToReplay) {
+        // Apply enhanced neuromodulation for targeted replay
+        if (pImpl->dopamine && pImpl->neuromodulationIntegrationEnabled) {
+            applyEnhancedNeuromodulationForTargetedReplay(currentStep, episode);
+        }
+        
+        // Apply attentional selection for targeted replay
+        if (pImpl->attention && pImpl->attentionIntegrationEnabled) {
+            applyAttentionSelectionForTargetedReplay(currentStep, episode);
+        }
+        
+        // Enhanced replay for novel experiences
+        if (episode->novelty > pImpl->noveltyThresholdForReplay) {
+            enhanceReplayForNovelExperience(currentStep, episode);
+        }
+        
+        // Standard replay
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+}
+
+void Brain::executeSleepRestReplay(SimulationStep currentStep) {
+    if (!pImpl->episodicMemory || !pImpl->sleepReplayEnabled) return;
+    
+    NLM_LOG_DEBUG("Executing sleep/rest replay at step " + std::to_string(currentStep));
+    
+    // Enhanced replay during sleep for consolidation
+    auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(4);
+    
+    for (const auto* episode : episodesToReplay) {
+        // Apply sleep-specific enhancements
+        applySleepReplayEnhancements(currentStep, episode);
+        
+        // Enhanced working memory consolidation
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->strengthenMemory(episode->stabilityScore * 1.5f);
+        }
+        
+        // Enhanced prediction system learning
+        if (pImpl->predictionSystem) {
+            pImpl->predictionSystem->train(episode->sensoryState);
+        }
+        
+        // Enhanced concept formation
+        if (pImpl->conceptFormation) {
+            std::vector<float> replayFeatures = episode->sensoryFeatures;
+            replayFeatures.insert(replayFeatures.end(), 
+                                episode->contextualFeatures.begin(), 
+                                episode->contextualFeatures.end());
+            replayFeatures.push_back(episode->reward);
+            replayFeatures.push_back(episode->noveltyLevel);
+            
+            pImpl->conceptFormation->updateConcept(replayFeatures, currentTime);
+        }
+        
+        // Standard replay
+        pImpl->episodicMemory->replayEpisode(episode);
+    }
+}
+
+void Brain::refinePredictionSystemThroughReplay(SimulationStep currentStep) {
+    if (!pImpl->predictionSystem || !pImpl->episodicMemory) return;
+    
+    NLM_LOG_DEBUG("Refining prediction system through replay at step " + std::to_string(currentStep));
+    
+    // Get episodes with good prediction accuracy
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Refine prediction based on episode outcomes
+        if (std::abs(episode->predictionError) < 0.3f) {
+            // Good prediction - reinforce
+            pImpl->predictionSystem->train(episode->sensoryState);
+        } else {
+            // Poor prediction - correct through replay
+            pImpl->predictionSystem->correctPrediction(episode->sensoryState, episode->predictionError);
+        }
+    }
+}
+
+void Brain::consolidateConceptsThroughReplay(SimulationStep currentStep) {
+    if (!pImpl->conceptFormation || !pImpl->episodicMemory) return;
+    
+    NLM_LOG_DEBUG("Consolidating concepts through replay at step " + std::to_string(currentStep));
+    
+    // Get episodes with strong feature correlations
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(2);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Enhance concept integration through replay
+        std::vector<float> enhancedFeatures = episode->sensoryFeatures;
+        enhancedFeatures.insert(enhancedFeatures.end(),
+                              episode->contextualFeatures.begin(),
+                              episode->contextualFeatures.end());
+        enhancedFeatures.push_back(episode->reward);
+        
+        pImpl->conceptFormation->updateConcept(enhancedFeatures, currentTime);
+    }
+}
+
+void Brain::enhancePlanningThroughReplay(SimulationStep currentStep) {
+    if (!pImpl->planner || !pImpl->episodicMemory) return;
+    
+    NLM_LOG_DEBUG("Enhancing planning through replay at step " + std::to_string(currentStep));
+    
+    // Get episodes with goal-related information
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(4);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Enhance planning based on episode outcomes and goals
+        if (episode->reward > 0.0f) {
+            // Successful episode - reinforce successful strategies
+            pImpl->planner->reinforceSuccessfulAction(episode->action, episode->reward);
+        } else if (episode->reward < 0.0f) {
+            // Unsuccessful episode - adjust planning strategies
+            pImpl->planner->adjustPlanningStrategy(episode->action, std::abs(episode->reward));
+        }
+    }
+}
+
+void Brain::integrateReplayWithNeuromodulation(SimulationStep currentStep) {
+    if (!pImpl->neuromodulationIntegrationEnabled || !pImpl->episodicMemory) return;
+    
+    if (currentStep % pImpl->neuromodulationIntegrationInterval != 0) return;
+    
+    NLM_LOG_DEBUG("Integrating replay with neuromodulation at step " + std::to_string(currentStep));
+    
+    // Get recent episodes
+    auto episodes = pImpl->episodicMemory->getRecentEpisodes(5);
+    
+    for (const auto& episode : episodes) {
+        // Apply neuromodulatory effects to replay
+        if (pImpl->dopamine) {
+            float dopamineEffect = (episode->reward > 0.0f) ? 
+                                  episode->reward * pImpl->neuromodulationBoost : 
+                                  episode->reward;
+            pImpl->dopamine->setLevel(dopamine->getLevel() + dopamineEffect * 0.1f);
+        }
+        
+        if (pImpl->curiosity) {
+            // Curiosity-based replay enhancement
+            pImpl->curiosity->update(pImpl->timestep * 0.5f);
+        }
+        
+        if (pImpl->novelty) {
+            // Novelty-based replay enhancement
+            float noveltyEffect = episode->novelty * pImpl->noveltyBoost;
+            // Apply novelty to replay selection
+        }
+        
+        if (pImpl->predictionError) {
+            // Prediction error-based replay enhancement
+            float errorEffect = std::abs(episode->predictionError) * pImpl->predictionErrorBoost;
+            // Apply prediction error to replay
+        }
+    }
+}
+
+void Brain::integrateReplayWithWorkingMemory(SimulationStep currentStep) {
+    if (!pImpl->workingMemoryIntegrationEnabled || !pImpl->episodicMemory || !pImpl->workingMemory) return;
+    
+    if (currentStep % pImpl->workingMemoryIntegrationInterval != 0) return;
+    
+    NLM_LOG_DEBUG("Integrating replay with working memory at step " + std::to_string(currentStep));
+    
+    // Get episodes for working memory integration
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Integrate episode into working memory
+        if (!episode->workingMemoryContent.empty()) {
+            pImpl->workingMemory->store(episode->workingMemoryContent, episode->workingMemoryRetention);
+        }
+        
+        // Strengthen working memory through replay
+        pImpl->workingMemory->strengthenMemory(episode->workingMemoryRetention * 1.2f);
+        
+        // Transfer stable working memory patterns to episodic memory
+        pImpl->workingMemory->consolidateToEpisodic(this);
+    }
+}
+
+void Brain::integrateReplayWithPredictionSystem(SimulationStep currentStep) {
+    if (!pImpl->predictionIntegrationEnabled || !pImpl->episodicMemory || !pImpl->predictionSystem) return;
+    
+    if (currentStep % pImpl->predictionIntegrationInterval != 0) return;
+    
+    NLM_LOG_DEBUG("Integrating replay with prediction system at step " + std::to_string(currentStep));
+    
+    // Get episodes with good prediction accuracy
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(4);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Update prediction system with replayed experience
+        pImpl->predictionSystem->train(episode->sensoryState);
+        
+        // Refine prediction based on episode outcomes
+        if (episode->predictionConfidence > 0.5f) {
+            pImpl->predictionSystem->updateExpectedReward(episode->reward, episode->predictionConfidence);
+        }
+    }
+}
+
+void Brain::integrateReplayWithConceptFormation(SimulationStep currentStep) {
+    if (!pImpl->conceptFormationIntegrationEnabled || !pImpl->episodicMemory || !pImpl->conceptFormation) return;
+    
+    if (currentStep % pImpl->conceptFormationIntegrationInterval != 0) return;
+    
+    NLM_LOG_DEBUG("Integrating replay with concept formation at step " + std::to_string(currentStep));
+    
+    // Get episodes with rich feature information
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(2);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Enhance concept formation through replayed features
+        std::vector<float> replayFeatures = episode->sensoryFeatures;
+        replayFeatures.insert(replayFeatures.end(),
+                            episode->contextualFeatures.begin(),
+                            episode->contextualFeatures.end());
+        replayFeatures.push_back(episode->reward);
+        replayFeatures.push_back(episode->noveltyLevel);
+        
+        pImpl->conceptFormation->updateConcept(replayFeatures, currentTime);
+    }
+}
+
+void Brain::integrateReplayWithPlanningSystem(SimulationStep currentStep) {
+    if (!pImpl->planningIntegrationEnabled || !pImpl->episodicMemory || !pImpl->planner) return;
+    
+    if (currentStep % pImpl->planningIntegrationInterval != 0) return;
+    
+    NLM_LOG_DEBUG("Integrating replay with planning system at step " + std::to_string(currentStep));
+    
+    // Get episodes with goal-related information
+    auto episodesToProcess = pImpl->episodicMemory->getEpisodesForReplay(3);
+    
+    for (const auto* episode : episodesToProcess) {
+        // Update planning system based on episode outcomes
+        if (episode->action != ActionType::Wait) {
+            // Update action preferences based on episode success
+            pImpl->planner->updateActionPreference(episode->action, 
+                                                 episode->reward, 
+                                                 episode->predictionConfidence);
+        }
+    }
+}
+
+void Brain::strengthenWorkingMemoryThroughReplay(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->workingMemory) return;
+    
+    // Store episode in working memory
+    pImpl->workingMemory->store(episode->sensoryState, episode->stabilityScore * 1.5f);
+    
+    // Strengthen memory traces
+    pImpl->workingMemory->strengthenMemory(episode->workingMemoryRetention * 1.2f);
+}
+
+void Brain::enhancePredictionSystemThroughReverseReplay(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->predictionSystem) return;
+    
+    // Enhance prediction through reverse replay
+    if (episode->predictionError > 0.0f) {
+        // Use prediction error to correct predictions
+        pImpl->predictionSystem->correctPrediction(episode->sensoryState, episode->predictionError);
+    } else {
+        // Reinforce successful predictions
+        pImpl->predictionSystem->train(episode->sensoryState);
+    }
+}
+
+void Brain::enhanceConceptFormationThroughReverseReplay(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->conceptFormation) return;
+    
+    // Enhance concept formation through reverse replay
+    std::vector<float> replayFeatures = episode->sensoryFeatures;
+    replayFeatures.insert(replayFeatures.end(),
+                        episode->contextualFeatures.begin(),
+                        episode->contextualFeatures.end());
+    
+    pImpl->conceptFormation->updateConcept(replayFeatures, currentTime);
+}
+
+void Brain::enhancePlanningThroughReverseReplay(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->planner) return;
+    
+    // Enhance planning through reverse replay
+    if (episode->action != ActionType::Wait) {
+        pImpl->planner->updateActionOutcome(episode->action, episode->reward, episode->predictionConfidence);
+    }
+}
+
+void Brain::applyEnhancedNeuromodulationForTargetedReplay(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->dopamine) return;
+    
+    // Apply enhanced neuromodulation for targeted replay
+    float neuromodulationEffect = pImpl->targetedReplayPriority * pImpl->neuromodulationBoost;
+    
+    if (episode->reward > 0.0f) {
+        // Positive reward - enhance dopamine
+        pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() + neuromodulationEffect * 0.2f);
+    } else {
+        // Negative reward - modulate dopamine
+        pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() - neuromodulationEffect * 0.1f);
+    }
+}
+
+void Brain::applyAttentionSelectionForTargetedReplay(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->attention) return;
+    
+    // Apply attentional selection for targeted replay
+    float attentionEffect = pImpl->attentionEnhancedReplayPriority * pImpl->attentionBoost;
+    
+    // Update attention based on episode characteristics
+    pImpl->attention->updateAttention(attentionEffect);
+}
+
+void Brain::enhanceReplayForNovelExperience(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    if (!pImpl->novelty) return;
+    
+    // Enhance replay for novel experiences
+    float noveltyBoost = episode->novelty * pImpl->noveltyBoost;
+    
+    // Apply novelty boost to replay strength
+    pImpl->episodicMemory->updateRelevance(currentStep, noveltyBoost);
+}
+
+void Brain::applySleepReplayEnhancements(SimulationStep currentStep, const EpisodicMemoryItem* episode) {
+    // Apply sleep-specific enhancements to replay
+    
+    // Enhance with slow oscillation synchronization
+    if (pImpl->deltaWaves) {
+        pImpl->deltaWaves->enhanceMemoryConsolidation(episode->stabilityScore);
+    }
+    
+    // Enhance with synaptic downscaling
+    if (pImpl->synapticHomeostasis) {
+        applySynapticDownscalingForSleepReplay(episode);
+    }
+    
+    // Enhance with systems consolidation
+    if (pImpl->hippocampalCorticalIntegration) {
+        pImpl->hippocampalCorticalIntegration->enhanceSystemsConsolidation(episode);
+    }
+}
+
+void Brain::applySynapticDownscalingForSleepReplay(const EpisodicMemoryItem* episode) {
+    if (!pImpl->synapticHomeostasis) return;
+    
+    // Apply synaptic downscaling for sleep replay
+    for (auto& region : pImpl->regions) {
+        for (auto* syn : region->getSynapses()) {
+            if (syn->getType() == SynapseType::Excitatory) {
+                float currentWeight = syn->getWeight();
+                if (currentWeight > 0.1f) {
+                    // Gradually weaken synapses for homeostatic balance during sleep
+                    syn->setWeight(currentWeight * 0.99f);
+                }
+            }
+        }
+    }
+}
+
+void Brain::collectReplayStatistics(SimulationStep currentStep) {
+    if (!pImpl->replayStatistics) return;
+    
+    // Collect replay system statistics
+    pImpl->replayStatistics->update(currentStep);
+    
+    // Log statistics periodically
+    if (currentStep % pImpl->statsCollectionInterval == 0) {
+        logReplayStatistics();
+    }
+}
+
+void Brain::logReplayStatistics() const {
+    if (!pImpl->replayStatistics) return;
+    
+    NLM_LOG_INFO("=== Enhanced Replay Statistics ===");
+    NLM_LOG_INFO("Total replay operations: " + std::to_string(pImpl->replayStatistics->totalReplayOperations));
+    NLM_LOG_INFO("Successful replays: " + std::to_string(pImpl->replayStatistics->successfulReplays));
+    NLM_LOG_INFO("Failed replays: " + std::to_string(pImpl->replayStatistics->failedReplays));
+    NLM_LOG_INFO("Consolidation cycles: " + std::to_string(pImpl->replayStatistics->consolidationCyclesCompleted));
+    NLM_LOG_INFO("Pattern improvements: " + std::to_string(pImpl->replayStatistics->patternImprovements));
+    NLM_LOG_INFO("Concept formations: " + std::to_string(pImpl->replayStatistics->conceptFormations));
+    NLM_LOG_INFO("Planning enhancements: " + std::to_string(pImpl->replayStatistics->planningEnhancements));
+    NLM_LOG_INFO("Prediction refinements: " + std::to_string(pImpl->replayStatistics->predictionRefinements));
+    NLM_LOG_INFO("Replay throughput: " + std::to_string(pImpl->replayStatistics->replayThroughput));
+    NLM_LOG_INFO("System integration score: " + std::to_string(pImpl->replayStatistics->systemIntegrationScore));
 }
 
 } // namespace nlm

@@ -167,19 +167,69 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveAfterAction
 void NeuralEpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
     if (!episode || !brain_) return;
     
-    // Reactivate neurons that were active during this episode
+    // Reactivate neurons that were active during this episode with enhanced replay
     for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
         NeuronId neuron = episode->activeNeurons[i];
         float activation = i < episode->neuronActivations.size() ? 
                           episode->neuronActivations[i] : 0.5f;
         
-        // Inject current to reawaken this pattern
-        brain_->injectCurrent(neuron, activation * 3.0f);
+        // Enhanced replay - higher activation for better pattern completion
+        float replayActivation = activation * 2.0f;  // Boost replay strength
+        
+        // Inject current to reawaken this pattern with enhanced strength
+        brain_->injectCurrent(neuron, replayActivation * 3.0f);
+        
+        // Store replay pattern in working memory for integration
+        if (brain_->getWorkingMemory()) {
+            brain_->getWorkingMemory()->storeToNeuron(
+                neuron,
+                replayActivation,
+                replayActivation * 1.5f,  // Enhanced magnitude for replay
+                brain_->getCurrentTime(),
+                activation * 0.5f   // Feature encoding
+            );
+            
+            // Strengthen memory trace based on episode stability
+            brain_->getWorkingMemory()->strengthenMemory(episode->stabilityScore * 1.5f);
+        }
     }
     
-    // Also inject sensory pattern if available
-    if (!episode->sensoryState.empty()) {
-        // This would go through sensory channels - simplified here
+    // Also inject sensory pattern if available with enhanced encoding
+    if (!episode->sensoryState.empty() && brain_->getWorkingMemory()) {
+        // Store sensory pattern for concept formation and prediction
+        brain_->getWorkingMemory()->store(
+            episode->sensoryState,
+            episode->noveltyLevel * 2.0f  // Enhanced strength for novel experiences
+        );
+        
+        // Enhance prediction system with sensory pattern
+        if (brain_->getPredictionSystem()) {
+            // Update prediction system with replayed experience
+            brain_->getPredictionSystem()->train(episode->sensoryState);
+        }
+    }
+    
+    // Enhance neuromodulation based on replayed episode
+    if (brain_->getDopamine() && episode->dopamineLevel > 0.0f) {
+        // Apply dopamine modulation based on replayed episode reward prediction
+        brain_->getDopamine()->recordActionOutcome(
+            ActionType::Wait,  // Would be actual action from episode
+            episode->rewardPrediction * episode->predictionConfidence
+        );
+    }
+    
+    // Enhance concept formation with replayed features
+    if (brain_->getConceptFormation()) {
+        // Combine multiple features for concept enhancement
+        std::vector<float> replayFeatures = episode->sensoryFeatures;
+        replayFeatures.insert(replayFeatures.end(), 
+                            episode->contextualFeatures.begin(), 
+                            episode->contextualFeatures.end());
+        replayFeatures.push_back(episode->reward);
+        replayFeatures.push_back(episode->noveltyLevel);
+        
+        // Update concept with replayed features
+        brain_->getConceptFormation()->updateConcept(replayFeatures, brain_->getCurrentTime());
     }
 }
 
@@ -219,11 +269,35 @@ float NeuralEpisodicMemory::getAverageReward() const {
 }
 
 void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+    // Remove episodes below relevance threshold using enhanced criteria
+    // Use both relevance score and stability for better consolidation decisions
+    auto it = std::remove_if(episodes_.begin(), episodes_.end(),
+        [this, relevanceThreshold](const EpisodicMemoryItem& episode) {
+            // Enhanced consolidation criteria:
+            // 1. Base relevance score (as before)
+            // 2. Stability score (resistant memories are worth keeping)
+            // 3. Working memory retention correlation
+            // 4. Neuromodulation integration
+            
+            float baseRelevance = (episode.contextualFeatures.empty() ? 0.5f : 0.5f);
+            float stabilityFactor = episode.stabilityScore;
+            float retentionFactor = episode.workingMemoryRetention;
+            float neuromodFactor = episode.neuromodulationIntegration;
+            
+            float combinedScore = baseRelevance * 0.4f + 
+                                stabilityFactor * 0.3f + 
+                                retentionFactor * 0.2f + 
+                                neuromodFactor * 0.1f;
+            
+            // Keep if combined score exceeds threshold
+            return combinedScore < relevanceThreshold;
+        });
+    
+    episodes_.erase(it, episodes_.end());
+    
+    // Update episodeNeurons list to match
+    while (episodes_.size() < pImpl->episodeNeurons.size()) {
+        pImpl->episodeNeurons.pop_back();
     }
 }
 
@@ -235,18 +309,32 @@ void NeuralEpisodicMemory::clear() {
 std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForReplay(
     size_t count) const {
     
-    // Select episodes for replay based on:
+    // Select episodes for replay based on enhanced criteria:
     // 1. Recency (more recent episodes)
-    // 2. Reward (higher reward episodes)
-    // 3. Unpredictability (higher prediction error episodes)
+    // 2. Stability (stable memories are good for replay)
+    // 3. Working memory retention (memories that survived working memory decay)
+    // 4. Neuromodulation integration (memories with strong neuromodulatory signals)
+    // 5. Reward prediction accuracy
     
-    std::vector<std::tuple<float, float, size_t>> scored;  // (score, reward, index)
+    std::vector<std::tuple<float, float, size_t, const EpisodicMemoryItem*>> scored;  // (score, stability, reward, episode)
     
     for (size_t i = 0; i < episodes_.size(); ++i) {
         float recencyScore = 1.0f / (episodes_[i].age + 1);
+        float stabilityScore = episodes_[i].stabilityScore;
         float rewardScore = episodes_[i].reward;
-        float score = recencyScore * 0.5f + rewardScore * 0.5f;
-        scored.emplace_back(score, rewardScore, i);
+        float neuromodScore = episodes_[i].neuromodulationIntegration;
+        float retentionScore = episodes_[i].workingMemoryRetention;
+        float predictionScore = episodes_[i].predictionConfidence * std::abs(episodes_[i].predictionError);
+        
+        // Combined score with weighted factors
+        float score = recencyScore * 0.25f + 
+                     stabilityScore * 0.20f + 
+                     rewardScore * 0.20f + 
+                     neuromodScore * 0.15f + 
+                     retentionScore * 0.10f + 
+                     predictionScore * 0.10f;
+        
+        scored.emplace_back(score, stabilityScore, rewardScore, &episodes_[i]);
     }
     
     // Sort by score
@@ -257,7 +345,7 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::getEpisodesForRepla
     
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(count, scored.size()); ++i) {
-        results.push_back(&episodes_[std::get<2>(scored[i])]);
+        results.push_back(std::get<3>(scored[i]));
     }
     
     return results;

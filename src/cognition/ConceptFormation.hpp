@@ -125,30 +125,62 @@ public:
     bool isNovel(const std::vector<float>& pattern,
                  float similarityThreshold = 0.7f) const;
 
-    // Get concept for a given pattern
-    size_t findConceptForPattern(const std::vector<float>& pattern) const;
-
-    // Clear all concepts
-    void clear();
-
-    // Get generalization ability (can concept handle variations?)
-    float getGeneralizationAbility(size_t conceptId) const;
-
-    // Set parameters
-    void setFormationThreshold(float t) { formationThreshold_ = t; }
-    void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    // Enhanced ConceptFormation integration with sensory processing
+    // Process comprehensive sensory state information with working memory integration
+    void processSensoryState(const std::vector<float>& sensoryState,
+                           const std::vector<float>& features,
+                           float reward,
+                           SimulationStep currentTime);
+    
+    // Concept abstraction and learning integration
+    // Abstract concepts from episodic memory for higher-level understanding
+    void abstractFromEpisodicMemory();
+    
+    // Enhanced concept storage and retrieval
+    // Store concept in episodic memory for consolidation
+    void storeConceptInEpisodicMemory(size_t conceptId);
+    
+    // Integration with neural planner for abstract goal setting
+    void integrateWithNeuralPlanner();
+    
+    // Integration with neuromodulation for concept novelty detection
+    void integrateWithNeuromodulation();
+    
+    // Integration with attention system for concept salience
+    void integrateWithAttentionSystem();
+    
+    // Configuration methods
+    void setAbstractionEnabled(bool enabled) { abstractionEnabled_ = enabled; }
+    void setNoveltyDetectionEnabled(bool enabled) { noveltyDetectionEnabled_ = enabled; }
+    void setWorkingMemoryIntegrationEnabled(bool enabled) { workingMemoryIntegrationEnabled_ = enabled; }
+    void setAttentionIntegrationEnabled(bool enabled) { attentionIntegrationEnabled_ = enabled; }
+    void setPredictionIntegrationEnabled(bool enabled) { predictionIntegrationEnabled_ = enabled; }
+    void setPlannerIntegrationEnabled(bool enabled) { plannerIntegrationEnabled_ = enabled; }
+    void setEpisodicMemoryStorageEnabled(bool enabled) { episodicMemoryStorageEnabled_ = enabled; }
 
 private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
+    // Additional integration flags
+    bool abstractionEnabled_;
+    bool noveltyDetectionEnabled_;
+    bool workingMemoryIntegrationEnabled_;
+    bool attentionIntegrationEnabled_;
+    bool predictionIntegrationEnabled_;
+    bool plannerIntegrationEnabled_;
+    bool episodicMemoryStorageEnabled_;
 
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
+    // Helper methods for enhanced integration
+    void updateConceptForPredictionError(float predictionError);
+    void applyAttentionToConceptFormation();
+    void storeConceptFeaturesInEpisodicMemory();
+    void refineConceptsBasedOnNeuromodulation(float neuromodulationSignal);
+    std::vector<float> computePatternAbstraction(const std::vector<std::vector<float>>& patterns);
+    std::vector<float> extractFeaturesFromEpisodes(const std::vector<const EpisodicMemoryItem*>& episodes);
+    void enhanceConceptWithEpisodicContext(size_t conceptId, const std::vector<const EpisodicMemoryItem*>& episodes);
+    float calculateConceptNovelty(size_t conceptId);
+    size_t createConceptFromPattern(const std::vector<float>& pattern,
+                                  const std::vector<float>& features,
+                                  float reward);
 
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -25,8 +25,15 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
+class Norepinephrine;
+class Serotonin;
 class Novelty;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
@@ -184,14 +191,10 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Current simulation state
+    Timestamp getCurrentTime() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
-    // Logging
-    void logStatus() const;
+    SimulationStep getCurrentStep() const;
     
 private:
     struct Impl;

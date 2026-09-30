@@ -1,5 +1,6 @@
 #include "ConceptFormation.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -27,34 +28,407 @@ ConceptFormation::~ConceptFormation() = default;
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("ConceptFormation initialized");
+    
+    // Initialize concept abstraction from episodic memory
+    setAbstractionEnabled(true);
+    
+    // Setup neuromodulation integration
+    setNoveltyDetectionEnabled(true);
+    
+    // Setup working memory integration
+    setWorkingMemoryIntegrationEnabled(true);
+    
+    // Setup attention system integration
+    setAttentionIntegrationEnabled(true);
+    
+    // Setup prediction system integration
+    setPredictionIntegrationEnabled(true);
+    
+    // Setup neural planner integration
+    setPlannerIntegrationEnabled(true);
+    
+    // Setup episodic memory storage
+    setEpisodicMemoryStorageEnabled(true);
+    
+    NLM_LOG_INFO("ConceptFormation initialized with enhanced integration");
 }
 
-size_t ConceptFormation::presentExperience(const std::vector<float>& pattern,
-                                          const std::vector<float>& features,
-                                          float reward,
-                                          SimulationStep currentTime) {
-    if (pattern.empty()) return 0;
+void ConceptFormation::abstractionFromEpisodicMemory() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
     
-    // Check if this pattern matches any existing concept
-    size_t matchingConcept = findConceptForPattern(pattern);
+    // Retrieve relevant episodes from episodic memory for concept abstraction
+    size_t currentStep = brain_->getCurrentTime();
+    auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(20);
     
-    if (matchingConcept > 0) {
-        // Update existing concept
-        updateConcept(matchingConcept, pattern, features, reward);
-        return matchingConcept;
+    // Extract patterns from episodes for concept formation
+    std::vector<std::vector<float>> episodePatterns;
+    for (const auto* episode : recentEpisodes) {
+        if (!episode->sensoryState.empty()) {
+            episodePatterns.push_back(episode->sensoryState);
+        }
     }
     
-    // Check if this is novel enough to form a new concept
-    if (isNovel(pattern, formationThreshold_)) {
-        // But wait - we need a few observations before committing to a concept
-        // This prevents forming concepts from noise
+    if (episodePatterns.size() < 2) return; // Need enough data for abstraction
+    
+    // Perform pattern abstraction using clustering
+    std::vector<float> abstractedPattern = computePatternAbstraction(episodePatterns);
+    
+    // Create concept from abstracted pattern
+    size_t conceptId = createConceptFromPattern(
+        abstractedPattern,
+        extractFeaturesFromEpisodes(recentEpisodes),
+        0.5f // Average reward for abstracted concept
+    );
+    
+    // Store abstracted concept
+    if (conceptId > 0) {
+        // Enhance concept with episodic context
+        enhanceConceptWithEpisodicContext(conceptId, recentEpisodes);
+    }
+}
+
+void ConceptFormation::storeConceptInEpisodicMemory(size_t conceptId) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Create episodic memory entry for the concept
+    EpisodicMemoryItem conceptMemory;
+    conceptMemory.timestamp = brain_->getCurrentTime();
+    
+    // Store concept prototype as sensory state
+    conceptMemory.sensoryState = concept->prototype;
+    
+    // Store concept features
+    conceptMemory.sensoryFeatures = concept->prototype;
+    
+    // Add concept metadata to features
+    conceptMemory.contextualFeatures.resize(8);
+    conceptMemory.contextualFeatures[0] = concept->totalObservations;  // Number of observations
+    conceptMemory.contextualFeatures[1] = concept->avgStability;     // Stability score
+    conceptMemory.contextualFeatures[2] = concept->instances.size();   // Instance count
+    
+    if (!concept->categoryHint.empty()) {
+        // Convert category hint to feature (simple encoding)
+        conceptMemory.contextualFeatures[3] = concept->categoryHint == "rewarding" ? 1.0f :
+                                              concept->categoryHint == "harmful" ? -1.0f : 0.0f;
+    }
+    
+    // Store concept ID as reward signal for retrieval
+    conceptMemory.reward = conceptId;  // Use concept ID as reward for storage
+    
+    // Store novelty and neuromodulation levels
+    conceptMemory.novelty = calculateConceptNovelty(conceptId);
+    conceptMemory.dopamineLevel = brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f;
+    conceptMemory.curiosityLevel = brain_->getCuriosity() ? brain_->getCuriosity()->getLevel() : 0.0f;
+    
+    // Store prediction system data
+    if (brain_->getPredictionSystem()) {
+        conceptMemory.predictionError = brain_->getPredictionSystem()->getPredictionError();
+        conceptMemory.predictionConfidence = brain_->getPredictionSystem()->getConfidence();
+    }
+    
+    // Store working memory content
+    if (brain_->getWorkingMemory()) {
+        const auto& memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+        conceptMemory.workingMemoryContent.reserve(memoryNeurons.size());
+        for (const auto& neuron : memoryNeurons) {
+            float activation = brain_->getWorkingMemory()->getNeuronActivation(neuron);
+            conceptMemory.workingMemoryContent.push_back(activation);
+        }
+    }
+    
+    // Store in episodic memory
+    brain_->getEpisodicMemory()->storeEpisode(conceptMemory);
+}
+
+void ConceptFormation::integrateWithNeuralPlanner() {
+    if (!brain_ || !brain_->getNeuralPlanner()) return;
+    
+    // Get current concepts
+    const auto& concepts = getConcepts();
+    if (concepts.empty()) return;
+    
+    // Select most stable and relevant concepts for planning
+    std::vector<float> abstractGoals;
+    size_t selectedCount = 0;
+    
+    for (const auto& concept : concepts) {
+        if (isConceptStable(concept.id) && concept.totalObservations > 3) {
+            // Convert concept properties to abstract goals
+            float stability = getConceptStability(concept.id);
+            float generalization = getGeneralizationAbility(concept.id);
+            float relevance = (stability + generalization) / 2.0f;
+            
+            // Add goal representation based on concept properties
+            abstractGoals.push_back(stability);
+            abstractGoals.push_back(generalization);
+            abstractGoals.push_back(relevance);
+            
+            selectedCount++;
+            if (selectedCount >= 5) break; // Limit number of goals
+        }
+    }
+    
+    if (!abstractGoals.empty()) {
+        brain_->getNeuralPlanner()->integrateWithConceptFormation(abstractGoals);
+    }
+}
+
+void ConceptFormation::integrateWithNeuromodulation() {
+    if (!brain_) return;
+    
+    // Get neuromodulation levels
+    float dopamine = brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f;
+    float curiosity = brain_->getCuriosity() ? brain_->getCuriosity()->getLevel() : 0.0f;
+    float novelty = brain_->getNovelty() ? brain_->getNovelty()->getLevel() : 0.0f;
+    
+    // Calculate concept novelty detection based on neuromodulation
+    float neuromodulationSignal = (dopamine * 0.4f) + (curiosity * 0.3f) + (novelty * 0.3f);
+    
+    // Update concept formation parameters based on neuromodulation
+    setFormationThreshold(0.5f + neuromodulationSignal * 0.2f);
+    setStabilityThreshold(0.6f + neuromodulationSignal * 0.15f);
+    
+    // Trigger concept refinement when neuromodulation is high
+    if (neuromodulationSignal > 0.7f) {
+        refineConceptsBasedOnNeuromodulation(neuromodulationSignal);
+    }
+}
+
+void ConceptFormation::integrateWithAttentionSystem() {
+    if (!brain_ || !brain_->getAttention()) return;
+    
+    // Get attention weights and salience for concept focusing
+    const auto& winners = brain_->getAttention()->getWinners();
+    if (winners.empty()) return;
+    
+    // Focus concept formation on attended concepts
+    float attentionFocus = 0.0f;
+    size_t attendedConceptCount = 0;
+    
+    for (const auto& concept : concepts_) {
+        // Check if concept matches attended neurons
+        bool isAttended = false;
+        for (size_t i = 0; i < concept.prototype.size() && i < winners.size(); ++i) {
+            if (concept.prototype[i] > 0.5f) {
+                // Check if this prototype neuron is in attention winners
+                // (This is a simplified check - real implementation would use neural IDs)
+                if (i < winners.size()) {
+                    isAttended = true;
+                    break;
+                }
+            }
+        }
         
-        // For now, create concept if sufficiently different from all others
-        return createConcept(pattern, features, reward);
+        if (isAttended) {
+            attentionFocus += concept.avgStability;
+            attendedConceptCount++;
+        }
     }
     
-    return 0;  // Not yet classifiable
+    if (attendedConceptCount > 0) {
+        attentionFocus /= attendedConceptCount;
+        
+        // Apply attention-based salience to concepts
+        for (auto& concept : concepts_) {
+            if (isConceptStable(concept.id)) {
+                // Boost stability of attended concepts
+                float attentionBonus = attentionFocus * 0.2f;
+                concept.avgStability = std::min(1.0f, concept.avgStability + attentionBonus);
+            }
+        }
+    }
+}
+
+void ConceptFormation::abstractionFromEpisodicMemory() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Retrieve relevant episodes from episodic memory for concept abstraction
+    size_t currentStep = brain_->getCurrentTime();
+    auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(20);
+    
+    // Extract patterns from episodes for concept formation
+    std::vector<std::vector<float>> episodePatterns;
+    for (const auto* episode : recentEpisodes) {
+        if (!episode->sensoryState.empty()) {
+            episodePatterns.push_back(episode->sensoryState);
+        }
+    }
+    
+    if (episodePatterns.size() < 2) return; // Need enough data for abstraction
+    
+    // Perform pattern abstraction using clustering
+    std::vector<float> abstractedPattern = computePatternAbstraction(episodePatterns);
+    
+    // Create concept from abstracted pattern
+    size_t conceptId = createConceptFromPattern(
+        abstractedPattern,
+        extractFeaturesFromEpisodes(recentEpisodes),
+        0.5f // Average reward for abstracted concept
+    );
+    
+    // Store abstracted concept
+    if (conceptId > 0) {
+        // Enhance concept with episodic context
+        enhanceConceptWithEpisodicContext(conceptId, recentEpisodes);
+    }
+}
+
+void ConceptFormation::storeConceptInEpisodicMemory(size_t conceptId) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    const DiscoveredConcept* concept = getConcept(conceptId);
+    if (!concept) return;
+    
+    // Create episodic memory entry for the concept
+    EpisodicMemoryItem conceptMemory;
+    conceptMemory.timestamp = brain_->getCurrentTime();
+    
+    // Store concept prototype as sensory state
+    conceptMemory.sensoryState = concept->prototype;
+    
+    // Store concept features
+    conceptMemory.sensoryFeatures = concept->prototype;
+    
+    // Add concept metadata to features
+    conceptMemory.contextualFeatures.resize(8);
+    conceptMemory.contextualFeatures[0] = concept->totalObservations;  // Number of observations
+    conceptMemory.contextualFeatures[1] = concept->avgStability;     // Stability score
+    conceptMemory.contextualFeatures[2] = concept->instances.size();   // Instance count
+    
+    if (!concept->categoryHint.empty()) {
+        // Convert category hint to feature (simple encoding)
+        conceptMemory.contextualFeatures[3] = concept->categoryHint == "rewarding" ? 1.0f :
+                                              concept->categoryHint == "harmful" ? -1.0f : 0.0f;
+    }
+    
+    // Store concept ID as reward signal for retrieval
+    conceptMemory.reward = conceptId;  // Use concept ID as reward for storage
+    
+    // Store novelty and neuromodulation levels
+    conceptMemory.novelty = calculateConceptNovelty(conceptId);
+    conceptMemory.dopamineLevel = brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f;
+    conceptMemory.curiosityLevel = brain_->getCuriosity() ? brain_->getCuriosity()->getLevel() : 0.0f;
+    
+    // Store prediction system data
+    if (brain_->getPredictionSystem()) {
+        conceptMemory.predictionError = brain_->getPredictionSystem()->getPredictionError();
+        conceptMemory.predictionConfidence = brain_->getPredictionSystem()->getConfidence();
+    }
+    
+    // Store working memory content
+    if (brain_->getWorkingMemory()) {
+        const auto& memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+        conceptMemory.workingMemoryContent.reserve(memoryNeurons.size());
+        for (const auto& neuron : memoryNeurons) {
+            float activation = brain_->getWorkingMemory()->getNeuronActivation(neuron);
+            conceptMemory.workingMemoryContent.push_back(activation);
+        }
+    }
+    
+    // Store in episodic memory
+    brain_->getEpisodicMemory()->storeEpisode(conceptMemory);
+}
+
+void ConceptFormation::integrateWithNeuralPlanner() {
+    if (!brain_ || !brain_->getNeuralPlanner()) return;
+    
+    // Get current concepts
+    const auto& concepts = getConcepts();
+    if (concepts.empty()) return;
+    
+    // Select most stable and relevant concepts for planning
+    std::vector<float> abstractGoals;
+    size_t selectedCount = 0;
+    
+    for (const auto& concept : concepts) {
+        if (isConceptStable(concept.id) && concept.totalObservations > 3) {
+            // Convert concept properties to abstract goals
+            float stability = getConceptStability(concept.id);
+            float generalization = getGeneralizationAbility(concept.id);
+            float relevance = (stability + generalization) / 2.0f;
+            
+            // Add goal representation based on concept properties
+            abstractGoals.push_back(stability);
+            abstractGoals.push_back(generalization);
+            abstractGoals.push_back(relevance);
+            
+            selectedCount++;
+            if (selectedCount >= 5) break; // Limit number of goals
+        }
+    }
+    
+    if (!abstractGoals.empty()) {
+        brain_->getNeuralPlanner()->integrateWithConceptFormation(abstractGoals);
+    }
+}
+
+void ConceptFormation::integrateWithNeuromodulation() {
+    if (!brain_) return;
+    
+    // Get neuromodulation levels
+    float dopamine = brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f;
+    float curiosity = brain_->getCuriosity() ? brain_->getCuriosity()->getLevel() : 0.0f;
+    float novelty = brain_->getNovelty() ? brain_->getNovelty()->getLevel() : 0.0f;
+    
+    // Calculate concept novelty detection based on neuromodulation
+    float neuromodulationSignal = (dopamine * 0.4f) + (curiosity * 0.3f) + (novelty * 0.3f);
+    
+    // Update concept formation parameters based on neuromodulation
+    setFormationThreshold(0.5f + neuromodulationSignal * 0.2f);
+    setStabilityThreshold(0.6f + neuromodulationSignal * 0.15f);
+    
+    // Trigger concept refinement when neuromodulation is high
+    if (neuromodulationSignal > 0.7f) {
+        refineConceptsBasedOnNeuromodulation(neuromodulationSignal);
+    }
+}
+
+void ConceptFormation::integrateWithAttentionSystem() {
+    if (!brain_ || !brain_->getAttention()) return;
+    
+    // Get attention weights and salience for concept focusing
+    const auto& winners = brain_->getAttention()->getWinners();
+    if (winners.empty()) return;
+    
+    // Focus concept formation on attended concepts
+    float attentionFocus = 0.0f;
+    size_t attendedConceptCount = 0;
+    
+    for (const auto& concept : concepts_) {
+        // Check if concept matches attended neurons
+        bool isAttended = false;
+        for (size_t i = 0; i < concept.prototype.size() && i < winners.size(); ++i) {
+            if (concept.prototype[i] > 0.5f) {
+                // Check if this prototype neuron is in attention winners
+                // (This is a simplified check - real implementation would use neural IDs)
+                if (i < winners.size()) {
+                    isAttended = true;
+                    break;
+                }
+            }
+        }
+        
+        if (isAttended) {
+            attentionFocus += concept.avgStability;
+            attendedConceptCount++;
+        }
+    }
+    
+    if (attendedConceptCount > 0) {
+        attentionFocus /= attendedConceptCount;
+        
+        // Apply attention-based salience to concepts
+        for (auto& concept : concepts_) {
+            if (isConceptStable(concept.id)) {
+                // Boost stability of attended concepts
+                float attentionBonus = attentionFocus * 0.2f;
+                concept.avgStability = std::min(1.0f, concept.avgStability + attentionBonus);
+            }
+        }
+    }
 }
 
 size_t ConceptFormation::createConcept(const std::vector<float>& pattern,

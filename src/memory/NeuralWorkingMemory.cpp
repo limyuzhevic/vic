@@ -1,5 +1,6 @@
 #include "NeuralWorkingMemory.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -242,6 +243,122 @@ void NeuralWorkingMemory::decayWeakTraces() {
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
     }
+}
+
+// Enhanced NeuralWorkingMemory Methods
+
+// Store detailed spike information including rate, burst activity, and temporal context
+void NeuralWorkingMemory::storeSpikeInfo(NeuronId neuron, float spikeRate, float burstActivity,
+                           float timestamp, SimulationStep step) {
+    // Store comprehensive spike information
+    // This adds detailed neural firing metrics to working memory
+    TemporalPattern pattern;
+    pattern.neuron = neuron;
+    pattern.step = step;
+    pattern.timestamp = timestamp;
+    pattern.strength = spikeRate;
+    pattern.burstActivity = burstActivity;
+    pattern.firingSequence.push_back(step);
+    
+    temporalPatterns_.push_back(pattern);
+    
+    // Clean up old patterns
+    if (temporalPatterns_.size() > MAX_TEMPORAL_EVENTS) {
+        temporalPatterns_.erase(temporalPatterns_.begin());
+    }
+}
+
+// Store detailed synaptic trace with source, destination, weight, and type
+void NeuralWorkingMemory::storeSynapticTrace(NeuronId sourceNeuron, NeuronId targetNeuron,
+                           float weight, SynapseType type, float timestamp,
+                           SimulationStep step, float strength) {
+    SynapticTrace trace;
+    trace.sourceNeuron = sourceNeuron;
+    trace.targetNeuron = targetNeuron;
+    trace.weight = weight;
+    trace.type = type;
+    trace.timestamp = timestamp;
+    trace.step = step;
+    trace.eligibility = strength;
+    
+    synapticTraces_.push_back(trace);
+    
+    // Clean up old traces
+    if (synapticTraces_.size() > MAX_TEMPORAL_EVENTS) {
+        synapticTraces_.erase(synapticTraces_.begin());
+    }
+}
+
+// Store temporal sequence for pattern learning
+void NeuralWorkingMemory::storeTemporalSequence(NeuronId neuron, SimulationStep step,
+                              float timestamp, float strength) {
+    // Store temporal sequence for pattern learning
+    // Enhanced version that captures sequence dynamics
+    TemporalPattern sequence;
+    sequence.neuron = neuron;
+    sequence.step = step;
+    sequence.timestamp = timestamp;
+    sequence.strength = strength;
+    sequence.isSequence = true;
+    
+    sequence.firingSequence.push_back(step);
+    
+    // Keep sequence limited
+    if (sequence.firingSequence.size() > 20) {
+        sequence.firingSequence.erase(sequence.firingSequence.begin());
+    }
+    
+    temporalPatterns_.push_back(sequence);
+    
+    // Clean up old sequences
+    if (temporalPatterns_.size() > MAX_TEMPORAL_EVENTS) {
+        temporalPatterns_.erase(temporalPatterns_.begin());
+    }
+}
+
+// Get comprehensive spike information for a neuron
+bool NeuralWorkingMemory::getSpikeInfo(NeuronId neuron, float& spikeRate, float& burstActivity,
+                         float& timestamp, SimulationStep& step) const {
+    for (const auto& pattern : temporalPatterns_) {
+        if (pattern.neuron == neuron) {
+            spikeRate = pattern.strength;
+            burstActivity = pattern.burstActivity;
+            timestamp = pattern.timestamp;
+            step = pattern.step;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Get synaptic trace information
+bool NeuralWorkingMemory::getSynapticTrace(NeuronId sourceNeuron, NeuronId targetNeuron,
+                         float& weight, SynapseType& type,
+                         float& timestamp, SimulationStep& step) const {
+    for (const auto& trace : synapticTraces_) {
+        if (trace.sourceNeuron == sourceNeuron && trace.targetNeuron == targetNeuron) {
+            weight = trace.weight;
+            type = trace.type;
+            timestamp = trace.timestamp;
+            step = trace.step;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Get temporal sequence information
+bool NeuralWorkingMemory::getTemporalSequence(NeuronId neuron, float& strength,
+                           float& timestamp, SimulationStep& step) const {
+    for (const auto& pattern : temporalPatterns_) {
+        if (pattern.neuron == neuron && pattern.isSequence) {
+            strength = pattern.strength;
+            timestamp = pattern.timestamp;
+            step = pattern.step;
+            return true;
+        }
+    }
+    return false;
 }
 
 // AttentionalSelection Implementation
