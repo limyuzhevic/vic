@@ -88,8 +88,13 @@ target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world validation)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Add validation module
+add_library(validation STATIC validation.cpp)
+target_include_directories(validation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(validation PUBLIC nlm_core nlm_agent nlm_world)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)

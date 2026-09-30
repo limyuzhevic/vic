@@ -6,6 +6,8 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <mutex>
+#include <atomic>
 
 namespace nlm {
 
@@ -75,6 +77,29 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper methods
+    void initializeNeuronGroups();
+    void distributeMotorNeurons(const std::vector<Neuron*>& neurons);
+    void distributeSensoryNeurons(const std::vector<Neuron*>& neurons);
+    void clearNeuronGroups();
+    void resetNeuromodulationState();
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& intern);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void computeNovelty(const std::vector<float>& vision);
+    void updateCuriosity();
+    void applyRewardToSynapses(float dopamineLevel);
+    void modulatePlasticity(float dopamineLevel);
+    
+    // Thread safety for concurrent operations
+    std::mutex initializationMutex_;  // For initialization
+    std::mutex stateMutex_;           // For shared state modification
+    
+    // Thread safety flags
+    std::atomic<bool> initializationComplete_;
+    std::atomic<bool> forceShutdown_;
     
     std::shared_ptr<Brain> brain_;
     
