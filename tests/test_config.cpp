@@ -78,12 +78,43 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+// Config Tests
+void testConfigPerformance() {
+    nlm::Config config;
+    
+    // Performance test: many lookups
+    std::vector<std::string> testKeys;
+    for (int i = 0; i < 1000; ++i) {
+        testKeys.push_back(std::to_string(i));
+        config.set(std::to_string(i), i, nlm::ConfigSource::Runtime);
+    }
+    
+    // Test hash map optimized lookup
+    for (const auto& key : testKeys) {
+        auto value = config.get<int>(key);
+        assert(value.has_value());
+        assert(*value == std::stoi(key));
+    }
+    
+    // Test batch operations
+    std::vector<std::string> batchKeys = {"0", "10", "100", "500", "999"};
+    
+    for (const auto& key : batchKeys) {
+        assert(config.has(key));
+        auto val = config.getOr<int>(key, -1);
+        assert(val == std::stoi(key));
+    }
+    
+    std::cout << "    testConfigPerformance passed\n";
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigPerformance();
 }
 
 } // namespace test_config

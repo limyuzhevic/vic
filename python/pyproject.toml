@@ -1,0 +1,369 @@
+# Python Package Configuration
+
+This file contains the configuration for the enhanced NLM Python bindings package.
+
+## Package Information
+
+- **Name**: nlm-enhanced-bindings
+- **Version**: 0.1.0
+- **Description**: Enhanced Python bindings for NLM (Neural Learning Machine)
+- **Author**: NLM Research Team
+- **License**: MIT
+- **Python Version**: 3.7+
+
+## Dependencies
+
+### Required Dependencies
+```toml
+[tool.poetry.dependencies]
+python = "^3.7"
+numpy = "^1.19.0"
+pybind11 = "^2.10"
+```
+
+### Optional Dependencies
+```toml
+[tool.poetry.dependencies]
+matplotlib = "^3.3.0"
+pandas = "^1.2.0"
+scikit-learn = "^0.24.0"
+torch = "^1.9.0"
+tensorflow = "^2.5.0"
+```
+
+## Build System
+
+```toml
+[tool.poetry.build]
+# Build system configuration
+```
+
+## Linting and Formatting
+
+```toml
+[tool.black]
+line-length = 88
+target-version = ['py37']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = E203, W503
+max-complexity = 18
+select = B,C,E,F,W,T4
+```
+
+## Testing
+
+```toml
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests", "examples"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+```
+
+## Coverage
+
+```toml
+[tool.coverage.run]
+source = ["enhanced_bindings"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if __name__ in ('__main__', '__builtin__'):",
+]
+```
+
+## Development
+
+```toml
+[tool.poetry.dev-dependencies]
+black = "^20.0"
+flake8 = "^3.9"
+isort = "^5.0"
+pytest = "^6.0"
+coverage = "^5.0"
+mypy = "^0.910"
+pre-commit = "^2.15"
+```
+
+## Scripts
+
+### Installation
+```bash
+poetry install
+```
+
+### Development Setup
+```bash
+poetry install --with dev
+```
+
+### Running Tests
+```bash
+pytest
+pytest tests/
+pytest examples/
+```
+
+### Linting
+```bash
+black enhanced_bindings examples tests
+isort enhanced_bindings examples tests
+flake8 enhanced_bindings examples tests
+```
+
+### Type Checking
+```bash
+mypy enhanced_bindings
+```
+
+### Formatting
+```bash
+black enhanced_bindings examples tests --check
+```
+
+### Pre-commit
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+## Package Structure
+
+```
+enhanced_bindings/
+├── __init__.py                    # Package initialization
+├── enhanced_bindings.py            # Main enhanced bindings module
+├── __pycache__/                   # Python cache
+│   └── *.pyc
+└── docs/
+    └── *.md                      # Documentation
+
+examples/
+├── basic_usage/
+│   ├── example1_simplest_brain.py
+│   ├── example2_silent_brain.py
+│   ├── example3_brain_in_world.py
+│   ├── example4_enhanced_brain.py
+│   ├── example5_enhanced_config.py
+│   └── example6_method_chaining.py
+├── advanced_usage/
+│   ├── example1_context_managers.py
+│   ├── example2_simulation_runner.py
+│   ├── example3_experiment_runner.py
+│   ├── example4_data_collector.py
+│   ├── example5_pythonic_interfaces.py
+│   └── example6_advanced_features.py
+├── error_handling/
+│   ├── example1_enhanced_exceptions.py
+│   ├── example2_type_validation.py
+│   ├── example3_parameter_validation.py
+│   ├── example4_state_validation.py
+│   ├── example5_error_recovery.py
+│   └── example6_error_logging.py
+├── performance/
+│   ├── example1_vectorization.py
+│   ├── example2_memory_optimization.py
+│   ├── example3_parallel_processing.py
+│   ├── example4_benchmarking.py
+│   ├── example5_optimization_tips.py
+│   └── example6_profiling.py
+├── integration/
+│   ├── example1_numpy_integration.py
+│   ├── example2_pandas_integration.py
+│   ├── example3_matplotlib_integration.py
+│   ├── example4_sklearn_integration.py
+│   ├── example5_complete_integration.py
+│   └── example6_custom_integrations.py
+├── phase3/
+│   └── *.py
+├── phase4/
+│   └── *.py
+└── README.md                      # Examples overview
+
+pyproject.toml                     # Package configuration
+pyproject.toml.example             # Example pyproject.toml
+setup.py                          # Setup script (for compatibility)
+setup.cfg                         # Setup configuration (for compatibility)
+
+docs/
+├── ARCHITECTURE.md                # Architecture documentation
+├── SCIENCE.md                     # Scientific background
+├── ROADMAP.md                     # Roadmap and future plans
+├── EXPERIMENTS.md                 # Experiment documentation
+├── PERFORMANCE.md                 # Performance documentation
+├── RESEARCH_METHODS.md            # Research methods
+├── LIMITATIONS.md                 # Limitations and boundaries
+├── BIOLOGICAL_FIDELITY.md          # Biological fidelity discussion
+├── FINAL_LIMITATIONS.md           # Final limitations
+├── PHASE6_ARCHITECTURE.md          # Phase 6 architecture
+├── PHASE6_FINAL_AUDIT.md           # Phase 6 audit
+├── PHASE6_FINAL_RESULTS.md        # Phase 6 results
+└── FAILURES.md                    # Failures and lessons learned
+
+tests/
+├── test_enhanced_bindings.py       # Enhanced bindings tests
+├── test_basic_functionality.py     # Basic functionality tests
+├── test_error_handling.py          # Error handling tests
+├── test_performance.py             # Performance tests
+├── test_integration.py             # Integration tests
+└── conftest.py                    # Pytest configuration
+```
+
+## Development Workflow
+
+### 1. Creating New Examples
+
+1. Create a new directory in `examples/` for the category
+2. Add a `README.md` file describing the examples
+3. Create example Python files with detailed comments
+4. Include expected output and analysis
+5. Test the examples to ensure they work correctly
+
+### 2. Updating Documentation
+
+1. Update `COMPREHENSIVE_DOCUMENTATION.md` for new features
+2. Update `README.md` for quick start guides
+3. Update example `README.md` files for new example categories
+4. Ensure all documentation is consistent and up-to-date
+
+### 3. Testing and Validation
+
+1. Run the examples to verify they work
+2. Test error handling and edge cases
+3. Profile performance for optimization opportunities
+4. Validate integration with Python ecosystem
+5. Update documentation based on test results
+
+### 4. Code Quality
+
+1. Follow Python coding standards (PEP 8)
+2. Use type hints for better code clarity
+3. Write comprehensive docstrings
+4. Include error handling and validation
+5. Optimize performance where possible
+6. Use context managers for resource management
+7. Apply Pythonic interfaces and patterns
+
+## Contributing
+
+### Contribution Guidelines
+
+1. **Fork the repository**
+2. **Create a feature branch**
+3. **Make your changes**
+4. **Test your changes**
+5. **Update documentation**
+6. **Submit a pull request**
+
+### Code Style
+
+- Use black for code formatting
+- Use isort for import sorting
+- Use flake8 for linting
+- Use mypy for type checking
+- Write comprehensive tests
+- Include docstrings for all public functions
+- Follow PEP 8 style guide
+
+### Documentation
+
+- Update `COMPREHENSIVE_DOCUMENTATION.md` for new features
+- Update example `README.md` files
+- Include examples and expected output
+- Provide clear explanations and usage patterns
+- Include troubleshooting and common pitfalls
+
+## License
+
+MIT License
+
+Copyright (c) 2026 NLM Research Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## Acknowledgments
+
+- Thanks to the NLM research team for developing the core framework
+- Thanks to the open-source community for contributing to the ecosystem
+- Thanks to contributors for improving the bindings and documentation
+- Thanks to users for feedback and feature requests
+
+## Contact
+
+For questions, feedback, or collaboration:
+- Refer to the project documentation
+- Check the examples for usage patterns
+- Review the code for best practices
+- Contact support if needed
+
+## Quick Start Summary
+
+```bash
+# Install the package
+pip install -e .
+
+# Run tests
+pytest
+
+# Run examples
+python examples/basic_usage/example1_simplest_brain.py
+python examples/advanced_usage/example1_context_managers.py
+python examples/error_handling/example1_enhanced_exceptions.py
+python examples/performance/example1_vectorization.py
+python examples/integration/example1_numpy_integration.py
+
+# View documentation
+less COMPREHENSIVE_DOCUMENTATION.md
+less README.md
+```
+
+This package provides comprehensive enhanced Python bindings for the NLM framework, making it easier to create, simulate, and analyze neural systems with modern Python tools and patterns.

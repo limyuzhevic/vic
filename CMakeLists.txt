@@ -133,11 +133,12 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Performance benchmark executable
+add_executable(nlm_performance_benchmark
+    src/experiments/PerformanceBenchmark.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_performance_benchmark PUBLIC nlm_core)
+
 
 # Testing
 enable_testing()

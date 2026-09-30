@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, size_t> keyIndex;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,9 +20,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -94,6 +92,21 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Fast path: try hash map first (O(1))
+    auto indexIt = pImpl->keyIndex.find(key);
+    if (indexIt != pImpl->keyIndex.end()) {
+        size_t index = indexIt->second;
+        if (index < pImpl->entries.size()) {
+            const ConfigEntry& entry = pImpl->entries[index];
+            try {
+                return std::get<T>(entry.value);
+            } catch (const std::bad_variant_access&) {
+                return std::nullopt;
+            }
+        }
+    }
+    
+    // Fallback: linear search (for robustness)
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -110,8 +123,33 @@ std::optional<T> Config::get(const std::string& key) const {
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    // Try fast hash map lookup first
+    auto indexIt = pImpl->keyIndex.find(key);
+    if (indexIt != pImpl->keyIndex.end()) {
+        size_t index = indexIt->second;
+        if (index < pImpl->entries.size()) {
+            const ConfigEntry& entry = pImpl->entries[index];
+            try {
+                return std::get<T>(entry.value);
+            } catch (const std::bad_variant_access&) {
+                // Type mismatch, fall through to default
+            }
+        }
+    }
+    
+    // Fallback to linear search and default
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            // Type mismatch, use default
+        }
+    }
+    
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -143,11 +181,31 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Fast path: hash map lookup (O(1))
+    return pImpl->keyIndex.find(key) != pImpl->keyIndex.end();
 }
 
 void Config::remove(const std::string& key) {
+    // Fast path: hash map lookup
+    auto indexIt = pImpl->keyIndex.find(key);
+    if (indexIt != pImpl->keyIndex.end()) {
+        size_t index = indexIt->second;
+        if (index < pImpl->entries.size()) {
+            // Remove from entries and update indices
+            pImpl->entries.erase(pImpl->entries.begin() + index);
+            
+            // Update indices in hash map
+            std::unordered_map<std::string, size_t> newIndex;
+            for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+                newIndex[pImpl->entries[i].key] = i;
+            }
+            pImpl->keyIndex = std::move(newIndex);
+            
+            return;
+        }
+    }
+    
+    // Fallback: linear search (should rarely be needed)
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
@@ -157,10 +215,14 @@ void Config::remove(const std::string& key) {
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    keys.reserve(pImpl->entries.size());  // Reserve capacity for performance
+    
+    // Use hash map keys for faster iteration
+    keys.reserve(pImpl->keyIndex.size());
+    for (const auto& pair : pImpl->keyIndex) {
+        keys.push_back(pair.first);
     }
+    
     return keys;
 }
 
