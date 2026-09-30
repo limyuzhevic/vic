@@ -1,3 +1,6 @@
+// Original NLM Configuration Implementation
+// This is the original simple configuration system that will be enhanced by ConfigEnhanced.hpp
+
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>

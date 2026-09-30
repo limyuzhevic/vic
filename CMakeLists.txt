@@ -18,6 +18,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find nlohmann/json package
+find_package(nlohmann_json REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -92,6 +95,25 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Performance optimizations
+add_library(nlm_performance STATIC
+    src/performance/CheckpointSystem.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/EventQueue.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/SparseConnectivity.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/Performance.cpp
+    src/performance/EventDrivenEngine.cpp
+    src/performance/PerformanceMonitor.cpp
+)
+
+target_include_directories(nlm_performance PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+target_link_libraries(nlm_performance PUBLIC nlohmann_json::nlohmann_json)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -125,7 +147,7 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_performance)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -144,7 +166,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_performance
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
