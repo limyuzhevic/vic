@@ -84,11 +84,78 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "{\n";
+    
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Serialize based on type using std::visit
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double without trailing zeros
+                std::ostringstream oss;
+                oss << std::fixed << arg;
+                std::string result = oss.str();
+                // Remove trailing zeros and potential trailing decimal point
+                if (result.find('.') != std::string::npos) {
+                    result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+                    if (result.back() == '.') {
+                        result.pop_back();
+                    }
+                }
+                file << result;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    std::ostringstream oss;
+                    oss << std::fixed << arg[i];
+                    std::string result = oss.str();
+                    if (result.find('.') != std::string::npos) {
+                        result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+                        if (result.back() == '.') {
+                            result.pop_back();
+                        }
+                    }
+                    file << result;
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << escapeString(arg[i]) << "\"";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << " // " << static_cast<int>(entry.source) << " (" << entry.description << ")\n";
     }
     
+    file << "}\n";
     return true;
 }
 
@@ -186,16 +253,68 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() * 2);  // Reserve space for escaped string
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\\\0': result += "\\0"; break;
+            case '\\b': result += "\\b"; break;
+            case '\\f': result += "\\f"; break;
+            case '\\n': result += "\\n"; break;
+            case '\\r': result += "\\r"; break;
+            case '\\t': result += "\\t"; break;
+            default: result += c; break;
+        }
+    }
+    return result;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+// Helper function for deserializing JSON values
+template<typename T>
+T Config::deserializeValue(const std::string& jsonStr) {
+    std::istringstream iss(jsonStr);
+    T value;
+    iss >> value;
+    return value;
+}
+
+// Specialization for strings (strip quotes)
+std::string Config::deserializeValue(const std::string& jsonStr) {
+    std::string result = jsonStr;
+    if (result.size() >= 2 && result.front() == '\"' && result.back() == '\"') {
+        result = result.substr(1, result.size() - 2);
+        // Unescape escaped characters
+        result = unescapeString(result);
+    }
+    return result;
+}
+
+std::string Config::unescapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\\\' && i + 1 < str.size()) {
+            char next = str[i + 1];
+            switch (next) {
+                case '\\': result += '\\'; i++; break;
+                case '\"': result += '\"'; i++; break;
+                case '0': result += '\\\0'; i++; break;
+                case 'b': result += '\\b'; i++; break;
+                case 'f': result += '\\f'; i++; break;
+                case 'n': result += '\\n'; i++; break;
+                case 'r': result += '\\r'; i++; break;
+                case 't': result += '\\t'; i++; break;
+                default: result += str[i]; break;
+            }
+        } else {
+            result += str[i];
+        }
+    }
     return result;
 }
 
