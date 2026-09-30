@@ -37,7 +37,6 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -53,22 +52,38 @@ public:
     // Parameters
     void setLearningRate(float rate);
     float getLearningRate() const;
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    // Hebbian-specific parameters
+    void setCorrelationWindow(float window);
+    float getCorrelationWindow() const;
+    
+    // Update neuromodulation factor
+    void updateNeuromodulationFactor(float factor);
+    
+    // Apply development stage effects
+    void applyDevelopmentStage(const DevelopmentSystem& devSystem);
+    
+    // Decay mechanisms
+    void applyDecay(float decayRate);
     
 private:
     struct Impl;
     Impl* pImpl;
 };
 
-// Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
-class AntiHebbianRule : public PlasticityRule {
+// Legacy Hebbian class for backward compatibility
+// TODO: Deprecate in favor of HebbianRule
+class Hebbian : public HebbianRule {
 public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
+    Hebbian();
+    ~Hebbian() override;
+    
+    // All methods inherited from HebbianRule
+    // Some may override for specific Hebbian behavior
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule

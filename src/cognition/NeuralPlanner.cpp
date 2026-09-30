@@ -335,9 +335,9 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
+float SelfModel::computeSelfGeneratedLikelihood(const std::vector<float>& beforeState,
+                                                   const std::vector<float>& afterState,
+                                                   ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated
     auto predicted = findMatchingEffect(action, beforeState);
     
@@ -539,7 +539,7 @@ void SocialLearning::clear() {
 }
 
 float SocialLearning::computeSimilarity(const std::vector<float>& a,
-                                       const std::vector<float>& b) const {
+                                        const std::vector<float>& b) const {
     if (a.size() != b.size() || a.empty()) return 0.0f;
     
     float dot = 0.0f, normA = 0.0f, normB = 0.0f;
@@ -552,6 +552,22 @@ float SocialLearning::computeSimilarity(const std::vector<float>& a,
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
     
     return dot / (std::sqrt(normA) * std::sqrt(normB));
+}
+
+// NeuralPlanner accessor methods for nested SelfModel and SocialLearning
+
+SelfModel* NeuralPlanner::getSelfModel() {
+    // SelfModel is accessible as a nested class within NeuralPlanner
+    // However, the current implementation doesn't provide direct access
+    // This is a placeholder for when SelfModel is properly integrated
+    return nullptr;
+}
+
+SocialLearning* NeuralPlanner::getSocialLearning() {
+    // SocialLearning is accessible as a nested class within NeuralPlanner
+    // However, the current implementation doesn't provide direct access
+    // This is a placeholder for when SocialLearning is properly integrated
+    return nullptr;
 }
 
 } // namespace nlm

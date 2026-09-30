@@ -1,12 +1,17 @@
 #include "AgentBrain.hpp"
+#include "../brain/NeuralRegion.hpp"
+#include "../motor/Action.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../motor/MotorSystem.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , motorSystem_(std::make_unique<MotorSystem>())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -150,8 +155,43 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_ || !motorSystem_) return MotorCommand::Wait;
     
+    // Try to get a motor region from the brain
+    const NeuralRegion* motorRegion = nullptr;
+    if (!brain_->getRegions().empty()) {
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Motor) {
+                    motorRegion = region.get();
+                    break;
+                }
+            }
+            if (motorRegion) break;
+        }
+    }
+    
+    // Use MotorSystem for action selection if we have a motor region
+    if (motorRegion) {
+        std::unique_ptr<Action> action = motorSystem_->selectAction(*motorRegion);
+        if (action) {
+            // Map ActionType to MotorCommand
+            ActionType actionType = action->getType();
+            switch (actionType) {
+                case ActionType::MoveForward: return MotorCommand::MoveForward;
+                case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+                case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+                case ActionType::TurnRight: return MotorCommand::TurnRight;
+                case ActionType::LookLeft: return MotorCommand::LookLeft;
+                case ActionType::LookRight: return MotorCommand::LookRight;
+                case ActionType::Interact: return MotorCommand::Interact;
+                case ActionType::Wait: return MotorCommand::Wait;
+                default: return MotorCommand::Wait;
+            }
+        }
+    }
+    
+    // Fallback to original method
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration

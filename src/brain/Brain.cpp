@@ -53,7 +53,7 @@ struct Brain::Impl {
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
+    HebbianRule* hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
     // Simulation parameters
@@ -100,13 +100,7 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        pImpl->hebbian = std::make_unique<HebbianRule>();
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
@@ -120,6 +114,10 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize nested cognitive systems within NeuralPlanner
+        // These provide self-modeling and social learning capabilities
+        // They are accessed through NeuralPlanner in the current architecture
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -652,8 +650,8 @@ STDP* Brain::getSTDP() {
     return pImpl->stdp.get();
 }
 
-Hebbian* Brain::getHebbian() {
-    return pImpl->hebbian.get();
+HebbianRule* Brain::getHebbian() {
+    return pImpl->hebbian;
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {

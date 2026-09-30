@@ -4,24 +4,15 @@
 
 namespace nlm {
 
-// Hebbian learning implementation
-class Hebbian : public PlasticityRule {
+// Legacy Hebbian class for backward compatibility
+// Now inherits from HebbianRule to use the real implementation
+class Hebbian : public HebbianRule {
 public:
     Hebbian();
     ~Hebbian() override;
     
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override;
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
-    const char* getName() const override;
-    
-    void setLearningRate(float rate);
-    float getLearningRate() const;
-    
-    void setMaxWeight(float maxWeight);
-    float getMaxWeight() const;
+    // All methods inherited from HebbianRule
+    // Some may override for specific Hebbian behavior
     
 private:
     struct Impl;

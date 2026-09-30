@@ -86,7 +86,7 @@ public:
     
     // Plasticity system access
     STDP* getSTDP();
-    Hebbian* getHebbian();
+    HebbianRule* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
     // Statistics
@@ -163,6 +163,12 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Get self-model (internal representation of agent's body and action consequences)
+    SelfModel* getSelfModel();
+    
+    // Get social learning (learning from observing other agents)
+    SocialLearning* getSocialLearning();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

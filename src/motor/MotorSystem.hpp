@@ -3,6 +3,7 @@
 #include "Action.hpp"
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -27,6 +28,23 @@ public:
     // Get action history
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
+    
+    // Neural integration methods
+    void processMotorNeurons(const class NeuralRegion& motorRegion);
+    float getActionStrength(ActionType action) const;
+    void updateActionStrengths(ActionType selectedAction);
+    void applyNeuromodulation(float neuromodulationLevel);
+    
+    // Curiosity-driven exploration support
+    void setCuriosityLevel(float level);
+    float getCuriosityLevel() const;
+    
+    // Action selection with exploration/exploitation balance
+    std::unique_ptr<Action> selectActionWithExploration(const class NeuralRegion& motorRegion,
+                                                         float explorationProbability);
+    
+    // Get all neural activity patterns
+    std::unordered_map<ActionType, float> getActivityPatterns() const;
     
 private:
     struct Impl;
