@@ -3,14 +3,40 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <set>
+#include <stdexcept>
+#include <functional>
+
+// JSON support (optional - if nlohmann/json is available)
+#ifdef HAVE_NLOHMANN_JSON
+#include "nlohmann/json.hpp"
+using json = nlohmann::json;
+#endif
+
+// YAML support (optional - if yaml-cpp is available)
+#ifdef HAVE_YAML_CPP
+#include "yaml-cpp/yaml.h"
+using YAML::Node;
+#endif
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // For future JSON/YAML support: std::unordered_map<std::string, json> parsedConfig;
+    // Configuration validation and schema
+    std::set<std::string> validKeys;
+    bool strictMode;
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> validators;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default validation
+    pImpl->strictMode = false;
+    initializeDefaultValidators();
+    initializeDefaultKeys();
+}
 
 Config::~Config() = default;
 
@@ -18,10 +44,154 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Initialize default configuration validators
+void Config::initializeDefaultValidators() {
+    // Basic type validation for known keys
+    pImpl->validators["random_seed"] = [](const ConfigValue& val) {
+        return std::holds_alternative<int64_t>(val);
+    };
     
+    pImpl->validators["simulation_timestep"] = [](const ConfigValue& val) {
+        return std::holds_alternative<double>(val);
+    };
+    
+    pImpl->validators["neuron_count"] = [](const ConfigValue& val) {
+        return std::holds_alternative<int64_t>(val);
+    };
+    
+    pImpl->validators["region_count"] = [](const ConfigValue& val) {
+        return std::holds_alternative<int64_t>(val);
+    };
+    
+    pImpl->validators["connection_probability"] = [](const ConfigValue& val) {
+        return std::holds_alternative<double>(val);
+    };
+    
+    // Array validation for specific keys
+    pImpl->validators["plasticity_learning_rate"] = [](const ConfigValue& val) {
+        return std::holds_alternative<double>(val);
+    };
+    
+    pImpl->validators["stdp_ltp_weight"] = [](const ConfigValue& val) {
+        return std::holds_alternative<double>(val);
+    };
+    
+    pImpl->validators["stdp_ltd_weight"] = [](const ConfigValue& val) {
+        return std::holds_alternative<double>(val);
+    };
+    
+    pImpl->validators["stdp_time_constant"] = [](const ConfigValue& val) {
+        return std::holds_alternative<double>(val);
+    };
+}
+
+// Initialize default valid configuration keys
+void Config::initializeDefaultKeys() {
+    pImpl->validKeys = {
+        "random_seed",
+        "simulation_timestep", 
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "plasticity_learning_rate",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_time_constant",
+        "development_synaptogenesis_rate",
+        "development_pruning_rate",
+        "dopamine_baseline",
+        "reward_discount_factor",
+        "environment_name",
+        "environment_width",
+        "environment_height",
+        "log_level",
+        "log_to_file",
+        "log_filename",
+        "max_simulation_steps",
+        "simulation_time_limit",
+        "visualization_enabled",
+        "visualization_update_rate"
+    };
+}
+
+// Validate configuration value for a key
+bool Config::validateKey(const std::string& key, const ConfigValue& value) const {
+    if (pImpl->strictMode) {
+        // Check if key is in valid keys set
+        if (pImpl->validKeys.find(key) == pImpl->validKeys.end()) {
+            return false;
+        }
+    }
+    
+    // Check if there's a specific validator for this key
+    auto validatorIt = pImpl->validators.find(key);
+    if (validatorIt != pImpl->validators.end()) {
+        return validatorIt->second(value);
+    }
+    
+    // No validator, accept any value
+    return true;
+}
+
+// Set strict mode for configuration validation
+void Config::setStrictMode(bool strict) {
+    pImpl->strictMode = strict;
+}
+
+// Add custom validator for a configuration key
+void Config::addValidator(const std::string& key, std::function<bool(const ConfigValue&)> validator) {
+    pImpl->validators[key] = validator;
+}
+
+// Add custom valid key
+void Config::addValidKey(const std::string& key) {
+    pImpl->validKeys.insert(key);
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Try to detect file format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Check first few lines for JSON/YAML indicators
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Detect file format
+    bool isJSON = false;
+    bool isYAML = false;
+    
+    if (firstLine.find('{') != std::string::npos || 
+        firstLine.find('[') != std::string::npos) {
+        isJSON = true;
+    } else if (firstLine.find(':') != std::string::npos ||
+               firstLine.find('-') != std::string::npos) {
+        isYAML = true;
+    }
+    
+    // Try JSON first
+#ifdef HAVE_NLOHMANN_JSON
+    if (isJSON) {
+        return loadFromJSONFile(filepath);
+    }
+#endif
+    
+    // Try YAML
+#ifdef HAVE_YAML_CPP
+    if (isYAML) {
+        return loadFromYAMLFile(filepath);
+    }
+#endif
+    
+    // Fall back to simple key=value format
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +225,97 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+#ifdef HAVE_NLOHMANN_JSON
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        json j;
+        file >> j;
+        
+        // Process JSON object
+        if (j.is_object()) {
+            for (auto& [key, value] : j.items()) {
+                ConfigValue configValue;
+                
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    configValue = value.get<int64_t>();
+                } else if (value.is_number_unsigned()) {
+                    configValue = value.get<uint64_t>();
+                } else if (value.is_number_float()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Convert JSON array to ConfigValue
+                    std::vector<std::string> strArray;
+                    for (const auto& item : value) {
+                        strArray.push_back(item.get<std::string>());
+                    }
+                    configValue = strArray;
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+        }
+    } catch (const std::exception& e) {
+        return false;
+    }
+    
+    return true;
+}
+#endif
+
+#ifdef HAVE_YAML_CPP
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Process YAML mapping
+        if (doc.IsMap()) {
+            for (const auto& pair : doc) {
+                std::string key = pair.first.as<std::string>();
+                ConfigValue configValue;
+                
+                if (pair.second.IsScalar()) {
+                    std::string valueStr = pair.second.as<std::string>();
+                    
+                    // Try to parse as different types
+                    try {
+                        bool boolVal = std::stoi(valueStr);
+                        configValue = boolVal;
+                    } catch (...) {
+                        try {
+                            double doubleVal = std::stod(valueStr);
+                            configValue = doubleVal;
+                        } catch (...) {
+                            configValue = valueStr;
+                        }
+                    }
+                } else if (pair.second.IsSequence()) {
+                    std::vector<std::string> strArray;
+                    for (const auto& item : pair.second) {
+                        strArray.push_back(item.as<std::string>());
+                    }
+                    configValue = strArray;
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+        }
+    } catch (const std::exception& e) {
+        return false;
+    }
+    
+    return true;
+}
+#endif
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -84,9 +345,21 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Save in simple key=value format (backward compatible)
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert ConfigValue to string
+        std::visit([&](const auto& val) {
+            file << entry.key << " = ";
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else {
+                file << val;
+            }
+            file << "\n";
+        }, entry.value);
     }
     
     return true;
@@ -115,6 +388,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate the configuration key before setting
+    if (!validateKey(key, value)) {
+        throw std::invalid_argument("Invalid configuration key or value: " + key);
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     

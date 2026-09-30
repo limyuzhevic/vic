@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON, YAML, or simple key=value file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a simple key=value file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +160,16 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("setStrictMode", &Config::setStrictMode, py::arg("strict"),
+             "Enable or disable strict mode for configuration validation")
+        .def("getStrictMode", &Config::getStrictMode,
+             "Get the current strict mode setting")
+        .def("addValidator", &Config::addValidator, py::arg("key"), py::arg("validator"),
+             "Add a custom validator for a configuration key")
+        .def("addValidKey", &Config::addValidKey, py::arg("key"),
+             "Add a custom valid key for configuration schema")
+        .def("validateKey", &Config::validateKey, py::arg("key"), py::arg("value"),
+             "Validate a configuration key and value")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

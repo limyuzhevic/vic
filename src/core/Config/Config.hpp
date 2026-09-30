@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <set>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -55,13 +58,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON, YAML, and simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (simple key=value format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -78,6 +81,13 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Configuration validation and control
+    void setStrictMode(bool strict);
+    bool getStrictMode() const { return pImpl->strictMode; }
+    void addValidator(const std::string& key, std::function<bool(const ConfigValue&)> validator);
+    void addValidKey(const std::string& key);
+    bool validateKey(const std::string& key, const ConfigValue& value) const;
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -86,6 +96,9 @@ public:
     
     // Get all keys
     std::vector<std::string> getKeys() const;
+    
+    // Get valid keys (for schema information)
+    std::set<std::string> getValidKeys() const { return pImpl->validKeys; }
     
     // Clear all
     void clear();
@@ -100,6 +113,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Initialize default validators and keys
+    void initializeDefaultValidators();
+    void initializeDefaultKeys();
 };
 
 } // namespace nlm
