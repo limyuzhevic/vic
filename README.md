@@ -95,6 +95,9 @@ NLM/
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── python/                         # Python bindings and API
+│   ├── bindings.cpp               # Enhanced Python bindings
+│   └── README.md                  # Python API documentation
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
@@ -111,115 +114,226 @@ NLM/
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
 ├── tests/
+├── nlm/                          # Python module structure
+│   ├── __init__.py
+│   ├── pynlm.py                # Generated Python bindings
+│   ├── advanced.py             # Advanced features
+│   ├── profiling.py            # Performance tools
+│   └── experiments.py          # Experiment management
+├── docs/                         # Documentation
+│   ├── ADVANCED_GUIDE.md
+│   ├── PYTHON_API_REFERENCE.md
+│   ├── EXAMPLES.md
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md
 └── configs/
 ```
 
-## Phase Summary
+## Project Structure
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+```
+NLM/
+├── CMakeLists.txt
+├── README.md
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+├── python/                         # Python bindings and API
+│   ├── bindings.cpp               # Enhanced Python bindings
+│   └── README.md                  # Python API documentation
+├── src/
+│   ├── core/           # Core utilities
+│   ├── brain/          # Neural components (integrated)
+│   ├── dynamics/       # Neural dynamics
+│   ├── plasticity/     # Plasticity rules
+│   ├── development/    # Developmental system
+│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── memory/        # Memory systems (integrated)
+│   ├── prediction/     # Prediction systems (integrated)
+│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── sensory/       # Sensory processing
+│   ├── motor/         # Motor system
+│   ├── environment/   # Environment interface
+│   ├── experiments/   # Experiment framework (Phase 6)
+│   └── visualization/  # Visualization
+├── tests/
+├── nlm/                          # Python module structure
+│   ├── __init__.py
+│   ├── pynlm.py                # Generated Python bindings
+│   ├── advanced.py             # Advanced features
+│   ├── profiling.py            # Performance tools
+│   └── experiments.py          # Experiment management
+├── docs/                         # Documentation
+│   ├── ADVANCED_GUIDE.md
+│   ├── PYTHON_API_REFERENCE.md
+│   ├── EXAMPLES.md
+│   ├── ARCHITECTURE.md
+│   ├── SCIENCE.md
+│   ├── ROADMAP.md
+│   ├── EXPERIMENTS.md
+│   ├── LIMITATIONS.md
+│   └── PHASE6_FINAL_AUDIT.md
+└── configs/
+```
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+## Python API Overview
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+The NLM project provides a comprehensive Python API for neural simulation research and experimentation. The Python bindings are built using pybind11 and provide access to the full NLM neural simulation framework.
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
+### Key Features
+
+#### Enhanced Pythonic Interface
+
+- **Pythonic wrapper classes** (`EnhancedBrain`, `World`, `Agent`, `MemoryManager`)
+- **Configuration management** with JSON/YAML support
+- **Context manager support** for automatic resource cleanup
+- **Property-based access** for intuitive API design
+
+#### Advanced Features
+
+- **Parameter sweep experiments** for systematic parameter testing
+- **Multi-environment testing** for robust evaluation across conditions
+- **Agent research** for custom agent development
+- **Performance monitoring** with real-time metrics
+- **Experiment management** for reproducible research
+- **Memory profiling** for resource optimization
+- **Batch processing** for large-scale simulations
+
+#### Performance Tools
+
+- **Memory monitoring** for resource tracking
+- **CPU monitoring** for system performance analysis
+
+## Python Module Structure
+
+The Python module is organized into several key components:
+
+### Core Module (`nlm/`)
+
+- **`pynlm`**: Generated Python bindings for the core NLM functionality
+- **`advanced`**: Advanced features for experimentation and research
+- **`profiling`**: Performance monitoring and optimization tools
+- **`experiments`**: Experiment management and analysis framework
+
+### Documentation
+
+The Python API is fully documented with:
+
+- **`docs/ADVANCED_GUIDE.md`**: Comprehensive guide for advanced users
+- **`docs/PYTHON_API_REFERENCE.md`**: Complete API reference documentation
+- **`docs/EXAMPLES.md`**: Practical examples and tutorials
+
+## Quick Start
+
+### Basic Usage
+
+```python
+from nlm import EnhancedBrain, World, Action
+
+# Create enhanced brain
+brain = EnhancedBrain()
+
+# Create world
+world = World()
+world.configure(100, 100, 10, 10)
+world.setAgentStart(50, 50)
+
+# Initialize brain
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    world.step(0.01)
+```
+
+### Advanced Features
+
+```python
+from nlm import AdvancedExperiment, PerformanceProfiler
+
+# Create advanced experiment
+experiment = AdvancedExperiment("my_experiment")
+
+# Run parameter sweep
+param_grid = {'width': [50, 100, 200], 'height': [50, 100, 200]}
+results = experiment.run_parameter_sweep(param_grid, brain_factory)
+
+# Create performance profiler
+profiler = PerformanceProfiler()
+profiler.start_profiling()
+
+# Run simulation with profiling
+result = profiler.benchmark_simulation(brain, world, num_steps=100)
+
+profiler.stop_profiling()
+```
+
+## Building Python Bindings
+
+The Python bindings are built using the existing C++ project. To use the Python API:
+
+1. Build the C++ project with Python bindings enabled
+2. The Python package will be automatically generated
+3. Use `pip install .` to install the package
+
+For detailed build instructions, see `HOW_TO_USE.md`.
+
+## Examples and Tutorials
+
+### Basic Examples
+
+See `docs/EXAMPLES.md` for:
+- Hello World example
+- Creating and initializing brains
+- Basic simulation loops
+- Configuration management
+
+### Advanced Examples
+
+See `docs/EXAMPLES.md` for:
+- Parameter sweep experiments
+- Multi-environment testing
+- Agent research
+- Performance benchmarking
+- Custom neuron populations
+
+### Research Examples
+
+See `docs/EXAMPLES.md` for:
+- Memory system integration
+- Neuromodulation research
+- Developmental studies
 - Social learning
-- Continual learning
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+## API Reference
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+See `docs/PYTHON_API_REFERENCE.md` for:
+- Complete class and function documentation
+- Type definitions and parameters
+- Return value descriptions
+- Usage examples for each component
 
-## Scientific Limitations
+## Advanced Guide
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+See `docs/ADVANCED_GUIDE.md` for:
+- Pythonic wrapper class design
+- Configuration system with JSON/YAML support
+- Performance monitoring tools
+- Experiment management framework
+- Custom neuron population creation
+- Batch processing utilities
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+## Migration Guide
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+The enhanced Python API maintains backward compatibility while providing new features. See `docs/PYTHON_API_REFERENCE.md` for migration information from the original API to the enhanced API.
 
 ## License
 
