@@ -111,6 +111,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
+    // NEW: Get individual neuromodulator levels
+    result.acetylcholineLevel = agent.getAcetylcholineLevel();
+    result.norepinephrineLevel = agent.getNorepinephrineLevel();
+    result.serotoninLevel = agent.getSerotoninLevel();
+    
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
@@ -149,6 +154,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.endTime = time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
+    
+    NLM_LOG_INFO("Acetylcholine: " + std::to_string(result.acetylcholineLevel));
+    NLM_LOG_INFO("Norepinephrine: " + std::to_string(result.norepinephrineLevel));
+    NLM_LOG_INFO("Serotonin: " + std::to_string(result.serotoninLevel));
     
     NLM_LOG_INFO("=== Experiment Complete ===");
     NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
@@ -190,7 +199,7 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 2: Neuromodulation systems exist
+    // Test 2: Neuromodulation systems exist (new neuromodulators)
     if (brain->getDopamine() != nullptr) {
         NLM_LOG_INFO("[PASS] Dopamine system is integrated");
     } else {
@@ -202,6 +211,35 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         NLM_LOG_INFO("[PASS] Curiosity system is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getNovelty() != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Novelty system is NOT integrated");
+        success = false;
+    }
+    
+    // NEW: Test new neuromodulators
+    if (brain->getAcetylcholine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Acetylcholine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Acetylcholine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getNorepinephrine() != nullptr) {
+        NLM_LOG_INFO("[PASS] Norepinephrine system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Norepinephrine system is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSerotonin() != nullptr) {
+        NLM_LOG_INFO("[PASS] Serotonin system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Serotonin system is NOT integrated");
         success = false;
     }
     

@@ -254,34 +254,230 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
----
+### Advanced Projects
 
-## Quick Reference
+#### Project 4: Advanced Memory Management
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+```python
+import pynlm
 
----
+# Setup with enhanced configuration
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 3000)
+config.set("region_count", 3)
+config.set("replay_interval", 25)
+config.set("consolidation_interval", 300)
 
-## Troubleshooting
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=25, height=25, visionWidth=12, visionHeight=12)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+# Enable all learning systems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+# Run for extended period
+for step in range(200):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
 
-**"Everything is 0"**
+# Check memory statistics
+stats = pynlm.getMemoryStats(brain)
+print(f"Working memory utilization: {stats.get('working_memory_utilization', 0):.2%}")
+print(f"Episodic memory: {stats.get('episodic_memory_current_episodes', 0)} episodes stored")
+
+# Trigger memory consolidation
+pynlm.triggerMemoryConsolidation(brain, 0.7)
+print("Memory consolidation completed")
+
+# Trigger replay
+replay_count = pynlm.triggerReplay(brain, 3)
+print(f"Replayed {replay_count} episodes")
+```
+
+#### Project 5: Neuromodulation Control
+
+```python
+import pynlm
+
+# Create brain with advanced configuration
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 4000)
+config.set("region_count", 4)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all neuromodulators
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Set developmental profile (accelerated, extended, or adult)
+agent.setDevelopmentProfile("accelerated")  # Options: accelerated, extended, adult
+
+# Run simulation with enhanced learning
+for step in range(300):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Monitor neuromodulation levels
+neuro_mod_level = agent.getNeuromodulationLevel()
+print(f"Overall neuromodulation level: {neuro_mod_level:.3f}")
+print(f"Dopamine level: {agent.getDopamineLevel():.3f}")
+print(f"Acetylcholine level: {agent.getAcetylcholineLevel():.3f}")
+print(f"Norepinephrine level: {agent.getNorepinephrineLevel():.3f}")
+print(f"Serotonin level: {agent.getSerotoninLevel():.3f}")
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+```
+
+#### Project 6: Advanced Simulation with Custom Parameters
+
+```python
+import pynlm
+
+# Setup with advanced configuration
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2000)
+config.set("region_count", 2)
+config.set("connection_probability", 0.2f)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=10, visionHeight=10)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Custom parameters for enhanced learning
+custom_params = {
+    "dopamine_boost": 0.3,
+    "acetylcholine_boost": 0.2,
+    "learning_rate": 0.05,
+    "exploration_bonus": 0.15
+}
+
+# Run advanced simulation with custom parameters
+metrics = pynlm.runAdvancedSimulation(brain, agent, world, 250, custom_params)
+total_reward, success_rate, avg_firing_rate = metrics
+
+print(f"Simulation Results:")
+print(f"  Average Reward per Step: {total_reward:.3f}")
+print(f"  Success Rate: {success_rate:.2%}")
+print(f"  Average Firing Rate: {avg_firing_rate:.3f}")
+
+# Get performance metrics
+performance = pynlm.getPerformanceMetrics(brain)
+print(f"\nPerformance Metrics:")
+for key, value in performance.items():
+    print(f"  {key}: {value:.3f}")
+```
+
+#### Project 7: Agent Behavior Customization
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Set different behavior profiles based on experiment goals
+experiment_goals = ["exploratory", "exploitative", "balanced"]
+
+for goal in experiment_goals:
+    print(f"\n=== Testing {goal} agent ===")
+    
+    # Reset for new experiment
+    agent.reset()
+    agent.setAgentBehaviorProfile(goal)
+    
+    # Run short simulation
+    for step in range(50):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Check behavior metrics
+    curiosity = agent.getCuriosityLevel()
+    reward_learning = "enabled" if agent.isRewardModulationEnabled() else "disabled"
+    development = "enabled" if agent.isDevelopmentEnabled() else "disabled"
+    
+    print(f"  Curiosity: {curiosity:.3f}")
+    print(f"  Reward learning: {reward_learning}")
+    print(f"  Development: {development}")
+```
+
+#### Project 8: Debugging and Monitoring
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=5, visionHeight=5)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run with debugging at specific steps
+for step in range(100):
+    if step % 25 == 0:
+        debug_info = pynlm.debugSimulationStep(brain, step)
+        print(f"\n--- Debug Info at Step {step} ---")
+        for key, value in debug_info.items():
+            if isinstance(value, (int, float)):
+                print(f"  {key}: {value:.3f}")
+            else:
+                print(f"  {key}: {value}")
+    
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("\n=== Final Status ===")
+final_debug = pynlm.debugSimulationStep(brain, 99)
+print(f"Total steps completed: {final_debug.get('step', 0)}")
+print(f"Final firing rate: {final_debug.get('firing_rate', 0):.3f}")
+print(f"Total spikes: {final_debug.get('spike_count', 0)}")
+print(f"Active neurons: {final_debug.get('active_neurons', 0)}")
+```
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 

@@ -1,5 +1,8 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -8,6 +11,9 @@ namespace nlm {
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
@@ -247,8 +253,26 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
+    // Acetylcholine (attention modulation based on novelty)
+    acetylcholineLevel_ = std::max(0.0f, 0.3f - std::abs(predictionError_) * 0.2f);
+    
+    // Norepinephrine (arousal modulation based on prediction error)
+    norepinephrineLevel_ = std::max(0.0f, std::abs(predictionError_) * 0.5f);
+    
+    // Serotonin (mood modulation based on reward)
+    serotoninLevel_ = std::clamp(reward * 0.4f + 0.1f, 0.0f, 1.0f);
+    
+    // Novelty (based on prediction error magnitude)
+    noveltyLevel_ = std::min(1.0f, std::abs(predictionError_) * 0.8f);
+    
+    // Curiosity (based on reward prediction error magnitude)
+    curiosityLevel_ = std::min(1.0f, std::abs(predictionError_) * 0.6f);
+    
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    acetylcholineLevel_ = std::clamp(acetylcholineLevel_, 0.0f, 1.0f);
+    norepinephrineLevel_ = std::clamp(norepinephrineLevel_, 0.0f, 1.0f);
+    serotoninLevel_ = std::clamp(serotoninLevel_, 0.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -256,8 +280,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Apply reward-modulated weight change with all neuromodulators
+                float neuromodulation = dopamineLevel_ * 0.4f + 
+                                       acetylcholineLevel_ * 0.2f + 
+                                       norepinephrineLevel_ * 0.2f + 
+                                       serotoninLevel_ * 0.2f;
+                float delta = eligibility * neuromodulation * plasticityModifier_;
                 syn->addToWeight(delta);
                 
                 // Decay eligibility trace
@@ -266,9 +294,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    // Modulate plasticity based on all neuromodulators
+    float plasticityFactor = dopamineLevel_ * 0.4f + 
+                             acetylcholineLevel_ * 0.2f + 
+                             norepinephrineLevel_ * 0.2f + 
+                             serotoninLevel_ * 0.2f;
+    plasticityFactor = 0.5f + plasticityFactor * 0.5f;  // Scale to 0.5-1.5 range
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -319,23 +350,28 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+    // Return combined neuromodulation level (average of all neuromodulators)
+    float totalLevel = dopamineLevel_ + acetylcholineLevel_ + norepinephrineLevel_ + serotoninLevel_;
+    return totalLevel / 4.0f;
 }
 
-float AgentBrain::getCuriosityLevel() const {
-    return curiosityLevel_;
+float AgentBrain::getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
 }
 
-float AgentBrain::getNoveltyLevel() const {
-    return noveltyLevel_;
+float AgentBrain::getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
 }
 
-float AgentBrain::getPredictionError() const {
-    return predictionError_;
+float AgentBrain::getSerotoninLevel() const {
+    return serotoninLevel_;
 }
 
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;

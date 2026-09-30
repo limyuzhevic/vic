@@ -43,6 +43,11 @@ public:
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
     
+    // Get individual neuromodulator levels
+    float getAcetylcholineLevel() const;
+    float getNorepinephrineLevel() const;
+    float getSerotoninLevel() const;
+    
     // Get curiosity level
     float getCuriosityLevel() const;
     
@@ -94,6 +99,9 @@ private:
     
     // Neuromodulation state
     float dopamineLevel_;
+    float acetylcholineLevel_;
+    float norepinephrineLevel_;
+    float serotoninLevel_;
     float noveltyLevel_;
     float curiosityLevel_;
     float predictionError_;
