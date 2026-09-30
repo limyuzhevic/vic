@@ -420,6 +420,340 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced helper functions for Python bindings
+    m.def("runLearningSimulation", [](std::shared_ptr<Brain> brain, const Config& config, size_t numSteps) {
+        runLearningSimulation(brain, config, numSteps);
+    }, py::arg("brain"), py::arg("config"), py::arg("numSteps"),
+       "Run a learning simulation with diverse input patterns");
+    
+    m.def("runAdvancedPlasticityTest", [](std::shared_ptr<Brain> brain, const Config& config) {
+        runAdvancedPlasticityTest(brain, config);
+    }, py::arg("brain"), py::arg("config"),
+       "Run advanced plasticity test with complex patterns");
+    
+    m.def("runCompleteBenchmark", [](std::shared_ptr<Brain> brain, const Config& config) {
+        runCompleteBenchmark(brain, config);
+    }, py::arg("brain"), py::arg("config"),
+       "Run complete benchmark suite");
+    
+    m.def("saveProgress", [](const std::string& filepath, std::shared_ptr<Brain> brain, const Config& config) {
+        saveProgress(filepath, brain, config);
+    }, py::arg("filepath"), py::arg("brain"), py::arg("config"),
+       "Save brain state and progress to checkpoint file");
+    
+    // Advanced Python-specific helper functions
+    m.def("createBrainFromParams", [](const std::string& description, 
+                                       size_t neuronCount = 1000, 
+                                       float connectionProbability = 0.1,
+                                       float learningRate = 0.001) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("brain.synapse_density", connectionProbability);
+        config->set("plasticity.learning_rate", learningRate);
+        return std::make_shared<Brain>(config);
+    }, py::arg("description"), py::arg("neuronCount") = 1000,
+       py::arg("connectionProbability") = 0.1, py::arg("learningRate") = 0.001,
+       "Create a brain with common parameters and description");
+    
+    m.def("createLearningEnvironment", [](std::shared_ptr<Brain> brain,
+                                          std::shared_ptr<SimpleWorld> world,
+                                          bool enableReward = true,
+                                          bool enableCuriosity = true,
+                                          bool enableDevelopment = true) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        if (enableReward) agent->enableRewardModulation(true);
+        if (enableCuriosity) agent->enableCuriosity(true);
+        if (enableDevelopment) agent->enableDevelopment(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+       py::arg("enableReward") = true, py::arg("enableCuriosity") = true,
+       py::arg("enableDevelopment") = true,
+       "Create an agent brain with learning subsystems enabled");
+    
+    m.def("runEpisode", [](std::shared_ptr<AgentBrain> agent,
+                         std::shared_ptr<SimpleWorld> world,
+                         size_t maxSteps,
+                         const std::string& description = "") -> std::map<std::string, double> {
+        std::map<std::string, double> stats;
+        auto brain = agent->getBrain();
+        
+        world->setRandomSeed(42);
+        world->reset();
+        agent->reset();
+        
+        if (description.empty()) {
+            description = "Episode " + std::to_string(maxSteps);
+        }
+        
+        double totalReward = 0.0;
+        size_t maxFiring = 0;
+        
+        for (size_t step = 0; step < maxSteps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            double reward = percept.getInternal()[0] if (percept.getInternal().size() > 0) else 0.0;
+            agent->applyRewardModulation(reward, 0.0);
+            
+            agent->updateDevelopment(0.1);
+            
+            totalReward += reward;
+            maxFiring = std::max(maxFiring, brain->getFiringNeuronCount());
+        }
+        
+        stats["total_reward"] = totalReward;
+        stats["average_reward"] = totalReward / maxSteps;
+        stats["max_firing"] = maxFiring;
+        stats["final_stage"] = static_cast<double>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("agent"), py::arg("world"), py::arg("maxSteps"),
+       py::arg("description") = "",
+       "Run a complete episode and return performance statistics");
+    
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain,
+                             size_t durationSteps,
+                             const std::string& benchmarkName = "default") {
+        NLM_LOG_INFO("=== Running " + benchmarkName + " Benchmark ===");
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        // Enable all plasticity for comprehensive benchmark
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, true);
+            }
+        }
+        
+        // Run benchmark with various stimuli
+        for (SimulationStep step = 0; step < durationSteps; ++step) {
+            // Vary input patterns
+            if (step % 4 == 0) {
+                for (size_t i = 0; i < 50 && i < brain->getTotalNeuronCount() / 20; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Excitatory, 40.0f);
+                }
+            } else if (step % 4 == 1) {
+                for (size_t i = 0; i < 25 && i < brain->getTotalNeuronCount() / 40; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Sensory, 60.0f);
+                }
+            } else if (step % 4 == 2) {
+                for (size_t i = 0; i < 10 && i < brain->getTotalNeuronCount() / 100; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Inhibitory, -20.0f);
+                }
+            }
+            
+            brain->step(step);
+            
+            if (step % 200 == 0) {
+                NLM_LOG_INFO("Benchmark step " + std::to_string(step) + 
+                           " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                           " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            }
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+        
+        NLM_LOG_INFO("=== " + benchmarkName + " Benchmark Complete ===");
+        NLM_LOG_INFO("Duration: " + std::to_string(durationSteps) + " steps");
+        NLM_LOG_INFO("Execution time: " + std::to_string(duration.count()) + " seconds");
+        NLM_LOG_INFO("Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        NLM_LOG_INFO("Final firing rate: " + std::to_string(brain->getAverageFiringRate()));
+    }, py::arg("brain"), py::arg("durationSteps"), py::arg("benchmarkName") = "default",
+       "Run a comprehensive benchmark on the brain");
+    
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) -> py::dict {
+        py::dict stats;
+        
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive statistics about the brain");
+    
+    m.def("compareBrains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2) -> py::dict {
+        py::dict comparison;
+        
+        comparison["brain1_neurons"] = brain1->getTotalNeuronCount();
+        comparison["brain1_synapses"] = brain1->getTotalSynapseCount();
+        comparison["brain1_firing"] = brain1->getFiringNeuronCount();
+        comparison["brain1_spikes"] = brain1->getTotalSpikeCount();
+        comparison["brain1_rate"] = brain1->getAverageFiringRate();
+        
+        comparison["brain2_neurons"] = brain2->getTotalNeuronCount();
+        comparison["brain2_synapses"] = brain2->getTotalSynapseCount();
+        comparison["brain2_firing"] = brain2->getFiringNeuronCount();
+        comparison["brain2_spikes"] = brain2->getTotalSpikeCount();
+        comparison["brain2_rate"] = brain2->getAverageFiringRate();
+        
+        comparison["difference_neurons"] = static_cast<double>(brain2->getTotalNeuronCount() - brain1->getTotalNeuronCount());
+        comparison["difference_synapses"] = static_cast<double>(brain2->getTotalSynapseCount() - brain1->getTotalSynapseCount());
+        comparison["difference_spikes"] = static_cast<double>(brain2->getTotalSpikeCount() - brain1->getTotalSpikeCount());
+        
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"), "Compare two brains and return statistical comparison");
+    
+    // Add convenience functions for common operations
+    m.def("initializeAndRun", [](std::shared_ptr<Brain> brain, size_t steps) {
+        brain->initialize();
+        double timestep = brain->getConfig()->getOr<double>("simulation_timestep", 0.001);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * timestep);
+            
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                           " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                           " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            }
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"),
+       "Initialize and run brain simulation");
+    
+    m.def("saveAndReset", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        brain->save(filepath);
+        brain->reset();
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+       "Save brain state and reset for new simulation");
+    
+    m.def("loadAndContinue", [](std::shared_ptr<Brain> brain, const std::string& filepath, size_t steps) {
+        brain->load(filepath);
+        double timestep = brain->getConfig()->getOr<double>("simulation_timestep", 0.001);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * timestep);
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("filepath"), py::arg("steps"),
+       "Load brain state and continue simulation");
+    
+    m.def("exportBrainToJSON", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        // Convert brain state to JSON-like structure
+        py::dict brainState;
+        
+        brainState["total_neurons"] = brain->getTotalNeuronCount();
+        brainState["total_synapses"] = brain->getTotalSynapseCount();
+        brainState["total_spikes"] = brain->getTotalSpikeCount();
+        brainState["firing_neuron_count"] = brain->getFiringNeuronCount();
+        brainState["average_firing_rate"] = brain->getAverageFiringRate();
+        brainState["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        brainState["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Save to file (simplified JSON output)
+        std::ofstream file(filepath);
+        if (file.is_open()) {
+            file << "{\n";
+            file << "  \"total_neurons\": " << brainState["total_neurons"].cast<int64_t>() << ",\n";
+            file << "  \"total_synapses\": " << brainState["total_synapses"].cast<size_t>() << ",\n";
+            file << "  \"total_spikes\": " << brainState["total_spikes"].cast<size_t>() << ",\n";
+            file << "  \"firing_neuron_count\": " << brainState["firing_neuron_count"].cast<size_t>() << ",\n";
+            file << "  \"average_firing_rate\": " << brainState["average_firing_rate"].cast<double>() << ",\n";
+            file << "  \"excitation_inhibition_ratio\": " << brainState["excitation_inhibition_ratio"].cast<double>() << ",\n";
+            file << "  \"developmental_stage\": " << brainState["developmental_stage"].cast<int>() << "\n";
+            file << "}\n";
+            file.close();
+            
+            NLM_LOG_INFO("Brain state exported to JSON file: " + filepath);
+            return true;
+        }
+        
+        return false;
+    }, py::arg("brain"), py::arg("filepath"),
+       "Export brain state to JSON file");
+    
+    // Add plotting and visualization helper functions
+    m.def("getLearningCurves", [](std::shared_ptr<Brain> brain, size_t windowSize) {
+        py::list learningData;
+        
+        // Simulate for some steps to get learning data
+        double timestep = brain->getConfig()->getOr<double>("simulation_timestep", 0.001);
+        
+        for (SimulationStep step = 0; step < 500; ++step) {
+            brain->step(step, step * timestep);
+            
+            if (step % 10 == 0) {
+                py::dict point;
+                point["step"] = step;
+                point["spike_count"] = brain->getTotalSpikeCount();
+                point["firing_neuron_count"] = brain->getFiringNeuronCount();
+                point["firing_rate"] = brain->getAverageFiringRate();
+                point["stage"] = static_cast<int>(brain->getDevelopmentalStage());
+                
+                learningData.append(point);
+            }
+        }
+        
+        return learningData;
+    }, py::arg("brain"), py::arg("windowSize") = 10,
+       "Get learning curve data for plotting");
+    
+    m.def("getSpikeHistory", [](std::shared_ptr<Brain> brain, size_t maxSamples) {
+        py::list spikeData;
+        
+        // Get spike history from spike system
+        if (auto* spikeSystem = brain->getSpikeSystem()) {
+            auto spikeHistory = spikeSystem->getSpikeHistory();
+            size_t samplesToShow = std::min(maxSamples, spikeHistory.size());
+            
+            for (size_t i = 0; i < samplesToShow; ++i) {
+                py::dict point;
+                point["time"] = spikeHistory[i].first;
+                point["neuron_id"] = spikeHistory[i].second;
+                spikeData.append(point);
+            }
+        }
+        
+        return spikeData;
+    }, py::arg("brain"), py::arg("maxSamples") = 100,
+       "Get spike history data for visualization");
+    
+    m.def("getRegionAnalysis", [](std::shared_ptr<Brain> brain, RegionId regionId) {
+        py::dict regionInfo;
+        
+        auto* region = brain->getRegion(regionId);
+        if (region) {
+            regionInfo["region_id"] = static_cast<uint64_t>(regionId.value);
+            regionInfo["neuron_count"] = region->getNeuronCount();
+            regionInfo["synapse_count"] = region->getSynapseCount();
+            regionInfo["firing_neuron_count"] = region->getFiringNeuronCount();
+            
+            auto neurons = region->getAllNeurons();
+            if (!neurons.empty()) {
+                double totalVoltage = 0.0;
+                double totalThreshold = 0.0;
+                
+                for (auto* neuron : neurons) {
+                    totalVoltage += neuron->getMembranePotential();
+                    totalThreshold += neuron->getThreshold();
+                }
+                
+                regionInfo["average_voltage"] = totalVoltage / neurons.size();
+                regionInfo["average_threshold"] = totalThreshold / neurons.size();
+            }
+        }
+        
+        return regionInfo;
+    }, py::arg("brain"), py::arg("regionId"),
+       "Get detailed analysis of a brain region");
 }
 
 } // namespace nlm
