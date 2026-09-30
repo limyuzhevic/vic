@@ -61,37 +61,19 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& filepath);
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Load from YAML format  
+    bool loadFromYAML(const std::string& filepath);
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Internal JSON parsing helpers
+    void parseJSONToConfig(const nlohmann::json& json, const std::string& prefix);
+    void setJSONValue(const std::string& key, const nlohmann::json& value);
+    void setJSONArray(const std::string& key, const nlohmann::json& array);
     
 private:
     struct Impl;

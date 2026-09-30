@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,9 +160,58 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // NEW: Add set() method to match HOW_TO_USE.md examples
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set a string configuration value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set an integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set a double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set a boolean configuration value")
+        // NEW: Add getOr() method
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or return default")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or return default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or return default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get configuration value or return default")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Expose ConfigSource enum for Python
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enum)pbdoc")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
+        .export_values();
+
+    // Add __version__ attribute to module
+    m.attr("__version__") = "0.1.0";
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -287,7 +336,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Add context manager support for SimpleWorld
+        .def("__enter__", [](SimpleWorld& self) -> SimpleWorld& {
+            return self;
+        })
+        .def("__exit__", [](SimpleWorld&, py::none, py::none, py::none) {
+            // Cleanup can be added here if needed
+        })
+        .def("__repr__", [](const SimpleWorld& world) {
+            return "<SimpleWorld: " + std::to_string(world.getWidth()) + "x" + 
+                   std::to_string(world.getHeight()) + " at (" +
+                   std::to_string(world.getAgentBody().x) + ", " +
+                   std::to_string(world.getAgentBody().y) + ")>";
+        });
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -328,20 +390,61 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+        // Add Python properties for better API
+        .def_readonly("total_neuron_count", &Brain::getTotalNeuronCount,
+                     "Total neuron count across all regions")
+        .def_readonly("total_synapse_count", &Brain::getTotalSynapseCount,
+                     "Total synapse count across all regions")
+        .def_readonly("firing_neuron_count", &Brain::getFiringNeuronCount,
+                     "Count of currently firing neurons")
+        .def_readonly("active_neuron_count", &Brain::getActiveNeuronCount,
+                     "Count of active neurons")
+        .def_readonly("average_firing_rate", &Brain::getAverageFiringRate,
+                     "Average firing rate across all neurons")
+        .def_readonly("total_spike_count", &Brain::getTotalSpikeCount,
+                     "Total spike count")
+        .def_readonly("excitaiton_inhibition_ratio", &Brain::getExcitationInhibitionRatio,
+                     "Excitation/inhibition balance ratio")
+        // Add Brain internal systems access
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get the spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get the STDP plasticity rule")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get the Hebbian plasticity rule")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get the structural plasticity rule")
+        // Memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get the working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get the episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get the associative memory system")
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get the prediction system")
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get the neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get the concept formation system")
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get the development system")
+        .def("getNeuromodulationLevel", &Brain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -387,6 +490,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        // Add context manager support for AgentBrain
+        .def("__enter__", [](AgentBrain& self) -> AgentBrain& {
+            return self;
+        })
+        .def("__exit__", [](AgentBrain&, py::none, py::none, py::none) {
+            // Cleanup can be added here if needed
+        })
+        .def("__repr__", [](const AgentBrain& agent) {
+            auto brain = agent.getBrain();
+            return "<AgentBrain: " + std::to_string(brain->getTotalNeuronCount()) + 
+                   " neurons connected to world>";
+        })
+        // Add all enable methods for AgentBrain
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -420,6 +536,17 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Expose ConfigSource enum for Python
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enum)pbdoc")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
+        .export_values();
+
+    // Add __version__ attribute to module
+    m.attr("__version__") = "0.1.0";
 }
 
 } // namespace nlm
