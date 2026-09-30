@@ -87,6 +87,11 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Validate inputs
+    if (sensoryVision_.empty() && !vision_.empty()) {
+        NLM_LOG_WARN("Vision data available but no vision neurons initialized");
+    }
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
@@ -94,6 +99,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("Skipping null vision neuron at index " + std::to_string(i));
         }
     }
     
@@ -103,6 +110,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("Skipping null touch neuron at index " + std::to_string(i));
         }
     }
     
@@ -112,6 +121,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("Skipping null internal neuron at index " + std::to_string(i));
         }
     }
     
@@ -121,6 +132,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
+        } else {
+            NLM_LOG_DEBUG("Skipping null proprioception neuron at index " + std::to_string(i));
         }
     }
     
@@ -150,7 +163,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_WARN("Cannot decode motor command: no brain available");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -168,6 +184,10 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         if (neurons.empty()) return 0.0f;
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            if (!n) {
+                NLM_LOG_WARN("Null neuron found in motor group");
+                continue;
+            }
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }

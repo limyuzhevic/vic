@@ -12,6 +12,13 @@ SensoryPercept::SensoryPercept()
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
     audio_.resize(0, 0.0f);
+    
+    // Validate initialization
+    if (vision_.size() != visionWidth_ * visionHeight_) {
+        NLM_LOG_WARN("Vision buffer size mismatch: expected " + 
+                     std::to_string(visionWidth_ * visionHeight_) + 
+                     ", got " + std::to_string(vision_.size()));
+    }
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
