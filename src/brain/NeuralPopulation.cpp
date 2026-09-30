@@ -7,7 +7,7 @@ namespace nlm {
 struct NeuralPopulation::Impl {
     PopulationId id;
     size_t size;
-    std::vector<Neuron*> neurons;
+    std::vector<std::shared_ptr<Neuron>> neurons;
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
@@ -47,25 +47,35 @@ Neuron* NeuralPopulation::getNeuron(NeuronIndex index) {
     if (index >= pImpl->neurons.size()) {
         return nullptr;
     }
-    return pImpl->neurons[index];
+    return pImpl->neurons[index].get();
 }
 
 const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
     if (index >= pImpl->neurons.size()) {
         return nullptr;
     }
-    return pImpl->neurons[index];
+    return pImpl->neurons[index].get();
 }
 
-void NeuralPopulation::addNeuron(Neuron* neuron) {
-    pImpl->neurons.push_back(neuron);
+void NeuralPopulation::addNeuron(std::shared_ptr<Neuron> neuron) {
+    pImpl->neurons.push_back(std::move(neuron));
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
     }
 }
 
-const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
+const std::vector<std::shared_ptr<Neuron>>& NeuralPopulation::getNeurons() const {
     return pImpl->neurons;
+}
+
+// Get raw neuron pointers (for compatibility with existing code)
+const std::vector<Neuron*>& NeuralPopulation::getRawNeurons() const {
+    static std::vector<Neuron*> rawNeurons;
+    rawNeurons.clear();
+    for (const auto& neuron : pImpl->neurons) {
+        rawNeurons.push_back(neuron.get());
+    }
+    return rawNeurons;
 }
 
 NeuronType NeuralPopulation::getNeuronType() const {
@@ -74,14 +84,14 @@ NeuronType NeuralPopulation::getNeuronType() const {
 
 void NeuralPopulation::setNeuronType(NeuronType type) {
     pImpl->neuronType = type;
-    for (auto* neuron : pImpl->neurons) {
+    for (auto& neuron : pImpl->neurons) {
         neuron->setType(type);
     }
 }
 
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuron : pImpl->neurons) {
         if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
             ++count;
         }
@@ -91,7 +101,7 @@ size_t NeuralPopulation::getActiveCount() const {
 
 size_t NeuralPopulation::getFiringCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuron : pImpl->neurons) {
         if (neuron->isFiring()) {
             ++count;
         }
@@ -104,7 +114,7 @@ float NeuralPopulation::getAverageFiringRate() const {
         return 0.0f;
     }
     float sum = 0.0f;
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuron : pImpl->neurons) {
         sum += neuron->getFiringRate();
     }
     return sum / static_cast<float>(pImpl->neurons.size());
@@ -118,19 +128,19 @@ float NeuralPopulation::getActivityLevel() const {
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
-    for (auto* neuron : pImpl->neurons) {
+    for (auto& neuron : pImpl->neurons) {
         neuron->initializeRandom(rng);
     }
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
-    for (auto* neuron : pImpl->neurons) {
+    for (auto& neuron : pImpl->neurons) {
         neuron->step(currentTime);
     }
 }
 
 void NeuralPopulation::reset() {
-    for (auto* neuron : pImpl->neurons) {
+    for (auto& neuron : pImpl->neurons) {
         neuron->reset();
     }
     pImpl->membranePotentials.clear();
@@ -139,7 +149,7 @@ void NeuralPopulation::reset() {
 std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
     std::vector<NeuronId> ids;
     ids.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuron : pImpl->neurons) {
         ids.push_back(neuron->getId());
     }
     return ids;
@@ -148,7 +158,7 @@ std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
 void NeuralPopulation::recordActivity() {
     pImpl->membranePotentials.clear();
     pImpl->membranePotentials.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
+    for (const auto& neuron : pImpl->neurons) {
         pImpl->membranePotentials.push_back(neuron->getMembranePotential());
     }
 }

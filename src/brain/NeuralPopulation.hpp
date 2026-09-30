@@ -38,7 +38,10 @@ public:
     void addNeuron(Neuron* neuron);
     
     // Get all neurons
-    const std::vector<Neuron*>& getNeurons() const;
+    const std::vector<std::shared_ptr<Neuron>>& getNeurons() const;
+    
+    // Get raw neuron pointers (for compatibility with existing code)
+    const std::vector<Neuron*>& getRawNeurons() const;
     
     // Population type (all neurons in population share same type)
     NeuronType getNeuronType() const;

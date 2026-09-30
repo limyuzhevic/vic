@@ -65,9 +65,9 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Sensory neurons for input injection (weak pointers to avoid ownership issues)
+    std::vector<std::weak_ptr<Neuron>> sensoryNeurons;
+    std::vector<std::weak_ptr<Neuron>> motorNeurons;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -200,17 +200,19 @@ bool Brain::initialize() {
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
-            // Collect sensory and motor neurons for I/O
+            // Collect sensory and motor neurons for I/O (use weak pointers to avoid ownership issues)
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
             if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
+                for (auto* neuron : sensoryPop->getRawNeurons()) {
+                    // Create a shared_ptr from the raw pointer, then convert to weak_ptr
+                    // Note: This assumes the neuron is owned by the region's populations
+                    pImpl->sensoryNeurons.push_back(std::weak_ptr<Neuron>(neuron->shared_from_this()));
                 }
             }
             if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
+                for (auto* neuron : motorPop->getRawNeurons()) {
+                    pImpl->motorNeurons.push_back(std::weak_ptr<Neuron>(neuron->shared_from_this()));
                 }
             }
             
@@ -588,11 +590,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
-    
-    const auto& values = input.getData();
+const auto& values = input.getData();
     if (values.empty()) return;
     
     size_t numSensory = pImpl->sensoryNeurons.size();
@@ -600,6 +598,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
+        // Check if neuron is still alive (weak_ptr is valid)
+        auto neuronPtr = pImpl->sensoryNeurons[i].lock();
+        if (!neuronPtr) continue;  // Neuron was destroyed, skip this entry
+        
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
@@ -607,11 +609,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         }
         
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        neuronPtr->injectCurrent(normalizedValue);
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            pImpl->workingMemory->storeToNeuron(neuronPtr->getId(), normalizedValue / 10.0f);
         }
     }
 }
@@ -693,14 +695,26 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // Simple action selection based on motor neuron activity
     // The motor neuron population with highest average activity determines action
     
+    // Check for valid motor neurons (filter out expired weak_ptrs)
+    std::vector<std::weak_ptr<Neuron>> validMotorNeurons;
+    for (auto& weakPtr : pImpl->motorNeurons) {
+        if (auto neuronPtr = weakPtr.lock()) {
+            validMotorNeurons.push_back(weakPtr);
+        }
+    }
+    
+    // Replace motorNeurons with valid ones
+    pImpl->motorNeurons = std::move(validMotorNeurons);
+    
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
+    for (auto& weakPtr : pImpl->motorNeurons) {
+        auto neuronPtr = weakPtr.lock();
+        if (neuronPtr && neuronPtr->isFiring()) {
             ++firingMotor;
         }
     }

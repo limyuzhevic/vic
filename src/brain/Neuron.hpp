@@ -3,6 +3,7 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
 
 namespace nlm {
 
@@ -42,7 +43,7 @@ struct NeuronState {
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
-class Neuron {
+class Neuron : public std::enable_shared_from_this<Neuron> {
 public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
@@ -54,6 +55,15 @@ public:
     Neuron& operator=(const Neuron&) = delete;
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
+    
+    // Get shared_ptr to self for weak_ptr creation
+    std::shared_ptr<Neuron> shared_from_this() {
+        return std::enable_shared_from_this<Neuron>::shared_from_this();
+    }
+    
+    std::shared_ptr<const Neuron> shared_from_this() const {
+        return std::enable_shared_from_this<Neuron>::shared_from_this();
+    }
     
     // Identity
     NeuronId getId() const;
