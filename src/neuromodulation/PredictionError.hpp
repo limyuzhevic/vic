@@ -31,6 +31,9 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Update error over time (for decay)
+    void update(TimestepDuration dt);
+    
 private:
     struct Impl;
     Impl* pImpl;

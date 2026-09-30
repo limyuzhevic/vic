@@ -55,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from JSON file
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -63,6 +63,9 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    
+    // Internal JSON loading (for hybrid support)
+    bool loadFromJSONFile(const std::string& filepath);
     
     // Get values
     template<typename T>
@@ -100,6 +103,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
 };
 
 } // namespace nlm

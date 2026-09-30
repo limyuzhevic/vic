@@ -57,4 +57,12 @@ void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
 }
 
+void PredictionSystem::update(TimestepDuration dt) {
+    // Update prediction model over time
+    // Decay prediction error slightly to prevent accumulation
+    pImpl->predictionError *= (1.0f - dt * 0.1f);
+    // Slightly adjust confidence based on error
+    pImpl->confidence = std::max(0.1f, pImpl->confidence - dt * 0.01f);
+}
+
 } // namespace nlm

@@ -19,9 +19,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first
+    bool jsonSuccess = loadFromJSONFile(filepath);
+    if (jsonSuccess) {
+        return true;
+    }
     
+    // Fall back to key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -50,6 +54,124 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // Simple JSON parser for basic key-value pairs
+    // This is a minimal implementation - for production use, consider a proper JSON library
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Remove whitespace
+    std::string json = trim(content);
+    if (json.empty() || (json[0] != '{' && json[0] != '[')) {
+        return false;  // Not JSON
+    }
+    
+    try {
+        // Simple JSON parsing - only supports { "key": "value", "number": 123 }
+        if (json[0] == '{') {
+            // Object parsing
+            size_t pos = 1;
+            while (pos < json.size() && json[pos] != '}') {
+                // Skip whitespace
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                if (pos >= json.size() || json[pos] == '}') {
+                    break;
+                }
+                
+                // Parse key
+                if (json[pos] != '"') {
+                    return false;
+                }
+                size_t keyStart = pos + 1;
+                pos = json.find('"', keyStart);
+                if (pos == std::string::npos) {
+                    return false;
+                }
+                std::string key = json.substr(keyStart, pos - keyStart);
+                
+                // Skip to colon
+                pos++;
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                if (pos >= json.size() || json[pos] != ':') {
+                    return false;
+                }
+                pos++;
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                
+                // Parse value (simplified)
+                std::string value;
+                if (pos < json.size() && json[pos] == '"') {
+                    // String value
+                    size_t valStart = pos + 1;
+                    pos = json.find('"', valStart);
+                    if (pos == std::string::npos) {
+                        return false;
+                    }
+                    value = json.substr(valStart, pos - valStart);
+                    pos++;  // Skip closing quote
+                } else if (pos < json.size() && (std::isdigit(json[pos]) || json[pos] == '-')) {
+                    // Number value
+                    size_t valStart = pos;
+                    while (pos < json.size() && (std::isdigit(json[pos]) || json[pos] == '.' || json[pos] == '-' || json[pos] == 'e' || json[pos] == 'E' || json[pos] == '+')) {
+                        pos++;
+                    }
+                    value = json.substr(valStart, pos - valStart);
+                } else if (pos < json.size() && json[pos] == 't' || json[pos] == 'f') {
+                    // Boolean value
+                    if (json.substr(pos, 4) == "true") {
+                        value = "true";
+                        pos += 4;
+                    } else if (json.substr(pos, 5) == "false") {
+                        value = "false";
+                        pos += 5;
+                    } else {
+                        return false;
+                    }
+                } else if (pos < json.size() && json[pos] == 'n') {
+                    // Null value
+                    if (json.substr(pos, 4) == "null") {
+                        value = "null";
+                        pos += 4;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+                
+                // Set the key-value pair
+                set(key, value, ConfigSource::File);
+                
+                // Skip comma or closing brace
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                if (pos < json.size() && json[pos] == ',') {
+                    pos++;
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
     }
     
     return true;
@@ -84,12 +206,94 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write in JSON format for better interoperability
+    file << "{\n";
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Write value based on type
+        if (std::holds_alternative<int>(entry.value)) {
+            file << std::get<int>(entry.value);
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            file << std::get<int64_t>(entry.value);
+        } else if (std::holds_alternative<double>(entry.value)) {
+            file << std::get<double>(entry.value);
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            file << (std::get<bool>(entry.value) ? "true" : "false");
+        } else if (std::holds_alternative<std::string>(entry.value)) {
+            file << "\"" << escapeString(std::get<std::string>(entry.value)) << "\"";
+        } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+            file << "[";  // Simplified array support
+            const auto& arr = std::get<std::vector<int>>(entry.value);
+            for (size_t i = 0; i < arr.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << arr[i];
+            }
+            file << "]";
+        } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+            file << "[";  // Simplified array support
+            const auto& arr = std::get<std::vector<double>>(entry.value);
+            for (size_t i = 0; i < arr.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << arr[i];
+            }
+            file << "]";
+        } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            file << "[";  // Simplified array support
+            const auto& arr = std::get<std::vector<std::string>>(entry.value);
+            for (size_t i = 0; i < arr.size(); ++i) {
+                if (i > 0) file << ", ";
+                file << "\"" << escapeString(arr[i]) << "\"";
+            }
+            file << "]";
+        } else {
+            file << "null";  // Unknown type
+        }
+        
+        if (!entry.description.empty()) {
+            file << "  // " << entry.description;
+        }
     }
     
+    file << "\n}\n";
+    
     return true;
+}
+
+// Helper method to escape JSON strings
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() + 10);
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    // Control character - use hex escape
+                    result += "\\u00";
+                    result += "0123456789ABCDEF"[(c >> 4) & 0xF];
+                    result += "0123456789ABCDEF"[ c       & 0xF];
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    
+    return result;
 }
 
 template<typename T>
@@ -199,10 +403,157 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+std::string Config::escapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() + 10);
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    // Control character - use hex escape
+                    result += "\\u00";
+                    result += "0123456789ABCDEF"[(c >> 4) & 0xF];
+                    result += "0123456789ABCDEF"[ c       & 0xF];
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    
+    return result;
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // Simple JSON parser for basic key-value pairs
+    // This is a minimal implementation - for production use, consider a proper JSON library
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Remove whitespace
+    std::string json = trim(content);
+    if (json.empty() || (json[0] != '{' && json[0] != '[')) {
+        return false;  // Not JSON
+    }
+    
+    try {
+        // Simple JSON parsing - only supports { "key": "value", "number": 123 }
+        if (json[0] == '{') {
+            // Object parsing
+            size_t pos = 1;
+            while (pos < json.size() && json[pos] != '}') {
+                // Skip whitespace
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                if (pos >= json.size() || json[pos] == '}') {
+                    break;
+                }
+                
+                // Parse key
+                if (json[pos] != '"') {
+                    return false;
+                }
+                size_t keyStart = pos + 1;
+                pos = json.find('"', keyStart);
+                if (pos == std::string::npos) {
+                    return false;
+                }
+                std::string key = json.substr(keyStart, pos - keyStart);
+                
+                // Skip to colon
+                pos++;
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                if (pos >= json.size() || json[pos] != ':') {
+                    return false;
+                }
+                pos++;
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                
+                // Parse value (simplified)
+                std::string value;
+                if (pos < json.size() && json[pos] == '"') {
+                    // String value
+                    size_t valStart = pos + 1;
+                    pos = json.find('"', valStart);
+                    if (pos == std::string::npos) {
+                        return false;
+                    }
+                    value = json.substr(valStart, pos - valStart);
+                    pos++;  // Skip closing quote
+                } else if (pos < json.size() && (std::isdigit(json[pos]) || json[pos] == '-')) {
+                    // Number value
+                    size_t valStart = pos;
+                    while (pos < json.size() && (std::isdigit(json[pos]) || json[pos] == '.' || json[pos] == '-' || json[pos] == 'e' || json[pos] == 'E' || json[pos] == '+')) {
+                        pos++;
+                    }
+                    value = json.substr(valStart, pos - valStart);
+                } else if (pos < json.size() && json[pos] == 't' || json[pos] == 'f') {
+                    // Boolean value
+                    if (json.substr(pos, 4) == "true") {
+                        value = "true";
+                        pos += 4;
+                    } else if (json.substr(pos, 5) == "false") {
+                        value = "false";
+                        pos += 5;
+                    } else {
+                        return false;
+                    }
+                } else if (pos < json.size() && json[pos] == 'n') {
+                    // Null value
+                    if (json.substr(pos, 4) == "null") {
+                        value = "null";
+                        pos += 4;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+                
+                // Set the key-value pair
+                set(key, value, ConfigSource::File);
+                
+                // Skip comma or closing brace
+                while (pos < json.size() && std::isspace(json[pos])) {
+                    pos++;
+                }
+                if (pos < json.size() && json[pos] == ',') {
+                    pos++;
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
+    }
+    
+    return true;
+}
+
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
+
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 

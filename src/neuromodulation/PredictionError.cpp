@@ -50,4 +50,10 @@ float PredictionError::getMagnitude() const {
     return std::abs(pImpl->error);
 }
 
+void PredictionError::update(TimestepDuration dt) {
+    // Apply decay to error magnitude over time
+    float decay = std::min(1.0f, dt * 0.1f);  // Decay factor
+    pImpl->error *= (1.0f - decay);
+}
+
 } // namespace nlm
