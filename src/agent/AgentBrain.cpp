@@ -133,7 +133,8 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        size_t count = std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / static_cast<float>(count);
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;

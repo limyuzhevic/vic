@@ -121,26 +121,49 @@ float Neuron::getLastSpikeTime() const {
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
     // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    // Validate input to prevent instability
+    if (std::isnan(amplitude) || std::isinf(amplitude)) {
+        return; // Ignore invalid input
+    }
+    // Clamp to reasonable biological range [-100.0f, 100.0f] mV
+    MembranePotential clampedAmplitude = std::clamp(amplitude, -100.0f, 100.0f);
+    pImpl->synapticInput += clampedAmplitude;
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
     // Real inhibitory input: subtract from total current
     // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Validate input to prevent instability
+    if (std::isnan(amplitude) || std::isinf(amplitude)) {
+        return; // Ignore invalid input
+    }
+    // Clamp to reasonable biological range [-100.0f, 100.0f] mV
+    MembranePotential clampedAmplitude = std::clamp(amplitude, -100.0f, 100.0f);
+    pImpl->synapticInput -= clampedAmplitude;
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    // Validate input to prevent instability
+    if (std::isnan(amplitude) || std::isinf(amplitude)) {
+        return; // Ignore invalid input
+    }
+    // Clamp to reasonable biological range [-100.0f, 100.0f] mV
+    MembranePotential clampedAmplitude = std::clamp(amplitude, -100.0f, 100.0f);
+    pImpl->state.adaptationVariable += clampedAmplitude * 0.1f;
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
     // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    // Validate input to prevent instability
+    if (std::isnan(current) || std::isinf(current)) {
+        return; // Ignore invalid input
+    }
+    // Clamp to reasonable biological range [-100.0f, 100.0f] mV
+    MembranePotential clampedCurrent = std::clamp(current, -100.0f, 100.0f);
+    pImpl->synapticInput += clampedCurrent;
 }
 
 void Neuron::clearTotalCurrent() {
