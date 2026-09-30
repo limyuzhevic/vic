@@ -142,27 +142,161 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def("__str__", &Config::summary,
+             "Get string representation of configuration")
+        .def("__len__", &Config::getKeys,
+             "Get number of configuration keys")
+        .def("__iter__", [](const Config& self) {
+            return py::make_iterator(self.getKeys().begin(), self.getKeys().end());
+        }, py::return_value_policy::copy,
+             "Iterate over configuration keys")
+        .def("copy", [](const Config& self) {
+            Config copy;
+            for (const auto& key : self.getKeys()) {
+                auto val = self.get<std::string>(key);
+                if (val.has_value()) {
+                    copy.set(key, *val, ConfigSource::Runtime);
+                }
+            }
+            return copy;
+        }, "Create a copy of the configuration")
+        .def("merge", [](Config& self, const Config& other) {
+            for (const auto& key : other.getKeys()) {
+                auto val = other.get<std::string>(key);
+                if (val.has_value()) {
+                    self.set(key, *val, ConfigSource::Runtime);
+                }
+            }
+        }, py::arg("other"),
+             "Merge another configuration into this one")
+        // Helper methods for common operations
+        .def("getString", &Config::get<std::string>, py::arg("key"),
+              "Get configuration value as string")
+        .def("getInt", &Config::get<int>, py::arg("key"),
+              "Get configuration value as integer")
+        .def("getFloat", &Config::get<double>, py::arg("key"),
+              "Get configuration value as float/double")
+        .def("getBool", &Config::get<bool>, py::arg("key"),
+              "Get configuration value as boolean")
+        .def("getStringOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as string with default")
+        .def("getIntOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as integer with default")
+        .def("getFloatOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as float/double with default")
+        .def("getBoolOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as boolean with default")
+        // File operations
+        .def("dump", &Config::summary,
+              "Get detailed configuration dump")
+        // Context manager support
+        .def("__enter__", [](Config& self) { return &self; })
+        .def("__exit__", [](Config&, const py::object&, const py::object&, const py::object&) {});
+
+    // Create convenience functions for common patterns
+    m.def("create_brain_with_config", [](std::map<std::string, std::string> configMap) {
+        Config config;
+        for (const auto& [key, value] : configMap) {
+            config.set(key, value, ConfigSource::Runtime);
+        }
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>(config));
+        return brain;
+    }, py::arg("config_map"), "Create brain with configuration from dictionary");
+
+    m.def("create_brain_with_file", [](const std::string& filepath) {
+        Config config;
+        config.loadFromFile(filepath);
+        return std::make_shared<Brain>(std::make_shared<Config>(config));
+    }, py::arg("filepath"), "Create brain with configuration from file");
+
+    m.def("create_agent_with_config", [](std::map<std::string, std::string> configMap) {
+        Config config;
+        for (const auto& [key, value] : configMap) {
+            config.set(key, value, ConfigSource::Runtime);
+        }
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>(config));
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("config_map"), "Create agent brain with configuration from dictionary");
+
+    // Helper utilities for working with NLM
+    m.def("configure_neuron_population", [](Config& config, const std::string& populationKey, int count) {
+        config.set(populationKey + ".neuron_count", count, ConfigSource::Runtime);
+    }, py::arg("config"), py::arg("population_key"), py::arg("count"),
+       "Configure neuron population size in configuration");
+
+    m.def("configure_plasticity", [](Config& config, double rate) {
+        config.set("plasticity.stdp.learning_rate", rate, ConfigSource::Runtime);
+        config.set("plasticity.hebbian.learning_rate", rate, ConfigSource::Runtime);
+    }, py::arg("config"), py::arg("rate"),
+       "Configure plasticity learning rates");
+
+    m.def("configure_development", [](Config& config, const std::string& stage) {
+        static const std::map<std::string, DevelopmentalStage> stageMap = {
+            {"initial", DevelopmentalStage::Initial},
+            {"critical_period", DevelopmentalStage::CriticalPeriod},
+            {"maturation", DevelopmentalStage::Maturation},
+            {"adult", DevelopmentalStage::Adult},
+            {"aging", DevelopmentalStage::Aging}
+        };
+        auto it = stageMap.find(stage);
+        if (it != stageMap.end()) {
+            config.set("development.stage", static_cast<int>(it->second), ConfigSource::Runtime);
+        }
+    }, py::arg("config"), py::arg("stage"),
+       "Configure developmental stage");
+
+    m.def("validate_config", [](const Config& config) {
+        std::vector<std::string> errors;
+        
+        // Check required keys
+        if (!config.has("brain.neuron_count")) {
+            errors.push_back("Missing required key: brain.neuron_count");
+        }
+        
+        if (!config.has("brain.synapse_density")) {
+            errors.push_back("Missing required key: brain.synapse_density");
+        }
+        
+        // Validate values
+        auto neuronCount = config.get<int>("brain.neuron_count");
+        if (neuronCount.has_value() && (*neuronCount <= 0)) {
+            errors.push_back("brain.neuron_count must be positive");
+        }
+        
+        auto density = config.get<double>("brain.synapse_density");
+        if (density.has_value() && (*density < 0.0 || *density > 1.0)) {
+            errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+
+    m.def("export_config_for_experiment", [](const Config& config, const std::string& experimentName) {
+        std::map<std::string, std::string> exportConfig;
+        
+        auto keys = config.getKeys();
+        for (const auto& key : keys) {
+            auto val = config.get<std::string>(key);
+            if (val.has_value()) {
+                exportConfig[key] = *val;
+            }
+        }
+        
+        // Add experiment metadata
+        exportConfig["experiment.name"] = experimentName;
+        exportConfig["experiment.export_timestamp"] = "TODO: add timestamp";
+        
+        return exportConfig;
+    }, py::arg("config"), py::arg("experiment_name"),
+       "Export configuration for experiment use");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

@@ -73,225 +73,130 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Advanced Usage: Configuration Management
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Configure Your Brain
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
-```
-
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
+# Create a custom configuration
 config = pynlm.createDefaultConfig()
+
+# Set various parameters
+config.set("brain.neuron_count", 2000)  # More neurons
+config.set("brain.synapse_density", 0.15)  # Higher connectivity
+config.set("plasticity.stdp.learning_rate", 0.005)  # Slower learning
+config.set("neuromod.dopamine.scale", 1.5)  # Stronger dopamine
+
+# Create brain with custom configuration
 brain = pynlm.createBrain(config)
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+```
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+### Use Dictionary Configuration
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+```python
+import pynlm
 
-print("Agent simulation complete!")
+# Configure using Python dictionary
+brain_config = {
+    "brain.neuron_count": 3000,
+    "brain.synapse_density": 0.12,
+    "plasticity.stdp.learning_rate": 0.003,
+    "neuromod.curiosity.enable": True,
+    "neuromod.novelty.enable": True
+}
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+for key, value in brain_config.items():
+    # Try to set as int, float, or string
+    try:
+        if isinstance(value, bool):
+            brain.getConfig().set(key, value)
+        elif isinstance(value, int):
+            brain.getConfig().set(key, value)
+        elif isinstance(value, float):
+            brain.getConfig().set(key, value)
+        else:
+            brain.getConfig().set(key, value)
+    except:
+        pass  # Skip if key doesn't exist
+
+brain.initialize()
+```
+
+### Validate Configuration
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
+
+# Check if configuration is valid
+errors = pynlm.validate_config(config)
+if errors:
+    print("Configuration errors:", errors)
+else:
+    print("Configuration is valid!")
 ```
 
 ---
 
-## Quick Reference
+## Configuration Examples
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+### Basic Configuration
 
----
+```python
+import pynlm
 
-## Troubleshooting
+# Start with default
+config = pynlm.createDefaultConfig()
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+# Modify specific settings
+config.set("brain.v_thresh", -45.0)  # Higher threshold
+config.set("brain.v_rest", -65.0)    # More negative resting potential
+config.set("brain.tau_mem", 25.0)    # Slower membrane time constant
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+print(config.summary())
+```
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+### Population Configuration
 
----
+```python
+import pynlm
 
-## Next Steps
+config = pynlm.createDefaultConfig()
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+# Configure different neuron populations
+pynlm.configure_neuron_population(config, "sensory_layer", 500)
+pynlm.configure_neuron_population(config, "motor_layer", 300)
+pynlm.configure_neuron_population(config, "interneuron_layer", 200)
 
-That's it! You're now ready to use NLM.
+# Configure plasticity
+pynlm.configure_plasticity(config, 0.001)
+
+# Configure development
+pynlm.configure_development(config, "critical_period")
+
+print("Configured for critical period development")
+print(config.summary())
+```
+
+### Export Configuration
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("plasticity.stdp.learning_rate", 0.001)
+
+# Export for experiment
+export_config = pynlm.export_config_for_experiment(config, "neural_plasticity_test")
+print("Exported config for experiment:")
+for key, value in export_config.items():
+    print(f"  {key}: {value}")
+```
