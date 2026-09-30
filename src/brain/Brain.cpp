@@ -11,7 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -114,7 +114,12 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem = std::make_unique<NeuralPrediction>();
+        predictionSystem->initialize(this);  // NeuralPrediction has initialize() method
+        predictionSystem->setSequenceMemorySize(100);  // Configurable memory
+        predictionSystem->setPredictionHorizon(10);    // Predict 10 steps ahead
+        predictionSystem->enableTemporalPrediction(true);
+        predictionSystem->enableActionConsequencePrediction(true);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -129,6 +134,23 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize all systems with brain reference (Phase 6 integration)
+        // This ensures memory systems have proper brain connection from construction
+        workingMemory->initialize(this);
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        
+        // Initialize cognition systems
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
+        
+        // Initialize neuromodulation systems  
+        novelty->initialize(this);
+        curiosity->initialize(this);
+        dopamine->initialize(this);
+        predictionError->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -232,32 +254,30 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
+    // Note: Already initialized in Brain::Impl constructor
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
+    // Initialize episodic memory  
+    // Note: Already initialized in Brain::Impl constructor
     pImpl->episodicMemory->setMaxEpisodes(1000);
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    // Note: Already initialized in Brain::Impl constructor
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
+    // Note: Already initialized in Brain::Impl constructor
     pImpl->planner->setPlanningDepth(5);
     
-    pImpl->conceptFormation->initialize(this);
+    pImpl->conceptFormation->setConceptCapacity(100);
     
-    pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Note: Already initialized in Brain::Impl constructor
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +531,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Record current brain state (current neural activity patterns)
+        // Convert neural activity to sensory-like representation for prediction
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        currentState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    } else {
+                        currentState.push_back(0.0f);
+                    }
+                }
+            }
+        }
+        
+        // Record state for prediction (will be used with sensory input from AgentBrain)
+        pImpl->predictionSystem->recordSensoryState(currentState, pImpl->currentStep);
+        
+        // Generate prediction for next step
+        auto predictedState = pImpl->predictionSystem->generatePrediction(pImpl->currentStep);
+        
+        // If we have prediction, it would modulate neural processing
+        // For now, just track prediction error for neuromodulation
+        if (!predictedState.empty()) {
+            float error = pImpl->predictionSystem->updateWithObservation(currentState, pImpl->currentStep);
+            
+            // Use prediction error for reward modulation
+            if (pImpl->dopamine) {
+                // Modulate dopamine based on prediction error
+                float neuromodulation = pImpl->predictionSystem->getPredictionError() * 0.5f;
+                neuromodulation = std::clamp(neuromodulation, -1.0f, 1.0f);
+                pImpl->dopamine->setLevel(neuromodulation);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1019,7 +1072,7 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
+NeuralPrediction* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 

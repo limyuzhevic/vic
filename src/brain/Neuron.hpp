@@ -2,7 +2,6 @@
 
 #include "../core/Types/Types.hpp"
 #include <vector>
-#include <array>
 
 namespace nlm {
 
@@ -41,7 +40,7 @@ struct NeuronState {
 };
 
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics through component coordination
 class Neuron {
 public:
     // Create neuron with ID
@@ -143,7 +142,35 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Component access methods (for brain integration)
+    NeuronDynamics& getDynamics() { return dynamics_; }
+    const NeuronState& getState() const { return stateManager_.getState(); }
+    
+    // Component methods (for specialized operations)
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    void setType(NeuronType type);
+    void setRegionId(RegionId region);
+    
+    // Coordinate components for step processing
+    void step(Timestamp currentTime);
+    
 private:
+    // Components
+    NeuronDynamics dynamics_;
+    NeuronState stateManager_;
+    SynapticInput synapticInput_;
+    SpikeHandler spikeHandler_;
+    AdaptationSystem adaptation_;
+    NeuronInitializer initializer_;
+    
+    // Neuron identity and metadata
+    NeuronId id_;
+    NeuronType type_;
+    RegionId regionId_;
+    PopulationId populationId_;
+    PlasticityFlags plasticityFlags_;
+    
+    // Legacy pImpl for backward compatibility (temporarily)
     struct Impl;
     Impl* pImpl;
 };

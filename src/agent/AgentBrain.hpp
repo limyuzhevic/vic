@@ -81,8 +81,24 @@ private:
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
+    std::vector<Neuron*> motorLeft_;
+    std::vector<Neuron*> motorRight_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
+    std::vector<Neuron*> motorLookUp_;
+    std::vector<Neuron*> motorLookDown_;
+    std::vector<Neuron*> motorJump_;
+    std::vector<Neuron*> motorClimb_;
+    std::vector<Neuron*> motorFall_;
+    std::vector<Neuron*> motorRoll_;
+    std::vector<Neuron*> motorGrab_;
+    std::vector<Neuron*> motorRelease_;
+    std::vector<Neuron*> motorPush_;
+    std::vector<Neuron*> motorPull_;
+    std::vector<Neuron*> motorLift_;
+    std::vector<Neuron*> motorDrop_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
@@ -92,12 +108,10 @@ private:
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
     
-    // Neuromodulation state
-    float dopamineLevel_;
-    float noveltyLevel_;
-    float curiosityLevel_;
-    float predictionError_;
-    float expectedReward_;
+    // Memory and prediction systems for integrated cognition
+    NeuralWorkingMemory* workingMemory_;
+    NeuralEpisodicMemory* episodicMemory_;
+    NeuralPrediction* predictionSystem_;
     
     // Development state
     double developmentalAge_;
@@ -112,6 +126,15 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Neuromodulation
+    float dopamineLevel_;
+    float noveltyLevel_;
+    float curiosityLevel_;
+    float predictionError_;
+    float expectedReward_;
 };
+
+} // namespace nlm
 
 } // namespace nlm

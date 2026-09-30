@@ -183,15 +183,257 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             result.success = true;
             break;
             
-        case MotorCommand::LookLeft:
-            // Pan sensor (no movement)
+        case MotorCommand::LookUp:
+            // Tilt sensor up
+            agent_.headPitch = std::min(agent_.headPitch + 0.5f, 1.0f);
+            generateVision();
             result.reward = 0.0f;
             result.success = true;
             break;
             
-        case MotorCommand::LookRight:
+        case MotorCommand::LookDown:
+            // Tilt sensor down
+            agent_.headPitch = std::max(agent_.headPitch - 0.5f, -1.0f);
+            generateVision();
             result.reward = 0.0f;
             result.success = true;
+            break;
+            
+        case MotorCommand::Jump:
+            // Jump action with physics
+            if (agent_.onGround) {
+                agent_.velocityY = 5.0f;  // Jump velocity
+                agent_.onGround = false;
+                agent_.isMoving = true;
+                result.reward = -0.5f;  // Jump cost
+                result.success = true;
+                result.message = "jumped";
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "already_airborne";
+            }
+            break;
+            
+        case MotorCommand::Climb:
+            // Climb action
+            if (agent_.climbing) {
+                // Continue climbing
+                agent_.climbProgress += 0.1f;
+                agent_.y += 0.1f;
+                agent_.energy -= 0.05f;
+                result.reward = -0.1f;
+                result.success = true;
+                result.message = "climbing";
+            } else {
+                // Start climbing if near climbable surface
+                float climbRange = 1.0f;
+                WorldObject* climbable = getObjectAt(agent_.x, agent_.y - climbRange);
+                if (climbable && climbable->type == WorldObjectType::Wall) {
+                    agent_.climbing = true;
+                    agent_.climbProgress = 0.0f;
+                    result.reward = -0.2f;
+                    result.success = true;
+                    result.message = "started_climbing";
+                } else {
+                    result.reward = -0.1f;
+                    result.success = false;
+                    result.message = "no_climbable_surface";
+                }
+            }
+            break;
+            
+        case MotorCommand::Fall:
+            // Fall action (allow falling)
+            if (agent_.onGround) {
+                // Start falling process
+                agent_.falling = true;
+                agent_.fallTimer = 0.0f;
+                result.reward = 0.0f;
+                result.success = true;
+                result.message = "started_falling";
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "already_falling";
+            }
+            break;
+            
+        case MotorCommand::Roll:
+            // Roll action (slide/kick)
+            if (agent_.onGround) {
+                float rollSpeed = 3.0f;
+                agent_.angularVelocity = rollSpeed * 2.0f;  // Roll in place
+                agent_.isTurning = true;
+                agent_.energy -= 0.1f;
+                result.reward = -0.2f;
+                result.success = true;
+                result.message = "rolled";
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "need_ground_to_roll";
+            }
+            break;
+            
+        case MotorCommand::Grab:
+            // Grab action (pick up object)
+            if (agent_.grabbing) {
+                result.reward = -0.05f;
+                result.success = false;
+                result.message = "already_grabbing";
+            } else {
+                float grabRange = 1.0f;
+                WorldObject* object = getObjectAt(agent_.x, agent_.y);
+                if (object && object->active && object->type == WorldObjectType::Resource) {
+                    // Pick up resource
+                    object->active = false;
+                    agent_.grabbedObject = object;
+                    agent_.grabbing = true;
+                    agent_.grabbedValue = object->value;
+                    agent_.energy -= 0.1f;
+                    result.reward = -0.1f;
+                    result.success = true;
+                    result.message = "grabbed_object";
+                } else if (object && object->active) {
+                    // Can't grab hazard
+                    result.reward = -0.2f;
+                    result.success = false;
+                    result.message = "cannot_grab_hazard";
+                } else {
+                    result.reward = -0.1f;
+                    result.success = false;
+                    result.message = "no_object_to_grab";
+                }
+            }
+            break;
+            
+        case MotorCommand::Release:
+            // Release action (drop object)
+            if (agent_.grabbing && agent_.grabbedObject) {
+                // Drop the object at current position
+                WorldObject dropped;
+                dropped.x = agent_.x;
+                dropped.y = agent_.y;
+                dropped.radius = 0.5f;
+                dropped.type = WorldObjectType::Resource;
+                dropped.value = agent_.grabbedValue;
+                dropped.active = true;
+                
+                objects_.push_back(dropped);
+                
+                // Gain energy from released resource
+                float energyGained = std::min(maxEnergy_ - agent_.energy, agent_.grabbedValue * 0.1f);
+                agent_.energy += energyGained;
+                
+                agent_.grabbing = false;
+                agent_.grabbedObject = nullptr;
+                agent_.grabbedValue = 0.0f;
+                
+                result.reward = energyGained * 0.5f;
+                result.success = true;
+                result.message = "released_object";
+            } else {
+                result.reward = -0.05f;
+                result.success = false;
+                result.message = "not_grabbing_anything";
+            }
+            break;
+            
+        case MotorCommand::Push:
+            // Push action (push nearby object)
+            if (agent_.grabbing && agent_.grabbedObject) {
+                // Push the grabbed object
+                agent_.grabbedObject->x += std::cos(agent_.orientation) * 0.5f;
+                agent_.grabbedObject->y += std::sin(agent_.orientation) * 0.5f;
+                agent_.energy -= 0.05f;
+                result.reward = -0.1f;
+                result.success = true;
+                result.message = "pushed_object";
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "nothing_to_push";
+            }
+            break;
+            
+        case MotorCommand::Pull:
+            // Pull action (pull nearby object)
+            if (agent_.grabbing && agent_.grabbedObject) {
+                // Pull the grabbed object toward agent
+                float dx = agent_.x - agent_.grabbedObject->x;
+                float dy = agent_.y - agent_.grabbedObject->y;
+                float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist > 0.1f) {
+                    float force = 0.3f;
+                    agent_.grabbedObject->x += dx / dist * force;
+                    agent_.grabbedObject->y += dy / dist * force;
+                }
+                agent_.energy -= 0.05f;
+                result.reward = -0.1f;
+                result.success = true;
+                result.message = "pulled_object";
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "nothing_to_pull";
+            }
+            break;
+            
+        case MotorCommand::Lift:
+            // Lift action (lift object overhead)
+            if (agent_.grabbing && agent_.grabbedObject) {
+                // Lift object to a higher position
+                if (agent_.grabbedObject->y < height_ - 1.0f) {
+                    agent_.grabbedObject->y += 0.2f;
+                    agent_.energy -= 0.1f;
+                    result.reward = -0.1f;
+                    result.success = true;
+                    result.message = "lifted_object";
+                } else {
+                    result.reward = -0.1f;
+                    result.success = false;
+                    result.message = "too_high_to_lift";
+                }
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "nothing_to_lift";
+            }
+            break;
+            
+        case MotorCommand::Drop:
+            // Drop action (release grabbed object)
+            if (agent_.grabbing && agent_.grabbedObject) {
+                // Drop object at current position
+                WorldObject dropped;
+                dropped.x = agent_.x;
+                dropped.y = agent_.y;
+                dropped.radius = agent_.grabbedObject->radius;
+                dropped.type = agent_.grabbedObject->type;
+                dropped.value = agent_.grabbedObject->value;
+                dropped.active = true;
+                
+                objects_.push_back(dropped);
+                
+                agent_.grabbing = false;
+                agent_.grabbedObject = nullptr;
+                agent_.grabbedValue = 0.0f;
+                
+                // Different reward for different object types
+                if (dropped.type == WorldObjectType::Resource) {
+                    float energyGained = std::min(maxEnergy_ - agent_.energy, dropped.value * 0.1f);
+                    agent_.energy += energyGained;
+                    result.reward = energyGained * 0.5f + 0.2f;  // Base reward for dropping
+                }
+                
+                result.success = true;
+                result.message = "dropped_object";
+            } else {
+                result.reward = -0.1f;
+                result.success = false;
+                result.message = "nothing_to_drop";
+            }
             break;
             
         case MotorCommand::Interact:

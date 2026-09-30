@@ -1,230 +1,175 @@
-# NLM — 熙然
+# NLM Documentation Repository
 
-**An Experimental Artificial Developmental Brain**
+This repository contains comprehensive documentation and examples for the NLM (Neural Learning Machine) framework.
 
-## What is NLM?
+## Documentation Structure
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+### Main Documentation Directories
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+1. **docs/advanced_usage/**
+   - `basic_integration_example.md`: Basic integration examples
+   - `advanced_agent_tutorial.md`: Advanced agent tutorials
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+2. **docs/tutorials/**
+   - `memory_system_tutorial.md`: Comprehensive memory system tutorial
 
-## Current Phase
+3. **docs/reference/**
+   - `configuration_guide.md`: Configuration reference guide
+   - `performance_optimization_guide.md`: Performance optimization guide
+   - `troubleshooting_guide.md`: Troubleshooting guide
+   - `research_applications_guide.md`: Research applications guide
+   - `api_reference.md`: Complete API reference documentation
 
-**PHASE 6: FINAL INTEGRATION**
+4. **examples/**
+   - `basic_brain.cpp`: Basic brain simulation example
+   - `memory_system_example.cpp`: Memory system usage example
+   - `agent_example.cpp`: Agent-based example
+   - `configuration_example.cpp`: Configuration creation example
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+## Usage
 
-### Phase 6 Integration Achievements
+### Basic Usage
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
-
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+1. **Include NLM headers**:
+```cpp
+#include "nlm/brain/Brain.hpp"
+#include "nlm/config/Config.hpp"
 ```
 
-## Running
-
-### Phase 6 Demo (Integration Test)
-```bash
-./nlm_phase6_demo
+2. **Create configuration**:
+```cpp
+auto config = std::make_shared<nlm::Config>();
+config->set("neuron_count", 100, nlm::ConfigSource::User);
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
-
-## Project Structure
-
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+3. **Create and initialize brain**:
+```cpp
+nlm::Brain brain(config);
+if (brain.initialize()) {
+    // Brain is ready for use
+}
 ```
 
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+4. **Run simulation**:
+```cpp
+for (int step = 0; step < 100; ++step) {
+    brain.step(step);
+}
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+### Examples
+
+Each example directory contains a complete, self-contained example that demonstrates specific NLM functionality:
+
+1. **basic_brain.cpp**: Simple brain creation and simulation
+2. **memory_system_example.cpp**: Comprehensive memory system usage
+3. **agent_example.cpp**: Agent-based simulation with learning
+4. **configuration_example.cpp**: Configuration creation and file output
+
+## Key Features
+
+### Memory Systems
+
+NLM implements multiple memory systems:
+
+1. **Working Memory**: Temporary active information storage
+2. **Episodic Memory**: Personal experiences and events
+3. **Semantic Memory**: Facts and general knowledge
+4. **Procedural Memory**: Skills and habits
+5. **Associative Memory**: Pattern associations and relationships
+
+### Advanced Features
+
+1. **Curiosity-Driven Learning**: Automatic exploration of novel environments
+2. **Neuromodulation**: Dopamine, curiosity, and novelty detection
+3. **Development System**: Brain maturation and development over time
+4. **Prediction System**: Anticipation of future states
+5. **Planning System**: Action planning and decision making
+6. **Attention System**: Feature selection and focus
+7. **Concept Formation**: Pattern discovery and category learning
+
+### Performance Optimization
+
+1. **Sparse Connectivity**: Efficient neural connection management
+2. **Memory Management**: Optimized memory usage and compression
+3. **Algorithm Optimization**: Efficient computational algorithms
+4. **Resource Management**: CPU and memory optimization
+
+## Research Applications
+
+### Neuroscience Research
+
+- **Brain Connectivity**: Study of neural connectivity patterns
+- **Learning Dynamics**: Investigation of learning mechanisms
+- **Cognitive Processes**: Modeling of cognitive processes
+- **Neural Development**: Study of brain development over time
+
+### Artificial Intelligence
+
+- **Autonomous Agents**: Development of intelligent agents
+- **Reinforcement Learning**: Reward-based learning systems
+- ** curiosity-Driven Learning**: Exploration and discovery
+- **Transfer Learning**: Application of learned skills to new tasks
+
+### Psychology Research
+
+- **Memory Research**: Study of memory systems and processes
+- **Decision Making**: Investigation of decision-making processes
+- **Cognitive Architecture**: Modeling of cognitive architecture
+- **Skill Acquisition**: Study of skill learning and development
+
+## Configuration
+
+### Configuration Categories
+
+1. **Core Brain**: Neuron count, regions, connections
+2. **Memory Systems**: Working memory, episodic memory, semantic memory
+3. **Plasticity**: STDP, Hebbian, structural plasticity
+4. **Development**: Growth stages, maturation
+5. **Prediction**: Future anticipation, error correction
+6. **Neuromodulation**: Dopamine, curiosity, novelty
+7. **Cognitive Systems**: Planning, attention, concept formation
+
+### Configuration Files
+
+Configuration files are JSON-formatted and can be loaded using:
+
+```cpp
+nlm::Config config = nlm::Config::fromFile("config.json");
+nlm::Brain brain(config);
 ```
+
+## Contributing
+
+### Contributing Guidelines
+
+1. **Code Quality**: Follow C++ best practices and coding standards
+2. **Documentation**: Maintain comprehensive documentation
+3. **Testing**: Write tests for new functionality
+4. **Examples**: Add new examples for complex features
+5. **Bug Reports**: Report issues and contribute fixes
+
+### Development Setup
+
+1. **Clone the repository**
+2. **Install dependencies**: CMake, C++ compiler, BLAS/LAPACK
+3. **Build**: `mkdir build && cd build && cmake .. && make`
+4. **Run tests**: `ctest`
+5. **Run examples**: `./examples/basic_brain`
 
 ## License
 
-MIT
+This documentation and example code are provided under the NLM license. See individual files for specific licensing information.
 
-## Authors
+## Contact
 
-Research project — See docs for scientific background.
+For questions, issues, or collaboration opportunities:
+- **Documentation**: See `docs/` for comprehensive documentation
+- **Examples**: See `examples/` for practical examples
+- **API Reference**: See `docs/api_reference.md` for complete API documentation
+
+## Acknowledgments
+
+This documentation was created to help users effectively use the NLM framework for neural simulation, learning, and cognition research.
+
+For more information about NLM and its capabilities, visit the NLM documentation portal.

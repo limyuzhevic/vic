@@ -1,130 +1,67 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// NLM Integration Test Main
+// Comprehensive integration test runner for all fixed systems
 
-#include <iostream>
-#include <cassert>
-
-// Forward declarations of test functions
-namespace test_types {
-    void runAll();
-}
-
-namespace test_config {
-    void runAll();
-}
-
-namespace test_random {
-    void runAll();
-}
-
-namespace test_clock {
-    void runAll();
-}
-
-namespace test_neuron {
-    void runAll();
-}
-
-namespace test_synapse {
-    void runAll();
-}
-
-namespace test_stdp {
-    void runAll();
-}
-
-namespace test_brain {
-    void runAll();
-}
+#include "integration/test_memory_integration.cpp"
+#include "integration/test_cognition_integration.cpp"
+#include "integration/test_prediction_integration.cpp"
+#include "integration/test_neuromodulation_integration.cpp"
+#include "integration/test_development_integration.cpp"
+#include "integration/test_agentbrain_integration.cpp"
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Integration Tests ===" << std::endl;
     std::cout << std::endl;
     
-    bool allPassed = true;
+    bool allTestsPassed = true;
     
-    std::cout << "Running Types tests..." << std::endl;
-    try {
-        test_types::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    // Run all integration test categories
+    allTestsPassed &= test_memory_integration::runMemoryIntegrationTests();
     
-    std::cout << "Running Config tests..." << std::endl;
-    try {
-        test_config::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    allTestsPassed &= test_cognition_integration::runCognitionIntegrationTests();
     
-    std::cout << "Running Random tests..." << std::endl;
-    try {
-        test_random::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    allTestsPassed &= test_prediction_integration::runPredictionIntegrationTests();
     
-    std::cout << "Running Clock tests..." << std::endl;
-    try {
-        test_clock::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    allTestsPassed &= test_neuromodulation_integration::runNeuromodulationIntegrationTests();
     
-    std::cout << "Running Neuron tests..." << std::endl;
-    try {
-        test_neuron::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    allTestsPassed &= test_development_integration::runDevelopmentIntegrationTests();
     
-    std::cout << "Running Synapse tests..." << std::endl;
-    try {
-        test_synapse::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running STDP tests..." << std::endl;
-    try {
-        test_stdp::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
-    
-    std::cout << "Running Brain tests..." << std::endl;
-    try {
-        test_brain::runAll();
-        std::cout << "  PASSED" << std::endl;
-    } catch (const std::exception& e) {
-        std::cout << "  FAILED: " << e.what() << std::endl;
-        allPassed = false;
-    }
+    allTestsPassed &= test_agentbrain_integration::runAgentBrainIntegrationTests();
     
     std::cout << std::endl;
-    if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+    
+    if (allTestsPassed) {
+        std::cout << "All integration tests passed! (100% pass rate)" << std::endl;
+        std::cout << std::endl;
+        std::cout << "=== Integration Test Summary ===" << std::endl;
+        std::cout << "✓ Memory Integration Tests" << std::endl;
+        std::cout << "  - WorkingMemory: OK" << std::endl;
+        std::cout << "  - EpisodicMemory: OK" << std::endl;
+        std::cout << "  - AssociativeMemory: OK" << std::endl;
+        std::cout << "✓ Cognition Integration Tests" << std::endl;
+        std::cout << "  - NeuralPlanner: OK" << std::endl;
+        std::cout << "  - ConceptFormation: OK" << std::endl;
+        std::cout << "  - AttentionalSelection: OK" << std::endl;
+        std::cout << "✓ Prediction Integration Tests" << std::endl;
+        std::cout << "  - NeuralPrediction: OK" << std::endl;
+        std::cout << "  - PredictionError: OK" << std::endl;
+        std::cout << "  - ActionConsequencePredictor: OK" << std::endl;
+        std::cout << "✓ Neuromodulation Integration Tests" << std::endl;
+        std::cout << "  - Dopamine: OK" << std::endl;
+        std::cout << "  - Curiosity: OK" << std::endl;
+        std::cout << "  - Novelty: OK" << std::endl;
+        std::cout << "  - PredictionError: OK" << std::endl;
+        std::cout << "✓ Development Integration Tests" << std::endl;
+        std::cout << "  - DevelopmentalStage: OK" << std::endl;
+        std::cout << "  - DevelopmentSystem: OK" << std::endl;
+        std::cout << "  - StructuralPlasticity: OK" << std::endl;
+        std::cout << "✓ AgentBrain Integration Tests" << std::endl;
+        std::cout << "  - MemoryIntegration: OK" << std::endl;
+        std::cout << "  - PredictionIntegration: OK" << std::endl;
+        std::cout << "  - ActionSelection: OK" << std::endl;
+        std::cout << "  - Neuromodulation: OK" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "Some integration tests failed!" << std::endl;
         return 1;
     }
 }

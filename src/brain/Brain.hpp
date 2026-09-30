@@ -19,7 +19,7 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -151,7 +151,7 @@ public:
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    NeuralPrediction* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     
