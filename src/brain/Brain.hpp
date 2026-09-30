@@ -11,23 +11,24 @@
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 class Novelty;
 class PredictionError;
+class Reward;
+class Reward;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -178,14 +179,32 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
+// Semantic memory - conceptual knowledge
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned behaviors and skills
+    NeuralProceduralMemory* getProceduralMemory();
+    
+    // Neuromodulation systems
+    Dopamine* getDopamine();
+    
+    // Novelty detection
     Novelty* getNovelty();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Serotonin - mood regulation and learning modulation
+    Serotonin* getSerotonin();
+    
+    // Norepinephrine - arousal and attention
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - memory and attention
+    Acetylcholine* getAcetylcholine();
+    
+    // Reward signal
+    Reward* getReward();
     
     // Get random generator
     RandomGenerator* getRandomGenerator();

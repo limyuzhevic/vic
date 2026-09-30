@@ -50,21 +50,27 @@ add_library(nlm_core STATIC
     src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Serotonin.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Dopamine.cpp
     src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/PredictionError.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/SelfModel.cpp
+    src/cognition/SocialLearning.cpp
+    src/cognition/SpatialRepresentation.cpp
+    src/cognition/TemporalRelation.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
