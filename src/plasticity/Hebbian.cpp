@@ -19,9 +19,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -69,7 +69,7 @@ void Hebbian::update(Synapse* synapse,
     // More sophisticated: use actual spike counts and firing rates
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
-    // Apply with bounds
+    // Apply with bounds - use synapse's built-in clamping
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
     }

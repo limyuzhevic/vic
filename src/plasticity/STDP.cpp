@@ -78,13 +78,9 @@ void STDP::update(Synapse* synapse,
         }
     }
     
-    // Apply weight change with bounds
+    // Apply weight change with bounds - use synapse's built-in clamping
     if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-        
-        // Apply weight change
+        // Use synapse's built-in clamping (addToWeight already clamps)
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
