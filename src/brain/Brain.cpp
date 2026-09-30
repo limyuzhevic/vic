@@ -9,6 +9,8 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralSemanticMemory.hpp"
+#include "../memory/NeuralProceduralMemory.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -31,6 +33,8 @@ struct Brain::Impl {
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
+std::unique_ptr<NeuralSemanticMemory> semanticMemory;
+std::unique_ptr<NeuralProceduralMemory> proceduralMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
@@ -75,6 +79,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Store current sensory input for prediction system
+    std::unique_ptr<class SensoryInput> currentSensoryInput;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -92,6 +99,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentSensoryInput(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -110,6 +118,8 @@ struct Brain::Impl {
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+semanticMemory = std::make_unique<NeuralSemanticMemory>();
+proceduralMemory = std::make_unique<NeuralProceduralMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
@@ -242,6 +252,8 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
+    pImpl->semanticMemory->initialize(this);
+    pImpl->proceduralMemory->initialize(this);
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
@@ -420,6 +432,16 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
+    }
+    // ========== STEP 6.5: Update semantic memory ==========
+    }
+    if (pImpl->semanticMemory) {
+        pImpl->semanticMemory->update(pImpl->timestep);
+    // ========== STEP 6.6: Update procedural memory ==========
+    if (pImpl->proceduralMemory) {
+        pImpl->proceduralMemory->update(pImpl->timestep);
+    }
+    }
         
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
@@ -511,8 +533,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make predictions based on current sensory input
+        if (pImpl->currentSensoryInput) {
+            // Generate prediction for next state based on current observation
+            auto predicted = pImpl->predictionSystem->predictNextState(*pImpl->currentSensoryInput);
+            
+            // Compare prediction with actual sensory observation
+            // Note: In real implementation, this would use the next sensory input
+            // For now, we train the prediction system with current observation
+            pImpl->predictionSystem->train(*pImpl->currentSensoryInput);
+            
+            // The prediction system would update its internal model
+            // and compute prediction error for neuromodulation systems
+            // This error can be used by prediction error neurons
+        }
+        
+        // Update prediction system with internal state
+        // Prediction system can also make predictions based on working memory
+        if (pImpl->workingMemory) {
+            // Simple internal signal for prediction system
+            // Would normally encode working memory state
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -589,6 +630,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Store current sensory input for prediction system
+    pImpl->currentSensoryInput = input.clone();
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -1015,6 +1059,15 @@ NeuralEpisodicMemory* Brain::getEpisodicMemory() {
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
+NeuralSemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+NeuralProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
+
+// ========== PREDICTION SYSTEM ACCESSOR ==========
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
@@ -1036,6 +1089,12 @@ ConceptFormation* Brain::getConceptFormation() {
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
+    if (pImpl->semanticMemory) {
+        NLM_LOG_INFO("Semantic memory activity: " + std::to_string(pImpl->semanticMemory->getSemanticActivity()));
+    }
+    if (pImpl->proceduralMemory) {
+        NLM_LOG_INFO("Procedural memory activity: " + std::to_string(pImpl->proceduralMemory->getProceduralActivity()));
+    }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
@@ -1100,6 +1159,12 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    if (pImpl->semanticMemory) {
+        NLM_LOG_INFO("Semantic memory activity: " + std::to_string(pImpl->semanticMemory->getSemanticActivity()));
+    }
+    if (pImpl->proceduralMemory) {
+        NLM_LOG_INFO("Procedural memory activity: " + std::to_string(pImpl->proceduralMemory->getProceduralActivity()));
+    }
     }
     
     // Development status
