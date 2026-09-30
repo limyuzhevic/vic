@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>  // Added for hash map optimization
 
 namespace nlm {
 
@@ -43,7 +44,23 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Exception types for configuration operations
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigFileError : public ConfigException {
+public:
+    explicit ConfigFileError(const std::string& message) : ConfigException(message) {}
+};
+
+class ConfigParseError : public ConfigException {
+public:
+    explicit ConfigParseError(const std::string& message) : ConfigException(message) {}
+};
+
+// Main configuration class with exception safety
 class Config {
 public:
     Config();
@@ -55,14 +72,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from file (JSON format) with exception safety
+    bool loadFromFile(const std::string& filepath) noexcept;
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from command line arguments with exception safety
+    bool loadFromArgs(int argc, char** argv) noexcept;
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Save to file with exception safety
+    bool saveToFile(const std::string& filepath) const noexcept;
     
     // Get values
     template<typename T>
@@ -71,7 +88,7 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +110,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Exception safety helpers
+    void validateKey(const std::string& key) const;
+    void validateConfigValue(const ConfigValue& value) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +121,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Exception safety implementation helpers
+    bool loadFromFileInternal(const std::string& filepath) noexcept;
+    bool saveToFileInternal(const std::string& filepath) const noexcept;
 };
 
 } // namespace nlm
