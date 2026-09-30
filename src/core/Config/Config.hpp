@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <typeindex>
+#include <limits>
 
 namespace nlm {
 
@@ -31,6 +33,14 @@ enum class ConfigSource {
     Runtime
 };
 
+// File format
+enum class ConfigFormat {
+    Unknown,
+    JSON,
+    YAML,
+    KeyValue
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -55,13 +65,22 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects JSON, YAML, or key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file
+    static bool loadFromJSON(const std::string& filepath, Config& config);
+    
+    // Load from YAML file
+    static bool loadFromYAML(const std::string& filepath, Config& config);
+    
+    // Load from simple key=value file
+    static bool loadFromSimpleKeyValue(const std::string& filepath, Config& config);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (auto-selects JSON/YAML based on extension)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -92,6 +111,20 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Schema registration
+    void registerSchema(const std::string& name, const std::type_index& type,
+                       const std::string& description, bool required = false,
+                       const std::string& defaultValue = "",
+                       const std::vector<std::string>& allowedValues = {},
+                       double minValue = std::numeric_limits<double>::lowest(),
+                       double maxValue = std::numeric_limits<double>::max());
+    
+    // Configuration validation
+    bool validate() const;
+    
+    // File format detection (static)
+    static ConfigFormat detectFileFormat(const std::string& filepath);
     
 private:
     struct Impl;

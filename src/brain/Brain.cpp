@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
@@ -11,9 +13,11 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -21,6 +25,87 @@
 #include <sstream>
 
 namespace nlm {
+
+// Brain configuration structure for simulation intervals and parameters
+struct BrainConfig {
+    // Simulation timing
+    double simulationTimestep = 0.001;     // 1ms
+    size_t replayInterval = 100;           // steps between replay events
+    size_t consolidationInterval = 1000;  // steps between consolidation
+    size_t developmentUpdateInterval = 1000;  // steps between development updates
+    size_t structuralPlasticityInterval = 100;  // steps between structural plasticity updates
+    
+    // Memory system
+    size_t workingMemoryCapacity = 100;    // capacity in number of traces
+    size_t maxEpisodicMemory = 1000;       // maximum episodes
+    
+    // Plasticity rates
+    float synaptogenesisRate = 0.0001f;    // probability of new synapse formation
+    float pruningRate = 0.00001f;         // probability of synapse removal
+    
+    // Development
+    float plasticityModulationInitial = 1.0f;      // high plasticity at start
+    float plasticityModulationCritical = 0.8f;      // during critical period
+    float plasticityModulationMaturation = 0.5f;    // during maturation
+    float plasticityModulationAdult = 0.2f;         // stable adult
+    
+    // Integration
+    float memoryConsolidationThreshold = 0.3f;      // threshold for memory consolidation
+    float attentionInhibitionStrength = 0.5f;       // strength of attentional inhibition
+    float attentionExcitationStrength = 1.5f;       // strength of attentional excitation
+    
+    // Neuromodulation
+    float neuromodulationFactor = 1.0f;             // neuromodulation effect factor
+    
+    // STDP parameters
+    float stdpLTPWeight = 0.01f;                   // long-term potentiation weight
+    float stdpLTDWeight = 0.012f;                  // long-term depression weight
+    float stdpTau = 20.0f;                         // STDP time constant
+};
+
+// Constants for brain system parameters
+class BrainConstants {
+public:
+    // Simulation
+    static constexpr double DEFAULT_TIMESTEP = 0.001;      // 1ms
+    static constexpr size_t DEFAULT_REPLAY_INTERVAL = 100;
+    static constexpr size_t DEFAULT_CONSOLIDATION_INTERVAL = 1000;
+    static constexpr size_t DEFAULT_DEVELOPMENT_UPDATE_INTERVAL = 1000;
+    static constexpr size_t DEFAULT_STRUCTURAL_PLASTICITY_INTERVAL = 100;
+    
+    // Memory
+    static constexpr size_t DEFAULT_WORKING_MEMORY_CAPACITY = 100;
+    static constexpr size_t DEFAULT_MAX_EPISODIC_MEMORY = 1000;
+    
+    // Plasticity
+    static constexpr float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;
+    static constexpr float DEFAULT_PRUNING_RATE = 0.00001f;
+    
+    // Development
+    static constexpr float DEFAULT_PLASTICITY_MODULATION_INITIAL = 1.0f;
+    static constexpr float DEFAULT_PLASTICITY_MODULATION_CRITICAL = 0.8f;
+    static constexpr float DEFAULT_PLASTICITY_MODULATION_MATURATION = 0.5f;
+    static constexpr float DEFAULT_PLASTICITY_MODULATION_ADULT = 0.2f;
+    
+    // Integration
+    static constexpr float DEFAULT_MEMORY_CONSOLIDATION_THRESHOLD = 0.3f;
+    static constexpr float DEFAULT_ATTENTION_INHIBITION_STRENGTH = 0.5f;
+    static constexpr float DEFAULT_ATTENTION_EXCITATION_STRENGTH = 1.5f;
+    
+    // Neuromodulation
+    static constexpr float DEFAULT_NEUROMODULATION_FACTOR = 1.0f;
+    
+    // STDP
+    static constexpr float DEFAULT_STDP_LTP_WEIGHT = 0.01f;
+    static constexpr float DEFAULT_STDP_LTD_WEIGHT = 0.012f;
+    static constexpr float DEFAULT_STDP_TAU = 20.0f;
+    
+    // Other constants
+    static constexpr float DEFAULT_SPIKE_SCALE_FACTOR = 10.0f;      // Scale factor for spike input
+    static constexpr float DEFAULT_EXCITATORY_INPUT_THRESHOLD = 0.5f; // Threshold for storing in memory
+    static constexpr size_t DEFAULT_EPISODE_INTERVAL = 10;          // steps between episode storage
+    static constexpr float DEFAULT_DOPAMINE_EXCITABILITY_MOD = 0.5f; // dopamine effect on excitability
+};
 
 struct Brain::Impl {
     std::shared_ptr<Config> config;
@@ -72,26 +157,22 @@ struct Brain::Impl {
     // Integration state
     bool isResting;  // For sleep/rest cycle
     size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Configuration
+    BrainConfig config;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
+        , timestep(BrainConstants::DEFAULT_TIMESTEP)
         , currentStep(0)
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -131,23 +212,35 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 
+                                              BrainConstants::DEFAULT_STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 
+                                              BrainConstants::DEFAULT_STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", 
+                                         BrainConstants::DEFAULT_STDP_TAU);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 
+                                                      BrainConstants::DEFAULT_SYNAPTOGENESIS_RATE);
+        float pruningRate = config->getOr<float>("pruning_rate", 
+                                                BrainConstants::DEFAULT_PRUNING_RATE);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        timestep = config->getOr<double>("simulation_timestep", 
+                                         BrainConstants::DEFAULT_TIMESTEP);
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        // Get configuration values
+        replayInterval = config->getOr<size_t>("replay_interval", 
+                                              BrainConstants::DEFAULT_REPLAY_INTERVAL);
+        consolidationInterval = config->getOr<size_t>("consolidation_interval", 
+                                                    BrainConstants::DEFAULT_CONSOLIDATION_INTERVAL);
+        developmentUpdateInterval = config->getOr<size_t>("development_update_interval", 
+                                                         BrainConstants::DEFAULT_DEVELOPMENT_UPDATE_INTERVAL);
+        structuralPlasticityInterval = config->getOr<size_t>("structural_plasticity_interval", 
+                                                            BrainConstants::DEFAULT_STRUCTURAL_PLASTICITY_INTERVAL);
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -155,6 +248,11 @@ struct Brain::Impl {
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
+    size_t replayInterval;
+    size_t consolidationInterval;
+    size_t developmentUpdateInterval;
+    size_t structuralPlasticityInterval;
+    std::unique_ptr<CheckpointManager> checkpointManager;
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -215,8 +313,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -274,7 +372,8 @@ bool Brain::initialize() {
             for (auto* neuron : neurons) {
                 if (neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                    MembranePotential synapticCurrent = event.weight * 
+                                                        BrainConstants::DEFAULT_SPIKE_SCALE_FACTOR;  // Scale factor
                     if (event.is_excitatory) {
                         neuron->receiveExcitatoryInput(synapticCurrent);
                     } else {
@@ -349,7 +448,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
                                  state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < 
+                                         pImpl->timestep * 2.0f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -400,23 +500,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
-    
+
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
-    
+
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
     }
-    
+
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
     }
-    
+
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -430,7 +530,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
                     // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    float excitabilityMod = dopamineLevel * 
+                                           BrainConstants::DEFAULT_DOPAMINE_EXCITABILITY_MOD;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
@@ -438,14 +539,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
-    
+
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
-    
+
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
             // Apply STDP with neuromodulation
@@ -476,10 +577,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             syn->step(currentTime);
         }
     }
-    
+
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    if (pImpl->stepsSinceLastEpisode >= BrainConstants::DEFAULT_EPISODE_INTERVAL) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -508,13 +609,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->storeEpisode(episode);
         }
     }
-    
+
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
     }
-    
+
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
@@ -525,18 +626,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->attention->processCompetition(competitors);
         }
     }
-    
+
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
     }
-    
+
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % pImpl->structuralPlasticityInterval == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
-    
+
     // ========== STEP 12: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
@@ -545,9 +646,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             pImpl->episodicMemory->replayEpisode(episode);
         }
     }
-    
+
     // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+    if (currentStep % pImpl->developmentUpdateInterval == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
@@ -558,30 +659,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    plasticityMod = BrainConstants::DEFAULT_PLASTICITY_MODULATION_INITIAL;  // High plasticity
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    plasticityMod = BrainConstants::DEFAULT_PLASTICITY_MODULATION_CRITICAL;
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    plasticityMod = BrainConstants::DEFAULT_PLASTICITY_MODULATION_MATURATION;
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    plasticityMod = BrainConstants::DEFAULT_PLASTICITY_MODULATION_ADULT;  // Stable
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            sp->setSynaptogenesisRate(BrainConstants::DEFAULT_SYNAPTOGENESIS_RATE * plasticityMod);
+            sp->setPruningRate(BrainConstants::DEFAULT_PRUNING_RATE * (2.0f - plasticityMod));
         }
     }
-    
+
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        pImpl->episodicMemory->consolidate(BrainConstants::DEFAULT_MEMORY_CONSOLIDATION_THRESHOLD);
     }
-    
+
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
@@ -610,7 +711,7 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        if (pImpl->workingMemory && std::abs(normalizedValue) > BrainConstants::DEFAULT_EXCITATORY_INPUT_THRESHOLD) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
@@ -721,8 +822,8 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    pImpl->stdp->setLTPWeight(BrainConstants::DEFAULT_STDP_LTP_WEIGHT * modulation);
+    pImpl->stdp->setLTDWeight(BrainConstants::DEFAULT_STDP_LTD_WEIGHT * modulation);
 }
 
 void Brain::updatePlasticity() {
@@ -1107,10 +1208,10 @@ void Brain::logStatus() const {
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+                     " (" + region->getName() + "): " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                     std::to_string(region->getSynapseCount()) + " synapses, " +
+                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
 }
 

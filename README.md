@@ -82,6 +82,53 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Original NLM (Phase 2 Basic)
+```bash
+./nlm
+```
+
+This runs the original main.cpp implementation with basic neural computation tests.
+
+### Advanced NLM CLI Tool
+```bash
+./nlm_cli --help
+```
+
+This provides comprehensive CLI functionality for advanced simulations, configuration management, benchmarking, and data export.
+
+## CLI Tool Features
+
+The `nlm_cli` tool extends the NLM with:
+
+- **Advanced argument parsing** with subcommands (simulate, config, benchmark, info, export)
+- **Multiple simulation modes** (Basic, Connectivity, Plasticity, STDP, Hebbian, Structural, Neuromodulation)
+- **Configuration management** with JSON, YAML, and key-value file support
+- **Multiple output formats** (JSON, YAML, CSV, XML, text)
+- **Progress reporting** with visual progress bars
+- **Performance benchmarking** capabilities
+- **Data export** for analysis and research
+
+### Quick Start Examples
+
+```bash
+# Run a basic simulation
+nlm_cli simulate --mode basic --steps 1000 --output basic_sim.json
+
+# Run plasticity learning simulation
+nlm_cli simulate --mode plasticity --steps 5000 --plasticity --output learning_results.json
+
+# Manage configuration
+nlm_cli config --load configs/experiment.yaml
+nlm_cli config --set debug true
+nlm_cli config --save configs/my_config.yaml
+
+# Run benchmarks
+nlm_cli benchmark --duration 60 --neuron-count 1000
+
+# Export data
+nlm_cli export --format json --output neurons.json --neurons
+```
+
 ## Project Structure
 
 ```
