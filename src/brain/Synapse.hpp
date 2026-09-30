@@ -1,11 +1,30 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <string>
+#include <stdexcept>
 
 namespace nlm {
 
 // Forward declaration
 class Neuron;
+
+// Synapse Type enumeration
+enum class SynapseType {
+    Excitatory,    // Positive weight, increases postsynaptic firing
+    Inhibitory,    // Negative weight, decreases postsynaptic firing
+    Modulatory     // Complex effects, can be positive or negative
+};
+
+// Factory function for creating synapses
+Synapse createSynapse(SynapseId id, NeuronId source, NeuronId destination, SynapseType type);
+
+// Validation function for synapse parameters
+bool validateSynapseParameters(SynapseType type, SynapticWeight weight, Delay delay);
+
+// Utility functions
+std::string SynapseTypeToString(SynapseType type);
+SynapseType StringToSynapseType(const std::string& str);
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
@@ -46,6 +65,7 @@ public:
     // Excitatory/Inhibitory
     bool isExcitatory() const;
     bool isInhibitory() const;
+    bool isModulatory() const;
     
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
@@ -61,6 +81,12 @@ public:
     // Enable/disable plasticity rules
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
+    // Short-term plasticity state
+    float getShortTermDepression() const;
+    float getShortTermFacilitation() const;
+    void setShortTermDepression(float depression);
+    void setShortTermFacilitation(float facilitation);
+    
     // Eligibility trace (for reward-modulated learning)
     float getEligibilityTrace() const;
     void setEligibilityTrace(float trace);
@@ -69,6 +95,7 @@ public:
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
     void setEfficacy(float efficacy);
+    void updateEfficacy(float delta);
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics

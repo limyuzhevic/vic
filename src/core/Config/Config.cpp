@@ -3,14 +3,41 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <vector>
+#include <string>
+#include <map>
+#include <nlohmann/json.hpp>
+#include <chrono>
+#include <iomanip>
 
 namespace nlm {
 
+using json = nlohmann::json;
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::map<std::string, std::string> typeHints;  // Track type hints for parsing
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Include nlohmann/json functionality - this should be in CMakeLists.txt
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Register common type hints
+    pImpl->typeHints["neuron_count"] = "int64_t";
+    pImpl->typeHints["region_count"] = "int64_t";
+    pImpl->typeHints["connection_probability"] = "float";
+    pImpl->typeHints["random_seed"] = "int64_t";
+    pImpl->typeHints["simulation_timestep"] = "double";
+    pImpl->typeHints["stdp_ltp_weight"] = "float";
+    pImpl->typeHints["stdp_ltd_weight"] = "float";
+    pImpl->typeHints["stdp_tau"] = "float";
+    pImpl->typeHints["synaptogenesis_rate"] = "float";
+    pImpl->typeHints["pruning_rate"] = "float";
+    pImpl->typeHints["replay_interval"] = "size_t";
+    pImpl->typeHints["consolidation_interval"] = "size_t";
+    pImpl->typeHints["checkpoint_dir"] = "string";
+    pImpl->typeHints["checkpoint_max_files"] = "size_t";
+    pImpl->typeHints["checkpoint_compression"] = "bool";
+}
 
 Config::~Config() = default;
 
@@ -19,9 +46,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first
+    if (loadFromJSON(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    }
     
+    // Fall back to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -52,10 +83,156 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from simple file: " + filepath);
     return true;
 }
 
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        json j;
+        file >> j;
+        
+        // Parse JSON config
+        if (j.contains("entries")) {
+            const auto& entries = j["entries"];
+            for (const auto& entry : entries) {
+                if (entry.contains("key") && entry.contains("value")) {
+                    std::string key = entry["key"];
+                    
+                    // Try to infer type from JSON value
+                    ConfigValue value;
+                    
+                    if (entry["value"].is_string()) {
+                        value = entry["value"].get<std::string>();
+                    } else if (entry["value"].is_number_integer()) {
+                        value = entry["value"].get<int64_t>();
+                    } else if (entry["value"].is_number_unsigned()) {
+                        value = entry["value"].get<size_t>();
+                    } else if (entry["value"].is_number_float()) {
+                        value = entry["value"].get<float>();
+                    } else if (entry["value"].is_boolean()) {
+                        value = entry["value"].get<bool>();
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+    } catch (const json::exception& e) {
+        NLM_LOG_WARNING(std::string("JSON parse error: ") + e.what() + ". Falling back to simple format.");
+        return false;
+    }
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Save in both simple format (for backward compatibility) and JSON
+    bool success = true;
+    
+    // Save simple format
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << getCurrentTimestamp() << "\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << getConfigSourceName(entry.source) << "\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
+    }
+    
+    file << "# End of configuration\n";
+    
+    // Also save JSON version
+    std::string jsonPath = filepath;
+    size_t dotPos = jsonPath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        jsonPath.replace(dotPos, std::string::npos, ".json");
+    }
+    
+    std::ofstream jsonFile(jsonPath);
+    if (jsonFile.is_open()) {
+        json j;
+        
+        json::array_t entriesArray;
+        for (const auto& entry : pImpl->entries) {
+            json entryJson;
+            entryJson["key"] = entry.key;
+            
+            // Convert ConfigValue to JSON
+            std::visit([&entryJson](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    entryJson["value"] = arg;
+                } else if constexpr (std::is_same_v<T, int64_t> || 
+                                     std::is_same_v<T, int32_t> ||
+                                     std::is_same_v<T, long>) {
+                    entryJson["value"] = static_cast<int64_t>(arg);
+                } else if constexpr (std::is_same_v<T, size_t>) {
+                    entryJson["value"] = static_cast<uint64_t>(arg);
+                } else if constexpr (std::is_same_v<T, float> || 
+                                     std::is_same_v<T, double>) {
+                    entryJson["value"] = static_cast<double>(arg);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    entryJson["value"] = arg;
+                }
+            }, entry.value);
+            
+            entryJson["source"] = static_cast<int>(entry.source);
+            entryJson["description"] = ""; // TODO: Store description
+            
+            entriesArray.push_back(entryJson);
+        }
+        
+        j["entries"] = entriesArray;
+        j["version"] = "1.0";
+        
+        jsonFile << std::setw(2) << j;
+        jsonFile.close();
+    }
+    
+    return true;
+}
+
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+std::string Config::getConfigSourceName(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::CommandLine: return "Command Line";
+        case ConfigSource::File: return "File";
+        default: return "Unknown";
+    }
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,31 +242,77 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR(std::string("Invalid config value for ") + key + ": " + e.what());
+                    success = false;
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Invalid config value for ") + key + ": " + e.what());
+                success = false;
+            }
+        }
+        // Handle --preset=name format
+        else if (arg.substr(0, 9) == "--preset=") {
+            std::string preset = arg.substr(9);
+            applyPreset(preset);
         }
     }
-    return true;
+    
+    return success;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+void Config::applyPreset(const std::string& presetName) {
+    if (presetName == "debug") {
+        set("random_seed", static_cast<int64_t>(12345), ConfigSource::Default);
+        set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        set("connection_probability", 0.2f, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.05f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.03f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.001f, ConfigSource::Default);
+        set("pruning_rate", 0.0001f, ConfigSource::Default);
+        set("replay_interval", static_cast<size_t>(50), ConfigSource::Default);
+        set("consolidation_interval", static_cast<size_t>(500), ConfigSource::Default);
+        NLM_LOG_INFO("Applied 'debug' preset configuration");
+    } else if (presetName == "production") {
+        set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        set("connection_probability", 0.1f, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        set("pruning_rate", 0.00001f, ConfigSource::Default);
+        set("replay_interval", static_cast<size_t>(100), ConfigSource::Default);
+        set("consolidation_interval", static_cast<size_t>(1000), ConfigSource::Default);
+        NLM_LOG_INFO("Applied 'production' preset configuration");
+    } else if (presetName == "research") {
+        set("random_seed", static_cast<int64_t>(2024), ConfigSource::Default);
+        set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+        set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+        set("connection_probability", 0.15f, ConfigSource::Default);
+        set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        set("stdp_ltd_weight", 0.018f, ConfigSource::Default);
+        set("synaptogenesis_rate", 0.0005f, ConfigSource::Default);
+        set("pruning_rate", 0.00005f, ConfigSource::Default);
+        set("replay_interval", static_cast<size_t>(200), ConfigSource::Default);
+        set("consolidation_interval", static_cast<size_t>(5000), ConfigSource::Default);
+        NLM_LOG_INFO("Applied 'research' preset configuration");
+    } else {
+        NLM_LOG_WARNING("Unknown preset name: " + presetName);
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
 }
 
 template<typename T>
@@ -127,10 +350,90 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    // Try to infer type from value
+    ConfigValue configValue;
+    
+    // Check type hints first
+    auto hintIt = pImpl->typeHints.find(key);
+    if (hintIt != pImpl->typeHints.end()) {
+        const std::string& typeName = hintIt->second;
+        if (typeName == "int64_t") {
+            try {
+                configValue = std::stoll(value);
+            } catch (...) {
+                configValue = value; // Fall back to string
+            }
+        } else if (typeName == "size_t") {
+            try {
+                configValue = static_cast<size_t>(std::stoull(value));
+            } catch (...) {
+                configValue = value; // Fall back to string
+            }
+        } else if (typeName == "float") {
+            try {
+                configValue = std::stof(value);
+            } catch (...) {
+                configValue = value; // Fall back to string
+            }
+        } else if (typeName == "double") {
+            try {
+                configValue = std::stod(value);
+            } catch (...) {
+                configValue = value; // Fall back to string
+            }
+        } else if (typeName == "bool") {
+            std::string lowerValue = toLower(value);
+            if (lowerValue == "true" || lowerValue == "1" || lowerValue == "yes") {
+                configValue = true;
+            } else if (lowerValue == "false" || lowerValue == "0" || lowerValue == "no") {
+                configValue = false;
+            } else {
+                configValue = value; // Fall back to string
+            }
+        } else {
+            configValue = value; // Use string
+        }
+    } else {
+        // Try to auto-detect type
+        std::string lowerValue = toLower(value);
+        
+        // Check for boolean
+        if (lowerValue == "true" || lowerValue == "false" ||
+            lowerValue == "1" || lowerValue == "0" ||
+            lowerValue == "yes" || lowerValue == "no") {
+            configValue = (lowerValue == "true" || lowerValue == "1" || lowerValue == "yes");
+        }
+        // Check for integer
+        else {
+            try {
+                // Try int64_t first
+                size_t pos;
+                int64_t intVal = std::stoll(value, &pos);
+                if (pos == value.size()) {
+                    configValue = intVal;
+                } else {
+                    // Try float
+                    float floatVal = std::stof(value, &pos);
+                    if (pos == value.size()) {
+                        configValue = floatVal;
+                    } else {
+                        configValue = value; // Fall back to string
+                    }
+                }
+            } catch (...) {
+                configValue = value; // Fall back to string
+            }
+        }
+    }
+    
+    set(key, configValue, source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
@@ -181,7 +484,7 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << getConfigSourceName(entry.source) << ")\n";
     }
     return oss.str();
 }

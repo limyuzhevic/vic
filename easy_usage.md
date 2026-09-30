@@ -1,26 +1,16 @@
 # NLM - Easy Usage Guide for Beginners
 
+**Phase 6 Enhanced Edition**
+
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (Neural Learning Machine) is a brain simulator for computers that lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
 - **Synapses** = Connections between brain cells
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
-
-That's it! NLM simulates all of this.
-
----
-
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
-
----
 
 ## Quick Start (Copy & Paste)
 
@@ -71,7 +61,27 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
+### Example 3: Advanced Configuration
+
+```python
+import pynlm
+
+# Advanced configuration with command-line presets
+brain = pynlm.createBrain(pynlm.createConfig())
+brain.loadFromArgs(["--preset=debug", "--enable-spike-tracing", "--verbose"])
+brain.initialize()
+
+# Run experiment
+for step in range(1000):
+    brain.step(step)
+
+# Analysis
+print("Brain Analysis:")
+print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+print(f"  Total synapses: {brain.getTotalSynapseCount()}")
+print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+print(f"  Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
 
 ## Simple Analogy
 
@@ -82,8 +92,6 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
 | Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
 
 ## The Simplest Possible Example
 
@@ -101,8 +109,6 @@ brain.step(0)
 
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
-
----
 
 ## Common Patterns
 
@@ -143,17 +149,29 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Advanced Features
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
+# Enable advanced debugging and analysis
+brain.enableAdvancedAnalysis()
+brain.enableDetailedLogging()
+brain.enablePerformanceMonitoring()
 
----
+# Enable plasticity rules
+brain.getSTDP()->enablePlasticity(True)
+brain.getHebbian()->enablePlasticity(True)
+brain.getStructuralPlasticity()->enablePlasticity(True)
+
+# Enable neuromodulation
+brain.getDopamine()->enableModulation()
+brain.getCuriosity()->enableModulation()
+brain.getNovelty()->enableModulation()
+
+# Enable memory systems
+brain.getWorkingMemory()->enableTracking()
+brain.getEpisodicMemory()->enableStorage()
+brain.getAssociativeMemory()->enableAssociation()
+```
 
 ## What Each Part Does
 
@@ -169,6 +187,8 @@ Makes the brain process one moment in time. The brain:
 - Checks each neuron
 - Sends signals between connected neurons
 - Updates connections based on learning rules
+- Maintains memory systems
+- Applies neuromodulation
 
 ### `world.update(time)`
 Updates the virtual world by `time` seconds.
@@ -179,7 +199,14 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
----
+### `brain.enableAdvancedAnalysis()`
+Enables advanced analysis and debugging capabilities.
+
+### `brain.enableDetailedLogging()`
+Enables detailed logging for debugging and monitoring.
+
+### `brain.enablePerformanceMonitoring()`
+Enables performance monitoring and metrics collection.
 
 ## Mini Projects
 
@@ -221,24 +248,28 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+# Setup with enhanced configuration
+brain = pynlm.createBrain(pynlm.createConfig())
+brain.loadFromArgs(["--preset=debug", "--enable-spike-tracing", "--verbose"])
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Enable all learning systems
+brain.enableAdvancedAnalysis()
+brain.getSTDP()->enablePlasticity(True)
+brain.getHebbian()->enablePlasticity(True)
+brain.getDopamine()->enableModulation()
+brain.getCuriosity()->enableModulation()
 
 # Run agent
 for step in range(100):
@@ -251,10 +282,49 @@ for step in range(100):
     if step % 20 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
 
+# Analysis
+print("Final Brain Status:")
+print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+print(f"  Total synapses: {brain.getTotalSynapseCount()}")
+print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+print(f"  Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"  Development stage: {brain.getDevelopmentalStage()}")
+
 print("Agent simulation complete!")
 ```
 
----
+## Advanced Configuration Options
+
+### Command-Line Presets
+```bash
+# Use preset configurations
+./nlm --preset=debug
+./nlm --preset=production
+./nlm --preset=research
+
+# Custom configuration with advanced options
+./nlm --neuron-count=2000 --region-count=4 --plasticity-mode=both \
+  --dopamine-level=0.5 --curiosity-level=0.3 --enable-spike-tracing \
+  --log-level=Debug --verbose
+```
+
+### Configuration File
+```python
+# Create custom configuration
+config = pynlm.createConfig()
+config.set("neuron_count", 1000)
+config.set("region_count", 1)
+config.set("connection_probability", 0.1)
+config.set("stdp_ltp_weight", 0.01)
+config.set("enable_spike_tracing", True)
+config.set("log_level", "Info")
+
+# Save configuration
+config.saveToFile("custom_config.json")
+
+# Load configuration
+brain = pynlm.createBrain(config)
+```
 
 ## Quick Reference
 
@@ -268,30 +338,51 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
-
----
+| Enable analysis | `brain.enableAdvancedAnalysis()` |
+| Enable logging | `brain.enableDetailedLogging()` |
+| Enable monitoring | `brain.enablePerformanceMonitoring()` |
 
 ## Troubleshooting
 
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Enable detailed logging: `brain.enableDetailedLogging()`
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Enable spike tracing: `brain.enableAdvancedAnalysis()`
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
-
----
+- Enable performance monitoring to debug issues
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details**
+   - Advanced C++ programming
+   - Configuration options
+   - Analysis tools
+   - Performance optimization
+
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works**
+   - System architecture
+   - Component interactions
+   - Design patterns
+
+3. **Experiment with different configurations!**
+   - Try different preset configurations
+   - Customize configuration parameters
+   - Use analysis tools to understand behavior
+
+4. **Explore advanced features**
+   - Advanced analysis and debugging
+   - Performance optimization
+   - Custom configuration files
+   - Integration with other tools
+
+That's it! You're now ready to use enhanced NLM Phase 6 with all its advanced features and capabilities.
