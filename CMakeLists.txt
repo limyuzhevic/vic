@@ -1,25 +1,42 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
+# C++20 standard with modern features
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# Build type configuration
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
+# Enhanced warning configuration
 if(MSVC)
     add_compile_options(/W4)
+    add_compile_options(/permissive-)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+    add_compile_options(-fvisibility=hidden)  # Reduce binary size
+    add_compile_options(-march=native)  # Optimize for current CPU
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Build options for different configurations
+option(NLM_BUILD_EXAMPLES "Build example programs" ON)
+option(NLM_BUILD_TESTS "Build test suite" ON)
+option(NLM_BUILD_DOCS "Build documentation" OFF)
+option(NLM_ENABLE_SANITIZERS "Enable memory debugging" OFF)
+option(NLM_ENABLE_PROFILING "Enable performance profiling" OFF)
+option(NLM_ENABLE_VECTORIZATION "Enable SIMD optimizations" ON)
+
+# Source directory configuration
+   # Build options for different configurations
+option(NLM_BUILD_EXAMPLES "Build example programs" ON)
+option(NLM_BUILD_TESTS "Build test suite" ON)
+option(NLM_BUILD_DOCS "Build documentation" OFF)
+option(NLM_ENABLE_SANITIZERS "Enable memory debugging" OFF)
+option(NLM_ENABLE_PROFILING "Enable performance profiling" OFF)
+option(NLM_ENABLE_VECTORIZATION "Enable SIMD optimizations" ON)
 
 # Core library
 add_library(nlm_core STATIC

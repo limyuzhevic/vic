@@ -1,5 +1,6 @@
 #include "Memory.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
