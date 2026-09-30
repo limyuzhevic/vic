@@ -213,13 +213,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
+    // Synaptic input contributes to membrane potential change (current / capacitance)
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution (returns toward resting potential)
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Note: dt is in seconds, need to convert to milliseconds for consistency with tau
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
@@ -231,27 +232,34 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+// Check for spike (when membrane potential reaches threshold)
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike for plasticity calculations
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to afterhyperpolarization level
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period - prevent immediate re-firing
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
+        // Increase adaptation variable for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
+        // Neuron is active but not currently firing (integration phase)
         pImpl->state.firingState = FiringState::Active;
     }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+}
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;

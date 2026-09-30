@@ -19,11 +19,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser for structured configuration files
+    // Current implementation supports simple key=value format
+    // Future enhancement: Support for JSON, YAML, and TOML formats
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config file not found: " + filepath);
         return false;
     }
     
@@ -81,13 +83,56 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    NLM_LOG_INFO("Saving configuration to: " + filepath);
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment with description
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Write value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
+    
+    file << "# Configuration saved at " << std::chrono::system_clock::now() << "\n";
     
     return true;
 }
@@ -115,8 +160,22 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Add validation for common key names to prevent typos
+    std::string normalizedKey = key;
+    std::transform(normalizedKey.begin(), normalizedKey.end(), normalizedKey.begin(), ::tolower);
+    
+    // Standardize common parameter names
+    if (normalizedKey == "randomseed") normalizedKey = "random_seed";
+    else if (normalizedKey == "neuroncount") normalizedKey = "neuron_count";
+    else if (normalizedKey == "simulationtimestep") normalizedKey = "simulation_timestep";
+    else if (normalizedKey == "connectionprobability") normalizedKey = "connection_probability";
+    else if (normalizedKey == "stdptau") normalizedKey = "stdp_tau";
+    else if (normalizedKey == "synaptogenesisrate") normalizedKey = "synaptogenesis_rate";
+    else if (normalizedKey == "pruningrate") normalizedKey = "pruning_rate";
+    else if (normalizedKey == "loglevel") normalizedKey = "log_level";
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+        [&normalizedKey](const ConfigEntry& e) { return e.key == normalizedKey; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;

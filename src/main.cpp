@@ -28,24 +28,57 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
+    printBanner();
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+Usage: nlm [options]
+
+Options:
+  --config=<file>                           Load configuration from specified file
+  --config <file>                           Load configuration from specified file (alternative format)
+  --random_seed=<value>                     Set random seed for reproducible experiments
+  --simulation_timestep=<val>                Set simulation timestep in seconds
+  --neuron_count=<value>                    Set number of neurons in the brain
+  --region_count=<value>                    Set number of brain regions
+  --connection_probability=<val>             Set connection probability for random connectivity
+  --stdp_ltp_weight=<val>                    Set STDP LTP weight
+  --stdp_ltd_weight=<val>                    Set STDP LTD weight
+  --stdp_tau=<val>                          Set STDP time constant
+  --synaptogenesis_rate=<val>                Set structural plasticity synaptogenesis rate
+  --pruning_rate=<val>                      Set structural plasticity pruning rate
+  --environment_name=<name>                 Set environment name
+  --environment_width=<value>                Set environment width
+  --environment_height=<value>               Set environment height
+  --log_level=<level>                       Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  --log_to_file=<true/false>                 Enable/disable logging to file
+  --log_filename=<file>                     Set log filename
+  --max_simulation_steps=<value>             Set maximum number of simulation steps
+  --simulation_time_limit=<val>              Set simulation time limit
+  --visualization_enabled=<true/false>       Enable/disable visualization
+  --visualization_update_rate=<val>           Set visualization update rate (Hz)
+  --help                                     Display this help message and exit
+
+Common Examples:
+  nlm --config=my_config.cfg
+  nlm --neuron_count=5000 --simulation_timestep=0.0001
+  nlm --random_seed=12345 --stdp_ltp_weight=0.02
+  nlm --environment_name=CustomEnv --environment_width=20 --environment_height=20
+
+For more information, visit: https://github.com/nlm-project/nlm
+
+Configuration parameters can also be set in the config file (default: configs/default.cfg)
+)" << std::endl;
+}
+
+// Check for help flag and display help if requested
+void checkForHelp(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-help") {
+            printHelp();
+            exit(0);
+        }
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,6 +355,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check for help flag and display help if requested
+    checkForHelp(argc, argv);
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
