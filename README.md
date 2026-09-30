@@ -225,6 +225,13 @@ CHANGED FUTURE BEHAVIOR
 
 MIT
 
-## Authors
+For beginners, the first few chapters of `HOW_TO_USE.md` provide a quick introduction to NLM.
 
-Research project — See docs for scientific background.
+The documentation includes:
+- `HOW_TO_USE.md` - Complete usage guide and Python API reference
+- `docs/ARCHITECTURE.md` - System architecture and design
+- `docs/SCIENCE.md` - Scientific background and principles
+
+For deeper understanding, read `docs/PHASE6_FINAL_AUDIT.md` to see how all systems integrate.
+
+That's it! You're now ready to use NLM.
