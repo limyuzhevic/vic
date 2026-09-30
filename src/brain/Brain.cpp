@@ -130,9 +130,9 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+        // Configure STDP parameters (matching main.cpp defaults)
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.02f);  // Match main.cpp: 0.02f
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.015f); // Match main.cpp: 0.015f
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
@@ -184,6 +184,19 @@ bool Brain::initialize() {
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Initialize plasticity systems BEFORE creating regions (they need proper initialization order)
+    // Configure STDP parameters from config (matching main.cpp defaults)
+    float ltpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.02f);  // Match main.cpp: 0.02f
+    float ltdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.015f); // Match main.cpp: 0.015f
+    float tau = pImpl->config->getOr<float>("stdp_tau", 20.0f);
+    pImpl->stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity parameters
+    float synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+    pImpl->structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    pImpl->structuralPlasticity->setPruningRate(pruningRate);
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {

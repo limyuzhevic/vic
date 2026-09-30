@@ -23,8 +23,17 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    Impl() 
+        : id()
+        , type(NeuronType::Internal)
+        , regionId(INVALID_REGION_ID)
+        , populationId(INVALID_POPULATION_ID)
+        , totalCurrent(0.0f)
+        , synapticInput(0.0f)
+        , spikeHistory()
+        , incomingSynapses()
+        , outgoingSynapses()
+        , plasticityFlags() {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -33,6 +42,12 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
+    
+    // Initialize state with safe defaults
+    pImpl->state.membranePotential = pImpl->state.restingPotential;
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.refractoryRemaining = 0;
 }
 
 Neuron::~Neuron() = default;
@@ -191,6 +206,19 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
+    // Validate timestep - prevent division by zero or extremely large values
+    if (dt <= 0.0f) {
+        NLM_LOG_ERROR("Invalid timestep in Neuron::stepLIF: " + std::to_string(dt));
+        return false;
+    }
+    
+    // Validate and clamp timestep to reasonable range
+    const float maxTimestep = 0.1f;  // 100ms max
+    if (dt > maxTimestep) {
+        NLM_LOG_WARNING("Large timestep detected: " + std::to_string(dt) + ". Clamping to " + std::to_string(maxTimestep));
+        dt = maxTimestep;
+    }
+    
     // Handle refractory period
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
@@ -213,11 +241,28 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Safety check: prevent division by zero or extremely large values
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid time constant in Neuron::stepLIF: " + std::to_string(tau));
+        return false;
+    }
+    
+    if (C <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane capacitance in Neuron::stepLIF: " + std::to_string(C));
+        return false;
+    }
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
+    // Clamp synaptic contribution to prevent instability
+    synapticContribution = std::clamp(synapticContribution, -100.0f, 100.0f);
+    
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
+    
+    // Clamp leak contribution to reasonable range
+    leakContribution = std::clamp(leakContribution, -50.0f, 50.0f);
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
@@ -272,21 +317,54 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
+    // Real random initialization with biological constraints and validation
+    // Validate random generator is working
+    if (!rng.isValid()) {
+        NLM_LOG_ERROR("Invalid random generator in Neuron::initializeRandom");
+        return;
+    }
+    
+    // Validate RNG methods exist
+    if (!rng.uniformReal || !rng.uniformInt) {
+        NLM_LOG_ERROR("Random generator methods not properly initialized");
+        return;
+    }
+    
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Clamp to reasonable biological range
+    float membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = std::clamp(membranePotential, -80.0f, -50.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Ensure threshold is realistic for biological neurons
+    float threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = std::clamp(threshold, -70.0f, -40.0f);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Keep within reasonable range
+    float restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = std::clamp(restingPotential, -80.0f, -60.0f);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Ensure reset potential is near resting potential
+    float resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = std::clamp(resetPotential, pImpl->state.restingPotential, -55.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    // Refractory period: 2-10ms typical, validate range
+    int refractoryMin = std::max(1, rng.uniformInt(1, 5));  // Minimum 1ms
+    int refractoryMax = std::min(20, rng.uniformInt(15, 30));  // Maximum 20ms
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(refractoryMin, refractoryMax));
+    
+    // Validate that threshold > reset potential > resting potential
+    if (pImpl->state.threshold <= pImpl->state.resetPotential) {
+        NLM_LOG_WARNING("Invalid neuron parameters: threshold <= reset potential, adjusting");
+        pImpl->state.threshold = pImpl->state.resetPotential + 5.0f;
+    }
+    
+    if (pImpl->state.resetPotential <= pImpl->state.restingPotential) {
+        NLM_LOG_WARNING("Invalid neuron parameters: reset potential <= resting potential, adjusting");
+        pImpl->state.resetPotential = pImpl->state.restingPotential + 3.0f;
+    }
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
@@ -297,6 +375,12 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Log initialization for debugging
+    NLM_LOG_DEBUG("Neuron " + std::to_string(pImpl->id) + " initialized: " +
+                  "V_rest=" + std::to_string(pImpl->state.restingPotential) +
+                  "mV, threshold=" + std::to_string(pImpl->state.threshold) +
+                  "mV, refractory=" + std::to_string(pImpl->state.refractoryPeriod) + "ms");
 }
 
 } // namespace nlm
