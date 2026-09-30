@@ -69,7 +69,7 @@ public:
             ExperimentMetrics metrics;
             metrics.episode = episode;
             
-            float episodeReward = 0.0f;
+float episodeReward = 0.0f;
             
             // Run steps
             for (int step = 0; step < stepsPerEpisode; ++step) {
@@ -159,17 +159,17 @@ public:
         std::cout << "===========================================\n";
         
         if (allMetrics.size() >= 2) {
-            const auto& first = allMetrics.front();
-            const auto& last = allMetrics.back();
+            const auto& initialMetrics = allMetrics.front();
+            const auto& finalMetrics = allMetrics.back();
             
             std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
-            std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
-            std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
-            std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";
+            std::cout << "  Reward: " << initialMetrics.totalReward << " -> " << finalMetrics.totalReward << "\n";
+            std::cout << "  Forward actions: " << initialMetrics.forwardCount << " -> " << finalMetrics.forwardCount << "\n";
+            std::cout << "  Exploration (wait): " << initialMetrics.waitCount << " -> " << finalMetrics.waitCount << "\n";
             
             // Calculate behavior change
-            float rewardChange = last.totalReward - first.totalReward;
-            float actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
+            float rewardChange = finalMetrics.totalReward - initialMetrics.totalReward;
+            float actionChange = static_cast<float>(finalMetrics.forwardCount) - static_cast<float>(initialMetrics.forwardCount);
             
             std::cout << "\nBehavioral change:\n";
             if (rewardChange > 0) {
@@ -183,8 +183,8 @@ public:
             }
             
             // Synapse change
-            if (last.totalSynapses != first.totalSynapses) {
-                std::cout << "  Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
+            if (finalMetrics.totalSynapses != initialMetrics.totalSynapses) {
+                std::cout << "  Synapses: " << initialMetrics.totalSynapses << " -> " << finalMetrics.totalSynapses << "\n";
             }
         }
         
@@ -193,53 +193,53 @@ public:
         std::cout << "experienced consequences, and modified its synapses.\n";
     }
     
-private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
-    }
-    
-    void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
-        config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
-        config->set("random_seed", 42u);
-        config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
-    }
-    
-    const char* motorCommandToString(MotorCommand cmd) {
-        switch (cmd) {
-            case MotorCommand::MoveForward: return "MoveForward";
-            case MotorCommand::MoveBackward: return "MoveBackward";
-            case MotorCommand::TurnLeft: return "TurnLeft";
-            case MotorCommand::TurnRight: return "TurnRight";
-            case MotorCommand::LookLeft: return "LookLeft";
-            case MotorCommand::LookRight: return "LookRight";
-            case MotorCommand::Interact: return "Interact";
-            case MotorCommand::Wait: return "Wait";
-            default: return "Unknown";
+    private:
+        void configureEnvironment(std::shared_ptr<Config> config) {
+            config->set("environment_width", 20);
+            config->set("environment_height", 20);
+            config->set("vision_width", 16);
+            config->set("vision_height", 16);
         }
-    }
-    
-    const char* stageToString(DevelopmentalStage stage) {
-        switch (stage) {
-            case DevelopmentalStage::Initial: return "Initial";
-            case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
-            case DevelopmentalStage::Maturation: return "Maturation";
-            case DevelopmentalStage::Adult: return "Adult";
-            case DevelopmentalStage::Aging: return "Aging";
-            default: return "Unknown";
+        
+        void configureBrain(std::shared_ptr<Config> config) {
+            config->set("neuron_count", 500);
+            config->set("region_count", 2);
+            config->set("connection_probability", 0.1f);
+            config->set("random_seed", 42u);
+            config->set("simulation_timestep", 0.001);
+            config->set("stdp_ltp_weight", 0.01f);
+            config->set("stdp_ltd_weight", 0.012f);
+            config->set("stdp_tau", 20.0f);
+            config->set("synaptogenesis_rate", 0.0001f);
+            config->set("pruning_rate", 0.00001f);
         }
-    }
-};
-
+        
+        const char* motorCommandToString(MotorCommand cmd) {
+            switch (cmd) {
+                case MotorCommand::MoveForward: return "MoveForward";
+                case MotorCommand::MoveBackward: return "MoveBackward";
+                case MotorCommand::TurnLeft: return "TurnLeft";
+                case MotorCommand::TurnRight: return "TurnRight";
+                case MotorCommand::LookLeft: return "LookLeft";
+                case MotorCommand::LookRight: return "LookRight";
+                case MotorCommand::Interact: return "Interact";
+                case MotorCommand::Wait: return "Wait";
+                default: return "Unknown";
+            }
+        }
+        
+        const char* stageToString(DevelopmentalStage stage) {
+            switch (stage) {
+                case DevelopmentalStage::Initial: return "Initial";
+                case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
+                case DevelopmentalStage::Maturation: return "Maturation";
+                case DevelopmentalStage::Adult: return "Adult";
+                case DevelopmentalStage::Aging: return "Aging";
+                default: return "Unknown";
+            }
+        }
+    };
+    
 } // namespace nlm
 
 // Main entry point for Phase 3 demo

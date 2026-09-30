@@ -56,46 +56,56 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
     // Run simulation
-    float totalReward = 0.0f;
-    float totalFiringRate = 0.0f;
-    size_t firingCount = 0;
+    float cumulativeReward = 0.0f;
+    float cumulativeFiringRate = 0.0f;
+    size_t firingStepsCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        const auto& regions = agent.getBrain()->getRegions();
+        SensoryPercept percept;
+        MotorCommand cmd;
+        NeuralRegion* region = nullptr;
         
-        // Process sensory input
-        agent.processSensoryInput(percept);
+        if (!regions.empty()) {
+            region = regions[0].get();
+            if (region) {
+                percept = world.observe(region);
+                agent.processSensoryInput(percept);
+                cmd = agent.decodeMotorCommand();
+            }
+        }
         
-        // Brain step
+        // Run brain step
         brain->step(step, step * 0.001);
         
-        // Get motor command
-        MotorCommand cmd = agent.decodeMotorCommand();
-        
-        // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
-        
-        // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
-        totalReward += reward;
-        
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
-        
-        // Update development
-        if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+        if (region) {
+            // Apply action to world
+            world.applyAction(region, cmd);
+            
+            // Compute reward
+            float reward = world.computeReward(region);
+            cumulativeReward += reward;
+            
+            // Apply reward modulation
+            agent.applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            if (config.enableDevelopment) {
+                agent.updateDevelopment(0.001);
+            }
+        } else {
+            NLM_LOG_WARNING("No regions available for observation");
         }
         
         // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
-        if (brain->getFiringNeuronCount() > 0) firingCount++;
+        cumulativeFiringRate += brain->getAverageFiringRate();
+        if (brain->getFiringNeuronCount() > 0) firingStepsCount++;
         
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                        " | Reward: " + std::to_string(cumulativeReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
@@ -103,8 +113,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    result.totalReward = cumulativeReward / config.maxSteps;
+    result.avgFiringRate = cumulativeFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
