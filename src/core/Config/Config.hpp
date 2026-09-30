@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -42,6 +43,31 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Error types
+enum class ConfigError {
+    None,
+    FileNotFound,
+    InvalidFormat,
+    MissingRequired,
+    InvalidValue,
+    OutOfRange
+};
+
+// Validation callback type
+using ValidationCallback = std::function<bool(const std::string&, const ConfigValue&)>;
+
+// Configuration metadata
+struct ConfigMetadata {
+    std::string key;
+    std::string description;
+    std::string defaultValue;
+    std::string type;
+    bool required;
+    ValidationCallback validator;
+};
+
+class ConfigManager;
 
 // Main configuration class
 class Config {
