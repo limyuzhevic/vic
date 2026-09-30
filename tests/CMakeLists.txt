@@ -19,6 +19,15 @@ add_executable(nlm_test
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
+# Enhanced features test
+add_executable(nlm_enhanced_tests
+    test_enhanced_features.cpp
+)
+
+target_link_libraries(nlm_enhanced_tests PRIVATE nlm_core nlm_agent nlm_world)
+target_compile_features(nlm_enhanced_tests PRIVATE cxx_std_20)
+
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_enhanced_tests COMMAND nlm_enhanced_tests)

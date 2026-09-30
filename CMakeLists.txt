@@ -28,6 +28,7 @@ add_library(nlm_core STATIC
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
+    src/core/Logger/Logger_enhanced.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
@@ -142,6 +143,20 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Performance tests
+add_executable(nlm_perf_tests tests/test_performance.cpp tests/test_benchmark.cpp)
+target_link_libraries(nlm_perf_tests nlm_core)
+
+# Enhanced features test
+add_executable(nlm_enhanced_tests tests/test_enhanced_features.cpp)
+target_link_libraries(nlm_enhanced_tests nlm_core nlm_agent nlm_world)
+
+# Python bindings (if enabled)
+if(PYTHON_BINDINGS)
+    pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+endif()
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
