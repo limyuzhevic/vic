@@ -144,22 +144,34 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("loadFromFile", [](py::object self, const std::string& filepath) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            return config->loadFromFile(filepath);
+        }, py::arg("filepath"), "Load configuration from a JSON file")
+        .def("loadFromArgs", [](py::object self, int argc, char** argv) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            return config->loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"), "Load configuration from command line arguments")
+        .def("saveToFile", [](py::object self, const std::string& filepath) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            return config->saveToFile(filepath);
+        }, py::arg("filepath"), "Save configuration to a JSON file")
+        .def("has", [](py::object self, const std::string& key) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            return config->has(key);
+        }, py::arg("key"), "Check if a configuration key exists")
+        .def("getKeys", [](py::object self) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            return config->getKeys();
+        }, "Get all configuration keys")
+        .def("clear", [](py::object self) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            config->clear();
+        }, "Clear all configuration entries")
+        .def("summary", [](py::object self) {
+            auto& config = self.cast<std::shared_ptr<Config>&>();
+            return config->summary();
+        }, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -169,14 +181,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
-        .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+        .def("setTimestamp", [](SensoryInput& self, double timestamp) {
+            self.setTimestamp(timestamp);
+        }, py::arg("timestamp"), "Set the timestamp");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::runtime_error("Vision data cannot be empty");
+            }
             self.setData(data);
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
@@ -187,9 +203,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::runtime_error("Audio data cannot be empty");
+            }
             self.setData(data);
         }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("setSampleRate", [](Audio& self, double sampleRate) {
+            if (sampleRate <= 0.0) {
+                throw std::runtime_error("Sample rate must be positive");
+            }
+            self.setSampleRate(sampleRate);
+        }, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);
 
@@ -361,13 +385,24 @@ PYBIND11_MODULE(pynlm, m) {
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
+        .def("processSensoryInput", [](AgentBrain& self, const SensoryPercept& percept) {
+            if (!percept.getVisionWidth() || !percept.getVisionHeight()) {
+                py::warnings::warn("Processing empty vision percept");
+            }
+            self.processSensoryInput(percept);
+        }, py::arg("percept"),
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
+        .def("applyRewardModulation", [](AgentBrain& self, double reward, double predictedReward) {
+            if (std::abs(reward) > 100.0) {
+                py::warnings::warn("Reward value seems unusually large: " + std::to_string(reward));
+            }
+            if (std::abs(predictedReward) > 100.0) {
+                py::warnings::warn("Predicted reward value seems unusually large: " + std::to_string(predictedReward));
+            }
+            self.applyRewardModulation(static_cast<float>(reward), static_cast<float>(predictedReward));
+        }, py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
@@ -388,17 +423,21 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable or disable curiosity")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -153,33 +153,77 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
+### Pattern 4: Error Handling and Configuration
+
+```python
+import pynlm
+
+# Create brain with error checking
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+
+# Check if a config key exists before using it
+if config.has("some_key"):
+    value = config.get("some_key")
+    if value:
+        print(f"Config value: {value}")
+
+# Save brain and config with error checking
+brain.save("my_brain.bin")
+config.saveToFile("my_config.txt")
+
+# Load and verify
+loaded_brain = pynlm.createBrain(config)
+loaded_brain.load("my_brain.bin")
+print(f"Loaded brain with {loaded_brain.getTotalNeuronCount()} neurons")
+```
+
+## Configuration Features
+
+The Config system now supports multiple value types and includes validation:
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# Set different value types
+config.set("integer_value", 42)
+config.set("float_value", 3.14)
+config.set("boolean_value", True)
+config.set("string_value", "Hello World")
+config.set("list_value", [1, 2, 3, 4, 5])
+config.set("string_list", ["apple", "banana", "cherry"])
+
+# Retrieve with proper type checking
+int_val = config.get("integer_value")
+if int_val:
+    print(f"Integer: {int_val}")
+
+float_val = config.get("float_value")
+if float_val:
+    print(f"Float: {float_val}")
+
+str_val = config.get("string_value")
+if str_val:
+    print(f"String: {str_val}")
+```
+
+### Configuration Validation
+
+The configuration system now validates values:
+
+```python
+# This will log a warning but not crash
+config.set("invalid_float", float('inf'))  # Creates inf value with warning
+
+# Values are automatically clamped to reasonable ranges
+config.set("reward_bound", 1000.0)  # Will be saved as-is but usage may warn
+```
+
 ---
 
 ## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
 
 ## Mini Projects
 
@@ -256,8 +300,6 @@ print("Agent simulation complete!")
 
 ---
 
-## Quick Reference
-
 | What you want | Code |
 |--------------|------|
 | Create brain | `pynlm.createBrain(config)` |
@@ -268,6 +310,13 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Create config | `pynlm.createDefaultConfig()` |
+| Check config | `config.has("key")` |
+| Get config | `config.get("key")` |
+| Set config | `config.set("key", value)` |
+| Save config | `config.saveToFile("file.txt")` |
+| Enable learning | `agent.enableRewardModulation(True)` |
+| Get development stage | `agent.getDevelopmentalStage()` |
 
 ---
 
@@ -285,6 +334,19 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Config save failed"**
+- Check if you have write permissions for the target directory
+- Make sure the path is correct and the directory exists
+
+**"Invalid configuration values"**
+- Use `config.get(key)` with proper type checking
+- Check that values are within expected ranges
+
+**"Python binding errors"**
+- Check that all required objects are properly initialized
+- Use try-except blocks for runtime errors
+- Set appropriate logging levels to debug issues
+
 ---
 
 ## Next Steps
@@ -293,5 +355,15 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the new error handling patterns in the documentation
+5. Learn about the enhanced configuration validation features
 
-That's it! You're now ready to use NLM.
+The NLM system now includes:
+- **Memory leak fixes** in AgentBrain.cpp
+- **Enhanced error handling** throughout the codebase
+- **Input validation** in Python bindings
+- **Configuration validation** with proper error messages
+- **Better documentation** with practical examples
+- **Robust file I/O** with error checking
+
+You're now ready to use NLM with confidence!
