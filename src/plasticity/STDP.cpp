@@ -52,45 +52,89 @@ void STDP::update(Synapse* synapse,
      *   - Doesn't account for synaptic eligibility traces
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    if (!validateSTDPParameters(synapse, preSpikes, postSpikes)) {
         return;
     }
     
+    float totalDelta = computeTotalWeightChange(preSpikes, postSpikes);
+    
+    if (std::abs(totalDelta) > 1e-6f) {
+        applySTDPWeightChange(synapse, totalDelta);
+    }
+}
+
+// Validate STDP parameters
+bool STDP::validateSTDPParameters(Synapse* synapse,
+                                   const std::vector<Timestamp>& preSpikes,
+                                   const std::vector<Timestamp>& postSpikes) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return false;
+    }
+    
+    // Validate spike timing data
+    for (const auto& time : preSpikes) {
+        if (time < 0) {
+            NLM_LOG_WARNING("Invalid pre-spike time: " + std::to_string(time));
+            return false;
+        }
+    }
+    
+    for (const auto& time : postSpikes) {
+        if (time < 0) {
+            NLM_LOG_WARNING("Invalid post-spike time: " + std::to_string(time));
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Compute total weight change from all spike pairs
+float STDP::computeTotalWeightChange(const std::vector<Timestamp>& preSpikes,
+                                     const std::vector<Timestamp>& postSpikes) const {
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            float delta = calculateSingleSpikePairChange(preTime, postTime, tau);
+            totalDelta += delta;
         }
     }
     
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-        
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
-        
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+    return totalDelta;
+}
+
+// Calculate weight change for a single spike pair
+float STDP::calculateSingleSpikePairChange(Timestamp preTime, Timestamp postTime, float tau) const {
+    float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    
+    if (dt > 0) {
+        // Pre before post: POTENTIATION
+        // "Cells that fire together, wire together" - but only if pre fires before post
+        return pImpl->ltpWeight * std::exp(-dt / tau);
+    } else if (dt < 0) {
+        // Post before pre: DEPRESSION
+        // "Anti-Hebbian" - connection weakens if post fires without pre
+        return -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
+    } else {
+        // dt == 0: no change (simultaneous spikes - rare in practice)
+        return 0.0f;
     }
+}
+
+// Apply STDP weight change to synapse
+void STDP::applySTDPWeightChange(Synapse* synapse, float totalDelta) {
+    // Scale by synaptic efficacy if available
+    float efficacy = synapse->getEfficacy();
+    totalDelta *= efficacy;
+    
+    // Apply weight change
+    synapse->addToWeight(totalDelta);
+    
+    // Update eligibility trace for reward-modulated learning
+    float currentTrace = synapse->getEligibilityTrace();
+    synapse->setEligibilityTrace(currentTrace + totalDelta);
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

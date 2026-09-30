@@ -327,10 +327,7 @@ int main(int argc, char** argv) {
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    initializeLogger();
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -342,8 +339,36 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
+    loadConfiguration(config, argc, argv);
     
-    // Try to load from file if provided
+    // Set default values for Phase 2
+    setupDefaultConfiguration(config);
+    
+    // Log configuration summary
+    logConfigurationSummary(config);
+    
+    // Initialize simulation
+    auto [brain, clock] = initializeSimulation(config);
+    
+    // Run all tests
+    runAllTests(brain);
+    
+    // Print final status
+    printFinalStatus(brain);
+    
+    return 0;
+}
+
+// Initialize logging system
+void initializeLogger() {
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+}
+
+// Load configuration from file and command line
+void loadConfiguration(std::shared_ptr<Config> config, int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -365,7 +390,10 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
+}
+
+// Set up default configuration values for Phase 2
+void setupDefaultConfiguration(std::shared_ptr<Config> config) {
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -381,8 +409,10 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
+}
+
+// Log configuration summary
+void logConfigurationSummary(const std::shared_ptr<Config>& config) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -391,7 +421,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
-    
+}
+
+// Initialize simulation components
+std::pair<std::shared_ptr<Brain>, std::shared_ptr<SimulationClock>> initializeSimulation(const std::shared_ptr<Config>& config) {
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
@@ -404,11 +437,16 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+        throw std::runtime_error("Brain initialization failed");
     }
     
     brain->logStatus();
     
+    return {brain, std::make_shared<SimulationClock>(clock)};
+}
+
+// Run all tests
+void runAllTests(std::shared_ptr<Brain> brain) {
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
@@ -423,8 +461,10 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
-    
-    // Final brain status
+}
+
+// Print final status
+void printFinalStatus(const std::shared_ptr<Brain>& brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
@@ -444,6 +484,4 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
-    
-    return 0;
 }

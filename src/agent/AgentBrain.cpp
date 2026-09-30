@@ -64,7 +64,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot initialize AgentBrain: brain_ is null");
+        return;
+    }
+    
+    // Initialize previous vision buffer with world dimensions
+    size_t visionWidth = world.getVisionWidth();
+    size_t visionHeight = world.getVisionHeight();
+    previousVision_.resize(visionWidth * visionHeight, 0.0f);
+    
+    // Reset developmental state
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -85,11 +95,24 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARNING("Cannot process sensory input: brain_ is null");
+        return;
+    }
+    
+    // Validate sensory percept data
+    if (percept.getVision().size() != previousVision_.size()) {
+        NLM_LOG_WARNING("Vision data size mismatch: expected " + 
+                       std::to_string(previousVision_.size()) + 
+                       " elements, got " + std::to_string(percept.getVision().size()));
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+    
+    // Safely process vision input with bounds checking
+    for (size_t i = 0; i < std::min(sensoryVision_.size(), vision.size()); ++i) {
         if (sensoryVision_[i]) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
@@ -99,7 +122,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryTouch_.size(), touch.size()); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
@@ -108,7 +131,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryInternal_.size(), intern.size()); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
@@ -117,7 +140,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    for (size_t i = 0; i < std::min(sensoryProprioception_.size(), proprio.size()); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
@@ -125,15 +148,17 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     
     // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    if (!vision.empty() && !previousVision_.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        
+        // Calculate total difference with bounds checking
+        for (size_t i = 0; i < std::min(vision.size(), previousVision_.size()); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
             totalDiff += diff;
         }
         
         // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+        noveltyLevel_ = totalDiff / static_cast<float>(std::max<size_t>(vision.size(), 1));
         
         // Decay and update
         noveltyLevel_ *= sensoryNoveltyDecay_;
@@ -236,7 +261,15 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    // Validate input parameters
+    if (reward != reward || predictedReward != predictedReward) {  // NaN check
+        NLM_LOG_WARNING("Invalid reward values in applyRewardModulation");
+        return;
+    }
+    
+    if (!brain_ || !rewardModulationEnabled_) {
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -251,19 +284,31 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
     // Apply to all synapses with eligibility traces
+    bool synapseModified = false;
+    
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) {
+                continue;  // Skip null synapse pointers
+            }
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
                 // Apply reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
                 syn->addToWeight(delta);
+                synapseModified = true;
                 
                 // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
             }
         }
+    }
+    
+    if (synapseModified) {
+        NLM_LOG_DEBUG("Applied reward modulation: prediction error = " + 
+                     std::to_string(predictionError_));
     }
     
     // Modulate plasticity based on dopamine

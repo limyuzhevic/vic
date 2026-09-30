@@ -25,6 +25,7 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
+    src/core/Constants/Constants.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp

@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include <stdexcept>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -31,6 +37,28 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation error
+class ConfigValidationError : public std::runtime_error {
+public:
+    ConfigValidationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+// Configuration type constraints
+struct ConfigConstraint {
+    using Validator = std::function<bool(const ConfigValue&)>;
+    
+    std::string name;
+    std::string description;
+    Validator validator;
+    
+    ConfigConstraint(const std::string& n, const std::string& desc, Validator v)
+        : name(n), description(desc), validator(v) {}
+    
+    bool validate(const ConfigValue& value) const {
+        return validator(value);
+    }
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -41,6 +69,34 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration schema
+class ConfigSchema {
+public:
+    void addConstraint(const ConfigConstraint& constraint) {
+        constraints_[constraint.name] = constraint;
+    }
+    
+    bool validate(const ConfigEntry& entry) const {
+        auto it = constraints_.find(entry.key);
+        if (it == constraints_.end()) {
+            return true;  // No constraint for this key
+        }
+        return it->second.validate(entry.value);
+    }
+    
+    const ConfigConstraint* getConstraint(const std::string& key) const {
+        auto it = constraints_.find(key);
+        return (it != constraints_.end()) ? &it->second : nullptr;
+    }
+    
+    void clear() {
+        constraints_.clear();
+    }
+    
+private:
+    std::unordered_map<std::string, ConfigConstraint> constraints_;
 };
 
 // Main configuration class
