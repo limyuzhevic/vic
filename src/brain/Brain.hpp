@@ -190,12 +190,46 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
-    void logStatus() const;
+    // ========== AGENT BRAIN INTERFACE ==========
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Get agent brain interface
+    AgentBrain* getAgentBrain();
+    
+    // Create agent brain interface
+    static std::unique_ptr<AgentBrain> createAgentBrain(std::shared_ptr<Brain> brain);
+    
+    // Application mode methods
+    bool isApplicationMode() const;
+    void setApplicationMode(bool enabled);
+    
+    // Get application configuration
+    ApplicationConfig* getApplicationConfig();
+    
+    // Application lifecycle
+    void initializeApplication();
+    void shutdownApplication();
+    bool isApplicationInitialized() const;
+    
+    // Application-specific features
+    void enableNeuralPruning(bool enable);
+    void enableMemoryCompression(bool enable);
+    void enableRealTimeVisualization(bool enable);
+    
+    bool isNeuralPruningEnabled() const;
+    bool isMemoryCompressionEnabled() const;
+    bool isRealTimeVisualizationEnabled() const;
+    
+    // Performance monitoring
+    double getCurrentMemoryUsage() const;
+    double getCurrentProcessingTime() const;
+    double getCurrentCPUUtilization() const;
+    
+    // Application status
+    std::string getApplicationStatus() const;
+    
+    // Application callbacks
+    void registerApplicationCallback(std::function<void()> callback);
+    void unregisterApplicationCallback();
+    void triggerApplicationCallbacks();
 
 } // namespace nlm

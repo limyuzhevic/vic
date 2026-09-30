@@ -1112,6 +1112,105 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+    
+    // ========== AGENT BRAIN INTERFACE ==========
+    
+    AgentBrain* getAgentBrain() {
+        return pImpl->agentBrain_.get();
+    }
+    
+    std::unique_ptr<AgentBrain> createAgentBrain(std::shared_ptr<Brain> brain) {
+        return std::make_unique<AgentBrain>(brain);
+    }
+    
+    bool isApplicationMode() const {
+        return pImpl->applicationMode_;
+    }
+    
+    void setApplicationMode(bool enabled) {
+        pImpl->applicationMode_ = enabled;
+    }
+    
+    ApplicationConfig* getApplicationConfig() {
+        return pImpl->applicationConfig_.get();
+    }
+    
+    void initializeApplication() {
+        if (!pImpl->applicationInitialized_) {
+            pImpl->applicationInitialized_ = true;
+        }
+    }
+    
+    void shutdownApplication() {
+        pImpl->applicationInitialized_ = false;
+    }
+    
+    bool isApplicationInitialized() const {
+        return pImpl->applicationInitialized_;
+    }
+    
+    void enableNeuralPruning(bool enable) {
+        pImpl->neuralPruningEnabled_ = enable;
+    }
+    
+    void enableMemoryCompression(bool enable) {
+        pImpl->memoryCompressionEnabled_ = enable;
+    }
+    
+    void enableRealTimeVisualization(bool enable) {
+        pImpl->realTimeVisualizationEnabled_ = enable;
+    }
+    
+    bool isNeuralPruningEnabled() const {
+        return pImpl->neuralPruningEnabled_;
+    }
+    
+    bool isMemoryCompressionEnabled() const {
+        return pImpl->memoryCompressionEnabled_;
+    }
+    
+    bool isRealTimeVisualizationEnabled() const {
+        return pImpl->realTimeVisualizationEnabled_;
+    }
+    
+    double getCurrentMemoryUsage() const {
+        return pImpl->currentMemoryUsage_;
+    }
+    
+    double getCurrentProcessingTime() const {
+        return pImpl->currentProcessingTime_;
+    }
+    
+    double getCurrentCPUUtilization() const {
+        return pImpl->currentCPUUtilization_;
+    }
+    
+    std::string getApplicationStatus() const {
+        std::ostringstream oss;
+        oss << "Application Status:";
+        oss << "  Mode: " << (pImpl->applicationMode_ ? "Enabled" : "Disabled");
+        oss << "  Initialized: " << (pImpl->applicationInitialized_ ? "Yes" : "No");
+        oss << "  Neural Pruning: " << (pImpl->neuralPruningEnabled_ ? "Enabled" : "Disabled");
+        oss << "  Memory Compression: " << (pImpl->memoryCompressionEnabled_ ? "Enabled" : "Disabled");
+        oss << "  Real-time Visualization: " << (pImpl->realTimeVisualizationEnabled_ ? "Enabled" : "Disabled");
+        oss << "  Memory Usage: " << getCurrentMemoryUsage() << " MB";
+        oss << "  CPU Utilization: " << (getCurrentCPUUtilization() * 100) << "%";
+        return oss.str();
+    }
+    
+    void registerApplicationCallback(std::function<void()> callback) {
+        pImpl->applicationCallbacks_.push_back(callback);
+    }
+    
+    void unregisterApplicationCallback() {
+        pImpl->applicationCallbacks_.clear();
+    }
+    
+    void triggerApplicationCallbacks() {
+        for (const auto& callback : pImpl->applicationCallbacks_) {
+            callback();
+        }
+    }
 }
 
 } // namespace nlm
