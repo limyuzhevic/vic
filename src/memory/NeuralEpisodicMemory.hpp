@@ -58,7 +58,7 @@ struct EpisodicMemoryItem {
 // - Relevance-weighted recall
 // - Replay during offline periods
 
-class NeuralEpisodicMemory {
+class NeuralEpisodicMemory : public virtual MemorySystem {
 public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();

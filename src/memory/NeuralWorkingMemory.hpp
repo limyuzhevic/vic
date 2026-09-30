@@ -18,7 +18,7 @@ namespace nlm {
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
 
-class NeuralWorkingMemory {
+class NeuralWorkingMemory : public virtual MemorySystem {
 public:
     NeuralWorkingMemory();
     ~NeuralWorkingMemory();
