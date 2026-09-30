@@ -137,6 +137,10 @@ brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# New in NLM 2.0: Get comprehensive brain statistics
+print(f"Plasticity stats: {brain.getPlasticityStats()}")
+print(f"Memory stats: {brain.getMemoryStats()}")
 ```
 
 #### Running a Simulation
@@ -190,67 +194,86 @@ world.update(timestep=0.1)
 import pynlm
 
 def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+    """Run a complete agent simulation with enhanced error handling."""
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
+    try:
+        # 1. Create configuration
+        config = pynlm.createDefaultConfig()
         
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
+        # 2. Create brain and initialize
+        brain = pynlm.createBrain(config)
+        brain.initialize()
         
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
+        # 3. Create agent brain interface
+        agent = pynlm.createAgentBrain(brain)
         
-        # Run brain step
-        brain.step(step)
+        # 4. Create and configure world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
         
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
+        # 5. Initialize agent with world
+        agent.initialize(world)
         
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        # 6. Enable enhanced subsystems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
         
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
+        # 7. Run simulation loop with error handling
+        for step in range(num_steps):
+            # Update world
+            world.update(timestep=0.1)
+            
+            # Get sensory input from world
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input in brain
+            if percept:  # Check if percept is valid
+                agent.processSensoryInput(percept)
+            else:
+                print(f"Warning: Invalid percept at step {step}")
+            
+            # Run brain step
+            brain.step(step)
+            
+            # Decode motor command from brain activity
+            motor_cmd = agent.decodeMotorCommand()
+            
+            # Apply motor command to world
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+            
+            # Print progress with enhanced statistics
+            if step % 100 == 0:
+                print(f"Step {step}:")
+                print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+                print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+                print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+                
+                # New in NLM 2.0: Get enhanced brain statistics
+                print(f"  Plasticity: {brain.getPlasticityStats()}")
+                print(f"  Memory: {brain.getMemoryStats()}")
         
-        # Update development
-        agent.updateDevelopment(0.1)
+        print("Agent simulation complete!")
         
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+        # New in NLM 2.0: Get final comprehensive statistics
+        print(f"Final enhanced stats:")
+        print(f"  Plasticity: {brain.getPlasticityStats()}")
+        print(f"  Memory: {brain.getMemoryStats()}")
+        
+    except Exception as e:
+        print(f"Error during simulation: {e}")
+        raise
 
 # Run the simulation
 run_agent_simulation(1000)
@@ -283,6 +306,11 @@ brain.getFiringNeuronCount()     # Currently firing
 brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
+# Enhanced Statistics
+brain.getBrainStats()             # Get comprehensive brain statistics
+brain.getPlasticityStats()        # Get plasticity system statistics
+brain.getMemoryStats()            # Get memory system statistics
+
 # State
 brain.save("checkpoint.bin")       # Save state
 brain.load("checkpoint.bin")       # Load state
@@ -290,6 +318,7 @@ brain.load("checkpoint.bin")       # Load state
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+region_shared = brain.getRegionShared(region_id)  # New: Shared pointer version
 ```
 
 #### Config Class
@@ -454,7 +483,50 @@ pynlm.WorldObjectType.Marker
 
 ---
 
-## Part 5: Example Scripts
+## Part 5: Additional Enhanced Features
+
+The enhanced Python bindings provide additional utility functions and features:
+
+```python
+import pynlm
+
+# Create brain with default configuration (enhanced)
+brain = pynlm.createBrainWithDefaults()
+
+# Create world with default configuration (enhanced)
+world = pynlm.createWorldWithDefaults()
+
+# Create agent brain with defaults (enhanced)
+agent = pynlm.createAgentBrainWithDefaults(brain, world)
+
+# Validate configuration (enhanced)
+try:
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 1000)
+    pynlm.validateConfig(config)  # Raises ConfigError if invalid
+    print("Configuration is valid!")
+except Exception as e:
+    print(f"Configuration error: {e}")
+
+# Get Python version information (enhanced)
+print(f"Python version: {pynlm.getPythonVersion()}")
+
+# Get detailed version information (enhanced)
+version_info = pynlm.getVersionInfo()
+print(f"NLM version: {version_info['nlm']}")
+print(f"Features: {', '.join(version_info['features'])}")
+
+# Initialize plasticity from configuration (enhanced)
+pynlm.initializePlasticityFromConfig(
+    config, brain.getSTDP(), brain.getHebbian(), brain.getStructuralPlasticity()
+)
+```
+
+---
+
+## Part 6: Example Scripts
+
+### Minimal Example
 
 ### Minimal Example
 

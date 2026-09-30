@@ -229,7 +229,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // More biologically realistic bounds: -80mV to 50mV
+    // -80mV: near typical neuronal resting potential
+    // 50mV: close to spike threshold, prevents runaway excitation
+    V = std::clamp(V, -80.0f, 50.0f);
     
     // Check for spike
     if (V >= threshold) {

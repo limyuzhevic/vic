@@ -215,12 +215,19 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
+// Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
-}
+    
+    // Additional safety: ensure eligibility trace doesn't accumulate negatively
+    if (pImpl->eligibilityTrace < -10.0f) {
+        pImpl->eligibilityTrace = -10.0f;  // Prevent runaway negative trace
+    }
+    if (pImpl->eligibilityTrace > 10.0f) {
+        pImpl->eligibilityTrace = 10.0f;   // Prevent runaway positive trace
+    }
 
 void Synapse::reset() {
     pImpl->weight = 0.0f;

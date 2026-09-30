@@ -18,7 +18,9 @@ struct STDP::Impl {
 
 STDP::STDP() : pImpl(new Impl) {}
 
-STDP::~STDP() = default;
+STDP::~STDP() {
+    delete pImpl;
+}
 
 void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
@@ -80,7 +82,12 @@ void STDP::update(Synapse* synapse,
     
     // Apply weight change with bounds
     if (std::abs(totalDelta) > 1e-6f) {
+        if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
+        if (!synapse) {
+            NLM_LOG_ERROR("STDP::update: Null synapse pointer provided");
+            return;
+        }
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
@@ -88,8 +95,11 @@ void STDP::update(Synapse* synapse,
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
+        // Use learning rate from STDP time constant
+        float learningRate = 0.01f / (1.0f + pImpl->timeConstant / 20.0f);
         float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        synapse->setEligibilityTrace(currentTrace + learningRate * totalDelta);
+    }
     }
 }
 

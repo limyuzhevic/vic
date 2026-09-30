@@ -19,16 +19,18 @@ struct StructuralPlasticity::Impl {
     size_t totalSynapsesCreated;
     size_t totalSynapsesPruned;
     
-    Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
-             minWeightThreshold(0.05f), activityThreshold(0.001f),
-             maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
-             useActivityDependency(true),
-             totalSynapsesCreated(0), totalSynapsesPruned(0) {}
+    StructuralPlasticity::Impl::Impl() : synaptogenesisRate(0.001f), pruningRate(0.0001f),
+              minWeightThreshold(0.05f), activityThreshold(0.001f),
+              maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
+              useActivityDependency(true),
+              totalSynapsesCreated(0), totalSynapsesPruned(0) {}
 };
 
 StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
 
-StructuralPlasticity::~StructuralPlasticity() = default;
+StructuralPlasticity::~StructuralPlasticity() {
+    delete pImpl;
+}
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {
@@ -45,24 +47,53 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
     }
     
     // Find the region containing the destination neuron
-    for (auto& region : brain->getRegions()) {
+    if (!brain) {
+        NLM_LOG_ERROR("StructuralPlasticity::createSynapse: Null brain pointer provided");
+        return INVALID_SYNAPSE_ID;
+    }
+    
+    const auto& regions = brain->getRegions();
+    if (regions.empty()) {
+        NLM_LOG_WARNING("StructuralPlasticity::createSynapse: Brain has no regions");
+        return INVALID_SYNAPSE_ID;
+    }
+    
+    // Check max total synapses limit globally
+    size_t totalSynapses = 0;
+    for (const auto& region : regions) {
+        totalSynapses += region->getSynapseCount();
+    }
+    if (totalSynapses >= pImpl->maxTotalSynapses) {
+        NLM_LOG_WARNING("StructuralPlasticity::createSynapse: Maximum synapses limit reached");
+        return INVALID_SYNAPSE_ID;
+    }
+    
+    // Find the region containing the destination neuron
+    for (auto& region : regions) {
         auto synapsesTo = region->getSynapsesTo(destination);
         
         // Check if connection already exists
         for (Synapse* syn : synapsesTo) {
+            if (!syn) {
+                NLM_LOG_ERROR("StructuralPlasticity::createSynapse: Null synapse in region");
+                continue;
+            }
             if (syn->getSourceNeuron() == source) {
+                NLM_LOG_INFO("StructuralPlasticity::createSynapse: Connection already exists");
                 return INVALID_SYNAPSE_ID;  // Connection already exists
             }
         }
         
         // Check max synapses limit
         if (region->getSynapseCount() >= pImpl->maxTotalSynapses) {
-            return INVALID_SYNAPSE_ID;
+            NLM_LOG_WARNING("StructuralPlasticity::createSynapse: Region synapse limit reached");
+            continue;  // Try next region
         }
         
         // Count outgoing synapses from source in this region
         auto synapsesFrom = region->getSynapsesFrom(source);
         if (synapsesFrom.size() >= pImpl->maxSynapsesPerNeuron) {
+            NLM_LOG_INFO("StructuralPlasticity::createSynapse: Neuron synapse limit reached");
             continue;  // Try next region
         }
         
@@ -79,21 +110,38 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
 
 bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
     if (!brain || synapse == INVALID_SYNAPSE_ID) {
+        if (!brain) {
+            NLM_LOG_ERROR("StructuralPlasticity::removeSynapse: Null brain pointer provided");
+        }
+        if (synapse == INVALID_SYNAPSE_ID) {
+            NLM_LOG_ERROR("StructuralPlasticity::removeSynapse: Invalid synapse ID provided");
+        }
         return false;
     }
     
     // Search all regions for the synapse
-    for (auto& region : brain->getRegions()) {
-        Synapse* syn = region->getSynapse(synapse);
-        if (syn) {
-            // For now, we mark the synapse for removal by zeroing its weight
-            // Actual removal would require modifying the region's synapse storage
-            syn->setWeight(0.0f);
-            ++pImpl->totalSynapsesPruned;
-            return true;
-        }
+    const auto& regions = brain->getRegions();
+    if (regions.empty()) {
+        NLM_LOG_WARNING("StructuralPlasticity::removeSynapse: Brain has no regions");
+        return false;
     }
     
+    for (auto& region : regions) {
+        Synapse* syn = region->getSynapse(synapse);
+        if (!syn) {
+            NLM_LOG_WARNING("StructuralPlasticity::removeSynapse: Synapse not found in any region");
+            continue;
+        }
+        
+        // For now, we mark the synapse for removal by zeroing its weight
+        // Actual removal would require modifying the region's synapse storage
+        syn->setWeight(0.0f);
+        ++pImpl->totalSynapsesPruned;
+        NLM_LOG_INFO("StructuralPlasticity::removeSynapse: Synapse marked for removal");
+        return true;
+    }
+    
+    NLM_LOG_WARNING("StructuralPlasticity::removeSynapse: Synapse not found");
     return false;
 }
 

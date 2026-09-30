@@ -1,6 +1,8 @@
 #include "Hebbian.hpp"
 #include "../../brain/Synapse.hpp"
 #include <algorithm>
+#include <cmath>
+#include "../core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -16,7 +18,9 @@ struct Hebbian::Impl {
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
 
-Hebbian::~Hebbian() = default;
+Hebbian::~Hebbian() {
+    delete pImpl;
+}
 
 void Hebbian::update(Synapse* synapse,
                       const std::vector<Timestamp>& preSpikes,
@@ -53,30 +57,60 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
+    // Compute Hebbian weight change using correlation
+    float weightChange = computeHebbianWeightChange(preSpikes, postSpikes, dt);
+    
+    // Apply with bounds
+    if (std::abs(weightChange) > 1e-6f) {
+        applyWeightChange(synapse, weightChange);
+    }
+}
+
+float Hebbian::computeHebbianWeightChange(const std::vector<Timestamp>& preSpikes,
+                                          const std::vector<Timestamp>& postSpikes,
+                                          TimestepDuration dt) const {
+    // More sophisticated Hebbian learning using spike timing correlation
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return 0.0f;
+    }
+    
+    // Compute cross-correlation between pre and post synaptic activity
+    float totalCorrelation = 0.0f;
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
             float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
+            
+            // Use 50ms time constant for temporal correlation
+            if (std::abs(dt) < 50.0f) {
+                float correlation = std::exp(-std::abs(dt) / 50.0f);
+                totalCorrelation += correlation;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
+    // Normalize by number of spike pairs
+    size_t numPairs = preSpikes.size() * postSpikes.size();
+    float avgCorrelation = numPairs > 0 ? totalCorrelation / numPairs : 0.0f;
     
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
-        applyWeightChange(synapse, delta);
-    }
+    // Apply learning rule with bounds
+    float weightChange = pImpl->learningRate * avgCorrelation;
+    
+    // Add homeostatic term to prevent runaway excitation
+    float homeostatic = 0.01f * (1.0f - avgCorrelation);
+    weightChange += homeostatic;
+    
+    // Clamp to prevent runaway potentiation
+    if (weightChange > 0.1f) weightChange = 0.1f;
+    if (weightChange < -0.1f) weightChange = -0.1f;
+    
+    return weightChange;
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!synapse) {
+        NLM_LOG_ERROR("Hebbian::applyWeightChange: Null synapse pointer provided");
+        return;
+    }
     
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);

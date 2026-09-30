@@ -10,6 +10,8 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
+**New in NLM 2.0:** Enhanced Python bindings with smart pointer APIs, comprehensive error handling, and advanced configuration options!
+
 That's it! NLM simulates all of this.
 
 ---
@@ -40,35 +42,56 @@ for i in range(100):
     brain.step(i)  # One step of thinking
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+
+# New in NLM 2.0: Get enhanced statistics
+print("Enhanced stats:", brain.getBrainStats())
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (Enhanced with Error Handling)
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+# Create everything with error handling
+try:
+    # Create brain
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    # Create agent
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable learning features
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # Run for 50 steps
+    for step in range(50):
+        world.update(0.1)  # Update world
+        percept = world.getSensoryPercept()  # What does the agent see?
+        
+        # Check if percept is valid
+        if percept:
+            agent.processSensoryInput(percept)  # Brain sees it
+            brain.step(step)  # Brain thinks
+            
+            action = agent.decodeMotorCommand()  # Brain decides action
+            world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+        else:
+            print(f"Warning: Invalid percept at step {step}")
+    
+    print("Simulation finished!")
+    print("Firing neurons:", brain.getFiringNeuronCount())
+    
+except Exception as e:
+    print(f"Error during simulation: {e}")
 ```
 
 ---
