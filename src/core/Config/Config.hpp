@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -30,6 +31,14 @@ enum class ConfigSource {
     CommandLine,
     Runtime
 };
+
+// JSON serialization helpers
+namespace json_helpers {
+    nlohmann::json to_json(const ConfigValue& value);
+    ConfigValue from_json(const nlohmann::json& j);
+    std::string config_value_to_string(const ConfigValue& value);
+    bool config_value_from_string(const std::string& str, ConfigValue& value);
+}
 
 // Configuration entry
 struct ConfigEntry {

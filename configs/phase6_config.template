@@ -1,0 +1,77 @@
+# NLM Phase 6 Configuration Template
+# This template shows all available configuration options for Phase 6: Final Integration
+
+# --- Core Simulation Parameters ---
+simulation_timestep = 0.001
+random_seed = 42
+neuron_count = 1000
+region_count = 1
+connection_probability = 0.1
+
+# --- Learning and Plasticity ---
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02f
+stdp_ltd_weight = 0.015f
+stdp_time_constant = 20.0
+development_synaptogenesis_rate = 0.0001f
+development_pruning_rate = 0.00001f
+
+# --- Neuromodulation ---
+dopamine_baseline = 0.1f
+dopamine_modulation_strength = 0.5f
+curiosity_strength = 0.3f
+novelty_threshold = 0.05f
+
+# --- Memory Systems ---
+working_memory_capacity = 50
+episodic_memory_max_episodes = 1000
+associative_memory_pattern_capacity = 500
+
+# --- Prediction and Cognition ---
+enable_predictive_planning = true
+prediction_horizon = 10
+concept_formation_enabled = true
+attention_mechanism_enabled = true
+
+# --- Development ---
+enable_development = true
+development_update_interval = 1000
+enable_curiosity = true
+curiosity_update_interval = 100
+enable_novelty_detection = true
+novelty_update_interval = 50
+
+# --- Checkpoint and Replay ---
+enable_checkpointing = true
+checkpoint_interval = 1000
+checkpoint_path = ./checkpoints/phase6_checkpoint.bin
+enable_replay = true
+replay_interval = 100
+replay_episodes = 3
+
+# --- Environment and Reward ---
+environment_name = SimpleWorld
+environment_width = 16
+environment_height = 16
+reward_discount_factor = 0.99f
+reward_scale = 1.0f
+
+# --- Logging and Debugging ---
+log_level = INFO
+log_to_file = false
+log_filename = nlm_phase6.log
+log_file_rotation = 10
+
+# --- Visualization ---
+visualization_enabled = true
+visualization_update_rate = 30.0
+visualization_window_width = 1024
+visualization_window_height = 768
+visualization_backend = OpenGL
+
+# --- Performance ---
+performance_mode = balanced
+enable_vectorization = true
+enable_parallel_processing = false
+memory_pool_size = 65536
+event_queue_size = 8192
