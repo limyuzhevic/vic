@@ -5,10 +5,10 @@
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -409,12 +409,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
+        // Pass current state for novelty detection
+        if (!pImpl->sensoryNeurons.empty()) {
+            float totalActivity = 0.0f;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                totalActivity += std::abs(neuron->getState().membranePotential - 
+                                         neuron->getState().restingPotential);
+            }
+            float avgActivity = totalActivity / pImpl->sensoryNeurons.size();
+            pImpl->novelty->setLevel(avgActivity);
+        } else {
+            pImpl->novelty->setLevel(0.0f);
+        }
         pImpl->novelty->update(pImpl->timestep);
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        // Get novelty and prediction error for curiosity computation
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        float predictionErrorLevel = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+        
+        pImpl->curiosity->update(noveltyLevel, predictionErrorLevel, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -511,8 +527,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state
+        // This creates forward predictions that drive attention and learning
+        
+        // For now, create a simple sensory input from current brain state
+        // In a complete implementation, this would come from agent world interaction
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Get average sensory activity
+            float totalActivity = 0.0f;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                totalActivity += std::abs(neuron->getState().membranePotential - 
+                                         neuron->getState().restingPotential);
+            }
+            float avgActivity = totalActivity / pImpl->sensoryNeurons.size();
+            
+            // Create simple prediction (predict future state based on current)
+            float predictedValue = avgActivity * 0.8f + pImpl->predictionError->getError() * 0.2f;
+            
+            // Update prediction system
+            pImpl->predictionSystem->updatePredictions(
+                SensoryInput(), // Placeholder - would use actual sensory input
+                SensoryInput()  // Placeholder - would use actual sensory input
+            );
+        }
+        
+        // Apply prediction error to neuromodulation
+        float predError = pImpl->predictionSystem->getPredictionError();
+        if (pImpl->predictionError) {
+            pImpl->predictionError->computeError(predictedValue, avgActivity);
+            pImpl->predictionError->updatePrediction(predictedValue);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +568,45 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Attention modulates neural excitability based on competition
+        // Higher attention increases excitability of attended neurons
+        float attentionStrength = pImpl->attention->getAttentionStrength();
+        if (attentionStrength > 0.0f) {
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Apply attention modulation
+                        float attentionMod = attentionStrength * 0.3f;
+                        neuron->injectCurrent(attentionMod);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity
+        // This creates abstract representations from sensory patterns
+        
+        // Collect current neural activity patterns for concept formation
+        std::vector<float> currentActivity;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    currentActivity.push_back(
+                        std::abs(neuron->getState().membranePotential - 
+                                neuron->getState().restingPotential) / 20.0f
+                    );
+                }
+            }
+        }
+        
+        // Update concept formation with activity patterns
+        if (!currentActivity.empty()) {
+            pImpl->conceptFormation->update(currentActivity, pImpl->timestep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
