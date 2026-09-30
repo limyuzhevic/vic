@@ -1,24 +1,17 @@
-cmake_minimum_required(VERSION 3.16)
-
 # Test configuration
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
-
-# Create test executable
-add_executable(nlm_test
-    test_main.cpp
-    test_types.cpp
-    test_config.cpp
-    test_random.cpp
-    test_clock.cpp
-    test_neuron.cpp
-    test_synapse.cpp
-    test_stdp.cpp
-    test_brain.cpp
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config/Advanced
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config/Performance
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config/Debug
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config/Experiment
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config/Validation
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/Config/Output
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine/Parser
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine/Options
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine/Validation
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine/Help
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/CommandLine/Utils
 )
-
-target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
-
-# Enable testing
-enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)

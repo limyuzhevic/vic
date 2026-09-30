@@ -5,6 +5,12 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <stdexcept>
+#include <functional>
+
+// Include nlohmann/json for JSON parsing/serialization
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -29,6 +35,34 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration validation error
+class ConfigValidationError : public std::runtime_error {
+public:
+    ConfigValidationError(const std::string& message) 
+        : std::runtime_error(message) {}
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    using Validator = std::function<bool(const ConfigValue&)>;
+    using Converter = std::function<ConfigValue(const std::string&)>;
+    
+    std::string name;
+    std::string description;
+    bool required;
+    ConfigValue defaultValue;
+    Validator validator;
+    Converter converter;
+    
+    ConfigSchema() 
+        : name(), description(), required(false), defaultValue(), 
+          validator(nullptr), converter(nullptr) {}
+    
+    ConfigSchema(const std::string& n, const std::string& d, bool r = false)
+        : name(n), description(d), required(r), defaultValue(), 
+          validator(nullptr), converter(nullptr) {}
 };
 
 // Configuration entry
@@ -93,6 +127,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Schema management methods
+    void addSchema(const std::string& key, const ConfigSchema& schema);
+    ConfigSchema getSchema(const std::string& key) const;
+    bool hasSchema(const std::string& key) const;
+    void removeSchema(const std::string& key);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +140,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string escapeJsonString(const std::string& input);
 };
 
 } // namespace nlm
