@@ -77,10 +77,36 @@ make -j4
 
 ### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm_phase6_demo [--steps <steps>] [--neurons <neurons>] [--checkpoint] [--verbose]
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected:
+
+**Tests performed:**
+- **Integration Verification**: Checks that all major brain systems exist and are connected
+- **Memory Integration**: Verifies working memory and episodic memory functionality
+- **Neuromodulation Integration**: Tests dopamine, curiosity, and novelty systems
+- **Checkpoint Test**: Validates save/load checkpoint functionality
+- **Replay Test**: Verifies episodic memory replay capabilities
+- **Full Integration Experiment**: Runs a complete simulation with all systems interacting
+
+**What it demonstrates:**
+- That memory systems are connected to neural processing
+- Neuromodulation affects plasticity and neural dynamics
+- Prediction system is integrated
+- Development affects plasticity rates
+- Replay and consolidation are functional
+- Checkpoint save/load works
+
+**Key metrics displayed:**
+- Total reward received
+- Average firing rate across the network
+- Episodes stored in memory
+- Dopamine, curiosity, and novelty levels
+- Integration status for each brain system
+- Wall clock execution time
+
+This is the final integration test that validates all previous Phase work has been successfully combined into a coherent artificial brain.
 
 ## Project Structure
 
