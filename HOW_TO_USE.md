@@ -13,14 +13,16 @@ This document covers:
 
 ## Part 1: Building the C++ Project from Source
 
-### Prerequisites
+### Traditional CMake Build
+
+#### Prerequisites
 
 - **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
 - **CMake**: Version 3.16 or higher
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
 
-### Build Steps
+#### Build Steps
 
 ```bash
 # Navigate to the project directory
@@ -40,7 +42,7 @@ make -j$(nproc)
 ctest --output-on-failure
 ```
 
-### Build Outputs
+#### Build Outputs
 
 After successful compilation, you will have:
 
@@ -54,7 +56,7 @@ After successful compilation, you will have:
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
 
-### Build Options
+#### Build Options
 
 ```bash
 # Debug build (with symbols and assertions)
@@ -68,11 +70,101 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
 
+### Quick Start Build Script
+
+The project includes a comprehensive build automation script that simplifies the build process significantly:
+
+#### Installation
+
+```bash
+# Make the build script executable
+chmod +x build_nlm.sh
+
+# Quick build and install in Release mode (recommended)
+./build_nlm.sh
+
+# Or build in Debug mode for development
+./build_nlm.sh build debug
+
+# Install Python bindings
+./build_nlm.sh python
+
+# Run tests
+./build_nlm.sh test
+```
+
+#### Build Script Features
+
+The `build_nlm.sh` script provides:
+
+- **System information display**: Shows OS, architecture, compiler versions, and Python availability
+- **Automatic dependency checking**: Validates C++ compiler, CMake version, and Python installation
+- **Build directory management**: Creates build directory if it doesn't exist
+- **Multiple build modes**: Release (default) and Debug builds
+- **Parallel compilation**: Automatically detects CPU cores for optimal build performance
+- **Python bindings integration**: Builds and installs Python bindings alongside C++ components
+- **Test execution**: Runs the test suite after build
+- **Demo execution**: Runs demonstration programs to verify functionality
+- **Installation support**: Installs NLM system-wide
+
+#### Quick Build Commands
+
+| Command | Description |
+|---------|-------------|
+| `./build_nlm.sh` | Quick build in Release mode (recommended) |
+| `./build_nlm.sh build debug` | Build in Debug mode for development |
+| `./build_nlm.sh python` | Build and install Python bindings |
+| `./build_nlm.sh test` | Run tests after build |
+| `./build_nlm.sh demo` | Build and run demonstration programs |
+| `./build_nlm.sh clean` | Clean build directory |
+| `./build_nlm.sh info` | Show system information |
+| `./build_nlm.sh help` | Show help message |
+
+#### Example Build Workflow
+
+```bash
+# Step 1: Make script executable and show system info
+chmod +x build_nlm.sh
+./build_nlm.sh info
+
+# Step 2: Quick build in Release mode (recommended for production)
+./build_nlm.sh
+
+# Step 3: Install Python bindings
+./build_nlm.sh python
+
+# Step 4: Run tests to verify build
+./build_nlm.sh test
+
+# Step 5: Run demos to test functionality
+./build_nlm.sh demo
+```
+
 ---
 
 ## Part 2: Installing the Python Library
 
 ### From Source (Recommended for Development)
+
+#### Method 1: Using the Build Script (Easiest)
+
+The build script provides the simplest way to install Python bindings:
+
+```bash
+# Make the build script executable
+chmod +x build_nlm.sh
+
+# Install Python bindings using the build script
+./build_nlm.sh python
+```
+
+This will:
+- Check for required dependencies
+- Install Python build tools (scikit-build-core, pybind11, etc.)
+- Build the C++ core library
+- Build and install Python bindings
+
+#### Method 2: Using pyproject.toml (Traditional)
 
 ```bash
 # Install build dependencies
@@ -81,15 +173,8 @@ pip install pybind11 scikit-build-core pytest numpy
 # Build and install
 pip install .
 
-# Or install in development mode
+# Or install in development mode (recommended for development)
 pip install -e .
-```
-
-### Using pyproject.toml (Modern Python Packaging)
-
-```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
 
 # Build only (without installing)
 pip install build
@@ -99,18 +184,16 @@ python -m build
 pip install dist/*.whl
 ```
 
-### Verifying Installation
+### Using pip (For Most Users)
 
-```python
-import pynlm
+If you just want to use NLM without development:
 
-# Check version
-print(pynlm.__version__)
+```bash
+# Quick install from PyPI (if available)
+pip install pynlm
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+# Or build and install directly
+pip install .
 ```
 
 ---
@@ -184,7 +267,7 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Complete Agent Example with Learning
 
 ```python
 import pynlm
@@ -238,7 +321,9 @@ def run_agent_simulation(num_steps=1000):
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
         # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        reward = 0.0
+        if percept.getInternal() and not percept.getInternal().empty():
+            reward = percept.getInternal()[0]
         agent.applyRewardModulation(reward, 0.0)
         
         # Update development
