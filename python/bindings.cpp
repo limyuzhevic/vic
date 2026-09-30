@@ -420,6 +420,125 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Add convenience functions for common workflows
+    m.def("run_example_simulation", [](size_t steps, std::string config_file) {
+        auto config = std::make_shared<Config>();
+        if (!config_file.empty()) {
+            config->loadFromFile(config_file);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create simple world for testing
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Run simulation
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return brain;
+    }, py::arg("steps") = 100, py::arg("config_file") = "",
+        "Run a complete example simulation with agent in world");
+
+    // Add utility functions for common operations
+    m.def("create_standard_config", []() {
+        auto config = std::make_shared<Config>();
+        // Set sensible defaults for general purpose simulation
+        config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.05f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.01, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("replay_interval", 50, ConfigSource::Default);
+        config->set("consolidation_interval", 500, ConfigSource::Default);
+        return config;
+    }, "Create a standard configuration for general purpose simulations");
+
+    // Add debugging and monitoring utilities
+    m.def("run_diagnostic", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> diagnostics;
+        
+        diagnostics["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        diagnostics["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        diagnostics["active_neurons"] = std::to_string(brain->getActiveNeuronCount());
+        diagnostics["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        diagnostics["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        diagnostics["e_i_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        
+        if (brain->getWorkingMemory()) {
+            diagnostics["working_memory_traces"] = std::to_string(brain->getWorkingMemory()->getActiveTraces());
+        }
+        if (brain->getEpisodicMemory()) {
+            diagnostics["episodic_episodes"] = std::to_string(brain->getEpisodicMemory()->getEpisodeCount());
+        }
+        
+        return diagnostics;
+    }, py::arg("brain"), "Run diagnostic analysis and return system statistics");
+
+    // Add batch processing utilities for advanced users
+    m.def("batch_simulate", [](std::vector<std::shared_ptr<Brain>> brains, size_t steps, bool parallel) {
+        // Simple batch simulation runner for multiple brains
+        // This can be extended for parallel processing in the future
+        for (size_t i = 0; i < brains.size(); ++i) {
+            for (size_t step = 0; step < steps; ++step) {
+                brains[i]->step(step);
+            }
+        }
+        return brains;
+    }, py::arg("brains"), py::arg("steps") = 100, py::arg("parallel") = false,
+        "Run batch simulation for multiple brains");
+
+    // Add checkpoint utilities
+    m.def("quick_save", [](std::shared_ptr<Brain> brain, std::string filename) {
+        std::string filepath = filename.empty() ? "quick_save.brain" : filename;
+        if (brain->save(filepath)) {
+            return true;
+        } else {
+            throw std::runtime_error("Failed to save brain to " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filename") = "", "Quick save brain state to file");
+
+    m.def("quick_load", [](std::string filename) {
+        std::string filepath = filename.empty() ? "quick_save.brain" : filename;
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (brain->load(filepath)) {
+            return brain;
+        } else {
+            throw std::runtime_error("Failed to load brain from " + filepath);
+        }
+    }, py::arg("filename") = "", "Quick load brain state from file");
+
+    // Add utility for getting system version and capabilities
+    m.def("get_version", []() {
+        return std::map<std::string, std::string>{
+            {"version", "0.1.0"},
+            {"phase", "6 (Final Integration)"},
+            {"description", "Neural Learning Machine - Experimental Artificial Developmental Brain"},
+            {"features", "Spiking neurons, memory systems, neuromodulation, prediction, cognition, development"}
+        };
+    }, "Get version and feature information about NLM");
+
+    // Add convenience function for creating a brain from scratch with minimal configuration
+    m.def("create_minimal_brain", [](size_t neuron_count) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("neuron_count") = 1000, "Create a minimal brain with basic configuration");
 }
 
 } // namespace nlm

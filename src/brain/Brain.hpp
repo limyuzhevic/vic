@@ -28,6 +28,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
