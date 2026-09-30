@@ -6,14 +6,36 @@
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
+#include "experiments/CommandLineParser.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Parse command-line arguments
+    CommandLineArgs args;
+    if (!args.parse(argc, argv)) {
+        return 1;
+    }
+    
+    // Show help if requested
+    if (args.help) {
+        args.printHelp();
+        return 0;
+    }
+    
+    // Validate arguments
+    if (!args.validate()) {
+        return 1;
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "Testing the integrated artificial brain..." << std::endl;
+    std::cout << "Configuration: " << args.neuronCount << " neurons, " 
+              << args.maxSteps << " steps" << std::endl;
+    std::cout << "Config file: " << args.configFile << std::endl;
+    std::cout << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
@@ -51,14 +73,15 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with command-line configuration
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.neuronCount = args.neuronCount;
+    config.maxSteps = args.maxSteps;
+    config.enableCheckpointing = args.enableCheckpointing;
+    config.enableReplay = args.enableReplay;
+    config.enableDevelopment = args.enableDevelopment;
+    config.checkpointPath = args.checkpointPath;
     
     auto result = experiment.run(config);
     

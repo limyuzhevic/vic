@@ -177,7 +177,44 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<float>>) {
+                // Handle vector<float>
+                const auto& vec = arg;
+                oss << "[";
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << vec[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Handle vector<int>
+                const auto& vec = arg;
+                oss << "[";
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << vec[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                // Handle vector<double>
+                const auto& vec = arg;
+                oss << "[";
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << vec[i];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                // Handle vector<std::string>
+                const auto& vec = arg;
+                oss << "[";
+                for (size_t i = 0; i < vec.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << vec[i] << "\"";
+                }
+                oss << "]";
             } else {
+                // Handle other primitive types
                 oss << arg;
             }
         }, entry.value);
