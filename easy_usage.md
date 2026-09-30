@@ -290,8 +290,43 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details**
+   - Covers building, installation, and complete API reference
+
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works**
+   - Deep dive into NLM system architecture
+
+3. **Experiment with different configurations!**
+   - Try `createDebugConfig()` for development
+   - Use `createProductionConfig()` for stable deployment
+   - Use `createResearchConfig()` for experimental research
+
+4. **Learn advanced features**
+   - Study the examples in `HOW_TO_USE.md`
+   - Use `pynlm.createPythonInterface()` for complete interface
+   - Check `pynlm.getInteractiveExamples()` for more examples
+
+5. **Get expert help**
+   - Use `pynlm.createAdvancedDocumentation()` for comprehensive docs
+   - Get code snippets with `pynlm.getCodeSnippets()`
+   - Access tutorials with `pynlm.getTutorialCode()`
+
+---
+
+## Expert Tips
+
+- **Always use `initialize()` before running simulations**
+- **Regularly save checkpoints with `brain.save()` for recovery**
+- **Monitor performance with `pynlm.benchmarkPerformance()`**
+- **Use `createResearchConfig()` for experimental setups**
+- **Use `createProductionConfig()` for stable deployments**
+- **Enable all learning systems for realistic behavior**
+- **Save simulation data for analysis and debugging**
+- **Use `pynlm.validateSimulation()` to catch issues early**
+- **Consider `pynlm.optimizeForPerformance()` for speed**
+- **Use `pynlm.tuneHyperparameters()` for optimization**
+
+That's it! You're now ready to use NLM at all levels, from beginner to expert. The system provides comprehensive tools for everything from simple demonstrations to large-scale research experiments.
+
+Enjoy exploring the fascinating world of artificial brains with NLM! 🧠✨

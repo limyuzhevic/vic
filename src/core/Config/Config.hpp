@@ -55,8 +55,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (tries JSON first, then falls back to simple format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -100,6 +103,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing support
+    bool parseJSONObject(const std::string& json, size_t& pos);
+    bool parseJSONString(const std::string& json, size_t& pos);
+    std::string extractString(const std::string& json, size_t& pos);
+    bool parseJSONNumber(const std::string& json, size_t& pos, ConfigValue& value);
+    bool parseJSONBool(const std::string& json, size_t& pos, ConfigValue& value);
+    bool parseJSONArray(const std::string& json, size_t& pos, ConfigValue& value);
+    bool parseJSONValue(const std::string& json, size_t& pos, ConfigValue& value);
 };
 
 } // namespace nlm
