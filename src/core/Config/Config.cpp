@@ -19,19 +19,34 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    NLM_LOG_INFO("Loading configuration from file: " + filepath);
+    
+    // Validate filepath is not empty
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot load configuration from empty filepath");
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Validate line format
+        if (!validateConfigLine(line)) {
+            NLM_LOG_WARNING("Skipping invalid config line " + std::to_string(lineNum) + ": " + line);
             continue;
         }
         
@@ -41,6 +56,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Skipping config line " + std::to_string(lineNum) + " with empty key");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,10 +69,12 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Set configuration value
             set(key, value, ConfigSource::File);
         }
     }
     
+    NLM_LOG_INFO("Configuration loaded successfully from " + std::to_string(getKeys().size()) + " entries");
     return true;
 }
 
@@ -200,6 +223,61 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+bool Config::validateConfigLine(const std::string& line) {
+    // Validate config line format: key=value
+    if (line.empty() || line.find('=') == std::string::npos) {
+        return false;
+    }
+    
+    size_t pos = line.find('=');
+    
+    // Key cannot be empty
+    std::string key = trim(line.substr(0, pos));
+    if (key.empty()) {
+        return false;
+    }
+    
+    // Validate key format (alphanumeric and underscores)
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            return false;
+        }
+    }
+    
+    // Value can be anything after the first =
+    std::string value = trim(line.substr(pos + 1));
+    
+    // Empty value is allowed (key only)
+    return true;
+}
+
+// Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

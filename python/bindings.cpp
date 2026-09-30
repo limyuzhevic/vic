@@ -160,9 +160,16 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        .def("setDefault", &Config::setDefault, py::arg("key"), py::arg("value"),
+             "Set a configuration value with default source")
+        .def("getOrDefault", &Config::getOrDefault, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value or return default if key doesn't exist")
+        .def("merge", &Config::merge, py::arg("other"),
+             "Merge another configuration into this one")
+        .def("diff", &Config::diff, py::arg("other"),
+             "Get differences between this configuration and another")
+        .def("isEquivalent", &Config::isEquivalent, py::arg("other"),
+             "Check if configuration is equivalent to another");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -198,16 +205,37 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
-    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
-        .def(py::init<>())
-        .def(py::init<ActionType>(), py::arg("type"))
-        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
-        .def("getType", &Action::getType)
-        .def("setType", &Action::setType, py::arg("type"))
-        .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
-        .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+    .def(py::init<>())
+    .def(py::init<ActionType>(), py::arg("type"))
+    .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+    .def("getType", &Action::getType)
+    .def("setType", &Action::setType, py::arg("type"))
+    .def("getParameters", &Action::getParameters)
+    .def("setParameters", &Action::setParameters, py::arg("params"))
+    .def("getName", &Action::getName)
+    .def("clone", &Action::clone)
+    .def("__repr__", [](const Action& action) {
+        std::string typeName = "Unknown";
+        switch (action.getType()) {
+            case ActionType::MoveForward: typeName = "MoveForward"; break;
+            case ActionType::MoveBackward: typeName = "MoveBackward"; break;
+            case ActionType::MoveLeft: typeName = "MoveLeft"; break;
+            case ActionType::MoveRight: typeName = "MoveRight"; break;
+            case ActionType::TurnLeft: typeName = "TurnLeft"; break;
+            case ActionType::TurnRight: typeName = "TurnRight"; break;
+            case ActionType::Look: typeName = "Look"; break;
+            case ActionType::LookUp: typeName = "LookUp"; break;
+            case ActionType::LookDown: typeName = "LookDown"; break;
+            case ActionType::Interact: typeName = "Interact"; break;
+            case ActionType::Eat: typeName = "Eat"; break;
+            case ActionType::Drink: typeName = "Drink"; break;
+            case ActionType::Rest: typeName = "Rest"; break;
+            case ActionType::Wait: typeName = "Wait"; break;
+            case ActionType::Custom: typeName = "Custom"; break;
+        }
+        return "<Action: " + typeName + ">";
+    });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())

@@ -64,19 +64,53 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
+    // Get configuration value or return default if key doesn't exist
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    // Set configuration value with validation
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set configuration value with default source (simpler API)
+    void setDefault(const std::string& key, const ConfigValue& value);
+    template<typename T>
+    void setDefault(const std::string& key, T value);
+    
+    // Get configuration value or return default if key doesn't exist (simpler API)
+    template<typename T>
+    T getOrDefault(const std::string& key, const T& defaultValue) const;
+    
+    // Configuration operations
+    bool merge(const Config& other);
+    std::vector<ConfigEntry> diff(const Config& other) const;
+    bool isEquivalent(const Config& other) const;
+    
+    // Utility functions (internal)
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    bool validateConfigLine(const std::string& line) const;
+    
+    // Configuration validation
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    
+    // Configuration statistics
+    size_t getEntryCount() const;
+    size_t getEntryCount(ConfigSource source) const;
+    std::string getStats() const;
+    
+    // Configuration comparison
+    bool operator==(const Config& other) const;
+    bool operator!=(const Config& other) const { return !(*this == other); }
+    
+    // Debug and development
+    void setDebugMode(bool debug);
+    bool isDebugMode() const;
+    void logConfiguration() const;
     
     // Check existence
     bool has(const std::string& key) const;
