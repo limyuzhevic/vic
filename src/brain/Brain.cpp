@@ -511,8 +511,85 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction system with sensory input and neural activity
+        // The prediction system generates predictions and tracks prediction errors
+        // Prediction errors drive learning and adaptation
+        
+        // Get current sensory state for prediction
+        std::vector<float> sensoryInput;
+        if (pImpl->sensoryNeurons.size() > 0) {
+            // Sample from sensory neurons for prediction
+            size_t sampleSize = std::min(size_t(10), pImpl->sensoryNeurons.size());
+            for (size_t i = 0; i < sampleSize; ++i) {
+                auto* neuron = pImpl->sensoryNeurons[i];
+                if (neuron) {
+                    float potential = neuron->getMembranePotential();
+                    // Normalize to [0,1] range for prediction
+                    float normalized = (potential + 100.0f) / 200.0f;  // Assuming -100 to +100 range
+                    normalized = std::clamp(normalized, 0.0f, 1.0f);
+                    sensoryInput.push_back(normalized);
+                }
+            }
+        }
+        
+        // Generate prediction based on sensory input
+        if (!sensoryInput.empty()) {
+            pImpl->predictionSystem->update(sensoryInput, pImpl->timestep);
+            
+            // Get prediction error and confidence
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            // Apply prediction error effects on neural excitability
+            if (predictionError > 0.1f) {
+                // High prediction error increases excitability and drives exploration
+                float explorationBoost = predictionError * 0.5f;
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    if (neuron && explorationBoost > 0.0f) {
+                        neuron->injectCurrent(explorationBoost * 10.0f);
+                    }
+                }
+            }
+            
+            // Apply confidence effects on plasticity
+            if (confidence > 0.8f) {
+                // High confidence stabilizes synaptic weights
+                // Apply small weight stabilization based on confidence
+                float confidenceFactor = (confidence - 0.5f) * 2.0f;  // 0 to 1 range
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        float weight = syn->getWeight();
+                        // Stabilize weights when confidence is high
+                        if (confidenceFactor > 0.0f) {
+                            float stabilization = weight * (1.0f - confidenceFactor) * 0.001f;
+                            syn->addToWeight(-stabilization);
+                        }
+                    }
+                }
+            }
+            
+            // Store prediction state in working memory for higher-level cognitive processing
+            if (pImpl->workingMemory && !sensoryInput.empty()) {
+                float avgInput = 0.0f;
+                for (float val : sensoryInput) avgInput += val;
+                avgInput /= sensoryInput.size();
+                
+                // Store prediction-related information in working memory
+                pImpl->workingMemory->storeToNeuron(static_cast<NeuronId>(-1), avgInput * 0.5f);  // Use special ID for meta-knowledge
+            }
+        }
+        
+        // Also update prediction error signal for neuromodulation
+        if (pImpl->predictionError) {
+            pImpl->predictionError->update(pImpl->timestep);
+            
+            // Apply prediction error effects on dopamine and other neuromodulators
+            float errorSignal = pImpl->predictionError->getLevel();
+            if (errorSignal > 0.5f) {
+                // High prediction error increases dopamine level for learning
+                pImpl->dopamine->setLevel(std::min(pImpl->dopamine->getLevel() + errorSignal * 0.2f, 1.0f));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +600,118 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Get attention weights and apply to neural processing
+            std::vector<std::pair<NeuronId, float>> attentionWeights = pImpl->attention->getAttentionWeights();
+            for (const auto& pair : attentionWeights) {
+                NeuronId neuronId = pair.first;
+                float attentionWeight = pair.second;
+                
+                // Apply attention weights to neuron excitability
+                for (auto& region : pImpl->regions) {
+                    for (auto* neuron : region->getAllNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            // Higher attention increases effective excitability
+                            neuron->injectCurrent(attentionWeight * 5.0f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Attention also modulates plasticity based on focus areas
+        if (pImpl->attention->getFocusedArea() != NeuronId()) {
+            NeuronId focusedArea = pImpl->attention->getFocusedArea();
+            float attentionStrength = pImpl->attention->getAttentionStrength();
+            
+            // Enhance plasticity in focused areas
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    if (syn->getSourceNeuron() == focusedArea || 
+                        syn->getDestinationNeuron() == focusedArea) {
+                        // Increase plasticity in attended connections
+                        float plasticityBoost = attentionStrength * 0.1f;
+                        syn->enablePlasticity(true, true, true);  // Enable all plasticity types
+                        
+                        // Apply additional weight changes based on attention
+                        if (plasticityBoost > 0.01f) {
+                            float weightChange = syn->getWeight() > 0 ? plasticityBoost : -plasticityBoost;
+                            syn->addToWeight(weightChange);
+                        }
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation integrates with prediction system and episodic memory
+        
+        // Gather neural activity patterns for concept formation
+        std::vector<std::vector<float>> activityPatterns;
+        
+        // Collect activity from different regions
+        for (auto& region : pImpl->regions) {
+            std::vector<float> pattern;
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        float activation = std::abs(neuron->getMembranePotential() - neuron->getRestingPotential()) / 50.0f;
+                        pattern.push_back(activation);
+                    }
+                }
+            }
+            
+            if (!pattern.empty()) {
+                activityPatterns.push_back(pattern);
+            }
+        }
+        
+        // Form concepts from activity patterns
+        if (!activityPatterns.empty()) {
+            pImpl->conceptFormation->update(activityPatterns, pImpl->timestep);
+            
+            // Apply concept-based modulation to attention and planning
+            std::vector<std::string> concepts = pImpl->conceptFormation->getConcepts();
+            if (!concepts.empty()) {
+                // Update planner with formed concepts
+                if (pImpl->planner) {
+                    pImpl->planner->updateConcepts(concepts);
+                }
+                
+                // Store concepts in working memory for access by higher cognitive functions
+                if (pImpl->workingMemory && !concepts.empty()) {
+                    for (size_t i = 0; i < std::min(size_t(5), concepts.size()); ++i) {
+                        // Store concept with activation level based on pattern strength
+                        float conceptActivation = 0.5f + (i % 3) * 0.1f;
+                        pImpl->workingMemory->storeToNeuron(static_cast<NeuronId>(-2 + i), conceptActivation);
+                    }
+                }
+            }
+            
+            // Concept formation also influences neuromodulation
+            // Novel concepts trigger curiosity and exploration
+            std::vector<std::string> novelConcepts = pImpl->conceptFormation->getNovelConcepts();
+            if (!novelConcepts.empty()) {
+                // Increase curiosity for novel concept detection
+                if (pImpl->curiosity) {
+                    float curiosityBoost = novelConcepts.size() * 0.2f;
+                    pImpl->curiosity->setLevel(std::min(pImpl->curiosity->getLevel() + curiosityBoost, 1.0f));
+                }
+                
+                // Novel concepts also increase prediction error
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->setLevel(std::min(pImpl->predictionError->getLevel() + 0.3f, 1.0f));
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 11: Apply structural plasticity periodically ==========
+    if (currentStep % 100 == 0) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
