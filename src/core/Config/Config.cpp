@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,8 +20,15 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension for format detection
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+        // TODO: Implement proper JSON/YAML parser using nlohmann/json or similar
+        NLM_LOG_WARNING("JSON/YAML config format requested but parser not yet implemented: " + filepath);
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,7 +36,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,17 +47,79 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Try to infer type based on value content
+        bool success = false;
+        
+        // Try bool
+        if (value == "true" || value == "false") {
+            set(key, value == "true", ConfigSource::File);
+            success = true;
+        }
+        // Try int
+        else {
+            bool isInt = true;
+            size_t i = 0;
+            bool negative = false;
+            if (value[0] == '-') {
+                negative = true;
+                i = 1;
             }
-            
+            for (; i < value.size(); ++i) {
+                if (!std::isdigit(value[i])) {
+                    isInt = false;
+                    break;
+                }
+            }
+            if (isInt) {
+                set(key, std::stoi(value), ConfigSource::File);
+                success = true;
+            }
+        }
+        // Try double
+        if (!success) {
+            bool isDouble = true;
+            size_t dotCount = 0;
+            size_t i = 0;
+            bool negative = false;
+            if (value[0] == '-') {
+                negative = true;
+                i = 1;
+            }
+            for (; i < value.size(); ++i) {
+                if (value[i] == '.') {
+                    dotCount++;
+                    if (dotCount > 1) {
+                        isDouble = false;
+                        break;
+                    }
+                } else if (!std::isdigit(value[i])) {
+                    isDouble = false;
+                    break;
+                }
+            }
+            if (isDouble) {
+                set(key, std::stod(value), ConfigSource::File);
+                success = true;
+            }
+        }
+        
+        // Fall back to string
+        if (!success) {
             set(key, value, ConfigSource::File);
         }
     }
@@ -56,6 +128,8 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +140,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Invalid argument format: " + arg);
+                success = false;
             }
         }
         // Handle -key value format
@@ -74,8 +151,18 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
+        // Handle boolean flags
+        else if (arg == "--help" || arg == "--version" || arg == "--verbose") {
+            // These are handled by the main application, not the config system
+            continue;
+        }
+        else {
+            NLM_LOG_WARNING("Unrecognized command line argument: " + arg);
+            success = false;
+        }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -84,34 +171,53 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << __DATE__ << " " << __TIME__ << "\n";
+    file << "\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << " (source: " << static_cast<int>(entry.source) << ")\n";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << std::fixed << std::setprecision(6) << arg << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [\"";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << arg[i];
+                }
+                file << "\"]\n";
+            } else {
+                file << entry.key << " = " << "<unprintable>" << "\n";
+            }
+        }, entry.value);
+        file << "\n";
     }
     
     return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
