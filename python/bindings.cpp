@@ -353,68 +353,294 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    .def("applyRewardModulation", [](AgentBrain& self, const std::vector<float>& rewards, const std::vector<float>& predictions) {
+        return self.applyRewardModulation(rewards, predictions);
+    }, py::arg("rewards"), py::arg("predictions"),
+        "Apply reward-based neuromodulation with multiple rewards");
+        
+        .def("batchProcessSensoryInputs", [](AgentBrain& self, const std::vector<SensoryPercept>& percepts) {
+        std::vector<float> allRewards;
+        for (const auto& percept : percepts) {
+            float reward = self.applyRewardModulation(0.0f, 0.0f);
+            allRewards.push_back(reward);
+        }
+        return allRewards;
+    }, py::arg("percepts"), "Process multiple sensory inputs in batch");
+        
+        .def("exportModelState", &AgentBrain::exportModelState,
+             "Export complete brain model state for persistence or analysis");
+        
+        .def("importModelState", &AgentBrain::importModelState, py::arg("state"),
+             "Import brain model state from exported data");
+        
+        .def("getConnectionMatrix", [](const AgentBrain& self) {
+        auto* brain = self.getBrain().get();
+        if (!brain) {
+            return std::vector<std::vector<float>>();
+        }
+        return brain->getConnectionMatrix();
+    }, "Get connection matrix for analysis");
+        
+        .def("getNetworkTopology", [](const AgentBrain& self) {
+        auto* brain = self.getBrain().get();
+        if (!brain) {
+            return std::vector<int>();
+        }
+        return brain->getNetworkTopologyStats();
+    }, "Get network topology statistics");
+        
+        .def("simulateEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, 
+                                  const std::vector<std::function<float(const SensoryPercept&)>> & rewardFuncs,
+                                  int maxSteps) {
+        return self.simulateEpisode(world, rewardFuncs, maxSteps);
+    }, py::arg("world"), py::arg("reward_functions"), py::arg("max_steps"),
+        "Simulate an entire episode with custom reward functions");
+        
+        .def("getBehaviorProfile", [](const AgentBrain& self, int steps) {
+        return self.getBehaviorProfile(steps);
+    }, py::arg("steps"), "Get behavioral profile statistics");
+        
+        .def("enableAdvancedLearning", &AgentBrain::enableAdvancedLearning, py::arg("enable"),
+             "Enable advanced learning algorithms (curiosity, prediction error, etc.)");
+        
+        .def("isAdvancedLearningEnabled", &AgentBrain::isAdvancedLearningEnabled);
+        
+        .def("resetToDevelopmentalStage", &AgentBrain::resetToDevelopmentalStage, py::arg("stage"),
+             "Reset brain to a specific developmental stage");
+        
+        .def("getAllNeuromodulators", [](const AgentBrain& self) {
+        std::unordered_map<std::string, float> neuromodulators;
+        neuromodulators["dopamine"] = self.getNeuromodulationLevel();
+        neuromodulators["curiosity"] = self.getCuriosityLevel();
+        neuromodulators["novelty"] = self.getNoveltyLevel();
+        neuromodulators["prediction_error"] = self.getPredictionError();
+        return neuromodulators;
+    }, "Get all neuromodulator levels");
+        
+        .def("printDebugInfo", [](const AgentBrain& self) {
+        auto* brain = self.getBrain().get();
+        if (brain) {
+            std::cout << "=== AgentBrain Debug Info ===" << std::endl;
+            std::cout << "Brain: " << brain->getTotalNeuronCount() << " neurons" << std::endl;
+            std::cout << "Regions: " << brain->getRegionCount() << std::endl;
+            std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+            std::cout << "Development: " << brain->getDevelopmentalStage() << std::endl;
+            std::cout << "Neuromodulation: " << self.getNeuromodulationLevel() << std::endl;
+            std::cout << "Curiosity: " << self.getCuriosityLevel() << std::endl;
+        }
+    }, "Print debug information");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
+    m.def("createBrainWithAdvancedConfig", [](const std::string& configFile) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (configFile.empty() || !config->loadFromFile(configFile)) {
+            // Apply advanced defaults if no config file provided
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("neuromod.dopamine.scale", 1.0);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config_file"), "Create a brain with advanced configuration");
+    
+    m.def("createBrainAndAgent", [](const std::string& configFile) {
+        auto config = std::make_shared<Config>();
+        if (configFile.empty() || !config->loadFromFile(configFile)) {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(brain, agent);
+    }, py::arg("config_file"), "Create a brain and agent brain interface");
+    
+    m.def("createWorldWithSettings", [](int width, int height, 
+                                       int visionWidth = 8, 
+                                       int visionHeight = 8,
+                                       float maxEnergy = 100.0f) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        return world;
+    }, py::arg("width"), py::arg("height"),
+        py::arg("vision_width") = 8,
+        py::arg("vision_height") = 8,
+        py::arg("max_energy") = 100.0f,
+        "Create a world with custom settings");
+    
+    m.def("createTrainingEnvironment", [](int width = 20, int height = 20,
+                                         const std::string& configFile = "") {
+        auto brain = createBrainWithAdvancedConfig(configFile);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = createWorldWithSettings(width, height);
+        
+        agent->initialize(world);
+        
+        // Enable all learning subsystems by default
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("width") = 20, py::arg("height") = 20,
+        py::arg("config_file") = "",
+        "Create a complete training environment");
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("createAdvancedConfig", [](int neuronCount, int maxSteps, bool enableLearning) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("brain.synapse_density", 0.1);
+        config->set("training.max_steps", maxSteps);
+        config->set("learning.enabled", enableLearning);
+        return config;
+    }, py::arg("neuron_count"), py::arg("max_steps"), py::arg("enable_learning"),
+        "Create an advanced configuration");
+    
+    m.def("runEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                         std::shared_ptr<AgentBrain> agent, int maxSteps) {
+        float totalReward = 0.0f;
+        int stepsCompleted = 0;
+        
+        for (int step = 0; step < maxSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = world->getSensoryPercept().getInternal()[0] if world->getSensoryPercept().getInternal() else 0.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            totalReward += reward;
+            stepsCompleted++;
+        }
+        
+        return std::make_tuple(totalReward, stepsCompleted);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("max_steps"),
+        "Run a complete episode and return total reward and steps");
+    
+    m.def("createLearningPipeline", []() {
+        class LearningPipeline {
+        public:
+            std::shared_ptr<Brain> brain;
+            std::shared_ptr<AgentBrain> agent;
+            std::shared_ptr<SimpleWorld> world;
+            
+            LearningPipeline(int width = 20, int height = 20) {
+                auto config = createDefaultConfig();
+                config->set("brain.neuron_count", 500);
+                
+                brain = createBrain(config);
+                brain->initialize();
+                
+                agent = createAgentBrain(brain);
+                world = createWorldWithSettings(width, height);
+                
+                agent->initialize(world);
+                
+                // Enable all learning subsystems
+                agent->enableRewardModulation(true);
+                agent->enableStructuralPlasticity(true);
+                agent->enableDevelopment(true);
+                agent->enableCuriosity(true);
+            }
+            
+            std::tuple<float, int, std::vector<float>> runEpisode(int maxSteps) {
+                float totalReward = 0.0f;
+                std::vector<float> episodeRewards;
+                
+                for (int step = 0; step < maxSteps; ++step) {
+                    world->update(0.1);
+                    auto percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                    brain->step(step);
+                    
+                    auto action = agent->decodeMotorCommand();
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                    
+                    float reward = 0.0f;
+                    auto internal = percept.getInternal();
+                    if (!internal.empty()) reward = internal[0];
+                    
+                    agent->applyRewardModulation(reward, 0.0f);
+                    
+                    totalReward += reward;
+                    episodeRewards.push_back(reward);
+                }
+                
+                return std::make_tuple(totalReward, maxSteps, episodeRewards);
+            }
+            
+            void printStats() {
+                std::cout << "=== Learning Pipeline Stats ===" << std::endl;
+                std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+                std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+                std::cout << "Development Stage: " << brain->getDevelopmentalStage() << std::endl;
+                std::cout << "Neuromodulation: " << agent->getNeuromodulationLevel() << std::endl;
+                std::cout << "Curiosity: " << agent->getCuriosityLevel() << std::endl;
+                std::cout << "Novelty: " << agent->getNoveltyLevel() << std::endl;
+            }
+        };
+        
+        return LearningPipeline();
+    }, "Create a learning pipeline with brain, agent, and world integrated");
+    
+    m.def("quickTest", []() {
+        std::cout << "=== Quick NLM Test ===" << std::endl;
+        auto config = createDefaultConfig();
+        config->set("brain.neuron_count", 100);
+        
+        auto brain = createBrain(config);
+        brain->initialize();
+        
+        for (int i = 0; i < 100; ++i) {
+            brain->step(i);
+            if (i % 20 == 0) {
+                std::cout << "Step " << i << ": " << brain->getFiringNeuronCount() << " firing neurons" << std::endl;
+            }
+        }
+        
+        std::cout << "Test completed successfully!" << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        std::cout << "Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+        
+        return true;
+    }, "Run a quick test of NLM functionality");
+    
+    m.def("getVersion", []() {
+        return "NLM Python Bindings v0.1.0 - Advanced Edition";
+    }, "Get the version of the NLM Python bindings");
+    
+    m.def("listAvailableConfigurations", []() {
+        std::vector<std::string> configs = {
+            "default", "advanced", "quick", "research"
+        };
+        return configs;
+    }, "List available configuration presets");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
