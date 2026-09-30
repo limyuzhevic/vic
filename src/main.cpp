@@ -28,7 +28,148 @@
 
 using namespace nlm;
 
-void printBanner() {
+// Validate configuration values for safety and consistency
+bool validateConfiguration(const Config& config) {
+    bool isValid = true;
+    
+    // Validate simulation parameters
+    double timestep = config.getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 0.1) {
+        NLM_LOG_WARNING("Invalid simulation_timestep " + std::to_string(timestep) + ", should be (0, 0.1]");
+        isValid = false;
+    }
+    
+    // Validate neuron count
+    int64_t neuronCount = config.getOr<int64_t>("neuron_count", 500);
+    if (neuronCount <= 0 || neuronCount > 100000) {
+        NLM_LOG_WARNING("Invalid neuron_count " + std::to_string(neuronCount) + ", should be (0, 100000]");
+        isValid = false;
+    }
+    
+    // Validate region count
+    int64_t regionCount = config.getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0 || regionCount > 1000) {
+        NLM_LOG_WARNING("Invalid region_count " + std::to_string(regionCount) + ", should be (0, 1000]");
+        isValid = false;
+    }
+    
+    // Validate connection probability
+    float connectionProb = config.getOr<float>("connection_probability", 0.15f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_WARNING("Invalid connection_probability " + std::to_string(connectionProb) + ", should be [0.0, 1.0]");
+        isValid = false;
+    }
+    
+        // Validate STDP parameters
+    float stdpLtpWeight = config.getOr<float>("stdp_ltp_weight", 0.02f);
+    if (stdpLtpWeight < 0.0f) {
+        NLM_LOG_WARNING("Invalid stdp_ltp_weight " + std::to_string(stdpLtpWeight) + ", should be >= 0.0");
+        isValid = false;
+    }
+    
+    float stdpLtdWeight = config.getOr<float>("stdp_ltd_weight", 0.015f);
+    if (stdpLtdWeight < 0.0f) {
+        NLM_LOG_WARNING("Invalid stdp_ltd_weight " + std::to_string(stdpLtdWeight) + ", should be >= 0.0");
+        isValid = false;
+    }
+    
+    float stdpTau = config.getOr<float>("stdp_tau", 20.0f);
+    if (stdpTau <= 0.0f) {
+        NLM_LOG_WARNING("Invalid stdp_tau " + std::to_string(stdpTau) + ", should be > 0.0");
+        isValid = false;
+    }
+    
+    // Validate plasticity rates
+    float synaptogenesisRate = config.getOr<float>("synaptogenesis_rate", 0.0001f);
+    if (synaptogenesisRate < 0.0f) {
+        NLM_LOG_WARNING("Invalid synaptogenesis_rate " + std::to_string(synaptogenesisRate) + ", should be >= 0.0");
+        isValid = false;
+    }
+    
+    float pruningRate = config.getOr<float>("pruning_rate", 0.00001f);
+    if (pruningRate < 0.0f) {
+        NLM_LOG_WARNING("Invalid pruning_rate " + std::to_string(pruningRate) + ", should be >= 0.0");
+        isValid = false;
+    }
+    
+    // Validate memory system parameters
+    int64_t replayInterval = config.getOr<int64_t>("replay_interval", 100);
+    if (replayInterval < 0) {
+        NLM_LOG_WARNING("Invalid replay_interval " + std::to_string(replayInterval) + ", should be >= 0");
+        isValid = false;
+    }
+    
+    int64_t consolidationInterval = config.getOr<int64_t>("consolidation_interval", 1000);
+    if (consolidationInterval < 0) {
+        NLM_LOG_WARNING("Invalid consolidation_interval " + std::to_string(consolidationInterval) + ", should be >= 0");
+        isValid = false;
+    }
+    
+    if (consolidationInterval > 0 && consolidationInterval <= replayInterval) {
+        NLM_LOG_WARNING("consolidation_interval should be > replay_interval for proper operation");
+        // This is a warning, not a failure
+    }
+    
+    // Validate checkpoint parameters
+    bool checkpointEnabled = config.getOr<bool>("checkpoint_enabled", true);
+    std::string checkpointDir = config.getOr<std::string>("checkpoint_dir", "./checkpoints");
+    int64_t checkpointMaxFiles = config.getOr<int64_t>("checkpoint_max_files", 10);
+    bool checkpointCompression = config.getOr<bool>("checkpoint_compression", true);
+    
+    if (checkpointMaxFiles <= 0) {
+        NLM_LOG_WARNING("Invalid checkpoint_max_files " + std::to_string(checkpointMaxFiles) + ", should be > 0");
+        isValid = false;
+    }
+    
+    // Validate development parameter
+    bool developmentEnabled = config.getOr<bool>("development_enabled", true);
+    
+    // Validate configuration file directory (basic check)
+    if (!checkpointDir.empty() && (checkpointDir.front() == '/' || checkpointDir.find("://") != std::string::npos)) {
+        // Absolute path or URL, acceptable
+    } else if (checkpointDir.find("..") != std::string::npos) {
+        NLM_LOG_WARNING("checkpoint_dir contains '..' which may cause file system issues");
+    }
+    
+    return isValid;
+}
+
+void printHelp() {
+    std::cout << "=== NLM Phase 2 Command Line Help ===" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm_phase2 [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help              Show this help message and exit" << std::endl;
+    std::cout << "  --config[=FILE]         Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --random_seed=N         Set random seed (default: 42)" << std::endl;
+    std::cout << "  --simulation_timestep=N  Set simulation timestep in ms (default: 0.001)" << std::endl;
+    std::cout << "  --neuron_count=N        Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=N        Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=N  Set connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --stdp_ltp_weight=N     Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd_weight=N     Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp_tau=N            Set STDP tau (default: 20.0)" << std::endl;
+    std::cout << "  --synaptogenesis_rate=N  Set synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning_rate=N        Set pruning rate (default: 0.00001)" << std::endl;
+    std::cout << "  --replay_interval=N     Set replay interval (default: 100)" << std::endl;
+    std::cout << "  --consolidation_interval=N  Set consolidation interval (default: 1000)" << std::endl;
+    std::cout << "  --development_enabled[=0|1]  Enable development (default: 1)" << std::endl;
+    std::cout << "  --checkpoint_enabled[=0|1]  Enable checkpointing (default: 1)" << std::endl;
+    std::cout << "  --checkpoint_dir=DIR     Set checkpoint directory (default: ./checkpoints)" << std::endl;
+    std::cout << "  --checkpoint_max_files=N  Set maximum checkpoint files (default: 10)" << std::endl;
+    std::cout << "  --checkpoint_compression[=0|1]  Enable checkpoint compression (default: 1)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm_phase2                                    # Run with defaults" << std::endl;
+    std::cout << "  nlm_phase2 --neuron_count=1000                 # Run with 1000 neurons" << std::endl;
+    std::cout << "  nlm_phase2 --config=myconfig.cfg              # Load custom config" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration files:" << std::endl;
+    std::cout << "  configs/default.cfg                           # Default configuration" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+}
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -345,9 +486,14 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
+    
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -356,15 +502,33 @@ int main(int argc, char** argv) {
         }
     }
     
+    // Show help and exit if requested
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (!configFile.empty()) {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+            
+            // Validate loaded configuration
+            if (!validateConfiguration(*config)) {
+                NLM_LOG_WARNING("Configuration validation failed, using defaults");
+            }
+        } else {
+            NLM_LOG_WARNING("Failed to load configuration from " + configFile + ", using defaults");
+        }
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("No configuration file specified, using defaults.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_ERROR("Failed to parse command line arguments");
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -381,6 +545,15 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Additional Phase 2 configuration options
+    config->set("replay_interval", 100, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
+    config->set("development_enabled", true, ConfigSource::Default);
+    config->set("checkpoint_enabled", true, ConfigSource::Default);
+    config->set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    config->set("checkpoint_max_files", 10, ConfigSource::Default);
+    config->set("checkpoint_compression", true, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");

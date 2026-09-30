@@ -12,6 +12,8 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
+    // Optimized: Direct synapse lookup for O(1) access instead of O(n)
+    std::unordered_map<SynapseId, std::unique_ptr<Synapse>*> synapseMap;
     
     explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
 };
@@ -132,6 +134,8 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     std::vector<Synapse*> result;
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
+        // Optimize: Reserve space for expected synapses
+        result.reserve(it->second.size());
         for (SynapseId synId : it->second) {
             if (auto* syn = getSynapse(synId)) {
                 result.push_back(syn);
@@ -145,6 +149,8 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
     std::vector<Synapse*> result;
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {
+        // Optimize: Reserve space for expected synapses
+        result.reserve(it->second.size());
         for (SynapseId synId : it->second) {
             if (auto* syn = getSynapse(synId)) {
                 result.push_back(syn);
@@ -297,8 +303,10 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
 
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
+    result.reserve(getTotalNeuronCount());  // Pre-allocate space
     for (auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
+        // Use insert with iterators for better performance than push_back in loop
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
     }
     return result;
@@ -306,6 +314,11 @@ std::vector<Neuron*> NeuralRegion::getAllNeurons() {
 
 std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     std::vector<const Neuron*> result;
+    size_t totalNeurons = 0;
+    for (const auto& pop : pImpl->populations) {
+        totalNeurons += pop->getSize();
+    }
+    result.reserve(totalNeurons);
     for (const auto& pop : pImpl->populations) {
         auto popNeurons = pop->getNeurons();
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());

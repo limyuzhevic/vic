@@ -4,7 +4,7 @@ namespace nlm {
 
 struct MotorSystem::Impl {
     std::vector<ActionType> availableActions;
-    std::vector<const Action*> actionHistory;
+    std::vector<std::unique_ptr<Action>> actionHistory;
     
     Impl() {
         availableActions = {

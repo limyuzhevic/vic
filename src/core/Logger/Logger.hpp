@@ -103,6 +103,17 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Performance monitoring
+    void addTimingData(const std::string& operation, 
+                      const std::chrono::duration<double>& duration, 
+                      LogLevel level);
+    
+    // Get performance statistics
+    static void getPerformanceStats(std::ostringstream& oss);
+    
+    // Dump system state for debugging
+    static void dumpSystemState(std::ostringstream& oss, const std::string& context);
 
 private:
     struct Impl;
@@ -137,5 +148,23 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Performance profiling helper
+class PerformanceProfiler {
+public:
+    PerformanceProfiler(const std::string& operation, LogLevel level = LogLevel::Info);
+    ~PerformanceProfiler();
+    
+private:
+    std::string operation_;
+    LogLevel level_;
+    std::chrono::high_resolution_clock::time_point start_;
+};
+
+// Performance logging macros
+#define NLM_LOG_PERFORMANCE(operation, level) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, level)
+#define NLM_LOG_PERFORMANCE_INFO(operation) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, nlm::LogLevel::Info)
+#define NLM_LOG_PERFORMANCE_WARNING(operation) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, nlm::LogLevel::Warning)
+#define NLM_LOG_PERFORMANCE_ERROR(operation) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, nlm::LogLevel::Error)
 
 } // namespace nlm

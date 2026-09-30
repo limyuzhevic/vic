@@ -106,6 +106,22 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    // Performance timing
+    struct TimingData {
+        std::string operation;
+        std::chrono::duration<double> duration;
+        LogLevel level;
+    };
+    std::vector<TimingData> timingData;
+    
+    // Statistics
+    struct Statistics {
+        size_t logCount = 0;
+        size_t errorCount = 0;
+        size_t warningCount = 0;
+        size_t debugCount = 0;
+    } stats;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -140,6 +156,21 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    
+    // Update statistics
+    pImpl->stats.logCount++;
+    switch (level) {
+        case LogLevel::Error:
+        case LogLevel::Critical:
+            pImpl->stats.errorCount++;
+            break;
+        case LogLevel::Warning:
+            pImpl->stats.warningCount++;
+            break;
+        case LogLevel::Debug:
+            pImpl->stats.debugCount++;
+            break;
+    }
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
@@ -186,12 +217,77 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // In practice, we just use getGlobal() which is already static
 }
 
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+// Helper function for starting performance timers
+class PerformanceProfiler {
+public:
+    PerformanceProfiler(const std::string& operation, LogLevel level = LogLevel::Info) 
+        : operation_(operation), level_(level), start_(std::chrono::high_resolution_clock::now()) {}
+    
+    ~PerformanceProfiler() {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(end - start_);
+        
+        // Log performance data
+        std::ostringstream oss;
+        oss << "PERFORMANCE: " << operation_ << " took " 
+            << std::fixed << std::setprecision(6) << duration.count() << "s";
+        
+        Logger::getGlobal().log(level_, oss.str());
+        
+        // Store timing data for later analysis
+        Logger::getGlobal().addTimingData(operation_, duration, level_);
+    }
+    
+private:
+    std::string operation_;
+    LogLevel level_;
+    std::chrono::high_resolution_clock::time_point start_;
+};
 
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+// Helper function for adding timing data to logger
+void Logger::addTimingData(const std::string& operation, 
+                          const std::chrono::duration<double>& duration, 
+                          LogLevel level) {
+    if (pImpl) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->timingData.push_back({operation, duration, level});
+    }
 }
 
-} // namespace nlm
+// Helper function to get current performance statistics
+void Logger::getPerformanceStats(std::ostringstream& oss) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    oss << "=== Performance Statistics ===\n";
+    oss << "Total log messages: " << pImpl->stats.logCount << "\n";
+    oss << "Error messages: " << pImpl->stats.errorCount << "\n";
+    oss << "Warning messages: " << pImpl->stats.warningCount << "\n";
+    oss << "Debug messages: " << pImpl->stats.debugCount << "\n";
+    
+    if (!pImpl->timingData.empty()) {
+        oss << "\n=== Timing Data ===\n";
+        for (const auto& timing : pImpl->timingData) {
+            oss << timing.operation << ": " 
+                << std::fixed << std::setprecision(6) << timing.duration.count() << "s "
+                << "(" << static_cast<int>(timing.level) << ")\n";
+        }
+    }
+}
+
+// Helper function to dump system state for debugging
+void Logger::dumpSystemState(std::ostringstream& oss, const std::string& context) {
+    oss << "=== System State Dump ===\n";
+    oss << "Context: " << context << "\n";
+    oss << "Timestamp: " << std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) << "\n";
+    oss << "Statistics:\n";
+    oss << "  Log messages: " << pImpl->stats.logCount << "\n";
+    oss << "  Error messages: " << pImpl->stats.errorCount << "\n";
+    oss << "  Warning messages: " << pImpl->stats.warningCount << "\n";
+    oss << "  Debug messages: " << pImpl->stats.debugCount << "\n";
+}
+
+// Enhanced logging macros with more context
+#define NLM_LOG_PERFORMANCE(operation, level) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, level)
+#define NLM_LOG_PERFORMANCE_INFO(operation) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, nlm::LogLevel::Info)
+#define NLM_LOG_PERFORMANCE_WARNING(operation) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, nlm::LogLevel::Warning)
+#define NLM_LOG_PERFORMANCE_ERROR(operation) nlm::PerformanceProfiler _perf_ ## __LINE__(operation, nlm::LogLevel::Error)
