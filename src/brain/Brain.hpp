@@ -2,12 +2,31 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
+#include "BrainError.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <functional>
+#include <vector>
+
+namespace nlm {
+
+// Forward declarations for BrainError hierarchy
+class BrainError;
+class BrainInitializationError;
+class BrainStepError;
+class BrainConfigurationError;
+class BrainMemoryError;
+class BrainIOException;
+class BrainValidationError;
+class BrainResourceError;
+
+// Forward declarations for helper classes
+class BrainValidator;
+class BrainUtils;
 
 namespace nlm {
 
@@ -28,6 +47,14 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Brain system abstract base classes
+class BrainSystem;
+class MemorySystem;
+class PredictionSystemBase;
+class CognitionSystem;
+class NeuromodulationSystem;
+class DevelopmentSystemBase;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -60,6 +87,16 @@ public:
     Brain& operator=(const Brain&) = delete;
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
+    
+    // Exception types accessible to users
+    using BrainError = nlm::BrainError;
+    using BrainInitializationError = nlm::BrainInitializationError;
+    using BrainStepError = nlm::BrainStepError;
+    using BrainConfigurationError = nlm::BrainConfigurationError;
+    using BrainMemoryError = nlm::BrainMemoryError;
+    using BrainIOException = nlm::BrainIOException;
+    using BrainValidationError = nlm::BrainValidationError;
+    using BrainResourceError = nlm::BrainResourceError;
     
     // Initialize brain with configuration
     bool initialize();
