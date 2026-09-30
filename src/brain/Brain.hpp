@@ -1,5 +1,5 @@
 #pragma once
-
+ 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
@@ -8,9 +8,9 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
-
+ 
 namespace nlm {
-
+ 
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -44,9 +44,13 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+// Forward declaration for SleepStateManager
+class SleepStateManager;
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Enhanced with Sleep State Management (Phase 6.5)
 
 class Brain {
 public:
@@ -192,6 +196,39 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // ========== SLEEP STATE MANAGEMENT ==========
+    
+    // Sleep state management
+    SleepState getCurrentSleepState() const;
+    bool isSleeping() const;
+    void forceSleepStateTransition(SleepState newState, float transitionDuration = 1.0f);
+    
+    // Sleep pressure management
+    void addSleepPressure(float pressure);
+    void releaseSleepPressure(float pressure);
+    float getSleepPressure() const;
+    
+    // Sleep debt management  
+    void addSleepDebt(float debt);
+    void reduceSleepDebt(float debt);
+    float getSleepDebt() const;
+    
+    // Circadian regulation
+    void setCircadianPhase(float phase);
+    void setCircadianPeriod(float period);
+    float getCircadianPhase() const;
+    float getCircadianPeriod() const;
+    float getCircadianSleepWindow() const;
+    
+    // Sleep statistics
+    float getTimeInCurrentSleepState() const;
+    float getTotalSleepTime() const;
+    float getSleepEfficiency() const;
+    size_t getMemoryReplayCount() const;
+    
+    // Get sleep state manager (for advanced configuration)
+    SleepStateManager* getSleepStateManager();
     
 private:
     struct Impl;
