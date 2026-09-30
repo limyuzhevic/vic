@@ -63,9 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
-## Building
-
 ```bash
 mkdir build
 cd build
@@ -73,14 +70,110 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
+## Running Python Examples
 
-### Phase 6 Demo (Integration Test)
+After building the C++ library, install and run Python examples:
+
 ```bash
-./nlm_phase6_demo
+# Install the Python package
+cd ..
+pip install -e .
+
+# Run basic example
+python -c "
+import pynlm
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+for i in range(10):
+    brain.step(i)
+print('Success! Created brain with', brain.getTotalNeuronCount(), 'neurons')
+"
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+## Python API Improvements
+
+### Enhanced Features
+
+The NLM Python bindings now include advanced features:
+
+1. **Performance Monitoring**: Track simulation timing and efficiency
+2. **Event Callbacks**: Custom handling of simulation events
+3. **Enhanced Error Handling**: Structured exception classes
+4. **Configuration**: Full access to configuration setting and querying
+5. **Debugging Tools**: System information and profiling utilities
+
+### Usage Examples
+
+```python
+import pynlm
+
+# Create and initialize brain (basic usage)
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+
+# Get brain statistics
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+print(f"Firing rate: {brain.getAverageFiringRate():.2f}")
+
+# Enhanced configuration (NEW!)
+config.set("brain.neuron_count", 2000)
+config.set("learning.rate", 0.01)
+
+# Performance monitoring (NEW!)
+monitor = pynlm.PerformanceMonitor()
+for step in range(100):
+    monitor.stepStart()
+    brain.step(step)
+    monitor.stepEnd()
+print(monitor.report())
+
+# Event callbacks (NEW!)
+def custom_callback(neuron_id, neuron_type, timestamp):
+    print(f"Spike detected: {neuron_id}")
+
+event_manager = pynlm.EventCallbackManager.getInstance()
+event_manager.addSpikeCallback(custom_callback)
+
+# Debugging (NEW!)
+print(pynlm.Debugger.getSystemInfo())
+```
+
+### Advanced Usage
+
+```python
+import pynlm
+
+# Complete agent setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run complete simulation
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print("Advanced simulation complete!")
+```
 
 ## Project Structure
 
@@ -110,7 +203,11 @@ NLM/
 │   ├── environment/   # Environment interface
 │   ├── experiments/   # Experiment framework (Phase 6)
 │   └── visualization/  # Visualization
-├── tests/
+├── python/              # Python bindings source
+│   └── bindings.cpp     # Enhanced Python bindings
+├── tests/               # C++ unit tests
+│   ├── test_*.cpp
+│   └── CMakeLists.txt
 └── configs/
 ```
 

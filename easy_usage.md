@@ -102,6 +102,28 @@ brain.step(0)
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
 
+### Enhanced Example with Performance Monitoring
+
+```python
+import pynlm
+
+# Create brain with monitoring
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Add performance monitoring
+monitor = pynlm.PerformanceMonitor()
+
+# Run simulation with performance tracking
+for i in range(100):
+    monitor.stepStart()
+    brain.step(i)
+    monitor.stepEnd()
+
+print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
+print(monitor.report())
+```
+
 ---
 
 ## Common Patterns
@@ -221,7 +243,43 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Enhanced Features
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning and monitoring (NEW!)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Add performance monitoring (NEW!)
+monitor = pynlm.PerformanceMonitor()
+
+# Run agent
+for step in range(100):
+    monitor.stepStart()
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    monitor.stepEnd()
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+print(monitor.report())
+```
 
 ```python
 import pynlm

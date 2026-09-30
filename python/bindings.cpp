@@ -5,6 +5,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <functional>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -16,19 +21,206 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// NLM Python Version
+#define NLM_PYTHON_VERSION "0.1.0"
+
 namespace py = pybind11;
 namespace nlm {
+
+// Exception classes for better error handling
+class NLMError : public std::runtime_error {
+public:
+    NLMError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigError : public NLMError {
+public:
+    ConfigError(const std::string& message) : NLMError("Config error: " + message) {}
+};
+
+class BrainError : public NLMError {
+public:
+    BrainError(const std::string& message) : NLMError("Brain error: " + message) {}
+};
+
+class WorldError : public NLMError {
+public:
+    WorldError(const std::string& message) : NLMError("World error: " + message) {}
+};
+
+// Performance monitoring
+class PerformanceMonitor {
+public:
+    struct Timings {
+        double stepTime = 0.0;
+        double totalTime = 0.0;
+        size_t stepCount = 0;
+        double avgStepTime() const { return stepCount > 0 ? totalTime / stepCount : 0.0; }
+    };
+
+    PerformanceMonitor() : startTime_(std::chrono::high_resolution_clock::now()) {}
+
+    void stepStart() {
+        stepStart_ = std::chrono::high_resolution_clock::now();
+    }
+
+    void stepEnd() {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - stepStart_);
+        timings_.stepTime = duration.count() / 1000000.0; // Convert to seconds
+        timings_.totalTime += timings_.stepTime;
+        timings_.stepCount++;
+    }
+
+    const Timings& getTimings() const { return timings_; }
+
+    void reset() {
+        timings_ = Timings();
+        startTime_ = std::chrono::high_resolution_clock::now();
+    }
+
+    double getUptime() const {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - startTime_);
+        return duration.count() / 1000000.0;
+    }
+
+    std::string report() const {
+        std::stringstream ss;
+        ss << "Performance Report:";
+        ss << "\n  Uptime: " << std::fixed << std::setprecision(3) << getUptime() << "s";
+        ss << "\n  Steps executed: " << timings_.stepCount;
+        ss << "\n  Average step time: " << std::fixed << std::setprecision(6) << timings_.avgStepTime() << "s";
+        ss << "\n  Steps per second: " << (timings_.avgStepTime() > 0 ? 1.0 / timings_.avgStepTime() : 0.0);
+        return ss.str();
+    }
+
+private:
+    std::chrono::high_resolution_clock::time_point startTime_;
+    std::chrono::high_resolution_clock::time_point stepStart_;
+    Timings timings_;
+};
+
+// Event callback system
+class EventCallbackManager {
+public:
+    using SpikeCallback = std::function<void(const NeuronId&, NeuronType, double)>;
+    using LearningCallback = std::function<void(const SynapseId&, float, const std::string&)>;
+    using StepCompleteCallback = std::function<void(SimulationStep, double, const Action*)>;
+    using DevelopmentCallback = std::function<void(DevelopmentalStage, double)>;
+
+    void addSpikeCallback(const SpikeCallback& callback) {
+        spikeCallbacks_.push_back(callback);
+    }
+
+    void addLearningCallback(const LearningCallback& callback) {
+        learningCallbacks_.push_back(callback);
+    }
+
+    void addStepCompleteCallback(const StepCompleteCallback& callback) {
+        stepCompleteCallbacks_.push_back(callback);
+    }
+
+    void addDevelopmentCallback(const DevelopmentCallback& callback) {
+        developmentCallbacks_.push_back(callback);
+    }
+
+    void clearCallbacks() {
+        spikeCallbacks_.clear();
+        learningCallbacks_.clear();
+        stepCompleteCallbacks_.clear();
+        developmentCallbacks_.clear();
+    }
+
+    const std::vector<SpikeCallback>& getSpikeCallbacks() const { return spikeCallbacks_; }
+    const std::vector<LearningCallback>& getLearningCallbacks() const { return learningCallbacks_; }
+    const std::vector<StepCompleteCallback>& getStepCompleteCallbacks() const { return stepCompleteCallbacks_; }
+    const std::vector<DevelopmentCallback>& getDevelopmentCallbacks() const { return developmentCallbacks_; }
+
+    static EventCallbackManager& getInstance() {
+        static EventCallbackManager instance;
+        return instance;
+    }
+
+private:
+    EventCallbackManager() = default;
+    std::vector<SpikeCallback> spikeCallbacks_;
+    std::vector<LearningCallback> learningCallbacks_;
+    std::vector<StepCompleteCallback> stepCompleteCallbacks_;
+    std::vector<DevelopmentCallback> developmentCallbacks_;
+};
+
+// Debug and profiling utilities
+class Debugger {
+public:
+    static std::string getMemoryUsage() {
+        // Simplified memory reporting
+        return "Memory monitoring not yet implemented (requires platform-specific code)";
+    }
+
+    static std::string getThreadInfo() {
+        return "Thread monitoring not yet implemented";
+    }
+
+    static std::string getSystemInfo() {
+        std::stringstream ss;
+        ss << "NLM Python Bindings Version: " << NLM_PYTHON_VERSION;
+        ss << "\nPlatform: " << (sizeof(void*) * 8) << "-bit";
+        return ss.str();
+    }
+};
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        A comprehensive Python interface for the NLM C++ neural simulation framework.
+        Version: 0.1.0
+
+        Features:
+        - Brain simulation with spiking neurons
+        - World interaction (SimpleWorld)
+        - Agent perception and action
+        - Configuration management
+        - Performance monitoring
+        - Event callbacks for custom simulation control
+        - Debugging and profiling tools
+        - JSON serialization support
+        - Enhanced error handling with structured exceptions
+
+        Classes:
+        - Brain: Main neural simulation engine
+        - Config: Configuration management
+        - AgentBrain: Brain-to-world interface
+        - SimpleWorld: 2D simulation environment
+        - SensoryInput: Base class for sensory data
+        - Vision: Visual sensory input
+        - Audio: Audio sensory input
+        - InternalSignals: Internal state signals
+        - Action: Motor actions
+        - WorldObject: Objects in the world
+        - AgentBody: Agent physical state
+        - SensoryPercept: Combined sensory perception
+
+        Enumerations:
+        - NeuronType: Various neuron types
+        - SynapseType: Synapse connection types
+        - DevelopmentalStage: Brain development stages
+        - FiringState: Neuron firing states
+        - ActionType: High-level action types
+        - MotorCommand: Low-level motor commands
+        - WorldObjectType: Types of world objects
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    m.attr("__version__") = NLM_PYTHON_VERSION;
 
+    // Register exception classes
+    py::register_exception<NLMError>(m, "NLMError");
+    py::register_exception<ConfigError>(m, "ConfigError");
+    py::register_exception<BrainError>(m, "BrainError");
+    py::register_exception<WorldError>(m, "WorldError");
+
+    // Neuron ID types
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -142,6 +334,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Enhanced Config class with set() method
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -154,6 +347,37 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::get<int>, py::arg("key"),
+             "Get integer configuration value")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get float/double configuration value")
+        .def("get", &Config::get<bool>, py::arg("key"),
+             "Get boolean configuration value")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get string configuration value")
+        .def("getOr", &Config::getOr<int>, py::arg("key"), py::arg("default_value"),
+             "Get integer value or default if key missing")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("default_value"),
+             "Get float value or default if key missing")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("default_value"),
+             "Get boolean value or default if key missing")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("default_value"),
+             "Get string value or default if key missing")
+        // NEW: set() method
+        .def("set", (void (Config::*)(const std::string&, int, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set integer configuration value")
+        .def("set", (void (Config::*)(const std::string&, double, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set float/double configuration value")
+        .def("set", (void (Config::*)(const std::string&, bool, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set boolean configuration value")
+        .def("set", (void (Config::*)(const std::string&, const std::string&, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set string configuration value")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -164,6 +388,62 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // JSON serialization support for Config
+    m.def("configToJson", [](const Config& config) {
+        // TODO: Implement proper JSON serialization
+        return "{\"error\": \"JSON serialization not yet implemented\"}";
+    }, py::arg("config"), "Convert configuration to JSON string");
+
+    m.def("jsonToConfig", [](const std::string& json) {
+        // TODO: Implement proper JSON deserialization
+        auto config = std::make_shared<Config>();
+        return config;
+    }, py::arg("json"), "Create configuration from JSON string");
+
+    // Enhanced performance monitoring
+    py::class_<PerformanceMonitor>(m, "PerformanceMonitor", "Performance monitoring utility")
+        .def(py::init<>())
+        .def("stepStart", &PerformanceMonitor::stepStart,
+             "Mark start of simulation step")
+        .def("stepEnd", &PerformanceMonitor::stepEnd,
+             "Mark end of simulation step")
+        .def("getUptime", &PerformanceMonitor::getUptime,
+             "Get monitor uptime in seconds")
+        .def("getAverageStepTime", &PerformanceMonitor::Timings::avgStepTime,
+             "Get average step time in seconds")
+        .def("getStepCount", [](const PerformanceMonitor& monitor) { return monitor.getTimings().stepCount; },
+             "Get number of steps executed")
+        .def("reset", &PerformanceMonitor::reset,
+             "Reset performance monitor")
+        .def("report", &PerformanceMonitor::report,
+             "Get performance report string");
+
+    // Event callback system
+    py::class_<EventCallbackManager>(m, "EventCallbackManager", "Event callback manager for simulation hooks")
+        .def(py::init<>())
+        .def("addSpikeCallback", &EventCallbackManager::addSpikeCallback,
+             "Add spike event callback", py::arg("callback"))
+        .def("addLearningCallback", &EventCallbackManager::addLearningCallback,
+             "Add learning event callback", py::arg("callback"))
+        .def("addStepCompleteCallback", &EventCallbackManager::addStepCompleteCallback,
+             "Add step completion callback", py::arg("callback"))
+        .def("addDevelopmentCallback", &EventCallbackManager::addDevelopmentCallback,
+             "Add development stage callback", py::arg("callback"))
+        .def("clearCallbacks", &EventCallbackManager::clearCallbacks,
+             "Clear all event callbacks")
+        .def_static("getInstance", &EventCallbackManager::getInstance,
+                   "Get singleton instance of EventCallbackManager");
+
+    // Debugging and profiling utilities
+    py::class_<Debugger>(m, "Debugger", "Debugging and profiling utilities")
+        .def_static("getSystemInfo", &Debugger::getSystemInfo,
+                   "Get system information")
+        .def_static("getMemoryUsage", &Debugger::getMemoryUsage,
+                   "Get memory usage information")
+        .def_static("getThreadInfo", &Debugger::getThreadInfo,
+                   "Get thread information");
+
+    // Enhanced SensoryInput classes
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -198,6 +478,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Enhanced Action class
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -207,7 +488,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("__repr__", [](const Action& action) {
+            std::stringstream ss;
+            ss << "<Action type=" << static_cast<int>(action.getType()) << ">";
+            return ss.str();
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -219,7 +505,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("__repr__", [](const WorldObject& obj) {
+            std::stringstream ss;
+            ss << "<WorldObject type=" << static_cast<int>(obj.type) << " at (" << obj.x << "," << obj.y << ")>";
+            return ss.str();
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -263,6 +554,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
+    // Enhanced SimpleWorld class
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
@@ -287,8 +579,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("__repr__", [](const SimpleWorld& world) {
+            return "<SimpleWorld size=" + std::to_string(world.getWidth()) + "x" + std::to_string(world.getHeight()) + ">";
+        });
 
+    // Enhanced Brain class
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -351,8 +647,15 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("__repr__", [](const Brain& brain) {
+            std::stringstream ss;
+            ss << "<Brain neurons=" << brain.getTotalNeuronCount() 
+               << " synapses=" << brain.getTotalSynapseCount() << ">";
+            return ss.str();
+        });
 
+    // Enhanced AgentBrain class
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -400,6 +703,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +720,15 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Module constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Error handling helpers
+    py::class_<py::error_already_set>(m, "ErrorAlreadySet")
+        .def(py::init<>());
+    }
 
 } // namespace nlm

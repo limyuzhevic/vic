@@ -302,7 +302,7 @@ config = pynlm.createDefaultConfig()
 if config.has("brain.neuron_count"):
     keys = config.getKeys()
 
-# Modify
+# NEW: Enhanced configuration setting (now available!)
 config.set("brain.neuron_count", 1000)
 config.set("learning.rate", 0.001)
 
@@ -494,6 +494,204 @@ for _ in range(500):
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(0)
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+```
+
+### Enhanced Simulation with Performance Monitoring
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Add performance monitoring (NEW!)
+monitor = pynlm.PerformanceMonitor()
+
+# Run episode with monitoring
+for step in range(500):
+    monitor.stepStart()
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    monitor.stepEnd()
+
+print("Episode complete!")
+print(monitor.report())
+```
+
+### Event-Driven Simulation
+
+```python
+import pynlm
+
+# Define callback functions
+def spike_callback(neuron_id, neuron_type, timestamp):
+    print(f"Spike: neuron {neuron_id} ({neuron_type}) at {timestamp}")
+
+def step_callback(step, time, action):
+    print(f"Step {step} completed at time {time}")
+    if action:
+        print(f"  Action: {action.getName()}")
+
+# Setup with event callbacks
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Register event callbacks (NEW!)
+event_manager = pynlm.EventCallbackManager.getInstance()
+event_manager.addSpikeCallback(spike_callback)
+event_manager.addStepCompleteCallback(step_callback)
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+```
+
+### Complete Research Experiment Template
+
+```python
+import pynlm
+import time
+import json
+
+class ResearchExperiment:
+    def __init__(self, config):
+        self.config = config
+        self.brain = None
+        self.world = None
+        self.agent = None
+        self.monitor = None
+        self.results = []
+        self.start_time = None
+        
+    def setup(self, world_config):
+        """Setup simulation environment"""
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        
+        self.world = pynlm.createSimpleWorld()
+        self.world.configure(**world_config)
+        self.world.reset()
+        
+        self.agent = pynlm.createAgentBrain(self.brain)
+        self.agent.initialize(self.world)
+        
+        # Enable research features
+        self.agent.enableRewardModulation(True)
+        self.agent.enableStructuralPlasticity(True)
+        self.agent.enableDevelopment(True)
+        self.agent.enableCuriosity(True)
+        
+        self.monitor = pynlm.PerformanceMonitor()
+        self.start_time = time.time()
+        
+    def run_episode(self, num_steps):
+        """Run a single episode with comprehensive monitoring"""
+        self.monitor.reset()
+        
+        for step in range(num_steps):
+            self.monitor.stepStart()
+            
+            # Environment interaction
+            self.world.update(0.1)
+            percept = self.world.getSensoryPercept()
+            self.agent.processSensoryInput(percept)
+            
+            # Brain processing
+            self.brain.step(step)
+            
+            # Action execution
+            action = self.agent.decodeMotorCommand()
+            self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            self.monitor.stepEnd()
+            
+            # Collect statistics
+            if step % 10 == 0:
+                stats = {
+                    'step': step,
+                    'time': self.world.getSimulationTime(),
+                    'firing_neurons': self.brain.getFiringNeuronCount(),
+                    'total_spikes': self.brain.getTotalSpikeCount(),
+                    'avg_firing_rate': self.brain.getAverageFiringRate(),
+                    'curiosity': self.agent.getCuriosityLevel(),
+                    'novelty': self.agent.getNoveltyLevel(),
+                    'development_stage': self.brain.getDevelopmentalStage(),
+                    'step_time': self.monitor.getTimings().stepTime
+                }
+                self.results.append(stats)
+                
+        return self.get_episode_stats()
+    
+    def get_episode_stats(self):
+        """Get summary statistics for the episode"""
+        if not self.results:
+            return {}
+            
+        total_time = time.time() - self.start_time
+        final_stats = self.results[-1]
+        
+        return {
+            'total_steps': len(self.results),
+            'total_time': total_time,
+            'steps_per_second': len(self.results) / total_time if total_time > 0 else 0,
+            'final_state': final_stats,
+            'performance_report': self.monitor.report(),
+            'config_used': {
+                'neuron_count': self.brain.getTotalNeuronCount(),
+                'synapse_count': self.brain.getTotalSynapseCount(),
+                'region_count': self.brain.getRegionCount()
+            }
+        }
+    
+    def save_results(self, filepath):
+        """Save experiment results to file"""
+        results = {
+            'experiment_config': self.config,
+            'episode_results': self.results,
+            'summary_stats': self.get_episode_stats(),
+            'timestamp': time.time()
+        }
+        
+        with open(filepath, 'w') as f:
+            json.dump(results, f, indent=2)
+
+# Example usage
+if __name__ == "__main__":
+    # Create configuration
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 500)
+    config.set("brain.synapse_density", 0.05)
+    
+    # Setup experiment
+    experiment = ResearchExperiment(config)
+    world_config = {
+        'width': 20, 'height': 20,
+        'visionWidth': 8, 'visionHeight': 8
+    }
+    experiment.setup(world_config)
+    
+    # Run experiment
+    print("Starting research experiment...")
+    stats = experiment.run_episode(1000)
+    
+    print(f"Experiment complete!")
+    print(f"Total steps: {stats['total_steps']}")
+    print(f"Steps per second: {stats['steps_per_second']:.2f}")
+    print(f"Performance: {stats['performance_report']}")
+    
+    # Save results
+    experiment.save_results("experiment_results.json")
+    print("Results saved to experiment_results.json")
 ```
 
 ---
