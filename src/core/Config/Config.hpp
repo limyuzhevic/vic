@@ -1,17 +1,21 @@
-#pragma once
-
+#include "core/ErrorHandling/ErrorHandling.hpp"
 #include <string>
 #include <memory>
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <unordered_map>
+#include <functional>
+#include <stdexcept>
+#include <filesystem>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
+// Forward declarations for JSON and YAML
+class ConfigValidator;
 
-// Configuration value types
+// Enhanced configuration value types
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -23,7 +27,7 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
-// Configuration source
+// Configuration source tracking
 enum class ConfigSource {
     Default,
     File,
@@ -37,10 +41,36 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string type;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), type("auto") {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& t = "auto")
+        : key(k), value(v), source(s), description(desc), type(t) {}
+};
+
+// Exception classes for configuration errors
+class ConfigException : public std::runtime_error {
+public:
+    ConfigException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigLoadException : public ConfigException {
+public:
+    ConfigLoadException(const std::string& message, const std::string& filepath)
+        : ConfigException("Failed to load config from " + filepath + ": " + message) {}
+};
+
+class ConfigSaveException : public ConfigException {
+public:
+    ConfigSaveException(const std::string& message, const std::string& filepath)
+        : ConfigException("Failed to save config to " + filepath + ": " + message) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    ConfigValidationException(const std::string& message)
+        : ConfigException("Configuration validation failed: " + message) {}
 };
 
 // Main configuration class
@@ -55,16 +85,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file with automatic format detection (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Save to file with automatic format detection (JSON, YAML, or simple key=value format)
+    bool saveToFile(const std::string& filepath) const;
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values
+    // Get values with type conversion
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
@@ -78,6 +108,9 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Get configuration summary
+    std::string summary() const;
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -90,16 +123,37 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Add entry with type information
+    void addEntry(const std::string& key, const ConfigValue& value, ConfigSource source, 
+                  const std::string& description = "", const std::string& type = "auto");
+    
+    // Get last error message
+    std::string getLastError() const;
+    
+    // Get type of value
+    std::string getType(const std::string& key) const;
+    
+    // Set value with automatic type detection from string
+    void setAuto(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Get value as string
+    std::string getString(const std::string& key) const;
+    
+    // Configuration validation (basic implementation)
+    bool validate() const;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::string lastError;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool endsWith(const std::string& str, const std::string& suffix);
+    static std::string getFileFormat(const std::string& filepath);
+    
+    // Type conversion utilities
+    static std::string configValueToString(const ConfigValue& value);
+    static std::string detectType(const std::string& str);
 };
-
-} // namespace nlm
