@@ -21,14 +21,20 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // IMPROVEMENT: Enhanced file loading with better error handling and format detection
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool hasEntries = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,16 +49,29 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+                hasEntries = true;
+                NLM_LOG_DEBUG("Config loaded: " + key + " = " + value + " (line " + std::to_string(lineNumber) + ")");
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse config line " + std::to_string(lineNumber) + ": " + e.what());
+                // Continue processing other lines instead of failing completely
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": missing '='");
         }
     }
     
-    return true;
+    if (!hasEntries && lineNumber > 0) {
+        NLM_LOG_WARNING("Config file " + filepath + " contains no valid entries");
+    }
+    
+    return hasEntries;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
