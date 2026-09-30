@@ -1,88 +1,89 @@
-#pragma once
+// Synapse.hpp
 
+#ifndef NLM_SYNAPSE_HPP
+#define NLM_SYNAPSE_HPP
+
+#include <memory>
+#include <vector>
 #include "../core/Types/Types.hpp"
 
 namespace nlm {
 
-// Forward declaration
-class Neuron;
-
-// Synapse representing a connection between neurons
-// Implements real synaptic transmission with delays and short-term plasticity
-
 class Synapse {
+private:
+    struct Impl;
+    Impl* pImpl;
+
 public:
-    // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
-    
     ~Synapse();
     
-    // Disable copying, enable moving
+    // Prevent copy operations
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
-    Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
     
-    // Identity
+    // Move operations
+    Synapse(Synapse&& other) noexcept;
+    Synapse& operator=(Synapse&& other) noexcept;
+
+    // ========== IDENTIFICATION ==========
     SynapseId getId() const;
-    
-    // Connection
     NeuronId getSourceNeuron() const;
     NeuronId getDestinationNeuron() const;
-    
-    // Weight
+
+    // ========== WEIGHT MANAGEMENT ==========
     SynapticWeight getWeight() const;
     void setWeight(SynapticWeight weight);
     void addToWeight(SynapticWeight delta);
     
-    // Delay (in simulation steps)
-    Delay getDelay() const;
-    void setDelay(Delay delay);
+    // Weight bounds enforcement
+    static constexpr float getMinWeight() { return -1.0f; }
+    static constexpr float getMaxWeight() { return 1.0f; }
     
-    // Type
+    bool clampWeight();  // Ensure weight is within bounds, returns true if changed
+
+    // ========== SYNAPSE PROPERTIES ==========
     SynapseType getType() const;
     void setType(SynapseType type);
     
-    // Excitatory/Inhibitory
-    bool isExcitatory() const;
-    bool isInhibitory() const;
+    Delay getDelay() const;
+    void setDelay(Delay delay);
+
+    // ========== SPIKE HISTORY ==========
+    void recordPreSpike(Timestamp time);
+    void recordPostSpike(Timestamp time);
     
-    // Activity history for plasticity
-    void recordPreSpike(Timestamp timestamp);
-    void recordPostSpike(Timestamp timestamp);
     const std::vector<Timestamp>& getPreSpikeHistory() const;
     const std::vector<Timestamp>& getPostSpikeHistory() const;
-    void clearHistory();
     
-    // Plasticity flags
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
+    void clearSpikeHistory();
+
+    // ========== PLASTICITY ==========
+    PlasticityFlags getPlasticityFlags() const;
+    void setPlasticityFlags(const PlasticityFlags& flags);
     
-    // Enable/disable plasticity rules
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
-    
-    // Eligibility trace (for reward-modulated learning)
-    float getEligibilityTrace() const;
     void setEligibilityTrace(float trace);
-    void decayEligibilityTrace(float decayRate);
+    float getEligibilityTrace() const;
+
+    // ========== SHORT-TERM PLASTICITY ==========
+    void updateShortTermPlasticity(Timestamp currentTime);
+    float getUtilizationFactor() const;
+    float getFacilitationFactor() const;
+    float getSynapticEfficacy() const;
+
+    // ========== SPIKE RECORDING ==========
+    void update(Timestamp currentTime);
+
+    // ========== STATISTICS ==========
+    size_t getPreSpikeCount() const;
+    size_t getPostSpikeCount() const;
+    float getAveragePreSpikeInterval() const;
+    float getAveragePostSpikeInterval() const;
     
-    // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
-    
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    // ========== DEBUG/UTILITY ==========
+    std::string debugInfo() const;
 };
 
 } // namespace nlm
+
+#endif // NLM_SYNAPSE_HPP

@@ -337,7 +337,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Structural plasticity");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -347,24 +347,27 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Pass through to config loading
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-') {
+            std::string key = arg.substr(1);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                config->set(key, value, ConfigSource::CommandLine);
             }
         }
     }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,15 +385,40 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Validate configuration
+    try {
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+        int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+        double timestep = config->getOr<double>("simulation_timestep", 0.001);
+        float connectionProb = config->getOr<float>("connection_probability", 0.15f);
+        
+        if (neuronCount <= 0) {
+            NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be positive.");
+            return 1;
+        }
+        if (regionCount <= 0) {
+            NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be positive.");
+            return 1;
+        }
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be positive.");
+            return 1;
+        }
+        if (connectionProb < 0.0f || connectionProb > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProb) + ". Must be between 0 and 1.");
+            return 1;
+        }
+        
+        NLM_LOG_INFO("Configuration validated successfully:");
+        NLM_LOG_INFO("  neuron_count: " + std::to_string(neuronCount));
+        NLM_LOG_INFO("  region_count: " + std::to_string(regionCount));
+        NLM_LOG_INFO("  simulation_timestep: " + std::to_string(timestep) + "s");
+        NLM_LOG_INFO("  connection_probability: " + std::to_string(connectionProb));
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Configuration validation failed: ") + e.what());
+        return 1;
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
