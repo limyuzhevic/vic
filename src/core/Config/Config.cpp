@@ -1,31 +1,323 @@
+#ifndef NLM_CORE_CONFIG_CONFIG_CPP
+#define NLM_CORE_CONFIG_CONFIG_CPP
+
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// Forward declaration for YAML parsing
+namespace yaml {
+    template<typename T>
+    T get(const YAML::Node& node, const std::string& key, const T& defaultValue);
+}
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Load from JSON file
+bool Config::loadFromJSON(std::ifstream& file) {
+    try {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string jsonContent = buffer.str();
+        
+        auto doc = nlohmann::json::parse(jsonContent);
+        
+        // Process JSON entries
+        if (doc.is_object()) {
+            for (auto it = doc.begin(); it != doc.end(); ++it) {
+                std::string key = it.key();
+                
+                // Handle different value types
+                if (it->is_string()) {
+                    set(key, it->get<std::string>(), ConfigSource::File);
+                } else if (it->is_number_integer()) {
+                    set(key, it->get<int64_t>(), ConfigSource::File);
+                } else if (it->is_number_unsigned()) {
+                    set(key, static_cast<int64_t>(it->get<uint64_t>()), ConfigSource::File);
+                } else if (it->is_number_float()) {
+                    set(key, it->get<double>(), ConfigSource::File);
+                } else if (it->is_boolean()) {
+                    set(key, it->get<bool>(), ConfigSource::File);
+                } else if (it->is_array()) {
+                    // Try to infer array type
+                    const auto& array = *it;
+                    if (!array.empty()) {
+                        if (std::all_of(array.begin(), array.end(), [](const auto& val) { return val.is_number_integer(); })) {
+                            std::vector<int64_t> intArray;
+                            intArray.reserve(array.size());
+                            for (const auto& val : array) {
+                                intArray.push_back(val.get<int64_t>());
+                            }
+                            set(key, intArray, ConfigSource::File);
+                        } else if (std::all_of(array.begin(), array.end(), [](const auto& val) { return val.is_number_float(); })) {
+                            std::vector<double> doubleArray;
+                            doubleArray.reserve(array.size());
+                            for (const auto& val : array) {
+                                doubleArray.push_back(val.get<double>());
+                            }
+                            set(key, doubleArray, ConfigSource::File);
+                        } else if (std::all_of(array.begin(), array.end(), [](const auto& val) { return val.is_string(); })) {
+                            std::vector<std::string> stringArray;
+                            stringArray.reserve(array.size());
+                            for (const auto& val : array) {
+                                stringArray.push_back(val.get<std::string>());
+                            }
+                            set(key, stringArray, ConfigSource::File);
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+    } catch (const std::exception& e) {
+        // JSON parsing failed, fall back to simple format
+    }
+    return false;
+}
 
-Config::~Config() = default;
+// Load from YAML file
+bool Config::loadFromYAML(std::ifstream& file) {
+    try {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string yamlContent = buffer.str();
+        
+        auto doc = YAML::Load(yamlContent);
+        
+        // Process YAML entries
+        if (doc.IsMap()) {
+            for (const auto& item : doc) {
+                std::string key = item.first.as<std::string>();
+                
+                // Handle different value types
+                if (item.second.IsScalar()) {
+                    if (item.second.IsString()) {
+                        set(key, item.second.as<std::string>(), ConfigSource::File);
+                    } else if (item.second.IsInteger()) {
+                        set(key, item.second.as<int64_t>(), ConfigSource::File);
+                    } else if (item.second.IsDouble()) {
+                        set(key, item.second.as<double>(), ConfigSource::File);
+                    } else if (item.second.IsBoolean()) {
+                        set(key, item.second.as<bool>(), ConfigSource::File);
+                    }
+                } else if (item.second.IsSequence()) {
+                    // Try to infer sequence type
+                    const auto& sequence = item.second;
+                    if (sequence.size() > 0) {
+                        if (std::all_of(sequence.begin(), sequence.end(), [](const auto& val) { return val.IsInteger(); })) {
+                            std::vector<int64_t> intArray;
+                            intArray.reserve(sequence.size());
+                            for (const auto& val : sequence) {
+                                intArray.push_back(val.as<int64_t>());
+                            }
+                            set(key, intArray, ConfigSource::File);
+                        } else if (std::all_of(sequence.begin(), sequence.end(), [](const auto& val) { return val.IsDouble(); })) {
+                            std::vector<double> doubleArray;
+                            doubleArray.reserve(sequence.size());
+                            for (const auto& val : sequence) {
+                                doubleArray.push_back(val.as<double>());
+                            }
+                            set(key, doubleArray, ConfigSource::File);
+                        } else if (std::all_of(sequence.begin(), sequence.end(), [](const auto& val) { return val.IsScalar() && val.as<std::string>().find('.') == std::string::npos && !std::isdigit(val.as<std::string>()[0]); })) {
+                            std::vector<std::string> stringArray;
+                            stringArray.reserve(sequence.size());
+                            for (const auto& val : sequence) {
+                                stringArray.push_back(val.as<std::string>());
+                            }
+                            set(key, stringArray, ConfigSource::File);
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+    } catch (const std::exception& e) {
+        // YAML parsing failed, fall back to simple format
+    }
+    return false;
+}
 
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Convert to JSON string
+std::string Config::toJSON() const {
+    nlohmann::json doc;
     
+    for (const auto& entry : pImpl->entries) {
+        std::visit([&doc, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                doc[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                doc[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                doc[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                doc[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                doc[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                doc[entry.key] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                doc[entry.key] = arg;
+            }
+        }, entry.value);
+    }
+    
+    return doc.dump(2); // Pretty print with 2-space indentation
+}
+
+// Convert to YAML string
+std::string Config::toYAML() const {
+    YAML::Emitter doc;
+    doc << YAML::BeginMap;
+    
+    for (const auto& entry : pImpl->entries) {
+        doc << YAML::Key << entry.key;
+        std::visit([&doc](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                doc << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                doc << YAML::Value << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                doc << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                doc << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                doc << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                doc << YAML::Value << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                doc << YAML::Value << arg;
+            }
+        }, entry.value);
+    }
+    
+    doc << YAML::EndMap;
+    return std::string(doc.c_str());
+}
+
+// Detect file format
+Config::FileFormat Config::detectFileFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return FileFormat::Unknown;
+    }
+    
+    std::string line;
+    bool hasKeyValue = false;
+    bool hasJsonBraces = false;
+    bool hasYamlKeyColon = false;
+    
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t eqPos = line.find('=');
+        if (eqPos != std::string::npos) {
+            hasKeyValue = true;
+        }
+        
+        if (line.find('{') != std::string::npos && line.find('}') != std::string::npos) {
+            hasJsonBraces = true;
+        }
+        
+        if (line.find(":") != std::string::npos && 
+            (line.find("  ") != std::string::npos || 
+             (line.find(' ') == std::string::npos && line.find('\t') != std::string::npos))) {
+            hasYamlKeyColon = true;
+        }
+    }
+    
+    if (hasJsonBraces && !hasKeyValue) {
+        return FileFormat::JSON;
+    } else if (hasYamlKeyColon) {
+        return FileFormat::YAML;
+    } else if (hasKeyValue) {
+        return FileFormat::KeyValue;
+    }
+    
+    return FileFormat::Unknown;
+}
+
+// Detect content format
+Config::FileFormat Config::detectContentFormat(const std::string& content) {
+    bool hasKeyValue = false;
+    bool hasJsonBraces = false;
+    bool hasYamlKeyColon = false;
+    
+    std::istringstream stream(content);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t eqPos = line.find('=');
+        if (eqPos != std::string::npos) {
+            hasKeyValue = true;
+        }
+        
+        if (line.find('{') != std::string::npos && line.find('}') != std::string::npos) {
+            hasJsonBraces = true;
+        }
+        
+        if (line.find(":") != std::string::npos && 
+            (line.find("  ") != std::string::npos || 
+             (line.find(' ') == std::string::npos && line.find('\t') != std::string::npos))) {
+            hasYamlKeyColon = true;
+        }
+    }
+    
+    if (hasJsonBraces && !hasKeyValue) {
+        return FileFormat::JSON;
+    } else if (hasYamlKeyColon) {
+        return FileFormat::YAML;
+    } else if (hasKeyValue) {
+        return FileFormat::KeyValue;
+    }
+    
+    return FileFormat::Unknown;
+}
+
+// Override loadFromFile to use enhanced parsers
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Detect file format
+    FileFormat format = detectFileFormat(filepath);
+    
+    // Try JSON parser first
+    if (format == FileFormat::JSON || format == FileFormat::Unknown) {
+        file.clear();
+        file.seekg(0);
+        if (loadFromJSON(file)) {
+            return true;
+        }
+    }
+    
+    // Try YAML parser
+    if (format == FileFormat::YAML || format == FileFormat::Unknown) {
+        file.clear();
+        file.seekg(0);
+        if (loadFromYAML(file)) {
+            return true;
+        }
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -55,161 +347,6 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
 } // namespace nlm
+
+#endif // NLM_CORE_CONFIG_CONFIG_CPP

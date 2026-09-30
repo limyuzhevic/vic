@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 
 namespace nlm {
 
@@ -55,7 +58,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,13 +96,32 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Utility functions
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // Advanced JSON/YAML operations
+    bool loadFromJSON(const std::string& jsonContent);
+    bool loadFromJSON(std::ifstream& file);
+    bool loadFromYAML(const std::string& yamlContent);
+    bool loadFromYAML(std::ifstream& file);
+    std::string toJSON() const;
+    std::string toYAML() const;
+    
+    // Configuration file format detection
+    enum class FileFormat {
+        Unknown,
+        KeyValue,
+        JSON,
+        YAML
+    };
+    
+    static FileFormat detectFileFormat(const std::string& filepath);
+    static FileFormat detectContentFormat(const std::string& content);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm
