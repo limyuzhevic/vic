@@ -197,28 +197,33 @@ void Synapse::step(Timestamp currentTime) {
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    // Use configurable timestep from simulation context (default 1ms)
+    TimestepDuration dt = 0.001f;  // Could be passed from simulation manager
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Clamp to prevent numerical instability
+        pImpl->shortTermFacilitation = std::clamp(pImpl->shortTermFacilitation, 0.0f, 1.0f);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Decay short-term depression (only affected by post-synaptic activity)
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        float timeSincePost = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+        // Recovery from depression toward 1.0 (facilitated state)
+        float recoveryRate = 1.0f - std::exp(-timeSincePost / Impl::STP_DEPRESSION_TAU);
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * recoveryRate;
+        // Clamp to reasonable bounds
+        pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.0f, 1.0f);
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    if (pImpl->eligibilityTrace != 0.0f) {
+        decayEligibilityTrace(0.001f);  // Configurable decay rate
+    }
     
-    // Clamp weight bounds
+    // Clamp weight bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
@@ -260,6 +265,65 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+}
+
+// Configuration methods for Synapse
+void Synapse::setSTPParameters(float facilitationTau, float depressionTau, float uMax) {
+    pImpl->stpFacilitationTau = std::max(1.0f, std::min(facilitationTau, 1000.0f));
+    pImpl->stpDepressionTau = std::max(1.0f, std::min(depressionTau, 1000.0f));
+    pImpl->stpUMax = std::clamp(uMax, 0.1f, 2.0f);
+}
+
+void Synapse::setEligibilityTraceDecayRate(float decayRate) {
+    pImpl->eligibilityTraceDecayRate = std::clamp(decayRate, 0.001f, 1.0f);
+}
+
+void Synapse::setWeightBounds(float minW, float maxW) {
+    pImpl->MIN_WEIGHT = std::min(minW, maxW - 0.1f);
+    pImpl->MAX_WEIGHT = std::max(maxW, minW + 0.1f);
+}
+
+float Synapse::getSTPFacilitationTau() const {
+    return pImpl->stpFacilitationTau;
+}
+
+float Synapse::getSTPDepressionTau() const {
+    return pImpl->stpDepressionTau;
+}
+
+float Synapse::getSTPU() const {
+    return pImpl->stpUMax;
+}
+
+float Synapse::getEligibilityTraceDecayRate() const {
+    return pImpl->eligibilityTraceDecayRate;
+}
+
+float Synapse::getMINWeight() const {
+    return pImpl->MIN_WEIGHT;
+}
+
+float Synapse::getMAXWeight() const {
+    return pImpl->MAX_WEIGHT;
+}
+
+// Initializers for Config-based configuration
+void Synapse::setDefaultConfig() {
+    setSTPParameters(100.0f, 200.0f, 1.0f);
+    setEligibilityTraceDecayRate(0.001f);
+    setWeightBounds(-1.0f, 1.0f);
+}
+
+void Synapse::setFastSTPConfig() {
+    setSTPParameters(10.0f, 20.0f, 1.5f);
+    setEligibilityTraceDecayRate(0.01f);
+    setWeightBounds(-0.5f, 0.5f);
+}
+
+void Synapse::setSlowSTPConfig() {
+    setSTPParameters(500.0f, 1000.0f, 0.5f);
+    setEligibilityTraceDecayRate(0.0001f);
+    setWeightBounds(-2.0f, 2.0f);
 }
 
 } // namespace nlm

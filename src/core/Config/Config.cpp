@@ -86,7 +86,44 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save key=value pair
+        file << entry.key << " = ";
+        
+        // Handle different value types
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -115,6 +152,74 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty() || key.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.") == std::string::npos) {
+        throw std::invalid_argument("Invalid configuration key: " + key);
+    }
+    
+    // Validate value based on type
+    std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            if (arg < -1000000 || arg > 1000000) {
+                throw std::invalid_argument("Integer value out of bounds: " + std::to_string(arg));
+            }
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            if (arg < -1000000 || arg > 1000000) {
+                throw std::invalid_argument("Int64 value out of bounds: " + std::to_string(arg));
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (std::isnan(arg) || std::isinf(arg)) {
+                throw std::invalid_argument("Double value is NaN or infinite: " + std::to_string(arg));
+            }
+            if (arg < -1000000.0 || arg > 1000000.0) {
+                throw std::invalid_argument("Double value out of bounds: " + std::to_string(arg));
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // No validation for boolean
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            if (arg.size() > 10000) {
+                throw std::invalid_argument("String value too long: " + std::to_string(arg.size()) + " characters");
+            }
+            // Check for potentially dangerous characters
+            for (char c : arg) {
+                if (c < 0 || c > 127) {
+                    throw std::invalid_argument("String contains non-ASCII characters");
+                }
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            if (arg.size() > 10000) {
+                throw std::invalid_argument("Vector size too large: " + std::to_string(arg.size()));
+            }
+            for (const auto& elem : arg) {
+                if (elem < -1000000 || elem > 1000000) {
+                    throw std::invalid_argument("Vector element out of bounds: " + std::to_string(elem));
+                }
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            if (arg.size() > 10000) {
+                throw std::invalid_argument("Vector size too large: " + std::to_string(arg.size()));
+            }
+            for (const auto& elem : arg) {
+                if (std::isnan(elem) || std::isinf(elem)) {
+                    throw std::invalid_argument("Vector element is NaN or infinite: " + std::to_string(elem));
+                }
+                if (elem < -1000000.0 || elem > 1000000.0) {
+                    throw std::invalid_argument("Vector element out of bounds: " + std::to_string(elem));
+                }
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            if (arg.size() > 10000) {
+                throw std::invalid_argument("Vector size too large: " + std::to_string(arg.size()));
+            }
+            for (const auto& elem : arg) {
+                if (elem.size() > 1000) {
+                    throw std::invalid_argument("String in vector too long: " + elem);
+                }
+            }
+        }
+    }, value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,14 +232,32 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate key and value
+    if (key.empty()) {
+        throw std::invalid_argument("Key cannot be empty");
+    }
+    if (value.size() > 10000) {
+        throw std::invalid_argument("String value too long: " + std::to_string(value.size()) + " characters");
+    }
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    // Validate integer value
+    if (value < -1000000 || value > 1000000) {
+        throw std::invalid_argument("Integer value out of bounds: " + std::to_string(value));
+    }
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    // Validate double value
+    if (std::isnan(value) || std::isinf(value)) {
+        throw std::invalid_argument("Double value is NaN or infinite: " + std::to_string(value));
+    }
+    if (value < -1000000.0 || value > 1000000.0) {
+        throw std::invalid_argument("Double value out of bounds: " + std::to_string(value));
+    }
     set(key, ConfigValue(value), source);
 }
 

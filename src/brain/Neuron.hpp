@@ -94,6 +94,22 @@ public:
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
     
+    // Advanced LIF configuration parameters
+    void setMembraneCapacitance(float capacitance);
+    void setTimeConstant(float tau);
+    void setVoltageBounds(float minV, float maxV);
+    void setAdaptationParameters(float decayRate, float incrementBase);
+    
+    float getMembraneCapacitance() const;
+    float getTimeConstant() const;
+    std::pair<float, float> getVoltageBounds() const;
+    std::pair<float, float> getAdaptationParameters() const;
+    
+    // Predefined configuration presets
+    void setDefaultConfig();
+    void setHighFiringConfig();
+    void setLowFiringConfig();
+    
     // Spike detection
     bool checkThreshold() const;
     float getLastSpikeTime() const;
@@ -134,7 +150,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // LIF phase implemented: standard integrate-and-fire dynamics with adaptation
     void step(Timestamp currentTime);
     
     // Reset to initial state

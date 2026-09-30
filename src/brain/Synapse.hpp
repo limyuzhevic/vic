@@ -43,10 +43,6 @@ public:
     SynapseType getType() const;
     void setType(SynapseType type);
     
-    // Excitatory/Inhibitory
-    bool isExcitatory() const;
-    bool isInhibitory() const;
-    
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
@@ -71,7 +67,8 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Implements synaptic dynamics with short-term plasticity (STP)
+    // and eligibility trace for reward-modulated learning
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -79,6 +76,23 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
+    
+    // Configuration methods
+    void setSTPParameters(float facilitationTau, float depressionTau, float uMax);
+    void setEligibilityTraceDecayRate(float decayRate);
+    void setWeightBounds(float minW, float maxW);
+    
+    float getSTPFacilitationTau() const;
+    float getSTPDepressionTau() const;
+    float getSTPU() const;
+    float getEligibilityTraceDecayRate() const;
+    float getMINWeight() const;
+    float getMAXWeight() const;
+    
+    // Predefined configuration presets
+    void setDefaultConfig();
+    void setFastSTPConfig();
+    void setSlowSTPConfig();
     
 private:
     struct Impl;

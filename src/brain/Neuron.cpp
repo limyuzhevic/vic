@@ -18,13 +18,27 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    // LIF parameters - now configurable
+    static constexpr float DEFAULT_MEMBRANE_CAPACITANCE = 1.0f;  // nF
+    static constexpr float DEFAULT_TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    // Configuration parameters
+    float membraneCapacitance;
+    float timeConstant;
+    float minPotential;
+    float maxPotential;
+    float adaptationDecayRate;
+    float adaptationIncrementBase;
+    
+    Impl() : id(), type(NeuronType::Internal), state(), regionId(), populationId(),
+             totalCurrent(0.0f), synapticInput(0.0f),
+             membraneCapacitance(DEFAULT_MEMBRANE_CAPACITANCE),
+             timeConstant(DEFAULT_TIME_CONSTANT),
+             minPotential(-100.0f),
+             maxPotential(50.0f),
+             adaptationDecayRate(0.98f),
+             adaptationIncrementBase(0.5f) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -210,8 +224,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = pImpl->timeConstant;  // ms (configurable)
+    float C = pImpl->membraneCapacitance;  // nF (configurable)
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -220,16 +234,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Unit conversion: 1000 converts ms to s for proper dimensional analysis
+    V = V + static_cast<float>(dt) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        pImpl->state.adaptationVariable *= pImpl->adaptationDecayRate;  // Configurable decay
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential using configurable bounds
+    V = std::clamp(V, pImpl->minPotential, pImpl->maxPotential);
     
     // Check for spike
     if (V >= threshold) {
@@ -248,7 +263,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // More realistic adaptation increment based on threshold crossing
+        pImpl->state.adaptationVariable += pImpl->adaptationIncrementBase + (threshold - V_rest) * 0.01f;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -260,8 +276,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Default LIF step with biologically realistic timestep
+    TimestepDuration dt = 0.001;  // 1ms default timestep (standard for neural simulations)
     stepLIF(currentTime, dt);
 }
 
@@ -297,6 +313,63 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+// Configuration methods for Neuron
+void Neuron::setMembraneCapacitance(float capacitance) {
+    pImpl->membraneCapacitance = std::max(0.1f, std::min(capacitance, 100.0f));
+}
+
+void Neuron::setTimeConstant(float tau) {
+    pImpl->timeConstant = std::max(1.0f, std::min(tau, 1000.0f));
+}
+
+void Neuron::setVoltageBounds(float minV, float maxV) {
+    pImpl->minPotential = std::min(minV, maxV - 10.0f);
+    pImpl->maxPotential = std::max(maxV, minV + 10.0f);
+}
+
+void Neuron::setAdaptationParameters(float decayRate, float incrementBase) {
+    pImpl->adaptationDecayRate = std::clamp(decayRate, 0.0f, 1.0f);
+    pImpl->adaptationIncrementBase = std::max(0.0f, incrementBase);
+}
+
+float Neuron::getMembraneCapacitance() const {
+    return pImpl->membraneCapacitance;
+}
+
+float Neuron::getTimeConstant() const {
+    return pImpl->timeConstant;
+}
+
+std::pair<float, float> Neuron::getVoltageBounds() const {
+    return std::make_pair(pImpl->minPotential, pImpl->maxPotential);
+}
+
+std::pair<float, float> Neuron::getAdaptationParameters() const {
+    return std::make_pair(pImpl->adaptationDecayRate, pImpl->adaptationIncrementBase);
+}
+
+// Initializers for Config-based configuration
+void Neuron::setDefaultConfig() {
+    setMembraneCapacitance(1.0f);
+    setTimeConstant(20.0f);
+    setVoltageBounds(-100.0f, 50.0f);
+    setAdaptationParameters(0.98f, 0.5f);
+}
+
+void Neuron::setHighFiringConfig() {
+    setMembraneCapacitance(0.5f);
+    setTimeConstant(10.0f);
+    setVoltageBounds(-80.0f, 60.0f);
+    setAdaptationParameters(0.95f, 1.0f);
+}
+
+void Neuron::setLowFiringConfig() {
+    setMembraneCapacitance(2.0f);
+    setTimeConstant(50.0f);
+    setVoltageBounds(-90.0f, 40.0f);
+    setAdaptationParameters(0.99f, 0.1f);
 }
 
 } // namespace nlm

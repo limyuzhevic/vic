@@ -14,11 +14,11 @@ public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // LIF phase implemented: standard integrate-and-fire dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Synaptic dynamics implemented: Tsodyks-Markram short-term plasticity
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
