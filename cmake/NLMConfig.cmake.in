@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+# Include the exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# Find dependencies
+set(NLM_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}")
+set(NLM_LIBRARY_DIR "${CMAKE_INSTALL_LIBDIR}")
+set(NLM_BINARY_DIR "${CMAKE_INSTALL_BINDIR}")
+
+# Add the targets to the global registry
+check_required_components(NLM)

@@ -82,6 +82,179 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Tutorial System
+
+This repository includes a comprehensive tutorial system covering all aspects of NLM. The tutorials are organized into 10 major sections and provided in the `NLM_TUTORIALS.md` file for easy reference and study.
+
+**To access the complete tutorial system:**
+```bash
+cat NLM_TUTORIALS.md
+```
+
+**Table of Contents Overview:**
+1. Getting Started Guide - Neuroscience fundamentals and first simulation
+2. Basic Usage Examples - Neuron simulation, synaptic transmission, STDP
+3. Advanced Examples - Neuromodulation, curiosity, development, predictive coding
+4. API Documentation - Python bindings, C++ API, configuration files, visualization
+5. Use Case Scenarios - Research, development, cognitive, neuromodulation, sensory applications
+6. Tutorial Series - 5 progressive tutorials from "Hello Neural World" to "Complete Integration"
+7. Best Practices - Performance optimization, memory management, configuration patterns
+8. Troubleshooting Guide - Common issues and debugging strategies
+9. Performance Optimization - Parameter tuning, memory optimization, parallelization
+10. Research Applications - Research methodology, experimental design, data analysis
+
+## Quick Start Tutorial
+
+If you're new to NLM, start with this simple example:
+
+```python
+import pynlm
+
+# Create a default brain configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run neural computation for 100 steps
+for step in range(100):
+    brain.step(step)
+
+print(f"Done! Your brain fired {brain.getTotalSpikeCount()} spikes")
+print(f"Neurons: {brain.getTotalNeuronCount()}, Firing: {brain.getFiringNeuronCount()}")
+```
+
+## Complete Tutorial System
+
+The NLM tutorial system provides comprehensive documentation for users at all skill levels:
+
+### For Complete Beginners
+- **Getting Started Guide**: Neuroscience fundamentals and first working simulation
+- **Basic Usage Examples**: Simple neuron simulation, synaptic transmission, STDP learning
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Simple Brain Integration**: Creating and managing brain regions
+- **Phase 6 Integration Demo**: Complete integrated brain simulation
+
+### For Intermediate Users
+- **Advanced Examples**: Neuromodulation, curiosity, developmental biology, predictive coding
+- **Use Case Scenarios**: Real-world applications across different domains
+- **Tutorial Series**: 5 progressive tutorials building from basics to complexity
+- **Best Practices**: Performance optimization and debugging strategies
+- **Troubleshooting**: Common issues and solution approaches
+
+### For Advanced Users
+- **Performance Optimization**: Parameter tuning and computational efficiency
+- **Research Applications**: Experimental design and data analysis methodologies
+- **API Documentation**: Python bindings and C++ API with detailed examples
+- **System Architecture**: Deep dive into Phase 6 integration details
+- **Extension Points**: Adding new components and mechanisms
+
+## Tutorial Learning Path
+
+### Step 1: Foundation (30-45 minutes)
+1. Read the Getting Started Guide section
+2. Run the "Hello Neural World" Python example
+3. Study the neuron simulation and synaptic transmission examples
+4. Understand basic STDP learning mechanisms
+
+### Step 2: Core Concepts (1-2 hours)
+1. Complete the brain region creation and management examples
+2. Work through the memory system integration demonstrations
+3. Explore neuromodulation and reward learning examples
+4. Study the Phase 6 integration demo
+
+### Step 3: Advanced Applications (2-4 hours)
+1. Implement the curiosity-driven learning examples
+2. Create developmental biology simulations
+3. Design predictive coding and error-based learning
+4. Build use case scenario implementations
+
+### Step 4: Research and Development (4-8 hours)
+1. Study the best practices and performance optimization guides
+2. Work through the troubleshooting and debugging examples
+3. Implement research application methodologies
+4. Create experimental designs and data analysis approaches
+
+## System Architecture Overview
+
+NLM implements a complete artificial developmental brain through Phase 6: FINAL INTEGRATION:
+
+```
+Phase 6 Integration Achievements:
+├── Memory Systems: Working + Episodic + Associative (✓ Connected)
+├── Neuromodulation: Dopamine + Curiosity + Novelty (✓ Connected)
+├── Prediction System: Temporal sequence learning (✓ Integrated)
+├── Cognition Systems: Planner + Concept + Attention + Self-model (✓ Connected)
+├── Development: Stage-based maturation (✓ Functional)
+├── Persistence: Checkpoint save/load (✓ Working)
+└── Replay and Consolidation: Memory replay during rest (✓ Active)
+```
+
+### Core Component Categories
+
+- **Memory Systems**: Working memory, episodic memory, associative memory
+- **Neuromodulation**: Dopamine, curiosity, novelty detection
+- **Prediction System**: Temporal sequence learning and action prediction
+- **Cognition Systems**: Planning, concept formation, attention, self-model
+- **Development**: Brain maturation from primitive to adult states
+- **Plasticity**: STDP, Hebbian, and structural learning
+
+## Technical Specifications
+
+### Simulation Characteristics
+- **Neuron Model**: Leaky Integrate-and-Fire (LIF)
+- **Time Scale**: Continuous simulation with variable time steps
+- **Memory Systems**: Neural implementations of working and episodic memory
+- **Learning Mechanisms**: STDP, Hebbian, reward-modulated plasticity
+- **Development**: Multi-stage progression from primitive to adult capabilities
+
+### Performance Features
+- **Event-Driven**: Efficient spike processing
+- **Parallel Processing**: SIMD vectorization for performance
+- **Memory Pools**: Optimized memory management
+- **Checkpoint System**: Save/load brain state
+- **Replay System**: Memory consolidation during rest
+
+## Getting Help and Support
+
+### Documentation Resources
+- **Phase 6 Demo**: `src/experiments/Phase6Demo.cpp` - Complete integration test
+- **Architecture Documentation**: `docs/ARCHITECTURE.md` - Detailed component descriptions
+- **Science Background**: `docs/SCIENCE.md` - Biological inspiration and limitations
+- **Phase 6 Architecture**: `docs/PHASE6_ARCHITECTURE.md` - Final integration details
+- **Enhanced Python API**: `python/README.md` - Modern Python interface
+- **Easy Usage**: `easy_usage.md` - Quick copy-paste examples
+- **Demo CLI**: `demo_enhanced_cli.py` - Enhanced command-line interface
+
+### Tutorial System Files
+The complete tutorial system is organized into:
+- **NLM_TUTORIALS.md**: Master table of contents and overview
+- **Comprehensive code examples** for all 10 tutorial sections
+- **Configuration file examples** for various scenarios
+- **Visualization usage** and performance optimization guides
+- **Research application** methodologies and experimental design
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
+
+## Additional Resources
+
+For the most current and comprehensive tutorial materials, please refer to the `NLM_TUTORIALS.md` file which contains:
+
+- Complete step-by-step working examples
+- Detailed explanations of all NLM concepts
+- Progressive tutorial series from beginner to advanced
+- Real-world use case scenarios
+- Best practices and troubleshooting guidance
+- Research application methodologies
+- Performance optimization techniques
+
+This tutorial system provides everything needed to master NLM from first principles through advanced research applications.
+
 ## Project Structure
 
 ```

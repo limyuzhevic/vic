@@ -31,6 +31,57 @@ enum class ConfigSource {
     Runtime
 };
 
+// Enhanced configuration key enumeration
+enum class ConfigKey {
+    // Basic configuration
+    RandomSeed,
+    SimulationTimestep,
+    NeuronCount,
+    RegionCount,
+    ConnectionProbability,
+    
+    // Plasticity configuration
+    PlasticityLearningRate,
+    StdpLtpWeight,
+    StdpLtdWeight,
+    StdpTimeConstant,
+    SynaptogenesisRate,
+    PruningRate,
+    PlasticityRule,
+    SynapticPruningRate,
+    
+    // Development configuration
+    DevelopmentalStage,
+    
+    // Neuromodulation configuration
+    NeuromodulationLevel,
+    DopamineBaseline,
+    
+    // Memory system configuration
+    MemorySystemType,
+    
+    // Output configuration
+    OutputFormat,
+    OutputInterval,
+    StatsFile,
+    PlotFile,
+    
+    // Simulation control
+    Steps,
+    Duration,
+    SkipLearning,
+    FastMode,
+    
+    // Monitoring and integration
+    EnableMonitoring,
+    CheckpointInterval,
+    MonitorFile,
+    
+    // Benchmarking
+    EnableBenchmarking,
+    BenchmarkReportFile
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -102,4 +153,9 @@ private:
     static std::string toLower(const std::string& str);
 };
 
-} // namespace nlm
+// Configuration key to string mapping
+inline const std::string configKeyToString(ConfigKey key);
+
+// String to configuration value parser
+inline std::optional<ConfigValue> parseStringToConfigValue(const std::string& key, const std::string& value);
+

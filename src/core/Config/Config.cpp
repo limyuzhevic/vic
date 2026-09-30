@@ -3,58 +3,144 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+// Enhanced configuration key enumeration
+enum class ConfigKey {
+    // Basic configuration
+    RandomSeed,
+    SimulationTimestep,
+    NeuronCount,
+    RegionCount,
+    ConnectionProbability,
+    
+    // Plasticity configuration
+    PlasticityLearningRate,
+    StdpLtpWeight,
+    StdpLtdWeight,
+    StdpTimeConstant,
+    SynaptogenesisRate,
+    PruningRate,
+    PlasticityRule,
+    SynapticPruningRate,
+    
+    // Development configuration
+    DevelopmentalStage,
+    
+    // Neuromodulation configuration
+    NeuromodulationLevel,
+    DopamineBaseline,
+    
+    // Memory system configuration
+    MemorySystemType,
+    
+    // Output configuration
+    OutputFormat,
+    OutputInterval,
+    StatsFile,
+    PlotFile,
+    
+    // Simulation control
+    Steps,
+    Duration,
+    SkipLearning,
+    FastMode,
+    
+    // Monitoring and integration
+    EnableMonitoring,
+    CheckpointInterval,
+    MonitorFile,
+    
+    // Benchmarking
+    EnableBenchmarking,
+    BenchmarkReportFile
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+// Configuration key to string mapping
+inline const std::string configKeyToString(ConfigKey key) {
+    switch (key) {
+        case ConfigKey::RandomSeed: return "random_seed";
+        case ConfigKey::SimulationTimestep: return "simulation_timestep";
+        case ConfigKey::NeuronCount: return "neuron_count";
+        case ConfigKey::RegionCount: return "region_count";
+        case ConfigKey::ConnectionProbability: return "connection_probability";
+        case ConfigKey::PlasticityLearningRate: return "plasticity_learning_rate";
+        case ConfigKey::StdpLtpWeight: return "stdp_ltp_weight";
+        case ConfigKey::StdpLtdWeight: return "stdp_ltd_weight";
+        case ConfigKey::StdpTimeConstant: return "stdp_time_constant";
+        case ConfigKey::SynaptogenesisRate: return "synaptogenesis_rate";
+        case ConfigKey::PruningRate: return "pruning_rate";
+        case ConfigKey::PlasticityRule: return "plasticity_rule";
+        case ConfigKey::SynapticPruningRate: return "synaptic_pruning_rate";
+        case ConfigKey::DevelopmentalStage: return "developmental_stage";
+        case ConfigKey::NeuromodulationLevel: return "neuromodulation_level";
+        case ConfigKey::DopamineBaseline: return "dopamine_baseline";
+        case ConfigKey::MemorySystemType: return "memory_system_type";
+        case ConfigKey::OutputFormat: return "output_format";
+        case ConfigKey::OutputInterval: return "output_interval";
+        case ConfigKey::StatsFile: return "stats_file";
+        case ConfigKey::PlotFile: return "plot_file";
+        case ConfigKey::Steps: return "steps";
+        case ConfigKey::Duration: return "duration";
+        case ConfigKey::SkipLearning: return "skip_learning";
+        case ConfigKey::FastMode: return "fast_mode";
+        case ConfigKey::EnableMonitoring: return "enable_monitoring";
+        case ConfigKey::CheckpointInterval: return "checkpoint_interval";
+        case ConfigKey::MonitorFile: return "monitor_file";
+        case ConfigKey::EnableBenchmarking: return "enable_benchmarking";
+        case ConfigKey::BenchmarkReportFile: return "benchmark_report_file";
+        default: return "unknown";
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
 }
 
+// String to configuration value parser
+inline std::optional<ConfigValue> parseStringToConfigValue(const std::string& key, const std::string& value) {
+    // Try to parse based on key patterns
+    if (key == "random_seed" || key == "region_count" || key == "steps") {
+        try {
+            return std::stoi(value);
+        } catch (...) {
+            return std::nullopt;
+        }
+    } else if (key == "neuron_count") {
+        try {
+            return static_cast<int64_t>(std::stoll(value));
+        } catch (...) {
+            return std::nullopt;
+        }
+    } else if (key == "simulation_timestep" || key == "output_interval" || 
+               key == "duration" || key == "checkpoint_interval" ||
+               key == "synaptic_pruning_rate" || key == "plasticity_learning_rate" ||
+               key == "stdp_ltp_weight" || key == "stdp_ltd_weight" ||
+               key == "stdp_time_constant" || key == "synaptogenesis_rate" ||
+               key == "pruning_rate" || key == "dopamine_baseline" ||
+               key == "neuromodulation_level") {
+        try {
+            return std::stod(value);
+        } catch (...) {
+            return std::nullopt;
+        }
+    } else if (key == "connection_probability" || 
+               key == "skip_learning" || key == "fast_mode" ||
+               key == "enable_monitoring" || key == "enable_benchmarking") {
+        // Convert string to boolean
+        std::string lowerValue = value;
+        std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
+        if (lowerValue == "true" || lowerValue == "1" || lowerValue == "yes") {
+            return true;
+        } else if (lowerValue == "false" || lowerValue == "0" || lowerValue == "no") {
+            return false;
+        }
+        return std::nullopt;
+    }
+    
+    // Default to string
+    return value;
+}
+
+// Enhanced loadFromArgs implementation
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -65,14 +151,41 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Parse and set configuration
+                auto config_value = parseStringToConfigValue(key, value);
+                if (config_value.has_value()) {
+                    set(key, config_value.value(), ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Special handling for boolean flags
+            if (key == "skip-learning" || key == "fast-mode" || 
+                key == "enable-monitoring") {
+                set(key, true, ConfigSource::CommandLine);
+            } else if (key == "plasticity-rule" || key == "memory-system" ||
+                       key == "output-format" || key == "stats-file" ||
+                       key == "plot-file" || key == "monitor-file" ||
+                       key == "benchmark-report" || key == "brain-config" ||
+                       key == "plasticity-config" || key == "developmental-stage") {
+                set(key, value, ConfigSource::CommandLine);
+            } else if (key == "steps" || key == "duration" ||
+                       key == "checkpoint-interval" || key == "synaptic-pruning") {
+                try {
+                    if (key == "steps" || key == "checkpoint-interval") {
+                        set(key, std::stoi(value), ConfigSource::CommandLine);
+                    } else {
+                        set(key, std::stod(value), ConfigSource::CommandLine);
+                    }
+                } catch (...) {
+                    // Ignore conversion errors
+                }
+            }
         }
     }
     return true;
