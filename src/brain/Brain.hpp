@@ -6,8 +6,12 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../core/Performance/PerformanceMonitoring.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -44,6 +48,27 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+// Batch operation result structure
+struct BatchOperationResult {
+    size_t operationsCompleted;
+    double totalTime;
+    std::vector<double> operationTimes;
+    bool success;
+    std::string errorMessage;
+};
+
+// Performance monitoring for brain operations
+struct BrainPerformanceStats {
+    PerformanceCounter neuronInjectionCounter;
+    PerformanceCounter sensoryProcessingCounter;
+    PerformanceCounter actionProductionCounter;
+    PerformanceCounter spikeDeliveryCounter;
+    PerformanceCounter plasticityApplicationCounter;
+    Timer avgNeuronInjectionTimer;
+    Timer avgSensoryProcessingTimer;
+    Timer avgActionProductionTimer;
+};
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
@@ -70,15 +95,101 @@ public:
     // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    // ========== BATCH OPERATIONS ==========
     
-    // Inject current directly into a specific neuron
-    void injectCurrent(NeuronId neuron, MembranePotential current);
+    // Batch operation for injecting currents into multiple neurons
+    BatchOperationResult injectCurrents(const std::vector<std::pair<NeuronId, MembranePotential>>& neuronCurrents,
+        bool parallel = true, bool vectorized = true);
     
-    // Inject current into all neurons of a specific type
-    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    // Batch operation for processing multiple sensory inputs
+    BatchOperationResult processSensoryInputs(const std::vector<const class SensoryInput*>& inputs,
+        bool parallel = true);
+    
+    // Batch operation for producing multiple actions
+    std::vector<std::unique_ptr<class Action>> produceActions(size_t count = 1,
+        bool parallel = true, bool vectorized = true);
+    
+    // Batch operation for world updates in SimpleWorld
+    BatchOperationResult batchUpdateWorld(const std::vector<std::pair<double, Timestamp>>& timeSteps,
+        bool parallel = true);
+    
+    // Batch operation for object operations in SimpleWorld
+    BatchOperationResult batchObjectOperations(const std::vector<std::function<bool(WorldObject*)>>& operations,
+        bool parallel = true);
+    
+    // Batch operation for AgentBrain sensory processing
+    BatchOperationResult batchProcessSensory(const std::vector<const SensoryPercept*>& percepts,
+        bool parallel = true);
+    
+    // Batch operation for AgentBrain command decoding
+    std::vector<MotorCommand> batchDecodeCommands(size_t count = 1,
+        bool parallel = true, bool vectorized = true);
+    
+    // Batch operation for Config loading/saving
+    BatchOperationResult batchLoadConfigs(const std::vector<std::string>& filepaths,
+        bool parallel = true);
+    
+    BatchOperationResult batchSaveConfigs(const std::vector<std::string>& filepaths,
+        bool parallel = true);
+    
+    // Performance monitoring methods
+    void recordPerformanceStat(const std::string& name, double time);
+    void recordPerformanceCounter(const std::string& name, size_t count, double timePerOp = 0.0);
+    void printPerformanceReport() const;
+    void resetPerformanceStats();
+    
+    // Memory optimization utilities
+    void preAllocateMemory();
+    void optimizeMemoryAccess();
+    size_t getCurrentMemoryUsage() const;
+    
+    // Progress tracking
+    void startLongOperation(const std::string& description, size_t totalSteps);
+    void advanceProgress(size_t steps = 1);
+    std::string getProgressStatus() const;
+    
+    // Benchmarking
+    struct BenchmarkResult {
+        std::string operationName;
+        size_t iterations;
+        double totalTime;
+        double avgTime;
+        double minTime;
+        double maxTime;
+        size_t operationsPerSecond;
+    };
+    
+    BenchmarkResult benchmarkOperation(const std::string& name,
+        std::function<void()> operation, size_t iterations = 100);
+    
+    // SIMD/parallel processing
+    static void processNeuronsSIMD(const std::vector<Neuron*>& neurons,
+        const std::function<void(Neuron*)>& operation);
+    
+    static void processSynapsesSIMD(const std::vector<Synapse*>& synapses,
+        const std::function<void(Synapse*)>& operation);
+    
+    // Thread pool for parallel operations
+    static ThreadPool& getThreadPool(size_t numThreads = std::thread::hardware_concurrency());
+    
+    // Cache management for frequently accessed data
+    void cacheNeuronRegions();
+    void clearNeuronCache();
+    const NeuralRegion* getCachedRegion(RegionId id) const;
+    
+    // Compressed data operations
+    bool compressState(const std::string& filepath, float compressionLevel = 0.5f) const;
+    bool decompressState(std::string& filepath, float compressionLevel = 0.5f);
+    
+    // Enhanced initialization with batch setup
+    bool initializeWithBatchSetup(const std::vector<std::string>& batchConfigs);
+    
+protected:
+    // Configuration
+    std::shared_ptr<const Config> getConfig() const;
+    
+    // Get random generator
+    RandomGenerator* getRandomGenerator();
     
     // Spike system access
     SpikeSystem* getSpikeSystem();
@@ -94,35 +205,35 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Memory system access
+    NeuralWorkingMemory* getWorkingMemory();
+    NeuralEpisodicMemory* getEpisodicMemory();
+    NeuralAssociativeMemory* getAssociativeMemory();
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Prediction system access
+    PredictionSystem* getPredictionSystem();
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Cognition system access
+    NeuralPlanner* getPlanner();
+    ConceptFormation* getConceptFormation();
+    AttentionalSelection* getAttention();
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Development system access
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // Reset brain state
-    void reset();
-    
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
-    
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    // Neuromodulation systems
+    Dopamine* getDopamine();
+    Curiosity* getCuriosity();
+    Novelty* getNovelty();
+    PredictionError* getPredictionErrorSignal();
     
     // Region management
-    RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
-    
-    // Get all regions
     const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
     
     // Inter-region connection management
@@ -137,65 +248,46 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-    
     // Logging
     void logStatus() const;
+    
+    // ========== BACKWARD COMPATIBILITY WRAPPERS ==========
+    
+    // Original methods (now use performance-enhanced versions)
+    void receiveSensoryInput(const class SensoryInput& input);
+    void injectCurrent(NeuronId neuron, MembranePotential current);
+    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    std::unique_ptr<class Action> produceAction();
+    void applyNeuromodulation(const class Neuromodulator& signal);
+    void updatePlasticity();
+    void develop();
+    void reset();
+    bool save(const std::string& filepath) const;
+    bool load(const std::string& filepath);
+    RegionId addRegion(const std::string& name = "");
     
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Performance monitoring
+    mutable BrainPerformanceStats performanceStats_;
+    
+    // Progress tracking
+    mutable ProgressTracker progressTracker_;
+    
+    // Memory cache
+    mutable std::unordered_map<RegionId, const NeuralRegion*> regionCache_;
+    mutable std::mutex cacheMutex_;
+    
+    // Thread pool for batch operations
+    static thread_local ThreadPool threadPool_;
+    
+    // SIMD optimization flags
+    static constexpr bool USE_SIMD = true;
+    static constexpr bool USE_VECTORIZATION = true;
+    static constexpr bool USE_PARALLEL = true;
 };
 
 } // namespace nlm
+

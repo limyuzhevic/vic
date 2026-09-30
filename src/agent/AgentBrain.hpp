@@ -4,10 +4,37 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Performance/PerformanceMonitoring.hpp"
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <numeric>
+#include <functional>
+#include <unordered_map>
+#include <chrono>
 
 namespace nlm {
+
+// Batch operation result structure
+struct BatchOperationResult {
+    size_t operationsCompleted;
+    double totalTime;
+    std::vector<double> operationTimes;
+    bool success;
+    std::string errorMessage;
+};
+
+// Performance monitoring for agent brain operations
+struct AgentBrainPerformanceStats {
+    PerformanceCounter sensoryProcessingCounter;
+    PerformanceCounter motorDecodingCounter;
+    PerformanceCounter rewardModulationCounter;
+    PerformanceCounter developmentUpdateCounter;
+    Timer avgSensoryProcessingTimer;
+    Timer avgMotorDecodingTimer;
+    Timer avgRewardModulationTimer;
+    Timer avgDevelopmentUpdateTimer;
+};
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -19,40 +46,89 @@ public:
     // Initialize with world
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
+    // ========== BATCH OPERATIONS ==========
+    
+    // Batch sensory processing
+    BatchOperationResult batchProcessSensory(const std::vector<const SensoryPercept*>& percepts,
+        bool parallel = true, bool vectorized = true);
+    
+    // Batch command decoding
+    std::vector<MotorCommand> batchDecodeCommands(size_t count = 1,
+        bool parallel = true, bool vectorized = true);
+    
+    // Batch reward modulation
+    BatchOperationResult batchApplyRewardModulation(const std::vector<std::pair<float, float>>& rewards,
+        bool parallel = true);
+    
+    // Batch development updates
+    BatchOperationResult batchUpdateDevelopment(const std::vector<double>& timesteps,
+        bool parallel = true);
+    
+    // Performance monitoring methods
+    void recordPerformanceStat(const std::string& name, double time);
+    void recordPerformanceCounter(const std::string& name, size_t count, double timePerOp = 0.0);
+    void printPerformanceReport() const;
+    void resetPerformanceStats();
+    
+    // Memory optimization utilities
+    void preAllocateMemory();
+    void optimizeMemoryAccess();
+    size_t getCurrentMemoryUsage() const;
+    
+    // Progress tracking
+    void startLongOperation(const std::string& description, size_t totalSteps);
+    void advanceProgress(size_t steps = 1);
+    std::string getProgressStatus() const;
+    
+    // Benchmarking
+    struct BenchmarkResult {
+        std::string operationName;
+        size_t iterations;
+        double totalTime;
+        double avgTime;
+        double minTime;
+        double maxTime;
+        size_t operationsPerSecond;
+    };
+    
+    BenchmarkResult benchmarkOperation(const std::string& name,
+        std::function<void()> operation, size_t iterations = 100);
+    
+    // SIMD/parallel processing
+    static void processSensoryPerceptSIMD(const std::vector<const SensoryPercept*>& percepts,
+        const std::function<void(const SensoryPercept*)>& operation);
+    
+    static void processMotorCommandSIMD(const std::vector<MotorCommand>& commands,
+        const std::function<void(MotorCommand)>& operation);
+    
+    // Thread pool for parallel operations
+    static ThreadPool& getThreadPool(size_t numThreads = std::thread::hardware_concurrency());
+    
+    // Cache management for frequently accessed data
+    void cacheSensoryData(const SensoryPercept& percept);
+    void clearSensoryCache();
+    const SensoryPercept* getCachedSensory(size_t index) const;
+    
+    // Compressed data operations
+    bool compressState(const std::string& filepath, float compressionLevel = 0.5f) const;
+    bool decompressState(std::string& filepath, float compressionLevel = 0.5f);
+    
+    // Enhanced initialization with batch setup
+    bool initializeWithBatchSetup(const std::vector<const SimpleWorld*>& worlds,
+        const std::vector<size_t>& perceptSizes);
+    
+    // Original methods (now use performance-enhanced versions)
     size_t getSensoryInputSize() const;
-    
-    // Get motor output size expected
     size_t getMotorOutputSize() const;
-    
-    // Process sensory percept and inject into brain
     void processSensoryInput(const SensoryPercept& percept);
-    
-    // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
-    
-    // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
-    
-    // Update development system
     void updateDevelopment(double timestep);
-    
-    // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
-    
-    // Get neuromodulation level
     float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
     float getCuriosityLevel() const;
-    
-    // Get novelty level
     float getNoveltyLevel() const;
-    
-    // Get prediction error
     float getPredictionError() const;
-    
-    // Reset agent for new episode
     void reset();
     
     // Get brain pointer
@@ -75,6 +151,16 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper methods for sensory processing
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    
+    // Helper methods for development
+    DevelopmentalStage getDevelopmentalStageFromAge(double age) const;
+    float getPlasticityFromAge(double age) const;
     
     std::shared_ptr<Brain> brain_;
     
@@ -112,6 +198,24 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Performance monitoring
+    mutable AgentBrainPerformanceStats performanceStats_;
+    
+    // Progress tracking
+    mutable ProgressTracker progressTracker_;
+    
+    // Memory cache
+    mutable std::unordered_map<size_t, const SensoryPercept*> sensoryCache_;
+    mutable std::mutex cacheMutex_;
+    
+    // Thread pool for batch operations
+    static thread_local ThreadPool threadPool_;
+    
+    // SIMD optimization flags
+    static constexpr bool USE_SIMD = true;
+    static constexpr bool USE_VECTORIZATION = true;
+    static constexpr bool USE_PARALLEL = true;
 };
 
 } // namespace nlm

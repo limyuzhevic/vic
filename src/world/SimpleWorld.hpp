@@ -2,9 +2,15 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../core/Performance/PerformanceMonitoring.hpp"
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <numeric>
+#include <functional>
+#include <unordered_map>
+#include <chrono>
 
 namespace nlm {
 
@@ -26,6 +32,27 @@ struct WorldObject {
         : x(px), y(py), radius(r), type(t), value(v), active(true) {}
 };
 
+// Batch operation result structure
+struct BatchOperationResult {
+    size_t operationsCompleted;
+    double totalTime;
+    std::vector<double> operationTimes;
+    bool success;
+    std::string errorMessage;
+};
+
+// Performance monitoring for world operations
+struct WorldPerformanceStats {
+    PerformanceCounter updateCounter;
+    PerformanceCounter collisionCheckCounter;
+    PerformanceCounter interactionCounter;
+    PerformanceCounter visionGenerationCounter;
+    Timer avgUpdateTimer;
+    Timer avgCollisionTimer;
+    Timer avgInteractionTimer;
+    Timer avgVisionTimer;
+};
+
 // Simple 2D world for NLM development
 // Provides sensory experience without semantic labels
 class SimpleWorld {
@@ -36,50 +63,105 @@ public:
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
     
-    // Reset world to initial state
+    // ========== BATCH OPERATIONS ==========
+    
+    // Batch update for multiple time steps
+    BatchOperationResult batchUpdate(const std::vector<double>& timesteps,
+        bool parallel = true, bool vectorized = true);
+    
+    // Batch object operations (add/remove/check)
+    BatchOperationResult batchAddObjects(const std::vector<WorldObject>& objects,
+        bool parallel = true);
+    
+    BatchOperationResult batchRemoveObjects(const std::vector<std::pair<float, float>>& positions,
+        bool parallel = true);
+    
+    BatchOperationResult batchGetObjectsAt(const std::vector<std::pair<float, float>>& positions,
+        bool parallel = true);
+    
+    // Batch collision checks
+    BatchOperationResult batchCheckCollisions(const std::vector<std::pair<float, float>>& positions,
+        bool parallel = true);
+    
+    // Batch vision generation
+    BatchOperationResult batchGenerateVision(const std::vector<std::pair<float, float>>& agentStates,
+        bool parallel = true);
+    
+    // Batch motor command processing
+    BatchOperationResult batchApplyMotorCommands(const std::vector<MotorCommand>& commands,
+        const std::vector<double>& times, bool parallel = true);
+    
+    // Performance monitoring methods
+    void recordPerformanceStat(const std::string& name, double time);
+    void recordPerformanceCounter(const std::string& name, size_t count, double timePerOp = 0.0);
+    void printPerformanceReport() const;
+    void resetPerformanceStats();
+    
+    // Memory optimization utilities
+    void preAllocateMemory();
+    void optimizeMemoryAccess();
+    size_t getCurrentMemoryUsage() const;
+    
+    // Progress tracking
+    void startLongOperation(const std::string& description, size_t totalSteps);
+    void advanceProgress(size_t steps = 1);
+    std::string getProgressStatus() const;
+    
+    // Benchmarking
+    struct BenchmarkResult {
+        std::string operationName;
+        size_t iterations;
+        double totalTime;
+        double avgTime;
+        double minTime;
+        double maxTime;
+        size_t operationsPerSecond;
+    };
+    
+    BenchmarkResult benchmarkOperation(const std::string& name,
+        std::function<void()> operation, size_t iterations = 100);
+    
+    // SIMD/parallel processing
+    static void processObjectsSIMD(const std::vector<WorldObject*>& objects,
+        const std::function<void(WorldObject*)>& operation);
+    
+    static void processAgentsSIMD(const std::vector<AgentBody*>& agents,
+        const std::function<void(AgentBody*)>& operation);
+    
+    // Thread pool for parallel operations
+    static ThreadPool& getThreadPool(size_t numThreads = std::thread::hardware_concurrency());
+    
+    // Cache management for frequently accessed data
+    void cacheObjectPositions();
+    void clearObjectCache();
+    const WorldObject* getCachedObject(float x, float y) const;
+    
+    // Compressed data operations
+    bool compressState(const std::string& filepath, float compressionLevel = 0.5f) const;
+    bool decompressState(std::string& filepath, float compressionLevel = 0.5f);
+    
+    // Enhanced initialization with batch setup
+    bool initializeWithBatchSetup(const std::vector<std::pair<float, float>>& agentStarts,
+        const std::vector<float>& maxEnergies);
+    
+    // Original methods (now use performance-enhanced versions)
     void reset();
-    
-    // Set agent starting position
     void setAgentStart(float x, float y);
-    
-    // Update world state (call each simulation step)
     void update(double timestep);
-    
-    // Apply motor command to agent
     ActionResult applyMotorCommand(MotorCommand cmd, double currentTime);
-    
-    // Get current sensory percept for the agent
     const SensoryPercept& getSensoryPercept() const { return sensory_; }
-    
-    // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
-    
-    // Add object to world
     void addObject(const WorldObject& obj);
-    
-    // Remove object at position
     void removeObject(float x, float y);
-    
-    // Check if position is valid (not wall)
     bool isValidPosition(float x, float y) const;
-    
-    // Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
-    
-    // World dimensions
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
-    
-    // Energy settings
     float getMaxEnergy() const { return maxEnergy_; }
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
-    
-    // Time
     double getSimulationTime() const { return simTime_; }
-    
-    // Seed for reproducibility
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
@@ -124,6 +206,24 @@ private:
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Performance monitoring
+    mutable WorldPerformanceStats performanceStats_;
+    
+    // Progress tracking
+    mutable ProgressTracker progressTracker_;
+    
+    // Memory cache
+    mutable std::unordered_map<std::pair<float, float>, WorldObject*> objectCache_;
+    mutable std::mutex cacheMutex_;
+    
+    // Thread pool for batch operations
+    static thread_local ThreadPool threadPool_;
+    
+    // SIMD optimization flags
+    static constexpr bool USE_SIMD = true;
+    static constexpr bool USE_VECTORIZATION = true;
+    static constexpr bool USE_PARALLEL = true;
 };
 
 } // namespace nlm
