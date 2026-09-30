@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
@@ -43,7 +45,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with enhanced features
 class Config {
 public:
     Config();
@@ -57,6 +59,15 @@ public:
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Legacy file loading (backward compatibility)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Load from JSON (future implementation)
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML (future implementation)
+    bool loadFromYAML(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -78,6 +89,9 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Enhanced setter with validation
+    bool setValidated(const std::string& key, const std::string& valueStr, ConfigSource source);
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -93,6 +107,14 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    
+    // Configuration statistics
+    size_t entryCount() const { return pImpl->entries.size(); }
+    bool isEmpty() const { return pImpl->entries.empty(); }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +122,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    bool setFromString(const std::string& key, const std::string& valueStr, ConfigSource source);
 };
 
 } // namespace nlm
