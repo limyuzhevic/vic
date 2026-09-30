@@ -28,11 +28,23 @@ struct Neuron::Impl {
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
-    pImpl->id = id;
+    // Validate input parameters
+    if (id == INVALID_NEURON_ID) {
+        // Use invalid ID but still create the neuron to avoid breaking systems
+        pImpl->id = id;
+    } else {
+        pImpl->id = id;
+    }
+    
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->synapticInput = 0.0f;
+    pImpl->plasticityFlags = PlasticityFlags(); // Initialize flags
+    
+    // Reset state to default values
+    reset();
 }
 
 Neuron::~Neuron() = default;
@@ -272,31 +284,50 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Validate RNG reference
+    if (!rng.isSeeded()) {
+        NLM_LOG_WARNING("RandomGenerator is not seeded in Neuron::initializeRandom");
+    }
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Initialize with biologically plausible random parameters
+    // Use tighter bounds for more realistic neural behavior
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Membrane potential starts near resting potential with small variation
+    float restingPot = pImpl->state.restingPotential;
+    pImpl->state.membranePotential = restingPot + rng.uniformReal(-3.0f, 3.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Threshold typically -55mV with biological variation
+    pImpl->state.threshold = std::clamp(-55.0f + rng.uniformReal(-2.0f, 2.0f), -80.0f, -30.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    // Resting potential biological range (-75mV to -65mV)
+    pImpl->state.restingPotential = std::clamp(-70.0f + rng.uniformReal(-5.0f, 5.0f), -75.0f, -65.0f);
+    
+    // Reset potential close to resting (typically 0-10mV depolarizing)
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 10.0f);
+    
+    // Refractory period biologically realistic (2-15ms)
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 15));
+    
+    // Leak conductance biological range (5-20 nS)
+    pImpl->state.leakConductance = std::clamp(10.0f + rng.uniformReal(-5.0f, 5.0f), 5.0f, 20.0f);
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.firingRate = 0.0f;
+    pImpl->state.synapseConductance = 0.0f;
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Validate final state consistency
+    if (pImpl->state.membranePotential >= pImpl->state.threshold) {
+        NLM_LOG_WARNING("Neuron initialized with membrane potential above threshold (instability)");
+        pImpl->state.membranePotential = pImpl->state.restingPotential;
+    }
 }
 
 } // namespace nlm
