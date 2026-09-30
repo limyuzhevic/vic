@@ -47,6 +47,9 @@ public:
     // Create neuron with ID
     explicit Neuron(NeuronId id);
     
+    // Create neuron with ID and configuration
+    Neuron(NeuronId id, std::shared_ptr<class Config> config = nullptr);
+    
     ~Neuron();
     
     // Disable copying, enable moving
@@ -142,6 +145,9 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Initialize with configuration parameters
+    void initializeFromConfig(std::shared_ptr<class Config> config);
     
 private:
     struct Impl;

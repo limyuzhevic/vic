@@ -134,7 +134,15 @@ void Config::set(const std::string& key, int value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, float value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
@@ -198,8 +206,8 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
-
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
@@ -211,5 +219,13 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Additional template instantiations for common types
+
+template std::optional<size_t> Config::get<size_t>(const std::string&) const;
+template size_t Config::getOr<size_t>(const std::string&, const size_t&) const;
+
+template std::optional<float> Config::get<float>(const std::string&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
 
 } // namespace nlm
