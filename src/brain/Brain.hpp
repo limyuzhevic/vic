@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Neuron;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

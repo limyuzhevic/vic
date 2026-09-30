@@ -1,7 +1,16 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+// Helper method to convert weak pointers to shared pointers for use
+std::vector<Neuron*> AgentBrain::getNeuronPointers(const std::vector<std::weak_ptr<Neuron>>& weakNeurons) const {
+    std::vector<Neuron*> result;
+    result.reserve(weakNeurons.size());
+    
+    for (const auto& weakNeuron : weakNeurons) {
+        if (auto neuron = weakNeuron.lock()) {
+            result.push_back(neuron.get());
+        }
+    }
+    
+    return result;
+}
 
 namespace nlm {
 
@@ -27,32 +36,36 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (auto& neuron : pop->getNeurons()) {
+                        // Convert to shared_ptr for storage, then to weak_ptr
+                        auto neuronShared = std::shared_ptr<Neuron>(neuron, [](Neuron*) {});
                         // Distribute motor neurons to different action groups
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 0: motorForward_.push_back(neuronShared); break;
+                            case 1: motorBackward_.push_back(neuronShared); break;
+                            case 2: motorTurnLeft_.push_back(neuronShared); break;
+                            case 3: motorTurnRight_.push_back(neuronShared); break;
+                            case 4: motorInteract_.push_back(neuronShared); break;
+                            case 5: motorWait_.push_back(neuronShared); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
+                    for (auto& neuron : pop->getNeurons()) {
+                        // Convert to shared_ptr for storage, then to weak_ptr
+                        auto neuronShared = std::shared_ptr<Neuron>(neuron, [](Neuron*) {});
                         // Distribute sensory neurons
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                            case 0: sensoryVision_.push_back(neuronShared); break;
+                            case 1: sensoryTouch_.push_back(neuronShared); break;
+                            case 2: sensoryInternal_.push_back(neuronShared); break;
+                            case 3: sensoryProprioception_.push_back(neuronShared); break;
                         }
                     }
                 }
@@ -87,40 +100,46 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
+    // Get neuron pointers from weak references
+    auto visionNeurons = getNeuronPointers(sensoryVision_);
+    auto touchNeurons = getNeuronPointers(sensoryTouch_);
+    auto internalNeurons = getNeuronPointers(sensoryInternal_);
+    auto proprioceptionNeurons = getNeuronPointers(sensoryProprioception_);
+    
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+    for (size_t i = 0; i < visionNeurons.size() && i < vision.size(); ++i) {
+        if (visionNeurons[i]) {
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+            visionNeurons[i]->injectCurrent(current);
         }
     }
     
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+    for (size_t i = 0; i < touchNeurons.size() && i < touch.size(); ++i) {
+        if (touchNeurons[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+            touchNeurons[i]->injectCurrent(current);
         }
     }
     
     // Internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
+    for (size_t i = 0; i < internalNeurons.size() && i < intern.size(); ++i) {
+        if (internalNeurons[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+            internalNeurons[i]->injectCurrent(current);
         }
     }
     
     // Proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+    for (size_t i = 0; i < proprioceptionNeurons.size() && i < proprio.size(); ++i) {
+        if (proprioceptionNeurons[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+            proprioceptionNeurons[i]->injectCurrent(current);
         }
     }
     
@@ -163,6 +182,14 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    // Get neuron pointers from weak references
+    auto forwardNeurons = getNeuronPointers(motorForward_);
+    auto backwardNeurons = getNeuronPointers(motorBackward_);
+    auto leftNeurons = getNeuronPointers(motorTurnLeft_);
+    auto rightNeurons = getNeuronPointers(motorTurnRight_);
+    auto interactNeurons = getNeuronPointers(motorInteract_);
+    auto waitNeurons = getNeuronPointers(motorWait_);
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
@@ -174,12 +201,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    float forwardAct = calcActivity(forwardNeurons);
+    float backwardAct = calcActivity(backwardNeurons);
+    float leftAct = calcActivity(leftNeurons);
+    float rightAct = calcActivity(rightNeurons);
+    float interactAct = calcActivity(interactNeurons);
+    float waitAct = calcActivity(waitNeurons);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {

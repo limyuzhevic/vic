@@ -82,7 +82,7 @@ public:
     void setRefractoryPeriod(uint32_t steps);
     void decrementRefractory();
     
-    // Firing rate (for rate-based computation)
+        // Firing rate (for rate-based computation)
     FiringRate getFiringRate() const;
     void setFiringRate(FiringRate rate);
     
@@ -93,6 +93,23 @@ public:
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
+    
+    // State modification with validation
+    void setState(const NeuronState& state);
+    
+    // Parameter validation helpers (for advanced users)
+    static float validateAndClampMembranePotential(MembranePotential potential);
+    static float validateAndClampThreshold(MembranePotential threshold);
+    static float validateAndClampRestingPotential(MembranePotential potential);
+    static float validateAndClampResetPotential(MembranePotential potential);
+    static float validateAndClampLeakConductance(MembranePotential conductance);
+    static uint32_t validateAndClampRefractoryPeriod(uint32_t period);
+    static bool isValidMembranePotential(float potential);
+    static bool isValidThreshold(float threshold);
+    static bool isValidRestingPotential(float potential);
+    static bool isValidResetPotential(float potential);
+    static bool isValidLeakConductance(float conductance);
+    static bool isValidRefractoryPeriod(uint32_t period);
     
     // Spike detection
     bool checkThreshold() const;

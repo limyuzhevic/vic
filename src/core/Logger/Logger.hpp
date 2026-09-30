@@ -116,6 +116,47 @@ private:
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
 
+// Enhanced logging with error context
+#define NLM_LOG_DEBUG_CTX(msg, op) \
+    nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
+
+#define NLM_LOG_INFO_CTX(msg, op) \
+    nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
+
+#define NLM_LOG_WARNING_CTX(msg, op) \
+    nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
+
+#define NLM_LOG_ERROR_CTX(msg, op) \
+    nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
+
+#define NLM_LOG_CRITICAL_CTX(msg, op) \
+    nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Exception handling macros
+#define NLM_THROW_CONFIG_ERROR(msg, component) \
+    do { \
+        throw nlm::ConfigError(msg, component); \
+    } while(0)
+
+#define NLM_THROW_MEMORY_ERROR(msg, component) \
+    do { \
+        throw nlm::MemoryError(msg, component); \
+    } while(0)
+
+#define NLM_THROW_SIMULATION_ERROR(msg, component) \
+    do { \
+        throw nlm::SimulationError(msg, component); \
+    } while(0)
+
+#define NLM_THROW_PLASTICITY_ERROR(msg, component) \
+    do { \
+        throw nlm::PlasticityError(msg, component); \
+    } while(0)
+
+// Error recovery macros
+#define NLM_TRY_RECOVER(operation, operation_name) \
+    nlm::ErrorRecovery::tryRecover(operation, operation_name)
+
 // Stream-style logging helper
 class LogStream {
 public:
