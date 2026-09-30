@@ -1,0 +1,27 @@
+# Example YAML configuration file
+entries:
+  server:
+    description: Server configuration
+    unit: object
+    value:
+      host: localhost
+      port: 8080
+      enabled: true
+  database:
+    description: Database configuration
+    unit: object
+    value:
+      url: postgresql://localhost:5432/mydb
+      pool_size: 10
+      ssl_enabled: true
+
+groups:
+  server:
+    description: Server configuration
+    priority: 50
+    isGlobal: false
+  database:
+    description: Database configuration
+    priority: 60
+    isGlobal: false
+

@@ -1,7 +1,10 @@
 // Config Tests
 #include "core/Config/Config.hpp"
+#include "core/AdvancedConfig.hpp"
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <vector>
 
 namespace test_config {
 
@@ -78,12 +81,117 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+// Test enhanced configuration system
+void testAdvancedConfig() {
+    nlm::Config config;
+    
+    // Test setting and getting with metadata
+    config.set("host", "localhost", nlm::ConfigSource::Runtime);
+    config.set("port", 8080, nlm::ConfigSource::Runtime);
+    config.set("enabled", true, nlm::ConfigSource::Runtime);
+    
+    assert(config.has("host"));
+    assert(config.has("port"));
+    assert(config.has("enabled"));
+    
+    auto host = config.get<std::string>("host");
+    assert(host.has_value() && *host == "localhost");
+    
+    auto port = config.get<int>("port");
+    assert(port.has_value() && *port == 8080);
+    
+    auto enabled = config.get<bool>("enabled");
+    assert(enabled.has_value() && *enabled == true);
+    
+    // Test configuration summary
+    std::string summary = config.summary();
+    assert(summary.find("host") != std::string::npos);
+    assert(summary.find("port") != std::string::npos);
+    assert(summary.find("enabled") != std::string::npos);
+    
+    // Test configuration keys
+    auto keys = config.getKeys();
+    assert(keys.size() == 3);
+    assert(std::find(keys.begin(), keys.end(), "host") != keys.end());
+    assert(std::find(keys.begin(), keys.end(), "port") != keys.end());
+    assert(std::find(keys.begin(), keys.end(), "enabled") != keys.end());
+    
+    std::cout << "    testAdvancedConfig passed" << std::endl;
+}
+
+// Test group management
+void testConfigGroups() {
+    nlm::Config config;
+    
+    // Create a test group
+    nlm::ConfigGroup group("server", "Server configuration", 50);
+    config.addGroup(group);
+    
+    // Add entries to group
+    config.set("host", "localhost", nlm::ConfigSource::Runtime);
+    config.set("port", 8080, nlm::ConfigSource::Runtime);
+    
+    // Test group management
+    auto groupNames = config.getGroupNames();
+    assert(groupNames.size() == 1);
+    assert(std::find(groupNames.begin(), groupNames.end(), "server") != groupNames.end());
+    
+    nlm::ConfigGroup* foundGroup = config.getGroup("server");
+    assert(foundGroup != nullptr);
+    assert(foundGroup->name == "server");
+    
+    // Test group member management
+    config.addToGroup("server", "host");
+    bool isInGroup = config.isInGroup("server", "host");
+    assert(isInGroup);
+    
+    std::cout << "    testConfigGroups passed" << std::endl;
+}
+
+// Test backward compatibility
+void testBackwardCompatibility() {
+    nlm::Config config;
+    
+    // Test legacy file loading format
+    std::ofstream legacyFile("legacy_config.txt");
+    legacyFile << "# Legacy configuration file\n";
+    legacyFile << "host = localhost\n";
+    legacyFile << "port = 8080\n";
+    legacyFile << "enabled = true\n";
+    legacyFile.close();
+    
+    bool loaded = config.loadFromFile("legacy_config.txt");
+    assert(loaded);
+    
+    // Test legacy format parsing
+    assert(config.has("host"));
+    assert(config.has("port"));
+    assert(config.has("enabled"));
+    
+    auto host = config.get<std::string>("host");
+    assert(host.has_value() && *host == "localhost");
+    
+    auto port = config.get<int>("port");
+    assert(port.has_value() && *port == 8080);
+    
+    auto enabled = config.get<bool>("enabled");
+    assert(enabled.has_value() && *enabled == true);
+    
+    // Clean up
+    std::remove("legacy_config.txt");
+    
+    std::cout << "    testBackwardCompatibility passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testAdvancedConfig();
+    testConfigGroups();
+    testBackwardCompatibility();
 }
 
 } // namespace test_config

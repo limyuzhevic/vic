@@ -26,6 +26,11 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/AdvancedConfig.cpp
+    src/core/JSONConfigParser.cpp
+    src/core/YAMLConfigParser.cpp
+    src/core/ConfigSchema.cpp
+    src/core/ConfigGroups.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
