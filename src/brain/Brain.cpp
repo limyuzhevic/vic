@@ -509,10 +509,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+    // ========== STEP 8b: Update neural prediction system ==========
+    // Use NeuralPrediction for real-time predictive coding
+    // This creates a forward model that predicts what will happen next
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from working memory
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!currentSensoryState.empty()) {
+            // Record current sensory state for prediction learning
+            // This is part of the predictive coding loop
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->store(currentSensoryState, 1.0f);
+            }
+            
+            // Generate prediction for what should happen next
+            // This uses the neural prediction system to create expectations
+            // Based on learned sequences and patterns
+            auto predicted = pImpl->predictionSystem->predictNextState(currentSensoryState);
+            
+            if (!predicted.empty()) {
+                // Update prediction system with predicted state
+                // This enables learning through prediction error
+                float predictionError = pImpl->predictionSystem->updateWithObservation(
+                    predicted, currentStep);
+                
+                // Log prediction activity for debugging
+                NLM_LOG_DEBUG("NeuralPrediction active - error: " + std::to_string(predictionError));
+                
+                // The prediction error drives learning and adaptation
+                // Lower error = better predictions = less need for plasticity
+                // Higher error = better learning = more plasticity needed
+                
+                // Use prediction error to modulate learning rates
+                if (pImpl->dopamine && predictionError > 0.3f) {
+                    // High prediction error = increased learning
+                    pImpl->dopamine->setLevel(0.8f);
+                    NLM_LOG_DEBUG("High prediction error - increasing dopamine for learning");
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +563,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Attention also modulates neural excitability based on what's being attended
+        // This creates top-down influence on neural processing
+        if (pImpl->attention->getWinners().size() > 0) {
+            for (const auto& winnerNeuron : pImpl->attention->getWinners()) {
+                // Find the neuron and increase its excitability
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == winnerNeuron) {
+                                // Attended neurons get a boost in excitability
+                                neuron->injectCurrent(0.5f);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation needs sensory state encoding to discover patterns
+        // We'll use the working memory's current representation as sensory state
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also get predicted state from prediction system if available
+        std::vector<float> predictedSensoryState;
+        if (pImpl->predictionSystem && pImpl->predictionSystem->getPredictionError() > 0.5f) {
+            // Use the prediction system's error signal to drive concept formation
+            // This creates a feedback loop between prediction and concept learning
+            predictedSensoryState = currentSensoryState; // Simplified for now
+        }
+        
+        // In a full implementation, concept formation would:
+        // 1. Analyze currentSensoryState to form/discover concepts
+        // 2. Use predictedSensoryState to understand expected patterns
+        // 3. Learn from prediction errors to refine concepts
+        
+        // For now, just update concept formation with available data
+        if (!currentSensoryState.empty()) {
+            // This would be the actual API call in a full implementation:
+            // pImpl->conceptFormation->presentExperience(currentSensoryState, features, reward, currentStep);
+            // For now, just log that we're presenting sensory data for concept formation
+            NLM_LOG_DEBUG("Concept formation would analyze sensory state of size: " + std::to_string(currentSensoryState.size()));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

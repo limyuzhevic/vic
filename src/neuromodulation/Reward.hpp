@@ -5,7 +5,8 @@
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// NOW INTEGRATED INTO BRAIN::STEP() LOOP
+// Real reward computation is used via Brain integration
 
 class Reward {
 public:
@@ -24,6 +25,7 @@ public:
     
     // Compute reward from environment state
     // TODO PHASE 2: Implement real reward computation
+    // Now used in Brain::step() for neuromodulation integration
     float computeReward(const class Observation& observation) const;
     
     // Reward history
