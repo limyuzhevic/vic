@@ -6,8 +6,31 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
+
+// Forward declaration for helper functions
+void initializeNeuronGroups(std::vector<Neuron*>& motorForward, 
+                           std::vector<Neuron*>& motorBackward,
+                           std::vector<Neuron*>& motorTurnLeft,
+                           std::vector<Neuron*>& motorTurnRight,
+                           std::vector<Neuron*>& motorInteract,
+                           std::vector<Neuron*>& motorWait,
+                           std::vector<Neuron*>& sensoryVision,
+                           std::vector<Neuron*>& sensoryTouch,
+                           std::vector<Neuron*>& sensoryInternal,
+                           std::vector<Neuron*>& sensoryProprioception,
+                           const Brain* brain);
+
+float calculateGroupActivity(const std::vector<Neuron*>& neurons);
+
+MotorCommand exploreWithCuriosity(RandomGenerator* rng, float exploreChance, 
+                                  const std::vector<MotorCommand>& validCommands);
+
+bool validateBrainPtr(const std::shared_ptr<Brain>& brain, const char* operation);
+
+float clamp(float value, float min, float max);
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
@@ -15,6 +38,12 @@ class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
+    
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
     
     // Initialize with world
     void initialize(const SimpleWorld& world);
