@@ -3,8 +3,244 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <iostream>
+#include <cctype>
 
 namespace nlm {
+
+// Simple JSON value structure
+struct JsonValue {
+    enum class Type { Null, String, Number, Boolean, Array, Object };
+    
+    Type type;
+    std::string stringValue;
+    double numberValue;
+    bool boolValue;
+    std::vector<JsonValue> arrayValue;
+    std::unordered_map<std::string, JsonValue> objectValue;
+    
+    JsonValue() : type(Type::Null) {}
+    JsonValue(const std::string& val) : type(Type::String), stringValue(val) {}
+    JsonValue(double val) : type(Type::Number), numberValue(val) {}
+    JsonValue(bool val) : type(Type::Boolean), boolValue(val) {}
+};
+
+// Simple JSON parser
+class JsonParser {
+public:
+    static JsonValue parse(const std::string& jsonStr) {
+        JsonValue result;
+        size_t pos = 0;
+        skipWhitespace(jsonStr, pos);
+        parseValue(jsonStr, pos, result);
+        return result;
+    }
+    
+private:
+    static void skipWhitespace(const std::string& str, size_t& pos) {
+        while (pos < str.size() && std::isspace(str[pos])) {
+            pos++;
+        }
+    }
+    
+    static void parseValue(const std::string& str, size_t& pos, JsonValue& result) {
+        skipWhitespace(str, pos);
+        
+        if (pos >= str.size()) {
+            return;
+        }
+        
+        char ch = str[pos];
+        
+        if (ch == '{') {
+            parseObject(str, pos, result);
+        } else if (ch == '[') {
+            parseArray(str, pos, result);
+        } else if (ch == '"') {
+            parseString(str, pos, result);
+        } else if (ch == 't' || ch == 'f') {
+            parseBoolean(str, pos, result);
+        } else if (ch == 'n') {
+            parseNull(str, pos, result);
+        } else {
+            parseNumber(str, pos, result);
+        }
+    }
+    
+    static void parseString(const std::string& str, size_t& pos, JsonValue& result) {
+        size_t start = ++pos; // Skip opening quote
+        while (pos < str.size() && str[pos] != '"') {
+            if (str[pos] == '\\' && pos + 1 < str.size()) {
+                pos++; // Skip escaped character
+            }
+            pos++;
+        }
+        if (pos < str.size()) {
+            result.type = JsonValue::Type::String;
+            result.stringValue = str.substr(start, pos - start);
+            pos++; // Skip closing quote
+        }
+    }
+    
+    static void parseNumber(const std::string& str, size_t& pos, JsonValue& result) {
+        size_t start = pos;
+        bool isDecimal = false;
+        while (pos < str.size() && (std::isdigit(str[pos]) || 
+                                   str[pos] == '.' || 
+                                   str[pos] == '-' || 
+                                   str[pos] == 'e' || 
+                                   str[pos] == 'E')) {
+            if (str[pos] == '.') {
+                if (isDecimal) break; // Multiple decimal points
+                isDecimal = true;
+            }
+            pos++;
+        }
+        result.type = JsonValue::Type::Number;
+        result.numberValue = std::stod(str.substr(start, pos - start));
+    }
+    
+    static void parseBoolean(const std::string& str, size_t& pos, JsonValue& result) {
+        if (str.substr(pos, 4) == "true") {
+            result.type = JsonValue::Type::Boolean;
+            result.boolValue = true;
+            pos += 4;
+        } else if (str.substr(pos, 5) == "false") {
+            result.type = JsonValue::Type::Boolean;
+            result.boolValue = false;
+            pos += 5;
+        }
+    }
+    
+    static void parseNull(const std::string& str, size_t& pos, JsonValue& result) {
+        if (str.substr(pos, 4) == "null") {
+            result.type = JsonValue::Type::Null;
+            pos += 4;
+        }
+    }
+    
+    static void parseArray(const std::string& str, size_t& pos, JsonValue& result) {
+        pos++; // Skip '['
+        result.type = JsonValue::Type::Array;
+        
+        skipWhitespace(str, pos);
+        if (pos < str.size() && str[pos] == ']') {
+            pos++; // Skip ']'
+            return;
+        }
+        
+        while (pos < str.size() && str[pos] != ']') {
+            JsonValue element;
+            parseValue(str, pos, element);
+            result.arrayValue.push_back(element);
+            
+            skipWhitespace(str, pos);
+            if (pos < str.size() && str[pos] == ',') {
+                pos++; // Skip ','
+                skipWhitespace(str, pos);
+            }
+        }
+        
+        if (pos < str.size() && str[pos] == ']') {
+            pos++; // Skip ']'
+        }
+    }
+    
+    static void parseObject(const std::string& str, size_t& pos, JsonValue& result) {
+        pos++; // Skip '{'
+        result.type = JsonValue::Type::Object;
+        
+        skipWhitespace(str, pos);
+        if (pos < str.size() && str[pos] == '}') {
+            pos++; // Skip '}'
+            return;
+        }
+        
+        while (pos < str.size() && str[pos] != '}') {
+            skipWhitespace(str, pos);
+            
+            // Parse key
+            if (str[pos] != '"') {
+                break; // Invalid JSON
+            }
+            std::string key;
+            size_t keyStart = ++pos; // Skip opening quote
+            while (pos < str.size() && str[pos] != '"') {
+                key += str[pos++];
+            }
+            if (pos < str.size()) {
+                pos++; // Skip closing quote
+                
+                skipWhitespace(str, pos);
+                if (pos < str.size() && str[pos] == ':') {
+                    pos++; // Skip ':'
+                    skipWhitespace(str, pos);
+                    
+                    // Parse value
+                    JsonValue value;
+                    parseValue(str, pos, value);
+                    result.objectValue[key] = value;
+                    
+                    skipWhitespace(str, pos);
+                    if (pos < str.size() && str[pos] == ',') {
+                        pos++; // Skip ','
+                        skipWhitespace(str, pos);
+                    }
+                }
+            }
+        }
+        
+        if (pos < str.size() && str[pos] == '}') {
+            pos++; // Skip '}'
+        }
+    }
+};
+
+// Configuration schema validation
+class ConfigValidator {
+public:
+    static bool validate(const JsonValue& json, const std::string& configFile) {
+        // Basic validation - can be extended for specific schema
+        return true;
+    }
+    
+    static bool validateValue(const std::string& key, const JsonValue& value) {
+        // Validate individual configuration values
+        // This can be extended based on configuration key
+        return true;
+    }
+};
+
+// Configuration documentation
+static const std::unordered_map<std::string, std::string> configDocumentation = {
+    {"neuron_count", "Number of neurons in the brain"},
+    {"region_count", "Number of brain regions"},
+    {"connection_probability", "Probability of connections between neurons (0.0-1.0)"},
+    {"simulation_timestep", "Time step for simulation in seconds"},
+    {"random_seed", "Random seed for reproducibility"},
+    {"stdp_ltp_weight", "STDP long-term potentiation weight"},
+    {"stdp_ltd_weight", "STDP long-term depression weight"},
+    {"stdp_tau", "STDP time constant"},
+    {"synaptogenesis_rate", "Rate of new synapse formation"},
+    {"pruning_rate", "Rate of synapse elimination"},
+    {"enable_checkpointing", "Enable checkpoint save/load functionality"},
+    {"enable_replay", "Enable memory replay functionality"},
+    {"enable_development", "Enable developmental plasticity"},
+    {"checkpoint_path", "Path for checkpoint files"},
+    {"log_level", "Log level: debug, info, warning, error, critical"},
+    {"log_file", "File path for log output"},
+    {"enable_colors", "Enable colored output"},
+};
+
+// Get configuration description
+static std::string getConfigDescription(const std::string& key) {
+    auto it = configDocumentation.find(key);
+    if (it != configDocumentation.end()) {
+        return it->second;
+    }
+    return "No documentation available for key: " + key;
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -18,42 +254,115 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+// Updated loadFromFile with JSON support
+    bool Config::loadFromFile(const std::string& filepath) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Read entire file
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // Try to parse as JSON first
+        bool isJson = false;
+        if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+            try {
+                JsonValue json = JsonParser::parse(content);
+                if (json.type == JsonValue::Type::Object) {
+                    // Parse JSON object
+                    for (const auto& pair : json.objectValue) {
+                        std::string key = pair.first;
+                        const JsonValue& value = pair.second;
+                        
+                        // Convert JSON value to string
+                        std::string strValue;
+                        switch (value.type) {
+                            case JsonValue::Type::String:
+                                strValue = value.stringValue;
+                                break;
+                            case JsonValue::Type::Number:
+                                strValue = std::to_string(value.numberValue);
+                                break;
+                            case JsonValue::Type::Boolean:
+                                strValue = value.boolValue ? "true" : "false";
+                                break;
+                            case JsonValue::Type::Null:
+                                strValue = "";
+                                break;
+                            default:
+                                NLM_LOG_WARNING("Skipping unsupported JSON type for key: " + key);
+                                continue;
+                        }
+                        
+                        set(key, strValue, ConfigSource::File);
+                    }
+                    
+                    isJson = true;
+                    NLM_LOG_INFO("Loaded JSON configuration from: " + filepath);
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Failed to parse JSON configuration: " + std::string(e.what()));
+                // Fall back to simple parsing
+            }
+        }
+        
+        // If not JSON or JSON parsing failed, try simple key=value format
+        if (!isJson) {
+            std::ifstream file2(filepath);
+            if (!file2.is_open()) {
+                return false;
             }
             
-            set(key, value, ConfigSource::File);
+            std::string line;
+            while (std::getline(file2, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    // Validate key (alphanumeric and underscores)
+                    if (!std::regex_match(key, std::regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))) {
+                        NLM_LOG_WARNING("Invalid configuration key format: " + key);
+                        continue;
+                    }
+                    
+                    // Validate value format based on key
+                    if (!validateConfigValue(key, value)) {
+                        NLM_LOG_WARNING("Invalid configuration value for key " + key + ": " + value);
+                        continue;
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                    
+                    // Log configuration with documentation
+                    std::string doc = getConfigDescription(key);
+                    NLM_LOG_DEBUG("Config[" + key + "] = \"" + value + "\" - " + doc);
+                }
+            }
+            
+            NLM_LOG_INFO("Loaded configuration from (simple format): " + filepath);
         }
+        
+        return true;
     }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {

@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <regex>
 
 namespace nlm {
 
@@ -93,6 +95,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration value
+    bool validateConfigValue(const std::string& key, const std::string& value);
+    
+    // Get configuration documentation
+    static std::string getConfigDescription(const std::string& key);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +108,27 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+};
+
+// Configuration documentation
+static const std::unordered_map<std::string, std::string> configDocumentation = {
+    {"neuron_count", "Number of neurons in the brain"},
+    {"region_count", "Number of brain regions"},
+    {"connection_probability", "Probability of connections between neurons (0.0-1.0)"},
+    {"simulation_timestep", "Time step for simulation in seconds"},
+    {"random_seed", "Random seed for reproducibility"},
+    {"stdp_ltp_weight", "STDP long-term potentiation weight"},
+    {"stdp_ltd_weight", "STDP long-term depression weight"},
+    {"stdp_tau", "STDP time constant"},
+    {"synaptogenesis_rate", "Rate of new synapse formation"},
+    {"pruning_rate", "Rate of synapse elimination"},
+    {"enable_checkpointing", "Enable checkpoint save/load functionality"},
+    {"enable_replay", "Enable memory replay functionality"},
+    {"enable_development", "Enable developmental plasticity"},
+    {"checkpoint_path", "Path for checkpoint files"},
+    {"log_level", "Log level: debug, info, warning, error, critical"},
+    {"log_file", "File path for log output"},
+    {"enable_colors", "Enable colored output"},
 };
 
 } // namespace nlm
