@@ -19,16 +19,21 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    #include "ErrorHandling.hpp"
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath, 
+                     NLMErrorCategory::IO, "File not found or permission denied");
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,34 +53,61 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Error parsing config file: " + filepath + " line " + std::to_string(lineNumber) + ": " + e.what(),
+                             NLMErrorCategory::Configuration, "Invalid key=value format");
+                // Continue processing other lines instead of failing completely
+            }
+        } else {
+            NLM_LOG_WARNING("Skipping invalid line in config file: " + filepath + " line " + std::to_string(lineNumber));
         }
     }
     
+    NLM_LOG_INFO("Successfully loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from: " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+    try {
+        // Use advanced command line parser for better argument handling
+        #include "CommandLineParser.hpp"
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        // Create a simple parser for backward compatibility
+        CommandLineParser parser;
+        std::map<std::string, std::string> parsedArgs;
+        
+        // Parse arguments
+        if (!parser.parse(argc, argv, parsedArgs)) {
+            return false;
+        }
+        
+        // Process parsed arguments
+        for (const auto& pair : parsedArgs) {
+            const std::string& name = pair.first;
+            const std::string& value = pair.second;
+            
+            // Skip help and version flags
+            if (name == "help" || name == "version") {
+                continue;
+            }
+            
+            try {
+                set(name, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                // Log error but continue processing other arguments
+                // In production, this would use proper logging
+                std::cerr << "Warning: Failed to parse argument '--" << name 
+                         << "': " << e.what() << std::endl;
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing command line arguments: " << e.what() << std::endl;
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
