@@ -6,209 +6,191 @@
 #include <memory>
 #include <deque>
 #include <functional>
+#include <unordered_map>
+#include <algorithm>
+#include <cmath>
+#include <chrono>
 
 namespace nlm {
 
-// EpisodicMemoryItem: Represents a stored experience
-// NOT a textual record - stores neural activity patterns and associations
-struct EpisodicMemoryItem {
+// EnhancedEpisodicMemoryItem: Represents a stored experience with multimodal components
+struct EnhancedEpisodicMemoryItem {
     SimulationStep timestamp;
     
-    // Sensory state at time of experience (encoded as activity pattern)
-    std::vector<float> sensoryState;
+    // Modalities: sensory, motor, reward, emotional
+    struct {
+        std::vector<float> sensoryState;    // Visual, auditory, tactile, proprioceptive
+        std::vector<float> motorState;     // Action executed
+        float reward;                      // Reward prediction error
+        float emotion;                     // Emotional valence
+        float novelty;                     // Novelty detection
+        float energy;                      // Energy levels
+        float attention;                   // Attentional focus
+    } modalities;
     
-    // Location/position information
+    // Temporal information
+    SimulationStep episodeAge;
+    std::vector<SimulationStep> temporalSequence;
+    
+    // Context information
     float positionX;
     float positionY;
     float orientation;
+    std::string locationTag;
     
-    // Action taken (if any)
-    ActionType action;
-    
-    // Internal state (energy, reward, etc.)
-    float reward;
-    float energy;
-    float novelty;
-    
-    // Consequence of action
-    std::vector<float> resultingSensoryState;
-    float resultingReward;
-    
-    // Associated neural activity pattern (who was firing)
+    // Neural representation
     std::vector<NeuronId> activeNeurons;
     std::vector<float> neuronActivations;
+    std::vector<NeuronId> replayNeurons;
     
-    // Time since this episode
-    SimulationStep age;
+    // Meta-information
+    float relevanceScore;
+    float consolidationStrength;
+    bool isConsolidated;
+    SimulationStep lastReplayStep;
+    std::vector<size_t> relatedEpisodeIds;
     
-    EpisodicMemoryItem()
-        : timestamp(0), positionX(0), positionY(0), orientation(0)
-        , action(ActionType::Wait)
-        , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+    EnhancedEpisodicMemoryItem()
+        : timestamp(0), episodeAge(0), relevanceScore(0.0f), 
+          consolidationStrength(0.0f), isConsolidated(false),
+          lastReplayStep(0), positionX(0), positionY(0), orientation(0) {
+        modalities.reward = 0.0f;
+        modalities.emotion = 0.0f;
+        modalities.novelty = 0.0f;
+        modalities.energy = 0.0f;
+        modalities.attention = 0.0f;
+    }
 };
 
-// NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate
-// NOT a database - episodes are encoded as synaptic patterns and can influence neural activity
-//
-// Key mechanisms:
-// - Episodes stored as neural activity patterns
-// - Retrieval via pattern completion (Hopfield-like)
-// - Temporal ordering through timestamps
-// - Relevance-weighted recall
-// - Replay during offline periods
-
+// NeuralEpisodicMemory: Enhanced with real-time capture and temporal compression
 class NeuralEpisodicMemory {
 public:
     NeuralEpisodicMemory();
     ~NeuralEpisodicMemory();
-
-    // Initialize with brain reference
+    
     void initialize(Brain* brain);
-
-    // Store a new experience
-    // The experience is encoded as neural activity and can influence future processing
-    void storeEpisode(const EpisodicMemoryItem& episode);
-
-    // Retrieve episodes similar to a query pattern
-    // Returns episodes ordered by relevance
-    std::vector<const EpisodicMemoryItem*> retrieveSimilar(const std::vector<float>& sensoryPattern,
-                                                           size_t maxResults = 5) const;
-
-    // Retrieve episodes from a specific time window
-    std::vector<const EpisodicMemoryItem*> retrieveTemporal(SimulationStep startTime,
-                                                            SimulationStep endTime,
-                                                            size_t maxResults = 10) const;
-
-    // Retrieve episodes by location
-    std::vector<const EpisodicMemoryItem*> retrieveByLocation(float x, float y,
-                                                             float radius,
-                                                             size_t maxResults = 5) const;
-
-    // Retrieve episodes following a specific action
-    std::vector<const EpisodicMemoryItem*> retrieveAfterAction(ActionType action,
-                                                              size_t maxResults = 5) const;
-
-    // Replay an episode - reactivates the neural patterns associated with it
-    // This allows the brain to "relive" the experience
-    void replayEpisode(const EpisodicMemoryItem* episode);
-
-    // Update episode relevance based on recent use
-    void updateRelevance(SimulationStep episodeId, float relevanceDelta);
-
-    // Get episode by index
-    const EpisodicMemoryItem* getEpisode(size_t index) const;
-
-    // Get total number of episodes
-    size_t getEpisodeCount() const { return episodes_.size(); }
-
-    // Get recent episodes
-    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
-
-    // Get average reward from episodes
-    float getAverageReward() const;
-
-    // Clear old episodes
-    void consolidate(float relevanceThreshold);
-
-    // Clear all episodes
-    void clear();
-
-    // Enable/disable replay
-    void enableReplay(bool enable) { replayEnabled_ = enable; }
-    bool isReplayEnabled() const { return replayEnabled_; }
-
-    // Get episodes for replay (selection based on relevance and recency)
-    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
-
-    // Replay multiple episodes (for sleep-like consolidation)
+    
+    // Enhanced episodic memory storage with real-time capture
+    void storeEpisode(const EnhancedEpisodicMemoryItem& episode);
+    void storeWithCompression(const EnhancedEpisodicMemoryItem& episode);
+    
+    // Multimodal retrieval with temporal compression
+    std::vector<const EnhancedEpisodicMemoryItem*> retrieveSimilar(
+        const std::vector<float>& sensoryPattern,
+        size_t maxResults = 5,
+        float relevanceThreshold = 0.3f) const;
+    
+    // Context-dependent retrieval
+    std::vector<const EnhancedEpisodicMemoryItem*> retrieveByContext(
+        float timeWindow = 0.0f,
+        float spatialRadius = 0.0f,
+        const std::string& locationTag = "",
+        const std::string& actionTag = "",
+        size_t maxResults = 10) const;
+    
+    // Temporal sequencing and chronological ordering
+    std::vector<const EnhancedEpisodicMemoryItem*> retrieveTemporalSequence(
+        SimulationStep startTime,
+        SimulationStep endTime,
+        size_t maxResults = 20) const;
+    
+    // Enhanced replay with pattern completion
+    void replayEpisode(const EnhancedEpisodicMemoryItem* episode);
     void replaySequence(const std::vector<size_t>& episodeIds);
-
+    void replayWithConsolidation(const std::vector<size_t>& episodeIds);
+    
+    // Temporal compression algorithms for efficient storage
+    void applyTemporalCompression();
+    void compressRecentEpisodes();
+    void compressBasedOnSimilarity();
+    
+    // Relevance-based prioritization and filtering
+    void updateRelevance(size_t episodeId, float delta);
+    void filterByRelevance(float threshold);
+    void prioritizeRecentEpisodes(float decayFactor);
+    
+    // Automatic consolidation and cleanup
+    void consolidate(float relevanceThreshold);
+    void cleanupOldEpisodes(size_t maxEpisodes);
+    void consolidateSleepCycles();
+    
+    // Memory optimization
+    void compressMemory() { applyTemporalCompression(); }
+    void optimizeRetrieval() { optimizeIndexStructures(); }
+    
+    // Get episodic statistics
+    const EnhancedEpisodicMemoryItem* getEpisode(size_t index) const;
+    size_t getEpisodeCount() const { return episodes_.size(); }
+    float getTotalStorageSize() const { return totalStorageSize_; }
+    
+    // Query and monitoring
+    std::vector<const EnhancedEpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
+    std::vector<const EnhancedEpisodicMemoryItem*> getRelevantEpisodes(float minRelevance) const;
+    float getAverageReward() const;
+    float getMemoryActivityLevel() const;
+    float getCompressionRatio() const { return compressionRatio_; }
+    
+    // Memory-guided prediction
+    std::vector<float> predictFuturePattern(const EnhancedEpisodicMemoryItem* lastEpisode) const;
+    
+    // Integration with working memory
+    void updateWorkingMemoryFromEpisode(size_t episodeId, NeuralWorkingMemory* workingMem);
+    void replayForWorkingMemory(NeuralWorkingMemory* workingMem);
+    
+    // Schema formation and abstraction
+    void extractSchemas();
+    void createGeneralizations();
+    std::vector<std::string> getExtractedSchemas() const { return extractedSchemas_; }
+    
+    // Emotional regulation through memory processing
+    void processEmotions();
+    void regulateEmotionalResponses();
+    float getAverageEmotionalValence() const;
+    
+    // Clearing and reset
+    void clear() { episodes_.clear(); replayIndex_.clear(); }
+    void resetCompressionStructures() { compressedTemporalIndex_.clear(); }
+    
 private:
-    // Compute similarity between query and stored episode
-    float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
-
-    // Check if episode matches criteria
-    bool matchesCriteria(const EpisodicMemoryItem& episode,
-                        const std::vector<float>* sensoryQuery,
-                        SimulationStep* startTime,
-                        SimulationStep* endTime,
-                        ActionType* actionQuery) const;
-
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
-    std::deque<EpisodicMemoryItem> episodes_;
+    std::deque<EnhancedEpisodicMemoryItem> episodes_;
     size_t maxEpisodes_;
+    float temporalCompressionRatio_;
+    float relevanceDecayRate_;
     bool replayEnabled_;
-};
-
-// AssociativeMemory: Creates and retrieves relationships between experiences
-// NOT a lookup table - associations are encoded in synaptic connectivity
-//
-// Key mechanisms:
-// - Co-activating neurons become associated via Hebbian plasticity
-// - Stronger associations form with repeated co-activation
-// - Can retrieve related items given a partial cue
-// - Spreading activation for associative recall
-
-class NeuralAssociativeMemory {
-public:
-    NeuralAssociativeMemory();
-    ~NeuralAssociativeMemory();
-
-    // Initialize with brain reference
-    void initialize(Brain* brain);
-
-    // Create association between two neural patterns
-    // Both patterns should be from actual neural activity
-    void associate(const std::vector<float>& patternA,
-                   const std::vector<float>& patternB,
-                   float strength = 1.0f);
-
-    // Create association based on experience
-    void associateFromExperience(const EpisodicMemoryItem& episode);
-
-    // Retrieve patterns associated with a query pattern
-    std::vector<std::vector<float>> retrieve(const std::vector<float>& queryPattern,
-                                            size_t maxResults = 5) const;
-
-    // Get association strength between two patterns
-    float getAssociationStrength(const std::vector<float>& patternA,
-                                const std::vector<float>& patternB) const;
-
-    // Update association based on outcome
-    void updateAssociation(const std::vector<float>& patternA,
-                          const std::vector<float>& patternB,
-                          float delta);
-
-    // Spread activation from cue pattern
-    // Returns patterns that become activated through association chains
-    std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern,
-                                                     size_t steps = 2) const;
-
-    // Clear associations
-    void clear();
-
-    // Get number of associations
-    size_t getAssociationCount() const { return associations_.size(); }
-
-private:
-    // Find pattern neuron or create one
-    NeuronId findPatternNeuron(const std::vector<float>& pattern);
-
-    // Compute pattern similarity
-    float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons_;
-    std::vector<std::tuple<NeuronId, NeuronId, float>> associations_;
+    
+    // Temporal indexing for efficient retrieval
+    std::vector<std::pair<SimulationStep, size_t>> temporalIndex_;
+    std::unordered_map<std::string, std::vector<size_t>> spatialIndex_;
+    std::unordered_map<std::string, std::vector<size_t>> actionIndex_;
+    
+    // Compression structures
+    std::deque<size_t> compressedTemporalIndex_;
+    std::vector<std::pair<float, size_t>> relevanceIndex_;
+    
+    // Total storage metrics
+    float totalStorageSize_;
+    float peakStorageSize_;
+    SimulationStep lastConsolidationStep_;
+    float compressionRatio_;
+    
+    // Schema and concept tracking
+    std::vector<std::string> extractedSchemas_;
+    std::unordered_map<std::string, std::vector<size_t>> schemaEpisodeMap_;
+    
+    // Helper methods
+    void buildTemporalIndex();
+    void buildSpatialIndex();
+    void buildActionIndex();
+    void optimizeIndexStructures();
+    void compressEpisode(EnhancedEpisodicMemoryItem& episode);
+    void mergeSimilarEpisodes();
+    void generateSchemaFromEpisodes();
+    void updateCompressionMetrics();
+    void consolidateWithReplay();
 };
 
 } // namespace nlm

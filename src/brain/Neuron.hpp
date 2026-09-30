@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../performance/SIMDVectorization.hpp"
 #include <vector>
 #include <array>
 
@@ -142,6 +143,10 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Performance optimization
+    void setSIMD(std::shared_ptr<SIMDVectorization> simd);
+    bool hasSIMD() const;
     
 private:
     struct Impl;

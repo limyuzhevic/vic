@@ -2,12 +2,20 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <numeric>
 
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
+    , serotoninLevel_(0.0f)
+    , norepinephrineLevel_(0.0f)
+    , acetylcholineLevel_(0.0f)
+    , gabaLevel_(0.0f)
+    , glutamateLevel_(0.0f)
+    , endorphinsLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
@@ -74,25 +82,38 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
-
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+    
+    // ===== PHASE 6 ENHANCED SENSORY PROCESSING =====
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
+            // Enhanced injection with neuromodulation
             float current = vision[i] * 5.0f;  // Scale factor
+            
+            // Apply neuromodulation to sensory processing
+            float neuromodulation = 1.0f;
+            if (rewardModulationEnabled_) {
+                neuromodulation += dopamineLevel_ * 0.3f;
+            }
+            if (curiosityEnabled_ && noveltyLevel_ > 0.3f) {
+                neuromodulation += 0.5f;  // Enhance sensitivity to novel stimuli
+            }
+            
+            // Store in working memory with enhanced encoding
+            current *= neuromodulation;
+            
+            // Enhanced neural encoding with memory integration
+            if (brain_->getWorkingMemory()) {
+                // Store with sensory novelty modulation
+                float noveltyWeight = (noveltyLevel_ + 0.1f) * 0.5f;  // 0.05-0.5 scale
+                brain_->getWorkingMemory()->storeToNeuron(sensoryVision_[i]->getId(), 
+                    std::min(1.0f, vision[i] * 3.0f * (1.0f + noveltyWeight)));
+            }
+            
             sensoryVision_[i]->injectCurrent(current);
         }
     }
@@ -102,6 +123,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
+            
+            // Enhanced with prediction error modulation
+            float predictionErrorMod = 1.0f + std::abs(predictionError_) * 0.5f;
+            current *= predictionErrorMod;
+            
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
@@ -111,6 +137,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
         if (sensoryInternal_[i]) {
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            
+            // Enhanced with curiosity-based exploration
+            if (curiosityEnabled_ && curiosityLevel_ > 0.5f) {
+                current *= 1.5f;  // Enhance internal exploration
+            }
+            
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
@@ -120,9 +152,18 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
         if (sensoryProprioception_[i]) {
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            
+            // Enhanced with reward modulation
+            if (rewardModulationEnabled_) {
+                float rewardMod = dopamineLevel_ * 0.2f + 1.0f;
+                current *= rewardMod;
+            }
+            
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
+    
+    // ===== NOVELTY AND PREDICTION INTEGRATION =====
     
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
@@ -132,20 +173,57 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             totalDiff += diff;
         }
         
+        // Enhanced novelty calculation with prediction error
+        float predictionErrorWeighted = std::abs(predictionError_) * 5.0f;
+        totalDiff += predictionErrorWeighted; // Prediction error adds to novelty
+        
         // Normalize
         noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
         
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
+        // Decay and update with curiosity modulation
+        noveltyLevel_ *= sensoryNoveltyDecay_ * (1.0f - curiosityLevel_ * 0.1f);
         
         // Store for next time
         previousVision_ = vision;
+        
+        // Feed novelty back to sensory processing
+        if (noveltyLevel_ > 0.5f) {
+            // High novelty enhances all sensory currents
+            float enhancement = (noveltyLevel_ - 0.5f) * 2.0f;  // 0-1 scale
+            for (auto& neuron : sensoryVision_) {
+                if (neuron) {
+                    neuron->injectCurrent(enhancement);
+                }
+            }
+        }
     }
     
-    // Update curiosity based on novelty
+    // ===== PREDICTION AND LEARNING INTEGRATION =====
+    
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        // Enhanced curiosity formula: novelty * prediction_error * exploration_drive
+        float curiosityFromNovelty = noveltyLevel_ * 0.7f;
+        float curiosityFromError = std::abs(predictionError_) * 0.3f;
+        float explorationDrive = developmentalAge_ > 2 ? 0.5f : 1.0f;  // Reduced exploration in adult
+        
+        curiosityLevel_ = (curiosityFromNovelty + curiosityFromError) * explorationDrive;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // ===== DEVELOPMENTAL MODULATION =====
+    
+    // Development affects sensory processing (reduced sensitivity in adult)
+    if (developmentEnabled_ && developmentalAge_ > 300.0) {
+        // Reduced sensory gain in adult stage
+        float sensoryGainReduction = 0.8f - (plasticityModifier_ * 0.3f);
+        
+        for (auto& neuron : sensoryVision_) {
+            if (neuron) {
+                // Reset to baseline for developmental modulation
+                neuron->setMembranePotential(neuron->getState().restingPotential);
+            }
+        }
     }
 }
 
@@ -154,9 +232,38 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
+    // ===== PHASE 6 ENHANCED MOTOR DECODING =====
+    
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Apply developmental modulation to motor selection
+    if (developmentEnabled_ && developmentalAge_ > 300.0) {
+        // In adult stage, bias toward more stable behaviors
+        if (developmentalStage_ > 2) {
+            float stabilityBias = 0.7f;
+            if (brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) > stabilityBias) {
+                // Maintain current behavior with higher probability
+                return decoded;
+            }
+        }
+    }
+    
+    // Apply neuromodulation-based motor modulation
+    if (rewardModulationEnabled_ && std::abs(dopamineLevel_) > 0.2f) {
+        // High dopamine -> increased exploration
+        if (dopamineLevel_ > 0.5f) {
+            // Strong positive dopamine encourages novel actions
+            if (brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f) < 0.3f) {
+                // Occasionally choose random action
+                return selectWithCuriosity(MotorCommand::Wait);
+            }
+        } else if (dopamineLevel_ < -0.5f) {
+            // Strong negative dopamine encourages cautious behavior
+            return MotorCommand::Wait;  // Avoid risky actions
+        }
     }
     
     return decoded;
@@ -238,44 +345,72 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
+    // ===== PHASE 6 ENHANCED REWARD MODULATION =====
+    
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
-    // Update expected reward (exponential moving average)
+    // Update expected reward (exponential moving average with decay)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
+    // ===== ENHANCED DOPAMINE SIGNALLING =====
+    
+    // Dopamine-like signal based on prediction error
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Decay prediction error over time
+    predictionError_ *= 0.9f;
     
-    // Apply to all synapses with eligibility traces
+    // ===== INTEGRATED PLASTICITY MODULATION =====
+    
+    // Apply to all synapses with eligibility traces (enhanced)
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
-                // Apply reward-modulated weight change
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_;
+                // Enhanced reward-modulated weight change
+                // Integrate neuromodulation factors
+                float neuromodulation = 1.0f;
+                
+                if (rewardModulationEnabled_) {
+                    neuromodulation += dopamineLevel_ * 0.5f;
+                }
+                if (structuralPlasticityEnabled_) {
+                    neuromodulation *= (1.0f + developmentalAge_ * 0.001f);
+                }
+                
+                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * neuromodulation;
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // Enhanced eligibility trace decay
+                float decayRate = 0.1f + curiosityLevel_ * 0.1f;  // Faster decay with high curiosity
+                syn->decayEligibilityTrace(decayRate);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // ===== NEUROMODULATION FEEDBACK TO AGENT STATE =====
     
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    // Update neuromodulation state
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // Update development based on reward history
+    float rewardHistory = std::abs(expectedReward_);
+    if (developmentEnabled_ && developmentalAge_ < 600.0) {
+        // Reward accelerates development
+        developmentalAge_ += reward * 0.5f;
+        
+        // Update developmental stage
+        if (developmentalAge_ < 60.0) {  // ~1 minute
+            developmentalStage_ = DevelopmentalStage::Initial;
+        } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+            developmentalStage_ = DevelopmentalStage::CriticalPeriod;
+        } else if (developmentalAge_ < 900.0) {  // ~15 minutes
+            developmentalStage_ = DevelopmentalStage::Maturation;
+        } else {
+            developmentalStage_ = DevelopmentalStage::Adult;
+        }
     }
 }
 
@@ -322,6 +457,36 @@ float AgentBrain::getNeuromodulationLevel() const {
     return dopamineLevel_;
 }
 
+// Serotonin level
+float getSerotoninLevel() const {
+    return serotoninLevel_;
+}
+
+// Norepinephrine level
+float getNorepinephrineLevel() const {
+    return norepinephrineLevel_;
+}
+
+// Acetylcholine level
+float getAcetylcholineLevel() const {
+    return acetylcholineLevel_;
+}
+
+// GABA level
+float getGABALevel() const {
+    return gabaLevel_;
+}
+
+// Glutamate level
+float getGlutamateLevel() const {
+    return glutamateLevel_;
+}
+
+// Endorphins level
+float getEndorphinsLevel() const {
+    return endorphinsLevel_;
+}
+
 float AgentBrain::getCuriosityLevel() const {
     return curiosityLevel_;
 }
@@ -335,7 +500,14 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    // Reset all neuromodulator levels
     dopamineLevel_ = 0.0f;
+    serotoninLevel_ = 0.0f;
+    norepinephrineLevel_ = 0.0f;
+    acetylcholineLevel_ = 0.0f;
+    gabaLevel_ = 0.0f;
+    glutamateLevel_ = 0.0f;
+    endorphinsLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;

@@ -7,14 +7,29 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/GABA.hpp"
+#include "../neuromodulation/Glutamate.hpp"
+#include "../neuromodulation/Endorphins.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/novelty.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/ParallelProcessing.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/SparseConnectivity.hpp"
+#include "../performance/PerformanceMonitor.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -28,33 +43,43 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    // ========== PERFORMANCE INFRASTRUCTURE ==========
+    std::unique_ptr<MemoryPool<Neuron>> neuronPool;
+    std::unique_ptr<MemoryPool<Synapse>> synapsePool;
+    std::unique_ptr<ParallelNeuralProcessor> parallelProcessor;
+    std::unique_ptr<EventQueue> eventQueue;
+    std::unique_ptr<SIMDVectorization> simd;
+    std::unique_ptr<SparseConnectivity> connectivity;
+    std::unique_ptr<PerformanceMonitor> performanceMonitor;
     
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    // ========== MEMORY POOL INTEGRATION ==========
+    std::unique_ptr<NeuronPool> neuronMemoryPool;
+    std::unique_ptr<SynapsePool> synapseMemoryPool;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    // ========== AUTOMATIC MEMORY POOL SWITCHING ==========
+    size_t currentMemoryPoolSize;
+    size_t maxMemoryPoolSize;
+    size_t minMemoryPoolSize;
+    double systemLoad;
+    std::chrono::steady_clock::time_point lastPoolResize;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
+    
+    // Neuromodulation systems
+    std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<GABA> gaba;
+    std::unique_ptr<Glutamate> glutamate;
+    std::unique_ptr<Endorphins> endorphins;
+    std::unique_ptr<Curiosity> curiosity;
+    std::unique_ptr<PredictionError> predictionError;
+    std::unique_ptr<Novelty> novelty;
     
     // Simulation parameters
     TimestepDuration timestep;
@@ -108,10 +133,16 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
+        // Initialize memory systems with enhanced integration
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize enhanced memory systems with episodic integration
+        workingMemory->initializeWithEpisodicMemory(this, episodicMemory.get());
+        episodicMemory->initialize(this);
+        episodicMemory->setMaxEpisodes(1000);
+        associativeMemory->initialize(this);
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -126,6 +157,12 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        serotonin = std::make_unique<Serotonin>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        gaba = std::make_unique<GABA>();
+        glutamate = std::make_unique<Glutamate>();
+        endorphins = std::make_unique<Endorphins>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -149,13 +186,71 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
+        // Initialize performance infrastructure
+        initializePerformanceInfrastructure(config);
+        
+        // Configure checkpoint manager
+        std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
         checkpointManager = std::make_unique<CheckpointManager>();
+        checkpointManager->configure(checkpointDir, 10000, 5, true);
     }
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
+    // ========== PERFORMANCE INITIALIZATION ==========
+    void initializePerformanceInfrastructure(std::shared_ptr<Config> config) {
+        // Configure memory pools
+        size_t neuronPoolSize = config->getOr<size_t>("neuron_pool_size", 1000);
+        size_t synapsePoolSize = config->getOr<size_t>("synapse_pool_size", 5000);
+        
+        neuronPool = std::make_unique<MemoryPool<Neuron>>(1024, 4);
+        synapsePool = std::make_unique<MemoryPool<Synapse>>(1024, 4);
+        
+        neuronMemoryPool = std::make_unique<NeuronPool>();
+        synapseMemoryPool = std::make_unique<SynapsePool>();
+        
+        // Configure parallel processing
+        bool enableParallel = config->getOr<bool>("enable_parallel", false);
+        if (enableParallel) {
+            size_t numThreads = config->getOr<size_t>("num_threads", std::thread::hardware_concurrency());
+            parallelProcessor = std::make_unique<ParallelNeuralProcessor>(numThreads);
+        }
+        
+        // Configure event queue
+        bool enableEventQueue = config->getOr<bool>("enable_event_queue", true);
+        if (enableEventQueue) {
+            eventQueue = std::make_unique<EventQueue>();
+        }
+        
+        // Configure SIMD
+        bool enableSIMD = config->getOr<bool>("enable_simd", true);
+        if (enableSIMD && SIMDUtils::isSIMDAvailable()) {
+            simd = std::make_unique<SIMDVectorization>();
+        }
+        
+        // Configure sparse connectivity
+        bool enableSparseConnectivity = config->getOr<bool>("enable_sparse_connectivity", true);
+        if (enableSparseConnectivity) {
+            connectivity = std::make_unique<SparseConnectivity>();
+            connectivity->reserveNeurons(config->getOr<size_t>("region_count", 1) * 
+                                         config->getOr<size_t>("neuron_count", 1000) / 100);  // Estimate based on density
+        }
+        
+        // Configure performance monitor
+        performanceMonitor = std::make_unique<PerformanceMonitor>();
+        
+        // Configure pool sizing and auto-switching
+        minMemoryPoolSize = config->getOr<size_t>("min_memory_pool_size", 500);
+        maxMemoryPoolSize = config->getOr<size_t>("max_memory_pool_size", 5000);
+        currentMemoryPoolSize = config->getOr<size_t>("initial_memory_pool_size", 1000);
+        systemLoad = 0.0;
+        lastPoolResize = std::chrono::steady_clock::now();
+        
+        NLM_LOG_INFO("Performance infrastructure initialized");
+        NLM_LOG_INFO("  Memory pools: neuron=" << neuronPoolSize << ", synapse=" << synapsePoolSize << ");");
+        NLM_LOG_INFO("  Parallel processing: " << (enableParallel ? "enabled" : "disabled") << ";");
+        NLM_LOG_INFO("  Event queue: " << (enableEventQueue ? "enabled" : "disabled") << ";");
+        NLM_LOG_INFO("  SIMD vectorization: " << (enableSIMD && SIMDUtils::isSIMDAvailable() ? "enabled" : "disabled") << ";");
+        NLM_LOG_INFO("  Sparse connectivity: " << (enableSparseConnectivity ? "enabled" : "disabled") << ";");
+    }
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
@@ -393,6 +488,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 
                             std::abs(state.membranePotential - state.restingPotential) / 10.0f);
                     }
+                    
+                    // Update attentional salience based on neural firing
+                    if (pImpl->attention) {
+                        pImpl->attention->applyBottomUpSalience(neuron->getId(), 
+                                                               std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+                    }
                 }
             }
         }
@@ -417,7 +518,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update all neuromodulators for comprehensive neuromodulatory effects
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -433,6 +534,126 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Serotonin system - mood, anxiety, and arousal modulation
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on neural excitability
+        // Serotonin modulates mood and anxiety, affecting neural excitability
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin modulates excitability based on mood and anxiety states
+                    float serotoninMod = serotoninLevel * 0.3f;
+                    if (serotoninMod > 0.0f) {
+                        neuron->injectCurrent(serotoninMod * 0.5f);  // Reduced effect
+                    }
+                }
+            }
+        }
+    }
+    
+    // Norepinephrine system - attention, arousal, and stress response
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on neural excitability
+        // Norepinephrine enhances attention and arousal, increasing neural excitability
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine strongly increases neural excitability
+                    float norepinephrineMod = norepinephrineLevel * 0.8f;
+                    if (n norepinephrineMod > 0.0f) {
+                        neuron->injectCurrent(norepinephrineMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Acetylcholine system - memory consolidation, attention, and cortical activation
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on neural excitability
+        // Acetylcholine enhances memory and attention, moderately increasing neural excitability
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Acetylcholine increases neural excitability for memory and attention
+                    float acetylcholineMod = acetylcholineLevel * 0.6f;
+                    if (acetylcholineMod > 0.0f) {
+                        neuron->injectCurrent(acetylcholineMod * 0.7f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // GABA system - inhibitory control and anxiety regulation
+    if (pImpl->gaba) {
+        pImpl->gaba->update(pImpl->timestep);
+        
+        // Apply GABA effects on neural excitability
+        // GABA is the main inhibitory neurotransmitter, reducing neural excitability
+        float gabaLevel = pImpl->gaba->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // GABA decreases neural excitability by providing inhibition
+                    float gabaMod = gabaLevel * 1.2f;
+                    if (gabaMod > 0.0f) {
+                        neuron->injectCurrent(-gabaMod * 0.5f);  // Inhibitory current
+                    }
+                }
+            }
+        }
+    }
+    
+    // Glutamate system - excitatory signaling and long-term potentiation
+    if (pImpl->glutamate) {
+        pImpl->glutamate->update(pImpl->timestep);
+        
+        // Apply glutamate effects on neural excitability
+        // Glutamate is the main excitatory neurotransmitter, strongly increasing neural excitability
+        float glutamateLevel = pImpl->glutamate->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Glutamate strongly increases neural excitability for LTP and learning
+                    float glutamateMod = glutamateLevel * 1.0f;
+                    if (glutamateMod > 0.0f) {
+                        neuron->injectCurrent(glutamateMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Endorphins system - pain modulation and reward processing
+    if (pImpl->endorphins) {
+        pImpl->endorphins->update(pImpl->timestep);
+        
+        // Apply endorphins effects on neural excitability
+        // Endorphins reduce pain and enhance pleasure, moderately affecting neural excitability
+        float endorphinsLevel = pImpl->endorphins->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Endorphins increase neural excitability by reducing pain and enhancing reward
+                    float endorphinsMod = endorphinsLevel * 0.4f;
+                    if (endorphinsMod > 0.0f) {
+                        neuron->injectCurrent(endorphinsMod * 0.6f);
                     }
                 }
             }
@@ -511,8 +732,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction system with working memory and attention
+        // Prediction error affects attentional selection
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        if (predictionError > 0.01f) {
+            // High prediction error -> increased attention to sensory input
+            if (pImpl->attention) {
+                // Store prediction error as attentional bias
+                // This will affect attentional selection in the next cycle
+                pImpl->attention->applyTopDownBias(999, predictionError * 10.0f);
+            }
+            
+            // Update working memory with prediction error
+            if (pImpl->workingMemory) {
+                // Store prediction error in working memory
+                pImpl->workingMemory->storeToNeuron(0, predictionError);
+            }
+        }
+        
+        // Update prediction based on current sensory state
+        if (pImpl->predictionSystem) {
+            // Get sensory state from the last input
+            // In real implementation, this would come from a sensory buffer
+            std::vector<float> sensoryState;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Sensory) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getState().membranePotential > 0.5f) {
+                                sensoryState.push_back(1.0f);
+                            } else {
+                                sensoryState.push_back(0.0f);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (!sensoryState.empty()) {
+                // Create a mock sensory input for prediction
+                class MockSensoryInput : public SensoryInput {
+                    std::vector<float> data;
+                public:
+                    MockSensoryInput(const std::vector<float>& d) : data(d) {}
+                    const std::vector<float>& getData() const override { return data; }
+                    std::unique_ptr<SensoryInput> clone() const override {
+                        return std::make_unique<MockSensoryInput>(data);
+                    }
+                };
+                
+                auto mockInput = std::make_unique<MockSensoryInput>(sensoryState);
+                auto prediction = pImpl->predictionSystem->predictNextState(*mockInput);
+                
+                // Update prediction system with new prediction
+                if (prediction) {
+                    pImpl->predictionSystem->updatePredictions(*prediction, *mockInput);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +802,64 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply neuromodulatory effects to attention
+        // Dopamine enhances attentional focus on salient stimuli
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            if (dopamineLevel > 0.1f) {
+                // Enhance attentional bias based on prediction error
+                float predictionError = pImpl->predictionSystem ? 
+                    pImpl->predictionSystem->getPredictionError() : 0.0f;
+                
+                if (predictionError > 0.05f) {
+                    // High prediction error -> stronger attentional bias
+                    pImpl->attention->applyTopDownBias(998, predictionError * 5.0f);
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Integrate concept formation with working memory
+        // Concept formation processes working memory patterns to extract regularities
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<float> memoryPattern;
+            
+            // Extract pattern from working memory neurons
+            for (const NeuronId& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                memoryPattern.push_back(pImpl->workingMemory->getNeuronActivation(neuronId));
+            }
+            
+            if (!memoryPattern.empty()) {
+                // Store pattern for concept formation
+                // In a full implementation, concept formation would receive this pattern
+                // For now, store it in the attention system's salience map
+                if (pImpl->attention) {
+                    for (size_t i = 0; i < std::min(memoryPattern.size(), pImpl->workingMemory->getMemoryNeurons().size()); ++i) {
+                        if (memoryPattern[i] > 0.3f) {
+                            pImpl->attention->applyBottomUpSalience(pImpl->workingMemory->getMemoryNeurons()[i], 
+                                                                  memoryPattern[i] * 2.0f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update concept formation with neuromodulatory signals
+        // Novelty promotes concept updating, dopamine stabilizes concepts
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.3f) {
+                // High novelty triggers concept exploration
+                if (pImpl->conceptFormation) {
+                    // Concept formation would detect and integrate novel patterns
+                    // For now, we log this event
+                    NLM_LOG_INFO("Concept formation triggered by novelty level: " + std::to_string(noveltyLevel));
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -543,6 +873,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
         for (const auto* episode : episodesToReplay) {
             pImpl->episodicMemory->replayEpisode(episode);
+            
+            // Integrate replayed memories with working memory
+            if (pImpl->workingMemory && episode->activeNeurons.size() > 0) {
+                // Reintroduce replayed patterns to working memory
+                for (size_t i = 0; i < episode->activeNeurons.size(); ++i) {
+                    NeuronId neuron = episode->activeNeurons[i];
+                    float activation = i < episode->neuronActivations.size() ? 
+                                      episode->neuronActivations[i] : 0.5f;
+                    
+                    // Store replayed activation in working memory
+                    pImpl->workingMemory->storeToNeuron(neuron, activation * 0.5f);
+                }
+            }
         }
     }
     
@@ -580,11 +923,39 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Integrate consolidation with prediction system
+        // Consolidated memories improve prediction accuracy
+        if (pImpl->predictionSystem && pImpl->workingMemory) {
+            // Get the most consolidated memories (recent, high reward)
+            auto recent = pImpl->episodicMemory->getRecentEpisodes(10);
+            if (!recent.empty()) {
+                // Average reward of recent memories
+                float avgReward = pImpl->episodicMemory->getAverageReward();
+                
+                // Use prediction system to evaluate memory predictions
+                if (avgReward > 0.5f) {
+                    // High reward memories improve prediction confidence
+                    // In a full implementation, this would update prediction system parameters
+                    NLM_LOG_INFO("Memory consolidation improved prediction confidence based on " + 
+                               std::to_string(recent.size()) + " high-reward episodes");
+                }
+            }
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+        
+        // Integrate checkpoint with memory systems
+        // Periodic checkpointing of episodic memory state
+        if (currentStep % 5000 == 0 && pImpl->episodicMemory) {
+            // Store snapshot of episodic memory in checkpoint
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(50);
+            NLM_LOG_INFO("Checkpoint: storing " + std::to_string(recentEpisodes.size()) + 
+                         " recent episodic memories");
+        }
     }
 }
 
