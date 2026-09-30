@@ -1,0 +1,70 @@
+# NLM Development Setup Script
+# Convenience script for setting up development environment.
+
+set(DEVELOPMENT_SETUP_CONTENT
+"# NLM Development Setup Script
+# This script helps developers set up the NLM development environment.
+
+# Set up environment variables
+if(WIN32)
+    set(NLM_PYTHONPATH "%PYTHONPATH%;${CMAKE_INSTALL_PREFIX}/${NLM_PYTHON_PACKAGE_DIR}")
+    set(PATH "%PATH%;${CMAKE_INSTALL_PREFIX}/${NLM_INSTALL_BINDIR}")
+else()
+    set(NLM_PYTHONPATH "${NLM_PYTHONPATH}:${CMAKE_INSTALL_PREFIX}/${NLM_PYTHON_PACKAGE_DIR}")
+    set(PATH "${PATH}:${CMAKE_INSTALL_PREFIX}/${NLM_INSTALL_BINDIR}")
+endif()
+
+# Set up library paths
+if(WIN32)
+    set(LIBRARY_PATH "${LIBRARY_PATH};${CMAKE_INSTALL_PREFIX}/${NLM_INSTALL_LIBDIR}")
+else()
+    set(LD_LIBRARY_PATH "${LD_LIBRARY_PATH}:${CMAKE_INSTALL_PREFIX}/${NLM_INSTALL_LIBDIR}")
+endif()
+
+# Create development shortcuts
+if(MSVC)
+    # Windows: Create batch files for development shortcuts
+    file(WRITE "${CMAKE_BINARY_DIR}/nlm-dev.bat"
+        "@echo off\r\n"
+        "call :setup_env\r\n"
+        "echo Setting up NLM development environment...\r\n"
+        "goto :eof\r\n"
+        ":setup_env\r\n"
+        "set NLM_ROOT=${CMAKE_INSTALL_PREFIX}\r\n"
+        "set PYTHONPATH=%NLM_ROOT%/${NLM_PYTHON_PACKAGE_DIR};%PYTHONPATH%\r\n"
+        "set PATH=%NLM_ROOT%/${NLM_INSTALL_BINDIR};%PATH%\r\n"
+        "set LIB=%NLM_ROOT%/${NLM_INSTALL_LIBDIR};%LIB%\r\n"
+    )
+else()
+    # Unix-like: Create shell scripts for development shortcuts
+    file(WRITE "${CMAKE_BINARY_DIR}/nlm-dev.sh"
+        "#!/bin/bash\r\n"
+        "echo \"Setting up NLM development environment...\"\r\n"
+        "export NLM_ROOT=${CMAKE_INSTALL_PREFIX}\r\n"
+        "export PYTHONPATH=$NLM_ROOT/${NLM_PYTHON_PACKAGE_DIR}:$PYTHONPATH\r\n"
+        "export PATH=$NLM_ROOT/${NLM_INSTALL_BINDIR}:$PATH\r\n"
+        "if [ -x /usr/bin/ldconfig ]; then\r\n"
+        "    echo \"Adding NLM libraries to system library path...\"\r\n"
+        "    echo $NLM_ROOT/${NLM_INSTALL_LIBDIR} | /usr/bin/ldconfig\r\n"
+        "fi\r\n"
+        "echo \"NLM development environment ready.\"\r\n"
+    )
+    execute_process(COMMAND chmod +x "${CMAKE_BINARY_DIR}/nlm-dev.sh")
+endif()
+
+# Create IDE project files (CMake)
+file(WRITE "${CMAKE_BINARY_DIR}/nlm-dev.cmake"
+    "# CMake script for NLM development\r\n"
+    "# Add this to your CMakeLists.txt to enable NLM development features\r\n\r\n"
+    "# Enable development mode\r\n"
+    "set(NLM_DEVELOPMENT_MODE ON)\r\n\r\n"
+    "# Add NLM include directories\r\n"
+    "include_directories(${NLM_SOURCE_DIR})\r\n\r\n"
+    "# Link against NLM libraries\r\n"
+    "target_link_libraries(\${PROJECT_NAME} PRIVATE nlm::nlm_core nlm::nlm_agent nlm::nlm_world)\r\n"
+)
+
+message(STATUS "Development setup complete")
+")
+
+file(WRITE "${CMAKE_BINARY_DIR}/nlm-setup.cmake" "${DEVELOPMENT_SETUP_CONTENT}")

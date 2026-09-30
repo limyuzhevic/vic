@@ -1,0 +1,41 @@
+# NLM Test Configuration
+# Test configuration template for generating test settings.
+
+# Test configuration template
+set(TEST_TEMPLATE
+"# Test Configuration for NLM
+# This file is generated from test_config.cmake.in
+
+# Test environment settings
+set(NLM_TEST_MODE "unit")
+set(NLM_TEST_TIMEOUT ${NLM_TEST_TIMEOUT})
+set(NLM_RANDOM_SEED ${NLM_RANDOM_SEED})
+set(NLM_SIMULATION_TIMESTEP ${NLM_SIMULATION_TIMESTEP})
+
+# Test directories
+set(NLM_TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../test_data)
+
+set(NLM_TEST_HELPERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../test_helpers)
+
+# Test performance thresholds
+set(NLM_PERFORMANCE_THRESHOLD_FAST 1000)
+set(NLM_PERFORMANCE_THRESHOLD_SLOW 10000)
+
+# Memory limits (in MB)
+set(NLM_MEMORY_LIMIT_NORMAL 512)
+set(NLM_MEMORY_LIMIT_EXTENSIVE 1024)
+
+# Test coverage configuration
+set(NLM_COVERAGE_MINIMUM 80)
+set(NLM_COVERAGE_REPORT_FORMAT "text")
+
+# Test result output format
+set(NLM_TEST_RESULTS_FORMAT "json")
+set(NLM_TEST_RESULTS_DIR ${CMAKE_BINARY_DIR}/test_results)
+
+# Test retry configuration
+set(NLM_TEST_RETRY_COUNT 0)
+set(NLM_TEST_RETRY_DELAY 1)
+")
+
+file(WRITE "${CMAKE_BINARY_DIR}/test_config.cmake" "${TEST_TEMPLATE}")

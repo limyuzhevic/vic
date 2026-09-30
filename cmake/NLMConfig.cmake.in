@@ -1,0 +1,50 @@
+# NLM CMake Configuration
+# Generated configuration file for NLM package.
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+find_dependency(Threads)
+
+# Include exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/NLMTargets.cmake")
+
+# NLM-specific configuration
+set(NLM_VERSION ${PROJECT_VERSION})
+
+# Platform-specific configuration
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(NLM_PLATFORM "linux")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(NLM_PLATFORM "windows")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(NLM_PLATFORM "macos")
+else()
+    set(NLM_PLATFORM "unknown")
+endif()
+
+# Feature detection
+if(TARGET nlm_core)
+    set(NLM_CORE_AVAILABLE TRUE)
+endif()
+
+if(TARGET nlm_agent)
+    set(NLM_AGENT_AVAILABLE TRUE)
+endif()
+
+if(TARGET nlm_world)
+    set(NLM_WORLD_AVAILABLE TRUE)
+endif()
+
+# Provide convenience functions for downstream projects
+include("${CMAKE_CURRENT_LIST_DIR}/NLMFunctions.cmake")
+
+# Summary message
+message(STATUS "NLM configuration loaded:")
+message(STATUS "  Version: ${NLM_VERSION}")
+message(STATUS "  Platform: ${NLM_PLATFORM}")
+message(STATUS "  Core available: ${NLM_CORE_AVAILABLE}")
+message(STATUS "  Agent available: ${NLM_AGENT_AVAILABLE}")
+message(STATUS "  World available: ${NLM_WORLD_AVAILABLE}")

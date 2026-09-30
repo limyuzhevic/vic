@@ -1,0 +1,164 @@
+# NLM Main Entry Point
+# Main CLI entry point for NLM.
+
+# Generate main.py file
+file(WRITE ${CMAKE_BINARY_DIR}/nlm/main.py
+"#!/usr/bin/env python3
+# NLM Main Entry Point
+# Command-line interface for NLM (Neural Learning Machine).
+
+import sys
+import os
+import argparse
+from pathlib import Path
+
+# Add the NLM module to the path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    import pynlm
+except ImportError as e:
+    print(f"Error importing pynlm: {e}")
+    print("Please install pynlm first: pip install pynlm")
+    sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="NLM - Neural Learning Machine",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm --help                    Show help information
+  nlm --version                 Show version information
+  nlm --run --steps 100         Run NLM simulation for 100 steps
+  nlm --experiment phase3       Run Phase 3 experiment
+  nlm --test                    Run unit tests
+""
+    )
+    
+    parser.add_argument('--version', action='store_true',
+                       help='Show version information')
+    
+    parser.add_argument('--help', action='store_true',
+                       help='Show help information')
+    
+    parser.add_argument('--run', action='store_true',
+                       help='Run NLM simulation')
+    
+    parser.add_argument('--steps', type=int, default=100,
+                       help='Number of simulation steps (default: 100)')
+    
+    parser.add_argument('--config', type=str, default='default.cfg',
+                       help='Configuration file path (default: default.cfg)')
+    
+    parser.add_argument('--experiment', type=str, choices=['phase3', 'phase4', 'phase5', 'phase6'],
+                       help='Run specific experiment')
+    
+    parser.add_argument('--test', action='store_true',
+                       help='Run unit tests')
+    
+    parser.add_argument('--benchmark', action='store_true',
+                       help='Run performance benchmarks')
+    
+    parser.add_argument('--verbose', '-v', action='store_true',
+                       help='Enable verbose output')
+    
+    parser.add_argument('--output', type=str, default='nlm_output.txt',
+                       help='Output file path (default: nlm_output.txt)')
+    
+    args = parser.parse_args()
+    
+    if args.version:
+        print(f"NLM {pynlm.__version__}")
+        print(f"Python {sys.version}")
+        return 0
+    
+    if args.help:
+        parser.print_help()
+        return 0
+    
+    try:
+        if args.run:
+            return run_simulation(args)
+        elif args.experiment:
+            return run_experiment(args)
+        elif args.test:
+            return run_tests(args)
+        elif args.benchmark:
+            return run_benchmarks(args)
+        else:
+            parser.print_help()
+            return 1
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+def run_simulation(args):
+    print(f"Running NLM simulation for {args.steps} steps...")
+    
+    # Load configuration
+    config = pynlm.createDefaultConfig()
+    if args.config != 'default.cfg':
+        config.loadFromFile(args.config)
+    
+    # Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Run simulation
+    for step in range(args.steps):
+        brain.step(step)
+        
+        if args.verbose:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+            print(f"  Spike count: {brain.getTotalSpikeCount()}")
+            print(f"  Active neurons: {brain.getActiveNeuronCount()}")
+    
+    print(f"Simulation completed. Final spike count: {brain.getTotalSpikeCount()}")
+    
+    # Save results
+    with open(args.output, 'w') as f:
+        f.write(f"NLM Simulation Results\n")
+        f.write(f"======================\n")
+        f.write(f"Steps: {args.steps}\n")
+        f.write(f"Final Spike Count: {brain.getTotalSpikeCount()}\n")
+        f.write(f"Final Active Neurons: {brain.getActiveNeuronCount()}\n")
+        f.write(f"Simulation Time: {args.steps * 0.001} seconds\n")
+    
+    print(f"Results saved to {args.output}")
+    return 0
+
+def run_experiment(args):
+    print(f"Running {args.experiment} experiment...")
+    
+    # This would load and run the specific experiment
+    # For now, we'll just provide a placeholder
+    print(f"Experiment {args.experiment} not yet implemented")
+    return 1
+
+def run_tests(args):
+    print("Running NLM unit tests...")
+    
+    # This would run the NLM test suite
+    # For now, we'll just provide a placeholder
+    print("Unit tests not yet implemented")
+    return 0
+
+def run_benchmarks(args):
+    print("Running NLM performance benchmarks...")
+    
+    # This would run performance benchmarks
+    # For now, we'll just provide a placeholder
+    print("Benchmarks not yet implemented")
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
+")
+
+# Make the file executable
+execute_process(COMMAND chmod +x ${CMAKE_BINARY_DIR}/nlm/main.py)

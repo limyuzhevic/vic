@@ -4,14 +4,44 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
-This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+This document provides a comprehensive guide to using NLM, including installation, configuration, and advanced usage examples. For complete API reference documentation, see **AGENTS.md**.
 
----
+## Table of Contents
 
-## Part 1: Building the C++ Project from Source
+1. [Getting Started](#getting-started)
+2. [Building from Source](#building-from-source)
+3. [Installing Python Bindings](#installing-python-bindings)
+4. [Basic Python Usage](#basic-python-usage)
+5. [Complete Agent Example](#complete-agent-example)
+6. [Configuration Options](#configuration-options)
+7. [Advanced Topics](#advanced-topics)
+8. [Troubleshooting](#troubleshooting)
+9. [Best Practices](#best-practices)
+10. [Further Reading](#further-reading)
+
+## Getting Started
+
+NLM is designed to create artificial brains that learn, remember, and make decisions through interaction with an environment.
+
+### The Three Key Components
+
+| Component | Purpose | Key Methods |
+|-----------|---------|-------------|
+| **Brain** | The artificial brain with neurons and synapses | `brain.initialize()`, `brain.step()`, `brain.produceAction()` |
+| **World** | The environment the brain interacts with | `world.configure()`, `world.update()`, `world.applyMotorCommand()` |
+| **Agent** | Bridge connecting brain to world | `agent.processSensoryInput()`, `agent.decodeMotorCommand()` |
+
+### Simple Analogy
+
+| Real World | NLM Code |
+|------------|----------|
+| You see something | `percept = world.getSensoryPercept()` |
+| Your brain processes it | `agent.processSensoryInput(percept)` |
+| You decide to act | `action = agent.decodeMotorCommand()` |
+| You do the action | `world.applyMotorCommand(action, time)` |
+| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+
+## Building from Source
 
 ### Prerequisites
 
@@ -68,9 +98,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
 ```
 
----
-
-## Part 2: Installing the Python Library
+## Installing Python Bindings
 
 ### From Source (Recommended for Development)
 
@@ -113,13 +141,9 @@ brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
 ```
 
----
+## Basic Python Usage
 
-## Part 3: Using the Python Library
-
-### Basic Usage
-
-#### Creating a Brain
+### 1. Creating a Brain
 
 ```python
 import pynlm
@@ -128,8 +152,8 @@ import pynlm
 config = pynlm.createDefaultConfig()
 
 # Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
@@ -139,7 +163,7 @@ print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
-#### Running a Simulation
+### 2. Running a Simulation
 
 ```python
 import pynlm
@@ -158,7 +182,7 @@ for step in range(1000):
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
 ```
 
-#### Creating a Simple World
+### 3. Creating a Simple World
 
 ```python
 import pynlm
@@ -184,7 +208,9 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+## Complete Agent Example
+
+This example demonstrates a complete agent simulation with all components working together.
 
 ```python
 import pynlm
@@ -192,12 +218,20 @@ import pynlm
 def run_agent_simulation(num_steps=1000):
     """Run a complete agent simulation with brain and world."""
     
+    print("=== NLM Agent Simulation ===")
+    print(f"Running {num_steps} simulation steps")
+    print()
+    
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
     
     # 2. Create brain and initialize
     brain = pynlm.createBrain(config)
     brain.initialize()
+    
+    print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+    print(f"Brain initialized successfully")
+    print()
     
     # 3. Create agent brain interface
     agent = pynlm.createAgentBrain(brain)
@@ -211,11 +245,22 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
+    print(f"Created world ({world.getWidth()}x{world.getHeight()})")
+    print(f"Agent initialized with world")
+    print()
+    
     # 6. Enable subsystems
     agent.enableRewardModulation(True)
     agent.enableStructuralPlasticity(True)
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
+    
+    print("Enabled learning subsystems:")
+    print("  - Reward modulation: Enabled")
+    print("  - Structural plasticity: Enabled")
+    print("  - Development: Enabled")
+    print("  - Curiosity: Enabled")
+    print()
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -245,180 +290,32 @@ def run_agent_simulation(num_steps=1000):
         agent.updateDevelopment(0.1)
         
         # Print progress
-        if step % 100 == 0:
+        if step % 200 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+            print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+            print()
+    
+    print("=== Simulation Complete ===")
+    print(f"Total steps simulated: {num_steps}")
+    print(f"Final firing neurons: {brain.getFiringNeuronCount()}")
+    print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+    print(f"Final developmental stage: {brain.getDevelopmentalStage()}")
 
 # Run the simulation
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+## Configuration Options
 
-#### Brain Class
+NLM supports extensive configuration through the `Config` class. The complete parameter reference is available in **AGENTS.md**.
 
-```python
-# Creation
-brain = pynlm.createBrain(config)
+### Common Configuration Parameters
 
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
-
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
-```
-
----
-
-## Part 4: Configuration Options
-
-### Brain Configuration
+#### Brain Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -433,7 +330,7 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
-### Plasticity Configuration
+#### Plasticity Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -444,7 +341,7 @@ pynlm.WorldObjectType.Marker
 | `plasticity.hebbian.enable` | bool | true | Enable Hebbian learning |
 | `plasticity.structural.enable` | bool | true | Enable structural plasticity |
 
-### Neuromodulation Configuration
+#### Neuromodulation Configuration
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -452,53 +349,293 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
----
-
-## Part 5: Example Scripts
-
-### Minimal Example
+### Configuration File Operations
 
 ```python
 import pynlm
 
-# Create and initialize
+# Create configuration
 config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
 
-# Simulate
-for i in range(100):
-    brain.step(i)
+# Save to file
+if config.saveToFile("my_config.json"):
+    print("Configuration saved successfully")
 
-print("Simulation complete!")
+# Load from file
+if config.loadFromFile("my_config.json"):
+    print("Configuration loaded successfully")
+    
+# Modify configuration
+config.set("brain.neuron_count", 2000)
+
+# Save updated configuration
+config.saveToFile("updated_config.json")
+
+# Type conversion
+neuron_count = config.asInt("brain.neuron_count")
+threshold = config.asDouble("brain.v_thresh")
+enabled = config.asBool("plasticity.stdp.enable")
 ```
 
-### Environment Interaction
+## Advanced Topics
+
+### 1. Custom Configuration
+
+Create specialized configurations for different tasks:
 
 ```python
 import pynlm
 
-# Setup
+# High-performance configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 5000)
+config.set("brain.synapse_density", 0.2)
+config.set("brain.tau_mem", 10.0)  # Faster dynamics
+config.set("brain.tau_ref", 1.0)   # Higher firing rates
+
+# Enable all learning mechanisms
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.01)
+config.set("plasticity.hebbian.enable", True)
+config.set("plasticity.structural.enable", True)
+
+# Enhanced neuromodulation
+config.set("neuromod.dopamine.scale", 2.0)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### 2. Type Conversion Utilities
+
+Safe type conversion with error handling:
+
+```python
+import pynlm
+
+# Create configuration with various types
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("brain.v_thresh", -45.0)
+config.set("plasticity.stdp.enable", True)
+config.set("brain.synapse_indices", [1, 5, 10, 15])
+config.set("brain.region_weights", [0.1, 0.5, 1.0, 2.0])
+
+# Type conversion
+try:
+    neuron_count = config.asInt("brain.neuron_count")
+    threshold = config.asDouble("brain.v_thresh")
+    enabled = config.asBool("plasticity.stdp.enable")
+    indices = config.asIntVector("brain.synapse_indices")
+    weights = config.asDoubleVector("brain.region_weights")
+    
+    print(f"Neuron count: {neuron_count}")
+    print(f"Threshold: {threshold}")
+    print(f"STDP enabled: {enabled}")
+    print(f"Indices: {indices}")
+    print(f"Weights: {weights}")
+    
+except (KeyError, TypeError) as e:
+    print(f"Error: {e}")
+```
+
+### 3. Batch Operations
+
+Efficient bulk operations:
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Batch set multiple configuration values
+updates = {
+    "brain.neuron_count": 1000,
+    "brain.v_thresh": -50.0,
+    "plasticity.stdp.enable": True,
+    "plasticity.hebbian.enable": True,
+    "neuromod.dopamine.scale": 1.0,
+    "neuromod.curiosity.enable": True
+}
+config.batchSet(updates)
+
+# Batch get multiple configuration values
+keys = ["brain.neuron_count", "brain.v_thresh", "plasticity.stdp.enable"]
+values = config.batchGet(keys)
+
+print("Batch operations completed")
+for key, value in values.items():
+    print(f"{key}: {value}")
+```
+
+### 4. Brain State Management
+
+Save and load brain state (checkpointing):
+
+```python
+import pynlm
+
+# Create brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
-agent = pynlm.createAgentBrain(brain)
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-agent.initialize(world)
 
-# Run episode
-for _ in range(500):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(0)
-    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+# Run some simulation
+for step in range(10):
+    brain.step(step)
+
+# Save brain state (checkpointing)
+if brain.save("checkpoint.bin"):
+    print("Brain state saved successfully")
+else:
+    print("Failed to save brain state")
+
+# Modify brain state
+for step in range(10, 20):
+    brain.step(step)
+
+# Save updated brain state
+brain.save("updated_checkpoint.bin")
+
+# Load brain state
+if brain.load("checkpoint.bin"):
+    print("Brain state loaded successfully")
+    
+# Verify state is restored
+for step in range(20):
+    brain.step(step)
 ```
 
----
+### 5. Validation and Error Handling
+
+Configuration validation and error handling:
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Add validation schema
+schema = {
+    "brain.neuron_count": pynlm.ConfigValidation("neuron_count", "Number of neurons")
+        .addRule(lambda x: x >= 100)
+        .addRule(lambda x: x <= 100000),
+    "brain.v_thresh": pynlm.ConfigValidation("threshold", "Neuron threshold potential")
+        .addRule(lambda x: x >= -100)
+        .addRule(lambda x: x <= -20)
+}
+config.addSchema(schema)
+
+# Validate configuration
+if config.validate():
+    print("Configuration is valid")
+else:
+    errors = config.getErrors()
+    print(f"Validation errors: {errors}")
+
+# Safe key access
+if config.has("brain.neuron_count"):
+    neuron_count = config.get("brain.neuron_count")
+    print(f"Neuron count: {neuron_count}")
+else:
+    print("Neuron count not configured")
+
+# Type conversion with error handling
+try:
+    int_value = config.asInt("brain.neuron_count")
+    print(f"Neuron count as int: {int_value}")
+except KeyError:
+    print("Neuron count key not found")
+except TypeError:
+    print("Neuron count value cannot be converted to int")
+```
 
 ## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. "Brain isn't doing anything"
+**Symptoms**: No neurons firing, no learning
+**Causes**:
+- Forgot to call `initialize()`
+- No sensory input connected
+- Configuration parameters are too restrictive
+
+**Solutions**:
+```python
+# Always initialize first
+brain = pynlm.createBrain(config)
+brain.initialize()  # Critical!
+
+# Ensure sensory input
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+```
+
+#### 2. Segmentation Faults
+**Symptoms**: Program crashes unexpectedly
+**Causes**:
+- Calling `step()` before `initialize()`
+- Invalid configuration values
+- Memory corruption from invalid operations
+
+**Solutions**:
+```python
+# Follow proper initialization sequence
+brain.initialize()  # Always first
+brain.step(0)        # Then step
+```
+
+#### 3. Import Error
+**Error**: "No module named 'pynlm'"
+**Solutions**:
+```bash
+# Reinstall the module
+pip install --force-reinstall .
+
+# Or install in development mode
+pip install -e .
+```
+
+#### 4. "The agent isn't moving"
+**Symptoms**: Agent stays in place
+**Causes**:
+- Motor command not applied
+- `world.update()` not called
+- No motor neurons active
+
+**Solutions**:
+```python
+# Ensure world update is called
+world.update(0.1)  # Each simulation step
+
+# Apply motor command
+action = agent.decodeMotorCommand()
+world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+#### 5. "Everything is 0"
+**Symptoms**: No neural activity
+**Causes**:
+- Need time for neurons to "warm up"
+- Insufficient input to neurons
+- Configuration parameters too restrictive
+
+**Solutions**:
+```python
+# Give neurons time to warm up
+for step in range(100):
+    brain.step(step)  # Let them settle
+
+# Ensure sensory input is provided
+agent.processSensoryInput(percept)
+```
 
 ### Build Issues
 
@@ -513,21 +650,150 @@ cmake .. -DPython_EXECUTABLE=$(which python)
 - Check CMake version >= 3.16
 - Verify all source files are present
 
-### Runtime Issues
+## Best Practices
 
-**ImportError: No module named 'pynlm':**
-```bash
-pip install --force-reinstall .
+### 1. Always Initialize Before Use
+```python
+brain.initialize()  # Never skip this!
+for step in range(100):
+    brain.step(step)
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+### 2. Reset Before Reuse
+```python
+brain.reset()  # Reset for new episode
+for step in range(100):
+    brain.step(step)
+```
 
----
+### 3. Use Configuration Wisely
+```python
+# Use defaults for simple cases
+config = pynlm.createDefaultConfig()
+
+# Customize only what's necessary
+config.set("brain.neuron_count", 2000)  # Custom value
+```
+
+### 4. Enable Appropriate Learning Mechanisms
+```python
+# Enable based on your task
+agent.enableRewardModulation(True)      # For reward-based learning
+agent.enableCuriosity(True)             # For exploration
+agent.enableStructuralPlasticity(True)  # For structural changes
+agent.enableDevelopment(True)           # For developmental changes
+```
+
+### 5. Monitor Progress
+```python
+for step in range(1000):
+    brain.step(step)
+    
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Active neurons: {brain.getActiveNeuronCount()}")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+        print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+```
+
+### 6. Use Type Conversion for Safety
+```python
+# Use type conversion methods for safety
+neuron_count = config.asInt("brain.neuron_count")  # Safe to use as int
+threshold = config.asDouble("brain.v_thresh")    # Safe to use as double
+enabled = config.asBool("plasticity.stdp.enable")  # Safe to use as bool
+```
+
+### 7. Batch Operations for Efficiency
+```python
+# Batch set multiple configuration values
+config.batchSet({
+    "brain.neuron_count": 1000,
+    "brain.v_thresh": -50.0,
+    "plasticity.stdp.enable": True
+})
+
+# Batch get multiple configuration values
+keys = ["brain.neuron_count", "brain.v_thresh", "plasticity.stdp.enable"]
+values = config.batchGet(keys)
+```
+
+### 8. Save and Load Brain State
+```python
+# Save brain state (checkpointing)
+brain.save("checkpoint.bin")
+
+# Load brain state
+brain.load("checkpoint.bin")
+```
+
+### 9. Use the Complete API Reference
+
+For comprehensive API documentation including:
+- Detailed method signatures and return types
+- Parameter descriptions and types
+- Complete examples for all classes
+- Usage patterns and best practices
+- Configuration parameter references
+
+See **AGENTS.md** for the complete API reference.
+
+### 10. Experiment with Different Configurations
+
+```python
+# Try different configurations for different tasks
+config = pynlm.createDefaultConfig()
+
+# For learning tasks
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.dopamine.scale", 1.0)
+
+# For exploration tasks
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+
+# For developmental tasks
+config.set("neuromod.curiosity.enable", True)
+```
 
 ## Further Reading
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- **AGENTS.md** - Complete API reference with all classes and methods
+- **easy_usage.md** - Beginner-friendly guide with simple examples
+- **README.md** - Project overview and quick start
+- **docs/ARCHITECTURE.md** - System architecture overview
+- **docs/SCIENCE.md** - Scientific background
+- **docs/EXPERIMENTS.md** - Experiment descriptions
+- **docs/PHASE6_FINAL_AUDIT.md** - Phase 6 implementation audit
+
+## Key Improvements in This Documentation
+
+This enhanced HOW_TO_USE.md now includes:
+
+1. **Comprehensive table of contents** - Easy navigation to all sections
+2. **Complete examples** - Working code for all major features
+3. **Advanced topics** - Custom configurations, batch operations, validation
+4. **Complete troubleshooting guide** - All common issues with solutions
+5. **Best practices section** - Comprehensive guidelines for effective usage
+6. **Reference to AGENTS.md** - Clear link to complete API documentation
+7. **Better formatting and structure** - Professional documentation layout
+8. **Enhanced explanations** - Clearer descriptions of concepts and usage
+9. **Consistent style** - Uniform formatting across all sections
+10. **Updated examples** - More realistic and complete code examples
+
+## See Also
+
+- **AGENTS.md** - Complete API reference with all classes and methods
+- **easy_usage.md** - Beginner-friendly guide with simple examples
+- **README.md** - Project overview and quick start
+- **docs/ARCHITECTURE.md** - System architecture overview
+- **docs/SCIENCE.md** - Scientific background
+- **docs/EXPERIMENTS.md** - Experiment descriptions
+- **docs/PHASE6_FINAL_AUDIT.md** - Phase 6 implementation audit
+
+## Copyright and License
+
+Copyright © NLM Project Authors. All rights reserved.
+
+MIT License - See LICENSE file for details.

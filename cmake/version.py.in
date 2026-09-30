@@ -1,0 +1,50 @@
+# NLM Python Package __init__.py Template
+# This file is used to create the __init__.py for the NLM Python package.
+
+# Generate version information
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/version.py.in
+    ${CMAKE_BINARY_DIR}/pynlm/__init__.py
+    @ONLY
+)
+
+# Create Python module metadata
+file(WRITE ${CMAKE_BINARY_DIR}/pynlm/version.py
+"# NLM Version Information
+# This file contains version metadata for the NLM Python module.
+
+__version__ = "${PROJECT_VERSION}"
+__author__ = "NLM Authors"
+__description__ = "Python bindings for NLM (Neural Learning Machine)"
+__license__ = "MIT"
+__url__ = "https://github.com/nlm-project/nlm"
+
+# Platform information
+import platform
+__platform__ = platform.system().lower()
+__architecture__ = platform.machine()
+
+# Python version information
+import sys
+__python_version__ = sys.version_info
+__python_version_str__ = ".".join(map(str, __python_version__[:3]))
+
+# Compiler information
+__compiler__ = "${CMAKE_CXX_COMPILER_ID}"
+__cxx_standard__ = "${CMAKE_CXX_STANDARD}"
+
+# Build configuration
+__build_type__ = "${CMAKE_BUILD_TYPE}"
+__install_prefix__ = "${CMAKE_INSTALL_PREFIX}"
+
+# Feature flags
+__features__ = {
+    "python_bindings": ${NLM_ENABLE_PYTHON_BINDINGS},
+    "tests": ${NLM_ENABLE_TESTS},
+    "phase3_experiments": ${NLM_ENABLE_PHASE3_EXPERIMENTS},
+    "phase4_experiments": ${NLM_ENABLE_PHASE4_EXPERIMENTS},
+    "performance_optimizations": ${NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS},
+    "coverage": ${NLM_ENABLE_COVERAGE},
+}
+""
+)

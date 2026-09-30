@@ -1,0 +1,166 @@
+# NLM Python Module Configuration
+# Configuration for the Python bindings module.
+
+# Python module configuration template
+set(PYMOD_TEMPLATE
+"# NLM Python Module Configuration
+# Generated from pynlmConfig.cmake.in
+
+# Python module information
+set(NLM_PYTHON_MODULE_NAME "pynlm")
+set(NLM_PYTHON_MODULE_VERSION "${PROJECT_VERSION}")
+set(NLM_PYTHON_MODULE_SO_NAME "${PYTHON_MODULE_SO_NAME}")
+
+# Python module paths
+set(NLM_PYTHON_MODULE_LIB_DIR "${PYTHON_MODULE_INSTALL_DIR}")
+set(NLM_PYTHON_MODULE_BIN_DIR "${PYTHON_MODULE_INSTALL_DIR}")
+
+# Python module dependencies
+set(NLM_PYTHON_MODULE_DEPENDENCIES "pybind11>=2.11.0")
+
+# Python module configuration
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../python/__init__.py.in
+    ${CMAKE_BINARY_DIR}/pynlm/__init__.py
+    @ONLY
+)
+
+# Python module setup.py
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../python/setup.py.in
+    ${CMAKE_BINARY_DIR}/pynlm/setup.py
+    @ONLY
+)
+")
+
+# Write Python module configuration file
+file(WRITE "${CMAKE_BINARY_DIR}/pynlm/pynlmConfig.cmake" "${PYMOD_TEMPLATE}")
+
+# Create Python module manifest
+set(PYMOD_MANIFEST
+"# NLM Python Module Manifest
+# This file describes the Python module structure and dependencies.
+
+PackageName: pynlm
+Version: ${PROJECT_VERSION}
+Description: Python bindings for NLM (Neural Learning Machine)
+Author: NLM Authors
+License: MIT
+Requires: pybind11>=2.11.0
+PythonVersion: >=3.8
+Platform: ${CMAKE_SYSTEM_NAME}
+Architecture: ${CMAKE_SIZEOF_VOID_P}-bit
+""
+
+file(WRITE "${CMAKE_BINARY_DIR}/pynlm/pynlm.MF" "${PYMOD_MANIFEST}")
+
+# Create Python module documentation
+set(PYMOD_DOCS
+"# NLM Python Module Documentation
+# Documentation for the Python bindings.
+
+## Overview
+
+This module provides Python bindings for NLM (Neural Learning Machine), an experimental
+computational brain project designed to simulate brain-like systems with neurons and synapses.
+
+## Installation
+
+### From Source
+
+```bash
+python setup.py build_ext --inplace
+```
+
+### Using pip
+
+```bash
+pip install pynlm
+```
+
+## API Reference
+
+### Core Classes
+
+#### Config
+
+Create a configuration object:
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+```
+
+#### Brain
+
+Create and initialize a brain:
+
+```python
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+Run simulation steps:
+
+```python
+for step in range(100):
+    brain.step(step)
+    print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+```
+
+### Usage Examples
+
+#### Basic Simulation
+
+```python
+import pynlm
+
+# Create brain with default configuration
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+    print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+```
+
+#### Configuration
+
+```python
+config = pynlm.createDefaultConfig()
+
+# Set configuration values
+config.set("brain.neuron_count", 5000)
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.dopamine.scale", 2.0)
+
+# Create brain with custom configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+## Module Functions
+
+### Configuration Functions
+
+- `createDefaultConfig()`: Create default configuration
+- `Config()`: Create configuration object
+
+### Brain Functions
+
+- `createBrain(config)`: Create brain with configuration
+- `Brain(config)`: Create brain object
+
+### Information Functions
+
+- `getVersion()`: Get module version
+- `getPlatform()`: Get platform information
+- `getArchitecture()`: Get architecture information
+""
+
+file(WRITE "${CMAKE_BINARY_DIR}/pynlm/README.md" "${PYMOD_DOCS}")
+
+message(STATUS "Python module configuration complete")

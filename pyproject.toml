@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "cmake>=3.16"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -27,10 +27,30 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "pybind11>=2.11.0",
+]
 
 [project.optional-dependencies]
 dev = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+    "coverage>=5.0",
+    "valgrind",
+    "asan",
+    "msan",
+]
+build = [
+    "cmake>=3.16",
+    "scikit-build-core>=0.5.0",
+    "pybind11>=2.11.0",
+]
+tests = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+]
+performance = [
     "pytest>=7.0",
     "numpy>=1.20",
 ]
@@ -39,6 +59,7 @@ dev = [
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+BugTracker = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -47,11 +68,49 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DNLM_ENABLE_TESTS=ON",
+    "-DNLM_ENABLE_PYTHON_BINDINGS=ON",
+    "-DNLM_ENABLE_PERFORMANCE_OPTIMIZATIONS=ON",
 ]
+cmake.build-dir = "build"
+cmake.generator = "Ninja"
+clean = ["build", "dist", "*.egg-info"]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_TESTS = true
+NLM_ENABLE_PYTHON_BINDINGS = true
+NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS = true
+NLM_ENABLE_COVERAGE = false
+NLM_ENABLE_VALGRIND_TESTS = false
+NLM_ENABLE_ASAN_TESTS = false
+NLM_ENABLE_MSAN_TESTS = false
+
+[tool.scikit-build.cmake.cache]
+CMAKE_BUILD_TYPE = "Release"
+CMAKE_CXX_STANDARD = "20"
+CMAKE_CXX_STANDARD_REQUIRED = true
+CMAKE_CXX_EXTENSIONS = false
+NLM_PLATFORM_DETECTION = true
+NLM_DEPENDENCY_MANAGEMENT = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "python/tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--tb=short",
+    "--verbose",
+    "--color=yes",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m "not slow\"')",
+    "integration: marks tests as integration tests",
+    "performance: marks tests as performance tests",
+    "benchmark: marks tests as benchmark tests",
+    "valgrind: marks tests as valgrind tests",
+    "asan: marks tests as AddressSanitizer tests",
+    "msan: marks tests as MemorySanitizer tests",
+]
+

@@ -1,0 +1,110 @@
+# Python Module Setup Script Template
+# This is the setup.py template for the NLM Python module.
+
+# Generate setup.py
+file(WRITE ${CMAKE_BINARY_DIR}/pynlm/setup.py
+"from setuptools import setup, find_packages
+from setuptools.extension import Extension
+from pybind11.setup_helpers import Pybind11Extension, build_ext
+import os
+import sys
+
+# Get the pybind11 include directory
+try:
+    import pybind11
+    pybind11_include = pybind11.get_include()
+except ImportError:
+    pybind11_include = \"\"
+
+# Determine the extension name
+MODULE_NAME = \"pynlm._core\"
+
+# Define the extension module
+ext_modules = [
+    Pybind11Extension(
+        MODULE_NAME,
+        sorted(glob.glob('${CMAKE_BINARY_DIR}/lib/*.so') + glob.glob('${CMAKE_BINARY_DIR}/lib/*.pyd')),
+        include_dirs=[
+            '${CMAKE_CURRENT_SOURCE_DIR}/../src',
+            pybind11_include,
+        ],
+        cxx_std=20,
+        extra_compile_args=['-O3'],
+        language='c++',
+    ),
+]
+
+# Read README for long description
+long_description = \"\"
+if os.path.exists('${CMAKE_CURRENT_SOURCE_DIR}/../README.md'):
+    with open('${CMAKE_CURRENT_SOURCE_DIR}/../README.md', 'r') as f:
+        long_description = f.read()
+
+setup(
+    name='pynlm',
+    version='${PROJECT_VERSION}',
+    author='NLM Authors',
+    description='Python bindings for NLM (Neural Learning Machine)',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    packages=find_packages(),
+    ext_modules=ext_modules,
+    install_requires=[
+        'numpy>=1.20',
+        'pybind11>=2.11.0',
+    ],
+    setup_requires=['pybind11>=2.11.0'],
+    python_requires='>=3.8',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: C++',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    ],
+    zip_safe=False,
+    entry_points={
+        'console_scripts': [
+            'nlm=nlm:main',
+            'nlm_phase3_demo=nlm_phase3_demo:main',
+            'nlm_phase4_demo=nlm_phase4_demo:main',
+        ],
+    },
+)
+")
+
+# Create requirements file
+file(WRITE ${CMAKE_BINARY_DIR}/pynlm/requirements.txt
+"numpy>=1.20
+pybind11>=2.11.0
+")
+
+# Create module metadata
+file(WRITE ${CMAKE_BINARY_DIR}/pynlm/pynlm-metadata.json
+"{
+    \"name\": \"pynlm\",
+    \"version\": \"${PROJECT_VERSION}\",
+    \"author\": \"NLM Authors\",
+    \"description\": \"Python bindings for NLM (Neural Learning Machine)\",
+    \"license\": \"MIT\",
+    \"requires_python\": \">=3.8\",
+    \"platform\": \"${CMAKE_SYSTEM_NAME}\",
+    \"architecture\": \"${CMAKE_SIZEOF_VOID_P}-bit\",
+    \"dependencies\": [
+        \"numpy>=1.20\",
+        \"pybind11>=2.11.0\"
+    ],
+    \"features\": {
+        \"python_bindings\": ${NLM_ENABLE_PYTHON_BINDINGS},
+        \"tests\": ${NLM_ENABLE_TESTS},
+        \"phase3_experiments\": ${NLM_ENABLE_PHASE3_EXPERIMENTS},
+        \"phase4_experiments\": ${NLM_ENABLE_PHASE4_EXPERIMENTS}
+    }
+}
+")

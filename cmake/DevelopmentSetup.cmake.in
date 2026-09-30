@@ -1,0 +1,103 @@
+# Development Setup Script
+# Convenience script for NLM developers.
+
+set(DEVELOPMENT_SETUP_CONTENT
+"# Development Setup for NLM
+# This script provides development convenience features for NLM.
+
+# Development environment variables
+if(MSVC)
+    # Windows
+    set(NLM_DEV_ROOT "${CMAKE_BINARY_DIR}/dev")
+    set(NLM_INCLUDE_PATH "${CMAKE_BINARY_DIR}/include")
+    set(NLM_LIB_PATH "${CMAKE_BINARY_DIR}/lib")
+    set(NLM_BIN_PATH "${CMAKE_BINARY_DIR}/bin")
+    
+    # Create batch file for development environment
+    file(WRITE "${NLM_DEV_ROOT}/nlm-dev.bat"
+        "@echo off\r\n"
+        "echo Setting up NLM development environment...\r\n"
+        "set NLM_DEV_ROOT=${NLM_DEV_ROOT}\r\n"
+        "set NLM_INCLUDE_PATH=%NLM_DEV_ROOT%/include\r\n"
+        "set NLM_LIB_PATH=%NLM_DEV_ROOT%/lib\r\n"
+        "set NLM_BIN_PATH=%NLM_DEV_ROOT%/bin\r\n"
+        "set INCLUDE=%NLM_INCLUDE_PATH%;%INCLUDE%\r\n"
+        "set LIB=%NLM_LIB_PATH%;%LIB%\r\n"
+        "set PATH=%NLM_BIN_PATH%;%PATH%\r\n"
+        "\r\n"
+        "echo NLM development environment configured.\r\n"
+        "echo.\r\n"
+        "echo Available commands:\r\n"
+        "echo   nlm                    - Run NLM simulation\r\n"
+        "echo   nlm_phase3_demo         - Run Phase 3 demo\r\n"
+        "echo   nlm_phase4_demo         - Run Phase 4 demo\r\n"
+        "echo   nlm-test               - Run unit tests\r\n"
+        "echo   nlm-benchmark          - Run performance benchmarks\r\n"
+    )
+else()
+    # Unix-like systems
+    set(NLM_DEV_ROOT "${CMAKE_BINARY_DIR}/dev")
+    set(NLM_INCLUDE_PATH "${CMAKE_BINARY_DIR}/include")
+    set(NLM_LIB_PATH "${CMAKE_BINARY_DIR}/lib")
+    set(NLM_BIN_PATH "${CMAKE_BINARY_DIR}/bin")
+    
+    # Create shell script for development environment
+    file(WRITE "${NLM_DEV_ROOT}/nlm-dev.sh"
+        "#!/bin/bash\r\n"
+        "echo \"Setting up NLM development environment...\"\r\n"
+        "export NLM_DEV_ROOT=${NLM_DEV_ROOT}\r\n"
+        "export NLM_INCLUDE_PATH=${NLM_INCLUDE_PATH}\r\n"
+        "export NLM_LIB_PATH=${NLM_LIB_PATH}\r\n"
+        "export NLM_BIN_PATH=${NLM_BIN_PATH}\r\n"
+        "export CPATH=${NLM_INCLUDE_PATH}:\${CPATH}\r\n"
+        "export C_INCLUDE_PATH=${NLM_INCLUDE_PATH}:\${C_INCLUDE_PATH}\r\n"
+        "export CPLUS_INCLUDE_PATH=${NLM_INCLUDE_PATH}:\${CPLUS_INCLUDE_PATH}\r\n"
+        "export LD_LIBRARY_PATH=${NLM_LIB_PATH}:\${LD_LIBRARY_PATH}\r\n"
+        "export PYTHONPATH=${NLM_BIN_PATH}:\${PYTHONPATH}\r\n"
+        "export PATH=${NLM_BIN_PATH}:\${PATH}\r\n"
+        "\r\n"
+        "echo \"NLM development environment configured.\"\r\n"
+        "echo\r\n"
+        "echo Available commands:\r\n"
+        "echo   nlm                    - Run NLM simulation\r\n"
+        "echo   nlm_phase3_demo         - Run Phase 3 demo\r\n"
+        "echo   nlm_phase4_demo         - Run Phase 4 demo\r\n"
+        "echo   nlm-test               - Run unit tests\r\n"
+        "echo   nlm-benchmark          - Run performance benchmarks\r\n"
+        "echo   nlm-dev                - Re-run this script\r\n"
+    )
+    
+    execute_process(COMMAND chmod +x "${NLM_DEV_ROOT}/nlm-dev.sh")
+endif()
+
+# Create development directory structure
+file(MAKE_DIRECTORY "${NLM_DEV_ROOT}")
+file(MAKE_DIRECTORY "${NLM_DEV_ROOT}/include/nlm")
+file(MAKE_DIRECTORY "${NLM_DEV_ROOT}/lib")
+file(MAKE_DIRECTORY "${NLM_DEV_ROOT}/bin")
+file(MAKE_DIRECTORY "${NLM_DEV_ROOT}/test_results")
+
+# Create development CMake configuration
+file(WRITE "${NLM_DEV_ROOT}/CMakeLists.txt"
+    "# NLM Development Configuration\r\n"
+    "cmake_minimum_required(VERSION 3.16)\r\n"
+    "project(NLM_DEV VERSION 0.1.0)\r\n\r\n"
+    "# Include NLM configuration\r\n"
+    "include(\${CMAKE_CURRENT_SOURCE_DIR}/../CMakeLists.txt)\r\n\r\n"
+    "# Development-specific settings\r\n"
+    "set(CMAKE_BUILD_TYPE Debug CACHE STRING \"Build type for development\")\r\n"
+    "set(NLM_ENABLE_TESTS ON CACHE BOOL \"Enable tests for development\")\r\n"
+    "set(NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS OFF CACHE BOOL \"Disable optimizations for debugging\")\r\n"
+    "set(NLM_ENABLE_COVERAGE ON CACHE BOOL \"Enable coverage analysis for development\")\r\n\r\n"
+    "# Development compiler flags\r\n"
+    "if(MSVC)\r\n"
+    "    add_compile_options(/Zi /DEBUG /RTC1)\r\n"
+    "else()\r\n"
+    "    add_compile_options(-g -O0 -DDEBUG)\r\n"
+    "endif()\r\n"
+)
+
+message(STATUS "Development setup complete")
+")
+
+file(WRITE "${CMAKE_BINARY_DIR}/DevelopmentSetup.cmake" "${DEVELOPMENT_SETUP_CONTENT}")

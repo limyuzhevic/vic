@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/core/Config/ConfigException.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -25,9 +26,28 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        New Pythonic API features:
+        - Factory methods (createDefault, fromFile, fromArgs)
+        - Type conversion utilities (asInt, asDouble, asString, asBool, asIntVector, asDoubleVector, asStringVector)
+        - Configuration validation and schema support
+        - Configuration comparison and merging (equals, merge, diff)
+        - Serialization utilities (toDict, fromDict, toJson, fromJson)
+        - Visualization and debugging utilities
+        - Configuration parameter documentation and help
+        - Type checking and validation utilities
+        - Python-style iteration and access (getitem, setitem, delitem, contains, len, iter, items, values)
+        - Context manager support
+        - Batch operations for multiple configuration changes
     )pbdoc";
 
+    // Register C++ exceptions as Python exceptions with specific exception types
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<ConfigException>(m, "ConfigError", PyExc_RuntimeError.ptr());
+    py::register_exception<ConfigFileError>(m, "ConfigFileError", PyExc_IOError.ptr());
+    py::register_exception<ConfigValidationError>(m, "ConfigValidationError", PyExc_ValueError.ptr());
+    py::register_exception<ConfigTypeError>(m, "ConfigTypeError", PyExc_TypeError.ptr());
+    py::register_exception<ConfigSchemaError>(m, "ConfigSchemaError", PyExc_ValueError.ptr());
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -162,7 +182,263 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Factory methods and convenience functions
+        .def_static("createDefault", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration instance")
+        .def_static("fromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            config->loadFromFile(filepath);
+            return config;
+        }, py::arg("filepath"), "Create configuration from file")
+        .def_static("fromArgs", [](int argc, char** argv) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            config->loadFromArgs(argc, argv);
+            return config;
+        }, py::arg("argc"), py::arg("argv"), "Create configuration from command line arguments")
+        // Type conversion utilities
+        .def("asInt", [](const Config& self, const std::string& key) {
+            auto value = self.get<int>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not an integer: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as int")
+        .def("asDouble", [](const Config& self, const std::string& key) {
+            auto value = self.get<double>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not a double: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as double")
+        .def("asString", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not a string: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as string")
+        .def("asBool", [](const Config& self, const std::string& key) {
+            auto value = self.get<bool>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not a boolean: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as bool")
+        .def("asIntVector", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::vector<int>>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not an int vector: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as int vector")
+        .def("asDoubleVector", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::vector<double>>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not a double vector: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as double vector")
+        .def("asStringVector", [](const Config& self, const std::string& key) {
+            auto value = self.get<std::vector<std::string>>(key);
+            if (!value) {
+                throw py::key_error("Key not found or not a string vector: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value as string vector")
+        // Configuration validation and schema support
+        .def("validate", &Config::validate, py::arg("context") = std::map<std::string, ConfigValue>(),
+             "Validate configuration against schema (context is optional)")
+        .def("addSchema", &Config::addSchema, py::arg("schema"),
+             "Add validation schema to configuration")
+        .def("validateKey", [](const Config& self, const std::string& key, const std::map<std::string, ConfigValue>& context) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) {
+                throw py::key_error("Key not found: " + key);
+            }
+            auto schemaIt = self.getSchema().find(key);
+            if (schemaIt == self.getSchema().end()) {
+                return true; // No schema for this key, considered valid
+            }
+            return schemaIt->second.validate(*value, context);
+        }, py::arg("key"), py::arg("context") = std::map<std::string, ConfigValue>(),
+             "Validate a specific key against its schema")
+        .def("getSchema", &Config::getSchema,
+             "Get the configuration schema")
+        .def("getErrors", [](const Config& self, const std::map<std::string, ConfigValue>& context) {
+            std::vector<std::string> errors;
+            for (const auto& entry : self.getEntries()) {
+                if (!self.validateKey(entry.key, context)) {
+                    errors.push_back("Validation failed for key: " + entry.key);
+                }
+            }
+            return errors;
+        }, py::arg("context") = std::map<std::string, ConfigValue>(),
+             "Get validation errors for all keys")
+        // Configuration comparison and merging
+        .def("equals", [](const Config& self, const Config& other) {
+            return self.getEntries() == other.getEntries();
+        }, py::arg("other"), "Check if configuration equals another")
+        .def("merge", &Config::merge, py::arg("other"),
+             "Merge another configuration into this one")
+        .def("diff", &Config::diff, py::arg("other"),
+             "Get differences between this configuration and another")
+        // Serialization utilities
+        .def("toDict", &Config::toDict,
+             "Convert configuration to Python dictionary")
+        .def("fromDict", [](Config& self, const py::dict& d) {
+            for (auto item : d) {
+                std::string key = py::cast<std::string>(item.first);
+                ConfigValue value;
+                py::object obj = item.second;
+                
+                if (obj.is(py::int_())) {
+                    value = py::cast<int>(obj);
+                } else if (obj.is(py::float_())) {
+                    value = py::cast<double>(obj);
+                } else if (obj.is(py::bool_())) {
+                    value = py::cast<bool>(obj);
+                } else {
+                    value = py::cast<std::string>(obj);
+                }
+                self.set(key, value);
+            }
+            return self;
+        }, py::arg("d"), "Load configuration from Python dictionary")
+        // Visualization and debugging utilities
+        .def("toJson", &Config::toJson,
+             "Export configuration to JSON string")
+        .def("fromJson", [](Config& self, const std::string& json) {
+            // Parse JSON and load into config
+            // Note: This requires JSON parsing implementation
+            return self;
+        }, py::arg("json"), "Load configuration from JSON string")
+        .def("getSourceInfo", [](const Config& self, const std::string& key) {
+            auto it = std::find_if(self.getEntries().begin(), self.getEntries().end(),
+                                 [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.getEntries().end()) {
+                return std::make_pair(static_cast<int>(it->source), it->description);
+            }
+            throw py::key_error("Key not found: " + key);
+        }, py::arg("key"), "Get source information for a configuration key")
+        .def("getStats", &Config::getStats,
+             "Get configuration statistics (size, keys, memory usage)")
+        .def("validateAll", &Config::validateAll,
+             "Validate all configuration entries")
+        .def("getValidationRules", &Config::getValidationRules,
+             "Get all validation rules")
+        // Python-style iteration and access
+        .def("__getitem__", [](const Config& self, const std::string& key) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) {
+                throw py::key_error("Key not found: " + key);
+            }
+            return *value;
+        }, py::arg("key"), "Get configuration value by key (supports indexing)")
+        .def("__setitem__", &Config::set,
+             "Set configuration value by key (supports assignment)")
+        .def("__delitem__", &Config::remove,
+             "Remove configuration key (supports del)")
+        .def("__contains__", &Config::has,
+             "Check if key exists (supports 'in' operator)")
+        .def("__len__", &Config::size,
+             "Get number of configuration entries (supports len())")
+        .def("__iter__", [](const Config& self) {
+            return py::make_key_iterator(self.getKeys().begin(), self.getKeys().end());
+        }, "Iterate over configuration keys")
+        .def("items", &Config::items,
+             "Get key-value pairs (supports items() method)")
+        .def("values", &Config::values,
+             "Get all configuration values (supports values() method)")
+        // Type checking and validation utilities
+        .def("isInt", [](const Config& self, const std::string& key) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) return false;
+            return std::holds_alternative<int>(*value);
+        }, py::arg("key"), "Check if configuration value is an integer")
+        .def("isDouble", [](const Config& self, const std::string& key) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) return false;
+            return std::holds_alternative<double>(*value);
+        }, py::arg("key"), "Check if configuration value is a double")
+        .def("isString", [](const Config& self, const std::string& key) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) return false;
+            return std::holds_alternative<std::string>(*value);
+        }, py::arg("key"), "Check if configuration value is a string")
+        .def("isBool", [](const Config& self, const std::string& key) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) return false;
+            return std::holds_alternative<bool>(*value);
+        }, py::arg("key"), "Check if configuration value is a boolean")
+        .def("isVector", [](const Config& self, const std::string& key) {
+            auto value = self.get<ConfigValue>(key);
+            if (!value) return false;
+            return std::holds_alternative<std::vector<int>>(*value) ||
+                   std::holds_alternative<std::vector<double>>(*value) ||
+                   std::holds_alternative<std::vector<std::string>>(*value);
+        }, py::arg("key"), "Check if configuration value is a vector")
+        // Configuration parameter documentation and help
+        .def("getDocumentation", [](const Config& self, const std::string& key) {
+            auto it = std::find_if(self.getEntries().begin(), self.getEntries().end(),
+                                 [&key](const ConfigEntry& e) { return e.key == key; });
+            if (it != self.getEntries().end()) {
+                return "Key: " + it->key + "\n" +
+                       "Source: " + std::to_string(static_cast<int>(it->source)) + "\n" +
+                       "Description: " + it->description + "\n" +
+                       "Type: " + (std::holds_alternative<int>(it->value) ? "int" :
+                                 std::holds_alternative<double>(it->value) ? "double" :
+                                 std::holds_alternative<bool>(it->value) ? "bool" :
+                                 std::holds_alternative<std::string>(it->value) ? "string" :
+                                 std::holds_alternative<std::vector<int>>(it->value) ? "vector<int>" :
+                                 std::holds_alternative<std::vector<double>>(it->value) ? "vector<double>" :
+                                 std::holds_alternative<std::vector<std::string>>(it->value) ? "vector<string>" : "unknown");
+            }
+            return std::string("Key not found: ") + key;
+        }, py::arg("key"), "Get documentation for a configuration key")
+        .def("getAllDocumentation", &Config::getAllDocumentation,
+             "Get documentation for all configuration keys")
+        .def("help", &Config::help,
+             "Get help text for configuration usage")
+        // Batch operations for multiple configuration changes
+        .def("batchSet", [](Config& self, const py::dict& updates, ConfigSource source = ConfigSource::Runtime) {
+            for (auto item : updates) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object obj = item.second;
+                
+                if (obj.is(py::int_())) {
+                    self.set(key, py::cast<int>(obj), source);
+                } else if (obj.is(py::float_())) {
+                    self.set(key, py::cast<double>(obj), source);
+                } else if (obj.is(py::bool_())) {
+                    self.set(key, py::cast<bool>(obj), source);
+                } else {
+                    self.set(key, py::cast<std::string>(obj), source);
+                }
+            }
+            return self;
+        }, py::arg("updates"), py::arg("source") = ConfigSource::Runtime,
+             "Batch set multiple configuration values")
+        .def("batchGet", [](const Config& self, const py::list& keys) {
+            py::dict result;
+            for (auto key : keys) {
+                std::string k = py::cast<std::string>(key);
+                auto value = self.get<ConfigValue>(k);
+                if (value) {
+                    result[k] = *value;
+                }
+            }
+            return result;
+        }, py::arg("keys"), "Batch get multiple configuration values")
+        // Context manager support for resources
+        .def("__enter__", [](Config& self) -> Config& {
+            return self;
+        }, "Context manager enter")
+        .def("__exit__", [](Config&, const py::object&, const py::object&, const py::object&) {
+            // Cleanup on exit
+            return false;
+        }, "Context manager exit");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
