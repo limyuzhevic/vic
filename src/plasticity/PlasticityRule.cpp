@@ -31,13 +31,35 @@ void HebbianRule::update(Synapse* synapse,
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // Count coincident spikes (simplified - improved for performance)
     size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
+    
+    if (preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Create sorted copies to avoid modifying originals
+    std::vector<Timestamp> sortedPre(preSpikes.begin(), preSpikes.end());
+    std::vector<Timestamp> sortedPost(postSpikes.begin(), postSpikes.end());
+    
+    std::sort(sortedPre.begin(), sortedPre.end());
+    std::sort(sortedPost.begin(), sortedPost.end());
+    
+    // Use two-pointer approach for O(N+M) complexity
+    size_t i = 0, j = 0;
+    while (i < sortedPre.size() && j < sortedPost.size()) {
+        Timestamp diff = std::abs(sortedPre[i] - sortedPost[j]);
+        
+        if (diff < 10.0) {  // 10ms coincidence window
+            ++coincidences;
+            ++i;
+            ++j;
+        } else if (sortedPre[i] < sortedPost[j]) {
+            // Pre spike is earlier, try next post spike
+            ++j;
+        } else {
+            // Post spike is earlier, try next pre spike  
+            ++i;
         }
     }
     
