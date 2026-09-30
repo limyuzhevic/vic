@@ -18,6 +18,8 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include <algorithm>
+#include <numeric>
 
 #include <iostream>
 #include <memory>
