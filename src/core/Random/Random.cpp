@@ -38,18 +38,29 @@ uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
 }
 
-uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
+uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
     if (min == max) {
         return min;
     }
-    std::uniform_int_distribution<uint32_t> dist(min, max);
+    std::uniform_int_distribution<uint64_t> dist(min, max);
     return dist(pImpl->gen);
 }
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
+    if (min > max) {
+        throw std::invalid_argument("min must be <= max");
+    }
+    if (min == max) {
+        return min;
+    }
+    std::uniform_int_distribution<uint64_t> dist(min, max);
+    return dist(pImpl->gen);
+}
+
+uint64_t RandomGenerator::uniformInt64(uint64_t min, uint64_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
@@ -77,28 +88,63 @@ float RandomGenerator::uniformReal(float min, float max) {
 }
 
 double RandomGenerator::normal(double mean, double stddev) {
+    if (stddev < 0.0) {
+        throw std::invalid_argument("standard deviation must be non-negative");
+    }
     std::normal_distribution<double> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::normal(float mean, float stddev) {
+    if (stddev < 0.0f) {
+        throw std::invalid_argument("standard deviation must be non-negative");
+    }
     std::normal_distribution<float> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 bool RandomGenerator::bernoulli(double p) {
+    if (p < 0.0 || p > 1.0) {
+        throw std::invalid_argument("probability must be between 0 and 1");
+    }
     std::bernoulli_distribution dist(p);
     return dist(pImpl->gen);
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    if (lambda < 0.0) {
+        throw std::invalid_argument("lambda must be non-negative");
+    }
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    if (lambda <= 0.0) {
+        throw std::invalid_argument("lambda must be positive");
+    }
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
+}
+
+double RandomGenerator::gamma(double alpha, double beta) {
+    if (alpha <= 0.0 || beta <= 0.0) {
+        throw std::invalid_argument("alpha and beta must be positive");
+    }
+    std::gamma_distribution<double> dist(alpha, beta);
+    return dist(pImpl->gen);
+}
+
+float RandomGenerator::gamma(float alpha, float beta) {
+    if (alpha <= 0.0f || beta <= 0.0f) {
+        throw std::invalid_argument("alpha and beta must be positive");
+    }
+    std::gamma_distribution<float> dist(alpha, beta);
+    return dist(pImpl->gen);
+}
+
+uint64_t RandomGenerator::getSeed() const {
+    return pImpl->currentSeed;
 }
 
 bool RandomGenerator::randomBool() {

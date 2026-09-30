@@ -85,8 +85,38 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     for (const auto& entry : pImpl->entries) {
+        // Skip internal/placeholder entries
+        if (entry.key.empty()) {
+            continue;
+        }
+        
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format based on type
+        switch (entry.type) {
+            case ConfigValueType::String:
+                file << "\"" << entry.stringValue << "\"";
+                break;
+            case ConfigValueType::Int:
+                file << entry.intValue;
+                break;
+            case ConfigValueType::Double:
+                file << entry.doubleValue;
+                break;
+            case ConfigValueType::Float:
+                file << entry.floatValue;
+                break;
+            case ConfigValueType::Bool:
+                file << (entry.boolValue ? "true" : "false");
+                break;
+            case ConfigValueType::Invalid:
+            default:
+                file << "UNKNOWN";
+                break;
+        }
+        
+        file << "\n\n";
     }
     
     return true;
