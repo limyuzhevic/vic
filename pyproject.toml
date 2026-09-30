@@ -1,3 +1,4 @@
+# pyproject.toml for Python bindings
 [build-system]
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
@@ -5,7 +6,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) - Complete neural simulation framework"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -23,16 +24,21 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "typing-extensions>=4.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov>=4.0",
+    "mypy>=1.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
 ]
 
 [project.urls]
@@ -55,3 +61,40 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = 'py38'
+include = '\.pyi?$'
+extend-exclude = '''
+(/migrations/|\.tox/|env/|venv/|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|build/|dist/)
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "UP", # pyupgrade
+    "C4", # flake8-comprehensions
+    "B",  # flake8-bugbear
+]
+ignore = [
+    "B008",  # Do not perform function calls in argument defaults
+    "B019",  # Use of functools.lru_cache or lru_decorator on methods can lead to memory leaks
+    "B024",  # Abstract class with __subclasshook__ should implement abstract methods
+]
+format = "grouped"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = false
