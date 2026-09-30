@@ -270,8 +270,19 @@ bool Brain::initialize() {
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         // Find destination neuron and deliver synaptic input
         for (auto& region : pImpl->regions) {
+            if (!region) {
+                NLM_LOG_ERROR("Null region in spike handler");
+                continue;
+            }
+            
             auto neurons = region->getAllNeurons();
             for (auto* neuron : neurons) {
+                // Check for null neuron pointer
+                if (!neuron) {
+                    NLM_LOG_ERROR("Null neuron pointer in spike handler");
+                    continue;
+                }
+                
                 if (neuron->getId() == event.destination_neuron) {
                     // Apply synaptic weight as current
                     MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
@@ -284,6 +295,8 @@ bool Brain::initialize() {
                 }
             }
         }
+        // Neuron not found - log warning
+        NLM_LOG_WARNING("Spike event destination neuron not found");
     });
     
     // Configure checkpoint manager
@@ -606,34 +619,78 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
-        // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        // Inject current into this sensory neuron (with null check)
+        if (i < pImpl->sensoryNeurons.size() && pImpl->sensoryNeurons[i] != nullptr) {
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        } else {
+            NLM_LOG_ERROR("Null sensory neuron at index " + std::to_string(i));
+        }
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Also store in working memory (with additional null checks)
+        if (pImpl->workingMemory && normalizedValue > 0.5f && 
+            i < pImpl->sensoryNeurons.size() && pImpl->sensoryNeurons[i] != nullptr) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Validate inputs
+    if (neuron == INVALID_NEURON_ID) {
+        NLM_LOG_WARNING("Attempted to inject current to invalid neuron ID");
+        return;
+    }
+    
+    if (current == 0.0f) {
+        // No-op for zero current
+        return;
+    }
+    
+    // Search for the target neuron across all regions
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_ERROR("Null region found during current injection");
+            continue;
+        }
+        
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
-            if (n->getId() == neuron) {
+            if (n && n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }
         }
     }
+    
+    // Neuron not found - log warning but don't crash
+    NLM_LOG_WARNING("Neuron ID " + std::to_string(neuron.value) + " not found for current injection");
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Validate inputs
+    if (current == 0.0f) {
+        // No-op for zero current
+        return;
+    }
+    
+    // Search for neurons of the specified type across all regions
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_ERROR("Null region found during current injection to neurons");
+            continue;
+        }
+        
         for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_ERROR("Null population found during current injection to neurons");
+                continue;
+            }
+            
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                    if (neuron) {
+                        neuron->injectCurrent(current);
+                    }
                 }
             }
         }
