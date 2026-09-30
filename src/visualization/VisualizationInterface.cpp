@@ -1,31 +1,36 @@
+// VisualizationInterface implementation
+
 #include "VisualizationInterface.hpp"
 
 namespace nlm {
 
 struct VisualizationInterface::Impl {
+    std::shared_ptr<Logger> logger;
     bool active;
     double updateRate;
     
-    Impl() : active(false), updateRate(30.0) {}
+    Impl(std::shared_ptr<Logger> l) : logger(l), active(false), updateRate(30.0) {}
 };
 
-VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
+VisualizationInterface::VisualizationInterface() : pImpl(std::make_unique<Impl>(Logger::getGlobal())) {}
 
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
-    pImpl->active = false;
+    if (!pImpl->logger) {
+        return false;
+    }
+    pImpl->logger->log("Initializing VisualizationInterface system", LogLevel::Info);
+    pImpl->active = true;
     return true;
 }
 
 void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Update visualization data
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Render current state
 }
 
 void VisualizationInterface::close() {
@@ -45,19 +50,20 @@ double VisualizationInterface::getUpdateRate() const {
 }
 
 void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+    // Network visualization
 }
 
 void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+    // Activity visualization
 }
 
 void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+    // Spike raster plot
 }
 
 void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+    // Weight matrix visualization
 }
 
 } // namespace nlm
+

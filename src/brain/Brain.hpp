@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/MemorySystemInterface.hpp"
+#include "../core/MemorySystemFactory.hpp"
+#include "../core/HelperFunctions.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -16,18 +19,6 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -137,52 +128,32 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // ========== MEMORY SYSTEMS (Unified Interface) ==========
     
-    // Working memory - transient active information
+    // Unified memory system interface
+    MemorySystemInterface* getMemorySystems();
+    const MemorySystemInterface* getMemorySystems() const;
+    
+    // Convenience access methods (delegated to unified interface)
     NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
     NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
     AttentionalSelection* getAttention();
+    DevelopmentSystem* getDevelopmentSystem();
+    Dopamine* getDopamine();
+    Curiosity* getCuriosity();
+    Novelty* getNovelty();
+    PredictionError* getPredictionErrorSignal();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

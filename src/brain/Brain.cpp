@@ -1,24 +1,6 @@
-#include "Brain.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../core/SimulationClock/SimulationClock.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "../development/DevelopmentSystem.hpp"
-#include "../neuromodulation/Neuromodulator.hpp"
-#include "../neuromodulation/Curiosity.hpp"
-#include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
-#include "../performance/CheckpointSystem.hpp"
-#include <fstream>
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "MemorySystemAdapter.hpp"
+#include "../core/MemorySystemFactory.hpp"
+#include "../core/HelperFunctions.hpp"
 
 namespace nlm {
 
@@ -49,6 +31,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    
+    // Unified memory system interface adapter
+    std::unique_ptr<MemorySystemInterface> memorySystemAdapter;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -149,8 +134,38 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Create unified memory system adapter after all systems are initialized
+        // Note: Since the systems were moved into the adapter, the individual pointers are now nullptr
+        // The adapter holds ownership of all the memory systems
+        memorySystemAdapter = std::make_unique<MemorySystemAdapter>(
+            std::move(workingMemory),
+            std::move(episodicMemory),
+            std::move(associativeMemory),
+            std::move(predictionSystem),
+            std::move(planner),
+            std::move(conceptFormation),
+            std::move(attention),
+            std::move(developmentSystem),
+            std::move(dopamine),
+            std::move(curiosity),
+            std::move(novelty),
+            std::move(predictionError)
+        );
+        
+        // All individual memory system pointers are now nullptr (moved)
+        // The unified adapter provides access to all systems through one interface
+        workingMemory = nullptr;
+        episodicMemory = nullptr;
+        associativeMemory = nullptr;
+        predictionSystem = nullptr;
+        planner = nullptr;
+        conceptFormation = nullptr;
+        attention = nullptr;
+        developmentSystem = nullptr;
+        dopamine = nullptr;
+        curiosity = nullptr;
+        novelty = nullptr;
+        predictionError = nullptr;
     }
     
     DevelopmentalStage developmentalStage;
@@ -229,35 +244,26 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+// ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+
+    // Use factory pattern for unified initialization
+    MemorySystemFactory::initializeWorkingMemory(pImpl->workingMemory.get(), 
+                                                 *pImpl->config, neuronCount);
+    MemorySystemFactory::initializeEpisodicMemory(pImpl->episodicMemory.get(), 
+                                                  *pImpl->config);
+    MemorySystemFactory::initializeAssociativeMemory(pImpl->associativeMemory.get(), this);
+    MemorySystemFactory::initializePredictionSystem(pImpl->predictionSystem.get());
+    MemorySystemFactory::initializeCognitionSystems(pImpl->planner.get(),
+                                                    pImpl->conceptFormation.get(),
+                                                    pImpl->attention.get(),
+                                                    *pImpl->config);
+    MemorySystemFactory::initializeNeuromodulationSystems(pImpl->dopamine.get(),
+                                                           pImpl->curiosity.get(),
+                                                           pImpl->novelty.get(),
+                                                           pImpl->predictionError.get(),
+                                                           this);
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    NLM_LOG_INFO("All memory systems initialized through unified factory pattern");
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -1003,70 +1009,89 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
+// ========== MEMORY SYSTEM ACCESSORS (Unified Interface) ==========
 
+// Unified memory system interface adapter
+MemorySystemInterface* Brain::getMemorySystems() {
+    // Create adapter if needed (should be created in constructor)
+    if (!pImpl->memorySystemAdapter) {
+        pImpl->memorySystemAdapter = std::make_unique<MemorySystemAdapter>(
+            std::move(pImpl->workingMemory),
+            std::move(pImpl->episodicMemory),
+            std::move(pImpl->associativeMemory),
+            std::move(pImpl->predictionSystem),
+            std::move(pImpl->planner),
+            std::move(pImpl->conceptFormation),
+            std::move(pImpl->attention),
+            std::move(pImpl->developmentSystem),
+            std::move(pImpl->dopamine),
+            std::move(pImpl->curiosity),
+            std::move(pImpl->novelty),
+            std::move(pImpl->predictionError)
+        );
+    }
+    return pImpl->memorySystemAdapter.get();
+}
+
+const MemorySystemInterface* Brain::getMemorySystems() const {
+    return pImpl->memorySystemAdapter.get();
+}
+
+// Convenience access methods (delegated to unified interface)
 NeuralWorkingMemory* Brain::getWorkingMemory() {
-    return pImpl->workingMemory.get();
+    return getMemorySystems()->getWorkingMemory();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
-    return pImpl->episodicMemory.get();
+    return getMemorySystems()->getEpisodicMemory();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
-    return pImpl->associativeMemory.get();
+    return getMemorySystems()->getAssociativeMemory();
 }
-
-// ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+    return getMemorySystems()->getPredictionSystem();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
-
 NeuralPlanner* Brain::getPlanner() {
-    return pImpl->planner.get();
+    return getMemorySystems()->getPlanner();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
-    return pImpl->conceptFormation.get();
+    return getMemorySystems()->getConceptFormation();
 }
 
 AttentionalSelection* Brain::getAttention() {
-    return pImpl->attention.get();
+    return getMemorySystems()->getAttention();
 }
-
-// ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
-    return pImpl->developmentSystem.get();
+    return getMemorySystems()->getDevelopmentSystem();
 }
-
-DevelopmentalStage Brain::getDevelopmentalStage() const {
-    return pImpl->developmentalStage;
-}
-
-void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
-    pImpl->developmentalStage = stage;
-}
-
-// ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+    return getMemorySystems()->getDopamine();
 }
 
 Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+    return getMemorySystems()->getCuriosity();
 }
 
 Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+    return getMemorySystems()->getNovelty();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
-    return pImpl->predictionError.get();
+    return getMemorySystems()->getPredictionErrorSignal();
+}
+
+DevelopmentalStage Brain::getDevelopmentalStage() const {
+    return getMemorySystems()->getDevelopmentalStage();
+}
+
+void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
+    getMemorySystems()->setDevelopmentalStage(stage);
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
@@ -1089,28 +1114,23 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
     NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
     
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
-    }
-    
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    // Memory system status using unified interface
+    if (pImpl->memorySystemAdapter) {
+        MemorySystemFactory::logMemoryStatus(*pImpl->memorySystemAdapter, *this);
+    } else {
+        NLM_LOG_INFO("Memory system adapter not available");
     }
     
-    // Development status
+    // Neuromodulation status (access through unified interface)
+    if (auto* dopamine = getDopamine()) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(dopamine->getLevel()));
+    }
+    
+    // Development status (access through unified interface)
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        Helper::logRegionInfo(region.get());
     }
 }
 

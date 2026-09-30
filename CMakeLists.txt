@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Configuration for enhanced features
+find_package(nlohmann_json 3.10.5 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -23,9 +27,9 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
 add_library(nlm_core STATIC
-    # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigAdvanced.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -54,6 +58,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Dopamine.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -62,6 +67,7 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralAssociativeMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
@@ -121,11 +127,20 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Benchmarking system
+add_library(nlm_benchmarking STATIC
+    src/benchmarking/EnhancedBenchmarkManager.cpp
+    src/benchmarking/AdvancedBenchmarkTypes.cpp
+    src/benchmarking/ConsoleRealTimeMonitor.cpp
+)
+target_include_directories(nlm_benchmarking PUBLIC src)
+target_link_libraries(nlm_benchmarking PUBLIC nlm_core nlm_agent)
+
 # Main executable
 add_executable(nlm
-    src/main.cpp
+    src/benchmark.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_benchmarking)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
