@@ -20,14 +20,20 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
-class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
 class Novelty;
-class PredictionError;
+class NeuralPrediction;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
+class Serotonin;
+class Norepinephrine;
+class Acetylcholine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -150,10 +156,8 @@ public:
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
+    // Get prediction neural network
+    NeuralPrediction* getNeuralPrediction();
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
@@ -178,11 +182,14 @@ public:
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
