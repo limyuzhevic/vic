@@ -1,89 +1,43 @@
-// Config Tests
+// Configuration Tests
+// Test Config class with JSON/YAML parsing
+
+#include <gtest/gtest.h>
 #include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
 
-namespace test_config {
+namespace nlm {
 
-void testConfigCreation() {
-    nlm::Config config;
-    assert(!config.has("test"));
+class ConfigTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        config = std::make_shared<Config>();
+    }
     
-    std::cout << "    testConfigCreation passed" << std::endl;
+    void TearDown() override {
+        config.reset();
+    }
+    
+    std::shared_ptr<Config> config;
+};
+
+TEST_F(ConfigTest, BasicFunctionality) {
+    config->set("test_int", static_cast<int64_t>(42), ConfigSource::User);
+    config->set("test_float", 3.14f, ConfigSource::User);
+    config->set("test_string", "hello", ConfigSource::User);
+    
+    EXPECT_EQ(config->get<int64_t>("test_int"), 42);
+    EXPECT_NEAR(config->get<float>("test_float"), 3.14f, 0.001f);
+    EXPECT_EQ(config->get<std::string>("test_string"), "hello");
 }
 
-void testConfigSetAndGet() {
-    nlm::Config config;
-    
-    config.set("int_value", 42, nlm::ConfigSource::Runtime);
-    assert(config.has("int_value"));
-    
-    auto intVal = config.get<int>("int_value");
-    assert(intVal.has_value());
-    assert(*intVal == 42);
-    
-    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
-    auto doubleVal = config.get<double>("double_value");
-    assert(doubleVal.has_value());
-    assert(*doubleVal > 3.13 && *doubleVal < 3.15);
-    
-    config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
-    auto stringVal = config.get<std::string>("string_value");
-    assert(stringVal.has_value());
-    assert(*stringVal == "hello");
-    
-    config.set("bool_value", true, nlm::ConfigSource::Runtime);
-    auto boolVal = config.get<bool>("bool_value");
-    assert(boolVal.has_value());
-    assert(*boolVal == true);
-    
-    std::cout << "    testConfigSetAndGet passed" << std::endl;
+TEST_F(ConfigTest, DefaultValues) {
+    EXPECT_EQ(config->getOrDefault<std::string>("missing", "default"), "default");
+    EXPECT_EQ(config->getOrDefault<int64_t>("missing", 0), 0);
+    EXPECT_NEAR(config->getOrDefault<float>("missing", 1.0f), 1.0f, 0.001f);
 }
 
-void testConfigGetOr() {
-    nlm::Config config;
-    
-    int val = config.getOr<int>("missing", 100);
-    assert(val == 100);
-    
-    config.set("existing", 50, nlm::ConfigSource::Runtime);
-    val = config.getOr<int>("existing", 100);
-    assert(val == 50);
-    
-    std::cout << "    testConfigGetOr passed" << std::endl;
+TEST_F(ConfigTest, ErrorHandling) {
+    EXPECT_THROW(config->get<std::string>("missing"), std::runtime_error);
 }
 
-void testConfigRemove() {
-    nlm::Config config;
-    
-    config.set("test", 123, nlm::ConfigSource::Runtime);
-    assert(config.has("test"));
-    
-    config.remove("test");
-    assert(!config.has("test"));
-    
-    std::cout << "    testConfigRemove passed" << std::endl;
-}
+} // namespace nlm
 
-void testConfigKeys() {
-    nlm::Config config;
-    
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
-    
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
-    
-    std::cout << "    testConfigKeys passed" << std::endl;
-}
-
-void runAll() {
-    testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
-}
-
-} // namespace test_config

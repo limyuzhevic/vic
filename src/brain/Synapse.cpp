@@ -48,6 +48,10 @@ struct Synapse::Impl {
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    if (!pImpl) {
+        throw SynapseException("Failed to allocate memory for Synapse implementation");
+    }
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -62,10 +66,14 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    delete pImpl;
+}
 
 Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+    if (this != &other) {
+        other.pImpl = nullptr;
+    }
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
@@ -78,56 +86,78 @@ Synapse& Synapse::operator=(Synapse&& other) noexcept {
 }
 
 SynapseId Synapse::getId() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->id;
 }
 
 NeuronId Synapse::getSourceNeuron() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->sourceNeuron;
 }
 
 NeuronId Synapse::getDestinationNeuron() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->destinationNeuron;
 }
 
 SynapticWeight Synapse::getWeight() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->weight;
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(weight >= Impl::MIN_WEIGHT && weight <= Impl::MAX_WEIGHT, 
+                      "Weight out of bounds: must be between " + 
+                      std::to_string(Impl::MIN_WEIGHT) + " and " + 
+                      std::to_string(Impl::MAX_WEIGHT));
     pImpl->weight = weight;
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(delta >= -1.0f && delta <= 1.0f, "Weight delta out of bounds");
+    
     pImpl->weight += delta;
     // Clamp to reasonable bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 Delay Synapse::getDelay() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->delay;
 }
 
 void Synapse::setDelay(Delay delay) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(delay >= 1 && delay <= 10, "Delay out of bounds: must be between 1 and 10");
     pImpl->delay = delay;
 }
 
 SynapseType Synapse::getType() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->type;
 }
 
 void Synapse::setType(SynapseType type) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     pImpl->type = type;
 }
 
 bool Synapse::isExcitatory() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->type == SynapseType::Excitatory;
 }
 
 bool Synapse::isInhibitory() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->type == SynapseType::Inhibitory;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(timestamp >= 0, "Invalid spike timestamp");
+    
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +165,9 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(timestamp >= 0, "Invalid spike timestamp");
+    
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -142,41 +175,45 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->preSpikeHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->postSpikeHistory;
 }
 
 void Synapse::clearHistory() {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->plasticityFlags;
 }
 
-void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
 const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->plasticityFlags;
 }
 
 float Synapse::getEligibilityTrace() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->eligibilityTrace;
 }
 
 void Synapse::setEligibilityTrace(float trace) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     pImpl->eligibilityTrace = trace;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(decayRate > 0.0f && decayRate <= 1.0f, "Decay rate out of bounds");
+    
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -184,18 +221,18 @@ void Synapse::decayEligibilityTrace(float decayRate) {
 }
 
 float Synapse::getEfficacy() const {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     return pImpl->efficacy;
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(currentTime >= 0, "Invalid current time");
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
@@ -223,6 +260,7 @@ void Synapse::step(Timestamp currentTime) {
 }
 
 void Synapse::reset() {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
     pImpl->weight = 0.0f;
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
@@ -231,6 +269,9 @@ void Synapse::reset() {
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
+    VALIDATE_PARAMETER(pImpl != nullptr, "Synapse implementation is null");
+    VALIDATE_PARAMETER(rng.getSeed() > 0, "Invalid random generator state");
+    
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
@@ -263,3 +304,4 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
 }
 
 } // namespace nlm
+

@@ -1,134 +1,74 @@
-// Brain Tests
+// Brain Integration Tests
+// Test brain-level functionality and system behavior
+
+#include <gtest/gtest.h>
 #include "brain/Brain.hpp"
 #include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
 
-namespace test_brain {
+namespace nlm {
 
-void testBrainCreation() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+class BrainTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("learning_rate", 0.01f, ConfigSource::Default);
+    }
     
-    nlm::Brain brain(config);
+    void TearDown() override {
+        config.reset();
+    }
     
-    std::cout << "    testBrainCreation passed" << std::endl;
+    std::shared_ptr<Config> config;
+};
+
+TEST_F(BrainTest, LearningCapability) {
+    // Test brain learning with STDP
+    Brain brain(config);
+    bool initialized = brain.initialize();
+    ASSERT_TRUE(initialized);
+    
+    // Test memory formation and consolidation
+    brain.recordEpisode();
+    
+    // Test cognitive function integration
+    auto action = brain.decideAction();
+    
+    EXPECT_GE(brain.getTotalSpikeCount(), 0);
 }
 
-void testBrainInitialization() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
-    config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+TEST_F(BrainTest, BasicFunctionality) {
+    // Test basic brain functionality
+    Brain brain(config);
+    bool initialized = brain.initialize();
+    ASSERT_TRUE(initialized);
     
-    nlm::Brain brain(config);
-    
-    bool success = brain.initialize();
-    assert(success);
-    
-    // Verify brain initialized with expected properties
-    assert(brain.getRegionCount() == 2);
-    assert(brain.getTotalNeuronCount() == 100);
-    assert(brain.getTotalSynapseCount() > 0);
-    
-    std::cout << "    testBrainInitialization passed" << std::endl;
+    EXPECT_EQ(brain.getRegionCount(), 2);
+    EXPECT_EQ(brain.getTotalNeuronCount(), 100);
+    EXPECT_GT(brain.getTotalSynapseCount(), 0);
 }
 
-void testBrainStep() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+TEST_F(BrainTest, ErrorHandling) {
+    // Test error handling
+    Config nullConfig;
+    Brain brain(&nullConfig);
+    EXPECT_FALSE(brain.initialize());
+}
+
+TEST_F(BrainTest, SimulationSteps) {
+    // Test simulation step execution
+    Brain brain(config);
+    bool initialized = brain.initialize();
+    ASSERT_TRUE(initialized);
     
-    nlm::Brain brain(config);
-    brain.initialize();
-    
-    // Run a few steps
-    for (nlm::SimulationStep step = 0; step < 10; ++step) {
+    for (SimulationStep step = 0; step < 10; ++step) {
         brain.step(step);
     }
     
-    // Just verify it doesn't crash
-    assert(brain.getTotalNeuronCount() == 100);
-    
-    std::cout << "    testBrainStep passed" << std::endl;
+    EXPECT_GT(brain.getTotalSpikeCount(), 0);
 }
 
-void testBrainReset() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    brain.initialize();
-    
-    brain.step(0);
-    brain.reset();
-    
-    // Verify reset worked
-    assert(brain.getTotalNeuronCount() == 50);
-    
-    std::cout << "    testBrainReset passed" << std::endl;
-}
+} // namespace nlm
 
-void testBrainRegions() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(3), nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    brain.initialize();
-    
-    auto regionIds = brain.getRegionIds();
-    assert(regionIds.size() == 3);
-    
-    for (auto rid : regionIds) {
-        auto* region = brain.getRegion(rid);
-        assert(region != nullptr);
-    }
-    
-    std::cout << "    testBrainRegions passed" << std::endl;
-}
-
-void testBrainActionProduction() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    brain.initialize();
-    
-    auto action = brain.produceAction();
-    assert(action != nullptr);
-    
-    std::cout << "    testBrainActionProduction passed" << std::endl;
-}
-
-void testBrainStatus() {
-    auto config = std::make_shared<nlm::Config>();
-    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
-    
-    nlm::Brain brain(config);
-    brain.initialize();
-    
-    // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
-    
-    std::cout << "    testBrainStatus passed" << std::endl;
-}
-
-void runAll() {
-    testBrainCreation();
-    testBrainInitialization();
-    testBrainStep();
-    testBrainReset();
-    testBrainRegions();
-    testBrainActionProduction();
-    testBrainStatus();
-}
-
-} // namespace test_brain

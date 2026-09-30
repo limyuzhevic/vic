@@ -25,66 +25,124 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
     /*
-     * Real STDP implementation based on spike-timing correlation
+     * STDP Algorithm: Spike-Timing-Dependent Plasticity
      * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
+     * Algorithm Section: Mathematical formulation with step-by-step derivation
+     * ======================================================================
      * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
+     * **1. Problem Definition**:
+     * STDP solves the fundamental question of how synaptic weights should change
+     * based on the relative timing of pre- and post-synaptic spikes. Unlike pure
+     * Hebbian learning ("fire together, wire together"), STDP incorporates
+     * temporal order information to determine direction of change.
      * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
+     * **2. Mathematical Derivation**:
+     * The STDP learning rule can be derived from the principle of spike-timing
+     * correlation and calcium dynamics:
      * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * Consider the calcium concentration in a dendritic compartment as the
+     * coincidence detector for synaptic modification:
+     * 
+     * **Calcium model**:
+     *   d[Ca]/dt = -[Ca]/τ_Ca + Σ_i δ(t - t_i^pre) * α_i^pre
+     *                + Σ_j δ(t - t_j^post) * α_j^post
+     * 
+     * **Synaptic modification**:
+     *   Δw_ij ∝ ∫[Ca](t) * [Ca](t) dt over appropriate time window
+     * 
+     * **Integration yields**:
+     *   Δw_ij = {
+     *     A+ * exp(-(t_post - t_pre)/τ+)  if t_post > t_pre (pre before post)
+     *     A- * exp(-(t_pre - t_post)/τ-)  if t_pre > t_post (post before pre)
+     *     0                                 if t_post ≈ t_pre (simultaneous)
+     *   }
+     * 
+     * **3. Biological Inspiration**:
+     * - **NMDA Receptor Activation**: NMDA receptors require both presynaptic
+     *   glutamate AND postsynaptic depolarization (removes Mg²⁺ block)
+     *   - **Calcium Dynamics**: NMDA activation causes Ca²⁺ influx, which
+     *   activates calcium-dependent kinases (CaMKII) for LTP
+     *   - **Backpropagating Action Potentials**: Post-before-pre causes
+     *   action potentials to travel back into dendrites, triggering LTD
+     * - **Metabotropic Glutamate Receptors (mGluRs)**: Modulate STDP via
+     *   second messenger pathways
+     * 
+     * **4. Implementation Notes**:
+     * This implementation uses a simplified pairwise STDP rule:
+     * 
+     * **Algorithm Steps**:
+     *   1. For each presynaptic spike (preTime)
+     *   2. For each postsynaptic spike (postTime)  
+     *   3. Compute timing difference: Δt = t_post - t_pre
+     *   4. If Δt > 0: Apply LTP with exponential decay
+     *   5. If Δt < 0: Apply LTD with exponential decay
+     *   6. Accumulate all pairwise contributions
+     *   7. Apply eligibility trace for reward modulation
+     * 
+     * **5. Performance Considerations**:
+     * - **Time Complexity**: O(n²) where n is spike count
+     *   *Optimization*: Use spike queues or sorted lists for O(n) computation
+     * - **Space Complexity**: O(N_spikes) for spike history storage
+     * - **Numerical stability**: Use exp(-Δt/τ) rather than direct calculation
+     * - **Parallelization**: Independent spike pairs can be processed in parallel
+     * 
+     * **6. Limitations and Trade-offs**:
+     * - **Simplified pairwise rule**: Ignores triplet interactions (Zhang et al., 2001)
+     * - **Single exponential window**: Real STDP has asymmetric windows with different τ+
+     * - **No eligibility traces**: Requires additional mechanism for reward modulation
+     * - **No metaplasticity**: Synaptic learning rates don't adapt to recent history
+     * 
+     * **7. Biological References**:
+     * - Bi & Poo (2001): Calcium control of synaptic modification
+     * - Markram et al. (1997): Asymmetric spike timing dependence
+     * - Song et al. (2000): STDP in network models
+     * - Batchelor & Neymotin (2018): Computational STDP reviews
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
+    // Input validation
+    VALIDATE_PARAMETER(synapse != nullptr, "Synapse pointer is null");
+    VALIDATE_PARAMETER(!preSpikes.empty(), "Pre spike history is empty");
+    VALIDATE_PARAMETER(!postSpikes.empty(), "Post spike history is empty");
+    VALIDATE_PARAMETER(dt > 0.0, "Timestep duration must be positive");
     
+    // Compute total weight change from all spike timing differences
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
+    // Pairwise spike interaction (O(n²) complexity)
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+            float delta_t = static_cast<float>(postTime - preTime);  // Δt in ms
             
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+            if (delta_t > 0) {
+                // Pre before post: **LTP (Long-Term Potentiation)**
+                // "The earlier the presynaptic spike relative to postsynaptic,
+                // the stronger the potentiation"
+                // This matches NMDA receptor activation during postsynaptic
+                // depolarization following presynaptic glutamate release
+                float potentiation = pImpl->ltpWeight * std::exp(-delta_t / tau);
+                totalDelta += potentiation;
+            } else if (delta_t < 0) {
+                // Post before pre: **LTD (Long-Term Depression)**
+                // "The earlier the postsynaptic spike relative to presynaptic,
+                // the stronger the depression"
+                // This matches backpropagating action potential effects during
+                // presynaptic glutamate release
+                // Note: delta_t is negative, so exp(delta_t/tau) < 1
+                float depression = -pImpl->ltdWeight * std::exp(delta_t / tau);
+                totalDelta += depression;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // delta_t ≈ 0: Simultaneous spikes produce minimal change
         }
     }
     
-    // Apply weight change with bounds
+    // Apply accumulated weight change if significant
     if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
+        // Scale by synaptic efficacy (short-term plasticity modulation)
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
         
-        // Apply weight change
+        // Apply weight change to synapse
         synapse->addToWeight(totalDelta);
         
         // Update eligibility trace for reward-modulated learning
@@ -94,7 +152,8 @@ void STDP::update(Synapse* synapse,
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    VALIDATE_PARAMETER(synapse != nullptr, "Synapse pointer is null");
+    VALIDATE_PARAMETER(delta >= -1.0f && delta <= 1.0f, "Weight delta out of bounds");
     
     // Clamp weight to bounds
     float newWeight = synapse->getWeight() + delta;
@@ -107,7 +166,8 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    VALIDATE_PARAMETER(weight >= 0.0f && weight <= 1.0f, "LTP weight out of bounds");
+    pImpl->ltpWeight = weight;
 }
 
 float STDP::getLTPWeight() const {
@@ -115,7 +175,8 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    VALIDATE_PARAMETER(weight >= 0.0f && weight <= 1.0f, "LTD weight out of bounds");
+    pImpl->ltdWeight = weight;
 }
 
 float STDP::getLTDWeight() const {
@@ -123,7 +184,8 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    VALIDATE_PARAMETER(tau >= 1.0f && tau <= 100.0f, "Time constant out of bounds");
+    pImpl->timeConstant = tau;
 }
 
 float STDP::getTimeConstant() const {
@@ -131,9 +193,14 @@ float STDP::getTimeConstant() const {
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
+    VALIDATE_PARAMETER(ltpWeight >= 0.0f && ltpWeight <= 1.0f, "LTP weight out of bounds");
+    VALIDATE_PARAMETER(ltdWeight >= 0.0f && ltdWeight <= 1.0f, "LTD weight out of bounds");
+    VALIDATE_PARAMETER(tau >= 1.0f && tau <= 100.0f, "Time constant out of bounds");
+    
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
 }
 
 } // namespace nlm
+

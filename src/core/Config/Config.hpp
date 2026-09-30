@@ -5,11 +5,30 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include "Exceptions.hpp"
+#include "CustomExceptions.hpp"
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Validation result
+struct ValidationResult {
+    bool isValid;
+    std::string errorMessage;
+    std::string errorCode;
+    
+    ValidationResult(bool valid = true, const std::string& error = "", const std::string& code = "")
+        : isValid(valid), errorMessage(error), errorCode(code) {}
+    
+    static ValidationResult success() { return ValidationResult(true); }
+    static ValidationResult error(const std::string& message, const std::string& code = "") {
+        return ValidationResult(false, message, code);
+    }
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -93,6 +112,24 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation and error handling
+    ValidationResult validate() const;
+    std::string getValidationError() const;
+    bool isValid() const;
+    
+    // Schema validation
+    ValidationResult validateSchema(const std::string& schemaFile) const;
+    ValidationResult validateRange(const std::string& key, const std::string& type, double min, double max) const;
+    
+    // Configuration metadata
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    std::vector<std::string> getKeysWithSource(ConfigSource source) const;
+    
+    // Error reporting and debugging
+    std::string getDetailedError() const;
+    void enableErrorLogging(bool enable);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +137,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidKey(const std::string& key);
+    static ValidationResult validateValue(const std::string& key, const ConfigValue& value);
+    static std::string valueToString(const ConfigValue& value) const;
+    
+    // Error handling helpers
+    void logError(const std::string& error) const;
+    void throwException(const std::string& error) const;
 };
 
 } // namespace nlm
+

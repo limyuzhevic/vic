@@ -1,24 +1,25 @@
-cmake_minimum_required(VERSION 3.16)
+# NLM Tests CMakeLists.txt
 
-# Test configuration
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+# Find GTest
+find_package(GTest REQUIRED)
 
-# Create test executable
-add_executable(nlm_test
-    test_main.cpp
-    test_types.cpp
-    test_config.cpp
-    test_random.cpp
-    test_clock.cpp
-    test_neuron.cpp
-    test_synapse.cpp
-    test_stdp.cpp
-    test_brain.cpp
-)
+# Create test executables
+function(add_nlm_test test_name)
+    add_executable(${test_name} ${test_name}.cpp)
+    target_link_libraries(${test_name} PRIVATE nlm GTest::gtest GTest::gtest_main)
+    add_test(NAME ${test_name} COMMAND ${test_name})
+endfunction()
 
-target_link_libraries(nlm_test PRIVATE nlm_core)
-target_compile_features(nlm_test PRIVATE cxx_std_20)
+# Add comprehensive tests
+add_nlm_test(test_neuron)
+add_nlm_test(test_synapse)
+add_nlm_test(test_brain)
+add_nlm_test(test_stdp)
+add_nlm_test(test_config)
+add_nlm_test(test_clock)
+add_nlm_test(test_random)
+add_nlm_test(test_types)
 
-# Enable testing
-enable_testing()
-add_test(NAME nlm_test COMMAND nlm_test)
+# Add integration and performance tests if needed
+# add_nlm_test(test_integration)
+# add_nlm_test(test_performance)
