@@ -1,0 +1,2 @@
+/usr/bin/ar qc libnlm_agent.a CMakeFiles/nlm_agent.dir/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_469b1cad-a94f-45b3-a158-ecfcd228cbcf/src/agent/SensoryPercept.cpp.o CMakeFiles/nlm_agent.dir/workspace/cf14c76c-4b1f-4d38-9a96-64cd8a400481/sessions/agent_469b1cad-a94f-45b3-a158-ecfcd228cbcf/src/agent/AgentBrain.cpp.o
+/usr/bin/ranlib libnlm_agent.a
