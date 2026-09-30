@@ -1,0 +1,56 @@
+# Phase 2 Example Configuration (JSON Format)
+# This is an example of a JSON configuration file for NLM Phase 2
+# JSON format is recommended for new configurations as it's more structured and easier to parse
+
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "simulation_timestep": 0.001,
+    "connection_probability": 0.15,
+    "random_seed": 42,
+    
+    "plasticity": {
+        "enable_plasticity": true,
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "stdp_time_constant": 20.0,
+        "learning_rate": 0.01
+    },
+    
+    "development": {
+        "synaptogenesis_rate": 0.0001,
+        "pruning_rate": 0.00001
+    },
+    
+    "neuromodulation": {
+        "dopamine_baseline": 0.0,
+        "curiosity_baseline": 0.1,
+        "novelty_sensitivity": 0.5
+    },
+    
+    "memory": {
+        "working_memory_capacity": 100,
+        "episodic_memory_size": 1000,
+        "consolidation_interval": 100
+    },
+    
+    "logging": {
+        "log_level": "INFO",
+        "log_to_file": true,
+        "log_filename": "nlm_simulation.log",
+        "max_log_size_mb": 100
+    },
+    
+    "simulation": {
+        "max_steps": 10000,
+        "time_limit_seconds": 3600.0,
+        "checkpoint_interval": 1000
+    },
+    
+    "visualization": {
+        "enabled": false,
+        "update_rate": 30.0,
+        "window_width": 1920,
+        "window_height": 1080
+    }
+}
