@@ -6,6 +6,12 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <map>
+#include <ctime>
+#include <iomanip>
+#include <fstream>
+#include <iostream>
 
 namespace nlm {
 
@@ -40,6 +46,22 @@ public:
 // Console logger implementation
 class ConsoleLogger : public ILogger {
 public:
+    // Rotation modes
+    enum class RotationMode {
+        None,
+        BySize,
+        ByTime
+    };
+    
+    // Rotation configuration
+    struct RotationConfig {
+        RotationMode mode = RotationMode::None;
+        size_t maxFileSize = 10 * 1024 * 1024;  // 10 MB
+        std::chrono::system_clock::duration rotationPeriod = std::chrono::hours(24);  // 24 hours
+        size_t maxFiles = 5;
+        std::string backupSuffix = ".bak";
+    };
+    
     ConsoleLogger();
     explicit ConsoleLogger(LogLevel level);
     ~ConsoleLogger() override;
@@ -56,12 +78,28 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Log rotation configuration
+    void setRotationMode(RotationMode mode);
+    void setRotationConfig(const RotationConfig& config);
+    RotationConfig getRotationConfig() const;
+    
+    // Force rotation
+    void rotate();
+    
+    // Get current log file size
+    size_t getLogFileSize() const;
+    
+    // Get log file path
+    std::string getLogFilePath() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
+    void rotateIfNeeded();
+    std::string getRotatedFileName(const std::string& baseName, int index) const;
 };
 
 // Main Logger class
@@ -103,18 +141,18 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
 
 // Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_DEBUG(msg) do { nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__); } while (false)
+#define NLM_LOG_INFO(msg) do { nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__); } while (false)
+#define NLM_LOG_WARNING(msg) do { nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__); } while (false)
+#define NLM_LOG_ERROR(msg) do { nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__); } while (false)
+#define NLM_LOG_CRITICAL(msg) do { nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__); } while (false)
 
 // Stream-style logging helper
 class LogStream {

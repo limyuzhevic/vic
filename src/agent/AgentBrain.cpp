@@ -34,12 +34,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                                     motorInteract_.size() + motorWait_.size();
                         
                         switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 0: motorForward_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 1: motorBackward_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 2: motorTurnLeft_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 3: motorTurnRight_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 4: motorInteract_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 5: motorWait_.push_back(std::make_unique<Neuron>(*n)); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -49,10 +49,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
                         switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                            case 0: sensoryVision_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 1: sensoryTouch_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 2: sensoryInternal_.push_back(std::make_unique<Neuron>(*n)); break;
+                            case 3: sensoryProprioception_.push_back(std::make_unique<Neuron>(*n)); break;
                         }
                     }
                 }
@@ -139,7 +139,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         noveltyLevel_ *= sensoryNoveltyDecay_;
         
         // Store for next time
-        previousVision_ = vision;
+        previousVision_ = std::move(vision);  // Fixed: use move to avoid copying
     }
     
     // Update curiosity based on novelty
@@ -162,52 +162,54 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
-        float sum = 0.0f;
-        for (Neuron* n : neurons) {
-            // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    MotorCommand AgentBrain::decodeFromMotorNeurons() {
+        // Calculate average activity in each motor group
+        auto calcActivity = [](const std::vector<std::unique_ptr<Neuron>>& neurons) -> float {
+            if (neurons.empty()) return 0.0f;
+            float sum = 0.0f;
+            for (const auto& n : neurons) {
+                if (n) {
+                    // Use membrane potential deviation from rest as activity measure
+                    sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+                }
+            }
+            return sum / neurons.size();
+        };
+        
+        float forwardAct = calcActivity(motorForward_);
+        float backwardAct = calcActivity(motorBackward_);
+        float leftAct = calcActivity(motorTurnLeft_);
+        float rightAct = calcActivity(motorTurnRight_);
+        float interactAct = calcActivity(motorInteract_);
+        float waitAct = calcActivity(motorWait_);
+        
+        // Find maximum activity
+        struct { MotorCommand cmd; float activity; } commands[] = {
+            {MotorCommand::MoveForward, forwardAct},
+            {MotorCommand::MoveBackward, backwardAct},
+            {MotorCommand::TurnLeft, leftAct},
+            {MotorCommand::TurnRight, rightAct},
+            {MotorCommand::Interact, interactAct},
+            {MotorCommand::Wait, waitAct}
+        };
+        
+        MotorCommand best = MotorCommand::Wait;
+        float bestActivity = waitAct;  // Default to wait if nothing stronger
+        
+        for (const auto& c : commands) {
+            if (c.activity > bestActivity) {
+                bestActivity = c.activity;
+                best = c.cmd;
+            }
         }
-        return sum / neurons.size();
-    };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
-    struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
-    };
-    
-    MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
-    for (const auto& c : commands) {
-        if (c.activity > bestActivity) {
-            bestActivity = c.activity;
-            best = c.cmd;
+        
+        // Only act if there's meaningful activity
+        if (bestActivity < 0.5f) {
+            return MotorCommand::Wait;
         }
+        
+        return best;
     }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
-        return MotorCommand::Wait;
-    }
-    
-    return best;
-}
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high

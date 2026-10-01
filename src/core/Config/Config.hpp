@@ -1,13 +1,3 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 
@@ -38,7 +28,7 @@ struct ConfigEntry {
     ConfigSource source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry() = default;
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
@@ -64,19 +54,28 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values - return const reference for direct access
+    template<typename T>
+    const ConfigValue& getValue(const std::string& key) const;
+    
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Type-specific getters
+    const std::string& getString(const std::string& key) const;
+    int getInt(const std::string& key) const;
+    double getDouble(const std::string& key) const;
+    bool getBool(const std::string& key) const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -100,6 +99,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static void validateConfigValue(const ConfigValue& value);
+    static bool canConvertToType(const ConfigValue& value, const std::type_info& targetType);
 };
 
 } // namespace nlm
