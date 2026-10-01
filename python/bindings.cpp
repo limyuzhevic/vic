@@ -400,26 +400,247 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Memory system accessors
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system)pbdoc")
+        .def("getActiveTraces", &WorkingMemory::getActiveTraces)
+        .def("getTotalTraces", &WorkingMemory::getTotalTraces)
+        .def("getTraceStrength", &WorkingMemory::getTraceStrength)
+        .def("getTracesByType", &WorkingMemory::getTracesByType);
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system)pbdoc")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount)
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes)
+        .def("getEpisode", &EpisodicMemory::getEpisode)
+        .def("getEpisodesForReplay", &EpisodicMemory::getEpisodesForReplay)
+        .def("addEpisode", &EpisodicMemory::addEpisode);
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Neuromodulation system accessors
+    py::class_<Neuromodulator>(m, "Neuromodulator", R"pbdoc(Neuromodulator system)pbdoc")
+        .def("getLevel", &Neuromodulator::getLevel)
+        .def("setLevel", &Neuromodulator::setLevel)
+        .def("getInfluence", &Neuromodulator::getInfluence)
+        .def("update", &Neuromodulator::update)
+        .def("getName", &Neuromodulator::getName);
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Prediction system accessors
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system)pbdoc")
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getConfidence", &PredictionSystem::getConfidence)
+        .def("getPredictions", &PredictionSystem::getPredictions)
+        .def("updatePrediction", &PredictionSystem::updatePrediction);
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Development system accessors
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system)pbdoc")
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage)
+        .def("setDevelopmentalStage", &DevelopmentSystem::setDevelopmentalStage)
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate)
+        .def("getAge", &DevelopmentSystem::getAge)
+        .def("getMaturationProgress", &DevelopmentSystem::getMaturationProgress)
+        .def("update", &DevelopmentSystem::update);
 
-} // namespace nlm
+    // Sensory system factory functions
+    m.def("createVision", [](size_t width, size_t height, size_t channels) {
+        return std::make_shared<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+       "Create a vision sensory input with specified dimensions");
+
+    m.def("createAudio", [](size_t sampleRate, size_t numSamples) {
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"),
+       "Create an audio sensory input");
+
+    m.def("createInternalSignals", []() {
+        return std::make_shared<InternalSignals>();
+    }, "Create internal signals sensory input");
+
+    // Advanced configuration creation functions
+    m.def("createAdvancedConfig", [](const std::string& configFile) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(configFile);
+        return config;
+    }, py::arg("configFile"), "Create and load configuration from file");
+
+    m.def("createOptimizedConfig", [](size_t neuronCount, double timestep) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("simulation_timestep", timestep);
+        config->set("random_seed", static_cast<int64_t>(std::random_device{}()));
+        // Phase 6 optimized defaults
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("enable_curiosity", true);
+        config->set("enable_reward_modulation", true);
+        config->set("enable_development", true);
+        config->set("enable_structural_plasticity", true);
+        return config;
+    }, py::arg("neuronCount"), py::arg("timestep"),
+       "Create optimized Phase 6 configuration");
+
+    m.def("createDevelopmentPreset", [](const std::string& preset) {
+        auto config = std::make_shared<Config>();
+        if (preset == "critical_period") {
+            config->set("enable_development", true);
+            config->set("development_stage", static_cast<int64_t>(1));  // CriticalPeriod
+            config->set("plasticity_multiplier", 2.0f);
+        } else if (preset == "adult") {
+            config->set("enable_development", true);
+            config->set("development_stage", static_cast<int64_t>(3));  // Adult
+            config->set("plasticity_multiplier", 0.5f);
+        } else if (preset == "aging") {
+            config->set("enable_development", true);
+            config->set("development_stage", static_cast<int64_t>(4));  // Aging
+            config->set("plasticity_multiplier", 0.2f);
+        } else {
+            config->set("enable_development", false);
+        }
+        return config;
+    }, py::arg("preset"), "Create development-specific configuration preset");
+
+    // Simulation control functions
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t steps, std::function<void(size_t, float)> callback) {
+        float totalReward = 0.0f;
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+            // Call callback with step and average firing rate
+            if (callback) {
+                callback(step, brain->getAverageFiringRate());
+            }
+            totalReward += brain->getTotalSpikeCount() * 0.001f;
+        }
+        return totalReward;
+    }, py::arg("brain"), py::arg("steps"), py::arg("callback") = nullptr,
+       "Run simulation for specified number of steps with optional progress callback");
+
+    m.def("runBrainEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        float totalReward = 0.0f;
+        for (uint64_t step = 0; step < 10000; ++step) {
+            // Get observation
+            SensoryPercept percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(step, step * 0.001);
+            
+            // Get motor command
+            MotorCommand cmd = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(cmd, step * 0.001);
+            
+            // Compute reward
+            float reward = world->computeReward();
+            totalReward += reward;
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.001);
+        }
+        return totalReward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Run complete brain episode in world with agent");
+
+    // Utility and analysis functions
+    m.def("computeNetworkStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, float> stats;
+        stats["total_neurons"] = static_cast<float>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<float>(brain->getTotalSynapseCount());
+        stats["active_neurons"] = static_cast<float>(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = static_cast<float>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["exc_inh_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+        stats["development_stage"] = static_cast<float>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive network statistics");
+
+    m.def("compareBrains", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2) {
+        std::map<std::string, std::pair<float, float>> comparison;
+        comparison["firing_rate"] = std::make_pair(
+            brain1->getAverageFiringRate(),
+            brain2->getAverageFiringRate()
+        );
+        comparison["total_spikes"] = std::make_pair(
+            static_cast<float>(brain1->getTotalSpikeCount()),
+            static_cast<float>(brain2->getTotalSpikeCount())
+        );
+        comparison["exc_inh_ratio"] = std::make_pair(
+            brain1->getExcitationInhibitionRatio(),
+            brain2->getExcitationInhibitionRatio()
+        );
+        return comparison;
+    }, py::arg("brain1"), py::arg("brain2"), "Compare two brains side by side");
+
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& path) {
+        return brain->save(path);
+    }, py::arg("brain"), py::arg("path"), "Save brain checkpoint to file");
+
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& path) {
+        return brain->load(path);
+    }, py::arg("brain"), py::arg("path"), "Load brain checkpoint from file");
+
+    m.def("exportBrainMetrics", [](std::shared_ptr<Brain> brain, const std::string& format) {
+        auto metrics = std::make_shared<Metrics>();
+        metrics->addMetric("firing_rate", brain->getAverageFiringRate());
+        metrics->addMetric("total_spikes", static_cast<float>(brain->getTotalSpikeCount()));
+        metrics->addMetric("exc_inh_ratio", brain->getExcitationInhibitionRatio());
+        metrics->addMetric("development_stage", static_cast<float>(brain->getDevelopmentalStage()));
+        
+        if (format == "json") {
+            return metrics->toJSON();
+        } else if (format == "csv") {
+            return metrics->toCSV();
+        } else if (format == "text") {
+            return metrics->toText();
+        }
+        return std::string("Unsupported format: " + format);
+    }, py::arg("brain"), py::arg("format"), "Export brain metrics in specified format");
+
+    m.def("createSimulationPreset", [](const std::string& preset) {
+        auto config = std::make_shared<Config>();
+        if (preset == "fast") {
+            config->set("neuron_count", static_cast<int64_t>(100));
+            config->set("max_steps", 1000);
+            config->set("stdp_ltp_weight", 0.02f);
+            config->set("stdp_ltd_weight", 0.018f);
+        } else if (preset == "balanced") {
+            config->set("neuron_count", static_cast<int64_t>(1000));
+            config->set("max_steps", 10000);
+            config->set("stdp_ltp_weight", 0.01f);
+            config->set("stdp_ltd_weight", 0.012f);
+        } else if (preset == "deep") {
+            config->set("neuron_count", static_cast<int64_t>(5000));
+            config->set("max_steps", 50000);
+            config->set("stdp_ltp_weight", 0.005f);
+            config->set("stdp_ltd_weight", 0.008f);
+        }
+        return config;
+    }, py::arg("preset"), "Create simulation preset configuration");
+
+    m.def("createProgressTracker", []() {
+        return std::make_shared<ProgressTracker>();
+    }, "Create progress tracker for long-running simulations");
+
+    m.def("compareIntegrationResults", [](const std::vector<Phase6IntegrationResult>& results) {
+        std::map<std::string, std::vector<float>> comparison;
+        for (const auto& result : results) {
+            comparison["total_reward"].push_back(result.totalReward);
+            comparison["avg_firing_rate"].push_back(result.avgFiringRate);
+            comparison["memory_episodes"].push_back(result.memoryEpisodesStored);
+            comparison["novelty_level"].push_back(result.noveltyLevel);
+            comparison["curiosity_level"].push_back(result.curiosityLevel);
+            comparison["dopamine_level"].push_back(result.dopamineLevel);
+        }
+        return comparison;
+    }, py::arg("results"), "Compare multiple integration experiment results");
+
+    m.def("createStandardPipeline", []() {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(config, brain, world, agent);
+    }, "Create standard NLM pipeline with default components");
