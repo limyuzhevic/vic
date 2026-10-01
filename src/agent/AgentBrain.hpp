@@ -58,6 +58,49 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // ========== MEMORY SYSTEM ACCESSORS ==========
+    
+    // Get working memory for active information storage
+    NeuralWorkingMemory* getWorkingMemory() { return brain_ ? brain_->getWorkingMemory() : nullptr; }
+    
+    // Get episodic memory for experience storage
+    NeuralEpisodicMemory* getEpisodicMemory() { return brain_ ? brain_->getEpisodicMemory() : nullptr; }
+    
+    // Get associative memory for pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory() { return brain_ ? brain_->getAssociativeMemory() : nullptr; }
+    
+    // Get prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem() { return brain_ ? brain_->getPredictionSystem() : nullptr; }
+    
+    // ========== MEMORY PROCESSING METHODS ==========
+    
+    // Process sensory input and store in working memory
+    void processSensoryInputWithMemory(const SensoryPercept& percept);
+    
+    // Store experience in episodic memory
+    void storeExperience(float reward, const std::vector<float>& sensoryState, 
+                         const std::vector<float>& resultingSensoryState, ActionType action);
+    
+    // Retrieve similar experiences from episodic memory
+    std::vector<const EpisodicMemoryItem*> retrieveSimilarExperiences(const std::vector<float>& sensoryState,
+                                                                     size_t maxResults = 3);
+    
+    // Get memory-based motor command
+    MotorCommand decodeMotorCommandWithMemory();
+    
+    // Apply memory-based reward modulation
+    void applyRewardModulationWithMemory(float reward, float predictedReward);
+    
+    // Update memory systems with current agent state
+    void updateMemorySystems(double timestep);
+    
+    // Check if memory systems are integrated
+    bool isMemoryIntegrated() const {
+        return getWorkingMemory() != nullptr || 
+               getEpisodicMemory() != nullptr || 
+               getPredictionSystem() != nullptr;
+    }
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }

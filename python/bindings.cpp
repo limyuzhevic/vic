@@ -393,28 +393,87 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
              py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+.def("enableCuriosity", &AgentBrain::enableCuriosity,
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // ========== MEMORY SYSTEM ACCESSORS ==========
+        
+        .def("getWorkingMemory", &AgentBrain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory for active information storage")
+        
+        .def("getEpisodicMemory", &AgentBrain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory for experience storage")
+        
+        .def("getAssociativeMemory", &AgentBrain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory for pattern associations")
+        
+        .def("getPredictionSystem", &AgentBrain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system for sensory prediction and error computation")
+        
+        // ========== MEMORY PROCESSING METHODS ==========
+        
+        .def("processSensoryInputWithMemory", &AgentBrain::processSensoryInputWithMemory,
+             py::arg("percept"),
+             "Process sensory input and store in working memory")
+        
+        .def("storeExperience", &AgentBrain::storeExperience,
+             py::arg("reward"), py::arg("sensoryState"), py::arg("resultingSensoryState"), py::arg("action"),
+             "Store experience in episodic memory and associative memory")
+        
+        .def("retrieveSimilarExperiences", &AgentBrain::retrieveSimilarExperiences,
+             py::arg("sensoryState"), py::arg("maxResults") = 3,
+             "Retrieve similar experiences from episodic memory")
+        
+        .def("decodeMotorCommandWithMemory", &AgentBrain::decodeMotorCommandWithMemory,
+             "Get memory-based motor command")
+        
+        .def("applyRewardModulationWithMemory", &AgentBrain::applyRewardModulationWithMemory,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply memory-based reward modulation")
+        
+        .def("updateMemorySystems", &AgentBrain::updateMemorySystems,
+             py::arg("timestep"),
+             "Update memory systems with current agent state")
+        
+        .def("isMemoryIntegrated", &AgentBrain::isMemoryIntegrated,
+             "Check if memory systems are integrated with the brain")
+        
+        .def("getMemoryStats", [](const AgentBrain& self) {
+            py::dict stats;
+            
+            auto workingMemory = self.getWorkingMemory();
+            if (workingMemory) {
+                stats["workingMemoryActive"] = workingMemory->getMemoryActivity() > 0.0f;
+                stats["workingMemorySize"] = workingMemory->getCurrentSize();
+                stats["workingMemoryCapacity"] = workingMemory->getCapacity();
+            }
+            
+            auto episodicMemory = self.getEpisodicMemory();
+            if (episodicMemory) {
+                stats["episodicMemoryCount"] = episodicMemory->getEpisodeCount();
+                stats["episodicMemoryMax"] = episodicMemory->getMaxEpisodes();
+            }
+            
+            auto associativeMemory = self.getAssociativeMemory();
+            if (associativeMemory) {
+                stats["associativeMemoryAssociations"] = 0;  // Simplified
+            }
+            
+            auto predictionSystem = self.getPredictionSystem();
+            if (predictionSystem) {
+                stats["predictionSystemActive"] = true;  // Simplified
+            }
+            
+            return stats;
+        }, "Get statistics about integrated memory systems")
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

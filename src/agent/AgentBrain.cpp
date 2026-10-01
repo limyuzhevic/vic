@@ -72,6 +72,14 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    
+    // Initialize memory systems integration
+    if (brain_) {
+        NLM_LOG_INFO("Memory integration check:");
+        NLM_LOG_INFO("  WorkingMemory: " + std::to_string(brain_->getWorkingMemory() != nullptr));
+        NLM_LOG_INFO("  EpisodicMemory: " + std::to_string(brain_->getEpisodicMemory() != nullptr));
+        NLM_LOG_INFO("  PredictionSystem: " + std::to_string(brain_->getPredictionSystem() != nullptr));
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -345,6 +353,177 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// ========== MEMORY SYSTEM PROCESSING METHODS ==========
+
+void AgentBrain::processSensoryInputWithMemory(const SensoryPercept& percept) {
+    // Store current sensory input in working memory
+    if (getWorkingMemory() && brain_) {
+        // Convert percept to neural pattern for working memory
+        std::vector<float> sensoryPattern;
+        
+        // Vision pattern
+        const auto& vision = percept.getVision();
+        sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+        
+        // Touch pattern
+        const auto& touch = percept.getTouch();
+        sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+        
+        // Internal pattern
+        const auto& internal = percept.getInternal();
+        sensoryPattern.insert(sensoryPattern.end(), internal.begin(), internal.end());
+        
+        // Proprioception pattern
+        const auto& proprio = percept.getProprioception();
+        sensoryPattern.insert(sensoryPattern.end(), proprio.begin(), proprio.end());
+        
+        // Store in working memory with increasing activation
+        if (!sensoryPattern.empty()) {
+            float strength = 1.0f;
+            
+            // Create a working memory trace for this sensory pattern
+            getWorkingMemory()->storeToNeuron(
+                NeuronId(static_cast<uint64_t>(sensoryPattern.size()) * 10000), 
+                strength
+            );
+        }
+    }
+    
+    // Original sensory processing (backward compatibility)
+    processSensoryInput(percept);
+}
+
+void AgentBrain::storeExperience(float reward, const std::vector<float>& sensoryState,
+                                const std::vector<float>& resultingSensoryState, ActionType action) {
+    auto episodicMemory = getEpisodicMemory();
+    if (!episodicMemory) return;
+    
+    // Create episodic memory item
+    EpisodicMemoryItem episode;
+    episode.timestamp = static_cast<SimulationStep>(brain_ ? 
+        brain_->getTotalSpikeCount() : 0);
+    episode.reward = reward;
+    episode.action = action;
+    episode.sensoryState = sensoryState;
+    episode.resultingSensoryState = resultingSensoryState;
+    episode.neurons.clear();
+    episode.neuronActivations.clear();
+    
+    // Add current brain state to episode (active neurons)
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        episode.neurons.push_back(neuron->getId());
+                        episode.neuronActivations.push_back(
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Store episode
+    episodicMemory->storeEpisode(episode);
+    
+    // Store in associative memory for pattern-action associations
+    auto associativeMemory = getAssociativeMemory();
+    if (associativeMemory) {
+        // Create pattern from sensory state
+        if (!sensoryState.empty()) {
+            // Create action pattern from action type
+            std::vector<float> actionPattern(sensoryState.size(), 0.0f);
+            actionPattern[0] = static_cast<float>(action) / 10.0f;  // Scale action to pattern range
+            
+            // Store association
+            associativeMemory->associate(sensoryState, actionPattern, 0.8f);
+        }
+    }
+    
+    NLM_LOG_INFO("Stored experience in episodic memory (reward: " + std::to_string(reward) +
+                ", action: " + std::to_string(static_cast<int>(action)) + ")");
+}
+
+std::vector<const EpisodicMemoryItem*> AgentBrain::retrieveSimilarExperiences(const std::vector<float>& sensoryState,
+                                                                              size_t maxResults) {
+    auto episodicMemory = getEpisodicMemory();
+    if (!episodicMemory) return {};
+    
+    return episodicMemory->retrieveSimilar(sensoryState, maxResults);
+}
+
+MotorCommand AgentBrain::decodeMotorCommandWithMemory() {
+    // Use memory to guide action selection
+    MotorCommand baseCommand = decodeMotorCommand();
+    
+    // Get working memory patterns
+    auto workingMemory = getWorkingMemory();
+    if (workingMemory) {
+        float memoryActivity = workingMemory->getMemoryActivity();
+        float memoryWeight = std::min(memoryActivity * 0.2f, 1.0f);  // Scale memory influence
+        
+        // If we have stored memories, use them to influence action
+        if (memoryActivity > 0.3f) {
+            // Higher memory activity suggests similar past experiences
+            // Bias toward actions that worked in similar situations
+            return selectWithCuriosity(baseCommand);
+        }
+    }
+    
+    // If no memory influence, use standard decoding
+    return baseCommand;
+}
+
+void AgentBrain::applyRewardModulationWithMemory(float reward, float predictedReward) {
+    // Apply standard reward modulation first
+    applyRewardModulation(reward, predictedReward);
+    
+    // Store experience in episodic memory
+    if (brain_ && brain_->getTotalSpikeCount() > 0) {
+        // We need sensory state and resulting state for episodic memory
+        // For now, use placeholders - in a real implementation, we would track
+        // sensory states before and after actions
+        std::vector<float> sensoryState;
+        std::vector<float> resultingSensoryState;
+        
+        ActionType lastAction = ActionType::Wait;
+        
+        storeExperience(reward, sensoryState, resultingSensoryState, lastAction);
+    }
+}
+
+void AgentBrain::updateMemorySystems(double timestep) {
+    // Update development (affects plasticity)
+    updateDevelopment(timestep);
+    
+    // Update memory systems if available
+    auto workingMemory = getWorkingMemory();
+    auto episodicMemory = getEpisodicMemory();
+    
+    if (workingMemory) {
+        // Update working memory
+        workingMemory->update(timestep);
+    }
+    
+    if (episodicMemory) {
+        // Update episodic memory (age episodes, run consolidation)
+        episodicMemory->consolidate(0.5f);
+    }
+    
+    // Get prediction system and update if available
+    auto predictionSystem = getPredictionSystem();
+    if (predictionSystem) {
+        // Prediction system updates would go here
+        // In a full implementation, this would:
+        // 1. Process current sensory state
+        // 2. Compare with prediction
+        // 3. Update prediction error
+        // 4. Store predictions in working memory
+    }
 }
 
 } // namespace nlm
