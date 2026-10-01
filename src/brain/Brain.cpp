@@ -511,8 +511,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // This enables predictive coding and expectation formation
+        
+        // Get current sensory prediction from prediction system
+        float prediction = pImpl->predictionSystem->predict(pImpl->timestep);
+        
+        // Compute prediction error (difference between expected and actual)
+        float predictionError = prediction - pImpl->predictionSystem->getExpectedValue();
+        
+        // Store prediction error for neuromodulation and learning
+        pImpl->predictionSystem->setPredictionError(predictionError);
+        
+        // Apply prediction error to neuromodulation systems
+        if (pImpl->dopamine) {
+            // Dopamine encodes prediction error (reward prediction error)
+            pImpl->dopamine->setPredictionError(predictionError);
+        }
+        
+        if (pImpl->curiosity) {
+            // Curiosity modulates exploration based on prediction error
+            pImpl->curiosity->setPredictionError(std::abs(predictionError));
+        }
+        
+        // Use prediction error to modulate plasticity
+        if (pImpl->dopamine) {
+            float plasticityMod = pImpl->dopamine->getPlasticityFactor();
+            pImpl->stdp->setLTPWeight(0.01f * plasticityMod);
+            pImpl->stdp->setLTDWeight(0.012f * plasticityMod);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,16 +555,89 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use working memory activity and attention to drive concept formation
+        
+        // Get active neural patterns from working memory
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Get attention focus to prioritize which patterns to process
+            std::vector<NeuronId> attentionFocus;
+            if (pImpl->attention) {
+                attentionFocus = pImpl->attention->getFocusedNeurons();
+            } else {
+                // Default: use all working memory neurons
+                attentionFocus = activeNeurons;
+            }
+            
+            // Form concepts from attended patterns
+            pImpl->conceptFormation->processPatterns(attentionFocus, pImpl->timestep);
+            
+            // Store formed concepts in semantic memory
+            if (pImpl->associativeMemory) {
+                auto concepts = pImpl->conceptFormation->getConcepts();
+                for (const auto& concept : concepts) {
+                    pImpl->associativeMemory->storePattern(concept.neurons, concept.strength);
+                }
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Neural planning ==========
+    if (pImpl->planner) {
+        // Use formed concepts to plan future actions
+        // This is central to goal-directed behavior
+        
+        // Get current action goals from motor system
+        std::vector<ActionType> goals;
+        if (pImpl->motorNeurons.size() > 0) {
+            // Simple: use motor neuron activity to infer goals
+            for (auto* neuron : pImpl->motorNeurons) {
+                if (neuron->isFiring() || neuron->getState().membranePotential > neuron->getState().threshold) {
+                    // Map neuron activity to action types (simplified)
+                    goals.push_back(ActionType::MoveForward); // Placeholder mapping
+                }
+            }
+        }
+        
+        // Get current concepts to inform planning
+        std::vector<Concept> concepts;
+        if (pImpl->conceptFormation) {
+            concepts = pImpl->conceptFormation->getConcepts();
+        }
+        
+        // Generate action plans based on goals and concepts
+        pImpl->planner->generatePlans(concepts, goals, pImpl->timestep);
+        
+        // Get best plan for current step
+        auto bestPlan = pImpl->planner->getBestPlan();
+        
+        // Apply planning effects on neural excitability
+        for (const auto& action : bestPlan.actions) {
+            // Modulate neural excitability based on planned actions
+            float planInfluence = 0.5f;  // Planning influence strength
+            
+            // Find and modulate relevant neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Simple: boost motor neurons based on planned actions
+                        if (pop->getNeuronType() == NeuronType::Motor) {
+                            neuron->injectCurrent(planInfluence);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -546,7 +646,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 14: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -574,15 +674,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Development also affects cognitive systems
+        if (pImpl->conceptFormation) {
+            // Concept formation becomes more stable with development
+            float conceptStability = 1.0f - (0.9f * plasticityMod);
+            pImpl->conceptFormation->setConceptStability(conceptStability);
+        }
+        
+        if (pImpl->planner) {
+            // Planning horizon increases with development
+            float planningHorizon = 2.0f + (3.0f * (1.0f - plasticityMod));
+            pImpl->planner->setPlanningHorizon(planningHorizon);
+        }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+        
+        // Also consolidate working memory
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->consolidate();
+        }
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }

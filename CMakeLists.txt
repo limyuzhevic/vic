@@ -107,25 +107,26 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
+# Phase 6 experiments (integration)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase6Demo.cpp
 )
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
-# Main executable
+# Main executable (Phase 6 Integration Demo)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -138,6 +139,55 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 5 demo executable
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Phase 6 demo executable (original nlm_phase6_demo renamed to avoid conflict)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# Advanced debugging and profiling tools
+add_executable(nlm_debugger
+    src/tools/Debugger.cpp
+)
+target_link_libraries(nlm_debugger PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Performance monitoring tools
+add_executable(nlm_profiler
+    src/tools/Profiler.cpp
+)
+target_link_libraries(nlm_profiler PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Checkpoint and restoration tools
+add_executable(nlm_checkpoint_tool
+    src/tools/CheckpointTool.cpp
+)
+target_link_libraries(nlm_checkpoint_tool PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Multi-agent simulation (for advanced research)
+add_executable(nlm_multi_agent
+    src/tools/MultiAgentSimulation.cpp
+)
+target_link_libraries(nlm_multi_agent PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Performance optimization targets (when enabled)
+if(ENABLE_PERFORMANCE_OPTIMIZATIONS)
+    # SIMD-optimized versions
+    add_library(nlm_core_simd STATIC
+        src/core/OptimizedCore.cpp
+    )
+    target_link_libraries(nlm_core_simd PUBLIC nlm_core)
+    set_target_properties(nlm_core_simd PROPERTIES COMPILE_FLAGS "-msse4 -march=native")
+    
+    # Use optimized version when available
+    target_link_libraries(nlm_core PUBLIC nlm_core_simd)
+endif()
 
 # Testing
 enable_testing()
