@@ -1017,13 +1017,180 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// ========== BATCH OPERATIONS FOR PERFORMANCE ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+// Batch current injection for multiple neurons
+void Brain::injectCurrentBatch(const std::vector<std::pair<NeuronId, MembranePotential>>& injections) {
+    NLM_LOG_DEBUG("Batch current injection for " + std::to_string(injections.size()) + " neurons");
+    
+    size_t injected = 0;
+    for (const auto& injection : injections) {
+        injectCurrent(injection.first, injection.second);
+        ++injected;
+    }
+    
+    NLM_LOG_DEBUG("Injected current into " + std::to_string(injected) + "/" + std::to_string(injections.size()) + " neurons");
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+// Batch current injection by neuron type for performance
+void Brain::injectCurrentToNeuronsBatch(NeuronType type, MembranePotential current, size_t maxNeurons) {
+    NLM_LOG_DEBUG("Batch current injection to neurons of type " + std::to_string(static_cast<int>(type)) + 
+                  " with current " + std::to_string(current) + " (max: " + std::to_string(maxNeurons) + " neurons)");
+    
+    size_t injected = 0;
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (auto* neuron : pop->getNeurons()) {
+                    neuron->injectCurrent(current);
+                    ++injected;
+                    if (maxNeurons > 0 && injected >= maxNeurons) {
+                        NLM_LOG_DEBUG("Reached max neurons limit: " + std::to_string(injected));
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_DEBUG("Batch injected current to " + std::to_string(injected) + " neurons of type " + std::to_string(static_cast<int>(type)));
+}
+
+// Batch synaptic operations for performance
+void Brain::applySynapticChangesBatch(const std::vector<std::pair<SynapseId, float>>& weightChanges) {
+    NLM_LOG_DEBUG("Batch synaptic weight changes for " + std::to_string(weightChanges.size()) + " synapses");
+    
+    size_t changed = 0;
+    for (const auto& change : weightChanges) {
+        // Find the synapse
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (syn->getId() == change.first) {
+                    float currentWeight = syn->getWeight();
+                    float newWeight = currentWeight + change.second;
+                    syn->setWeight(newWeight);
+                    ++changed;
+                    break;
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_DEBUG("Applied weight changes to " + std::to_string(changed) + "/" + std::to_string(weightChanges.size()) + " synapses");
+}
+
+// Batch memory operations for performance
+void Brain::storeMemoryBatch(const std::vector<EpisodicMemoryItem>& episodes) {
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_WARNING("Episodic memory not available for batch storage");
+        return;
+    }
+    
+    NLM_LOG_DEBUG("Batch storing " + std::to_string(episodes.size()) + " memory episodes");
+    
+    size_t stored = 0;
+    for (const auto& episode : episodes) {
+        pImpl->episodicMemory->storeEpisode(episode);
+        ++stored;
+    }
+    
+    NLM_LOG_DEBUG("Stored " + std::to_string(stored) + "/" + std::to_string(episodes.size()) + " memory episodes");
+}
+
+// Batch statistics collection for performance
+struct Brain::BatchStatistics {
+    size_t totalNeurons;
+    size_t totalSynapses;
+    size_t totalActiveNeurons;
+    size_t totalFiringNeurons;
+    float averageFiringRate;
+    float excitationInhibitionRatio;
+    size_t totalMemoryTrails;
+    size_t totalMemoryEpisodes;
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+};
+
+Brain::BatchStatistics Brain::getBatchStatistics() const {
+    BatchStatistics stats;
+    
+    // Global statistics
+    stats.totalNeurons = getTotalNeuronCount();
+    stats.totalSynapses = getTotalSynapseCount();
+    stats.totalActiveNeurons = getActiveNeuronCount();
+    stats.totalFiringNeurons = getFiringNeuronCount();
+    stats.averageFiringRate = getAverageFiringRate();
+    stats.excitationInhibitionRatio = getExcitationInhibitionRatio();
+    
+    // Memory system statistics
+    stats.totalMemoryTrails = pImpl->workingMemory ? pImpl->workingMemory->getActiveTraces() : 0;
+    stats.totalMemoryEpisodes = pImpl->episodicMemory ? pImpl->episodicMemory->getEpisodeCount() : 0;
+    
+    // Neuromodulation system statistics
+    stats.dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+    stats.curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+    stats.noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+    
+    return stats;
+}
+
+// Batch region operations for performance
+void Brain::resetAllRegions() {
+    NLM_LOG_DEBUG("Resetting all brain regions");
+    
+    for (auto& region : pImpl->regions) {
+        region->reset();
+    }
+    
+    NLM_LOG_DEBUG("Reset completed for all regions");
+}
+
+void Brain::initializeAllRegions() {
+    NLM_LOG_DEBUG("Initializing all brain regions");
+    
+    for (auto& region : pImpl->regions) {
+        region->initialize();
+    }
+    
+    NLM_LOG_DEBUG("Initialization completed for all regions");
+}
+
+// Get batch of neurons for advanced processing
+std::vector<Neuron*> Brain::getNeuronsBatch(NeuronType type, size_t limit) const {
+    std::vector<Neuron*> neurons;
+    neurons.reserve(limit);
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                const auto& popNeurons = pop->getNeurons();
+                for (size_t i = 0; i < popNeurons.size() && neurons.size() < limit; ++i) {
+                    neurons.push_back(popNeurons[i]);
+                }
+            }
+        }
+    }
+    
+    return neurons;
+}
+
+// Get batch of synapses for advanced processing
+std::vector<Synapse*> Brain::getSynapsesBatch(size_t limit) const {
+    std::vector<Synapse*> synapses;
+    synapses.reserve(limit);
+    
+    for (auto& region : pImpl->regions) {
+        const auto& regionSynapses = region->getSynapses();
+        for (size_t i = 0; i < regionSynapses.size() && synapses.size() < limit; ++i) {
+            synapses.push_back(regionSynapses[i]);
+        }
+    }
+    
+    return synapses;
+}
+
+// ========== PREDICTION SYSTEM ACCESSOR ==========
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();

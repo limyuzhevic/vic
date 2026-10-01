@@ -148,12 +148,48 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
-    // ========== PREDICTION SYSTEM ==========
+    // ========== BATCH OPERATIONS FOR PERFORMANCE ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Batch current injection for multiple neurons (performance optimized)
+    void injectCurrentBatch(const std::vector<std::pair<NeuronId, MembranePotential>>& injections);
     
-    // ========== COGNITION SYSTEMS ==========
+    // Batch current injection by neuron type for performance
+    void injectCurrentToNeuronsBatch(NeuronType type, MembranePotential current, size_t maxNeurons = 0);
+    
+    // Batch synaptic operations for performance
+    void applySynapticChangesBatch(const std::vector<std::pair<SynapseId, float>>& weightChanges);
+    
+    // Batch memory operations for performance
+    void storeMemoryBatch(const std::vector<EpisodicMemoryItem>& episodes);
+    
+    // Batch statistics collection for performance
+    struct BatchStatistics {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t totalActiveNeurons;
+        size_t totalFiringNeurons;
+        float averageFiringRate;
+        float excitationInhibitionRatio;
+        size_t totalMemoryTrails;
+        size_t totalMemoryEpisodes;
+        float dopamineLevel;
+        float curiosityLevel;
+        float noveltyLevel;
+    };
+    
+    BatchStatistics getBatchStatistics() const;
+    
+    // Batch region operations for performance
+    void resetAllRegions();
+    void initializeAllRegions();
+    
+    // Get batch of neurons for advanced processing
+    std::vector<Neuron*> getNeuronsBatch(NeuronType type, size_t limit = 0) const;
+    
+    // Get batch of synapses for advanced processing
+    std::vector<Synapse*> getSynapsesBatch(size_t limit = 0) const;
+    
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
