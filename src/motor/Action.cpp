@@ -52,8 +52,29 @@ std::string Action::getName() const {
     return std::string(actionTypeToString(type_));
 }
 
+// Concept integration
+void Action::setConceptGuidance(const std::string& guidance) {
+    conceptGuidance_ = guidance;
+}
+
+std::string Action::getConceptGuidance() const {
+    return conceptGuidance_;
+}
+
+void Action::setConceptId(size_t id) {
+    conceptId_ = id;
+}
+
+size_t Action::getConceptId() const {
+    return conceptId_;
+}
+
+// Clone
 std::unique_ptr<Action> Action::clone() const {
-    return std::make_unique<Action>(type_, parameters_);
+    auto cloned = std::make_unique<Action>(type_, parameters_);
+    cloned->conceptGuidance_ = conceptGuidance_;
+    cloned->conceptId_ = conceptId_;
+    return cloned;
 }
 
 } // namespace nlm

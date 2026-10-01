@@ -15,7 +15,7 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // TODO PHASE 6: Integrate working memory with sensory input and attention
     void store(NeuronId neuron, float value);
     
     // Retrieve item

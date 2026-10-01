@@ -19,7 +19,7 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // TODO PHASE 6: Implement proper JSON/YAML parser with validation and schema support
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
@@ -43,7 +43,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }

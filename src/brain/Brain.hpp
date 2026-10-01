@@ -6,6 +6,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <string>
 
@@ -25,9 +26,14 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -164,6 +170,18 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
+    // Self-model for body schema (stub for future expansion)
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation (stub for future expansion)
+    SocialLearning* getSocialLearning();
+    
+    // Self-model for body schema (stub for future expansion)
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation (stub for future expansion)
+    SocialLearning* getSocialLearning();
+    
     // ========== DEVELOPMENT SYSTEM ==========
     
     DevelopmentSystem* getDevelopmentSystem();
@@ -174,6 +192,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and impulsivity
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

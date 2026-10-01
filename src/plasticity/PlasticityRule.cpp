@@ -24,7 +24,7 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
+    // TODO PHASE 6: Integrate Hebbian learning with neuromodulation and homeostatic plasticity
     // PLACEHOLDER: Simple correlated firing increases weight
     
     if (preSpikes.empty() || postSpikes.empty()) {

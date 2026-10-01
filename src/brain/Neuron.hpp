@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // TODO PHASE 6: Integrate neuron dynamics with network activity and plasticity
     void step(Timestamp currentTime);
     
     // Reset to initial state

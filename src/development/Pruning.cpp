@@ -30,12 +30,12 @@ void Pruning::setPruningRate(float rate) {
 }
 
 void Pruning::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real pruning
+    // TODO PHASE 6: Integrate synaptic pruning with working memory consolidation
     // PLACEHOLDER: Weak synapses are removed probabilistically
 }
 
 bool Pruning::pruneSynapse(Synapse* synapse) {
-    // TODO PHASE 2: Implement real synapse removal
+    // TODO PHASE 6: Implement real synapse removal with consolidation
     return false;
 }
 

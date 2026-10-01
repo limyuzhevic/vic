@@ -45,12 +45,21 @@ public:
     // Get action name
     std::string getName() const;
     
+    // Concept integration
+    void setConceptGuidance(const std::string& guidance);
+    std::string getConceptGuidance() const;
+    
+    void setConceptId(size_t id);
+    size_t getConceptId() const;
+    
     // Clone
     std::unique_ptr<Action> clone() const;
     
 private:
     ActionType type_;
     std::vector<float> parameters_;
+    std::string conceptGuidance_;
+    size_t conceptId_;
     static const char* actionTypeToString(ActionType type);
 };
 

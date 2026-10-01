@@ -13,7 +13,7 @@ public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    // TODO PHASE 6: Integrate plasticity with neuromodulation and homeostatic mechanisms
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,

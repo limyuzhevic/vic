@@ -5,9 +5,11 @@
 
 ---
 
+---
+
 ## Executive Summary
 
-The NLM/熙然 codebase contains a sophisticated architecture with many well-designed components, but **most cognitive systems are disconnected from the main brain loop**. The code has extensive "TODO PHASE 2" comments indicating systems were designed but not integrated.
+The NLM/熙然 codebase contains a sophisticated architecture with many well-designed components, but **most cognitive systems are disconnected from the main brain loop**. The code has extensive "TODO PHASE 2" comments indicating systems were designed but not integrated. These now represent Phase 6 integration priorities.
 
 **Key Finding:** The brain has the *anatomy* of a cognitive system but lacks the *integration* that makes it function as a coherent artificial brain.
 
@@ -375,7 +377,7 @@ The codebase does NOT demonstrate:
 
 | File | TODO Count | Nature |
 |------|-----------|--------|
-| Brain.hpp | 7 | "TODO PHASE 2" for memory, prediction, save/load |
+| Brain.hpp | 7 | "TODO PHASE 6" for memory, prediction, save/load |
 | Brain.cpp | 5 | Implementation stubs |
 | Memory.hpp | 8 | "PLACEHOLDER" comments |
 | Neuromodulator.hpp | 4 | "PLACEHOLDER" for ACh, NE, 5-HT |

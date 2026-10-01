@@ -13,21 +13,21 @@ public:
     StructuralPlasticity();
     ~StructuralPlasticity();
     
-    // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+// Create new synapse
+    // TODO PHASE 6: Integrate synaptic creation with working memory and development stages
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
-    
+
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // TODO PHASE 6: Integrate synaptic removal with working memory consolidation
     bool removeSynapse(Brain* brain, SynapseId synapse);
-    
+
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // TODO PHASE 6: Integrate neuron creation with development and learning
     NeuronId createNeuron(Brain* brain, NeuronType type);
-    
+
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // TODO PHASE 6: Integrate neuron removal with development and memory consolidation
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate

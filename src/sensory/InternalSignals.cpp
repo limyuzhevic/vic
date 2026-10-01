@@ -14,7 +14,7 @@ InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
 InternalSignalsProcessor::~InternalSignalsProcessor() = default;
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
+    // TODO PHASE 6: Integrate internal signal processing with neuromodulation and homeostasis
     // PLACEHOLDER: Just pass through
     pImpl->processedSignals = signals.getData();
     

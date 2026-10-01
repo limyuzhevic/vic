@@ -13,12 +13,12 @@ class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
-    // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+// Update neuron state for one step
+    // TODO PHASE 6: Integrate neuron dynamics with plasticity and neuromodulation
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
-    
+
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // TODO PHASE 6: Integrate synaptic dynamics with plasticity mechanisms
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
@@ -53,7 +53,7 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// TODO PHASE 6: Implement Hodgkin-Huxley with ion channel dynamics and voltage-gated mechanisms
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement HH dynamics
@@ -65,7 +65,7 @@ public:
 };
 
 // FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// TODO PHASE 6: Implement FHN dynamics with excitable system and recovery
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement FHN dynamics
