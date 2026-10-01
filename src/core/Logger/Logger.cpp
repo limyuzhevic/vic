@@ -1,10 +1,3 @@
-#include "Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <mutex>
-
 namespace nlm {
 
 struct ConsoleLogger::Impl {
@@ -12,6 +5,11 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string filepath;
+    size_t maxFileSize = 10 * 1024 * 1024; // 10MB
+    size_t currentFileSize = 0;
+    unsigned int fileNumber = 1;
+    bool logRotationEnabled = false;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -40,6 +38,31 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
+    // Handle log rotation if enabled and file is open
+    if (pImpl->logRotationEnabled && pImpl->fileOut.is_open()) {
+        if (pImpl->currentFileSize + output.size() + 1 > pImpl->maxFileSize) {
+            // Rotate log file
+            pImpl->fileOut.close();
+            
+            // Close current file
+            pImpl->fileOut.close();
+            
+            // Create new file with number suffix
+            std::string rotatedFilepath = pImpl->filepath;
+            if (!pImpl->filepath.empty()) {
+                size_t dotPos = rotatedFilepath.find_last_of('.');
+                if (dotPos != std::string::npos) {
+                    rotatedFilepath = rotatedFilepath.substr(0, dotPos) + "_" +
+                                     std::to_string(pImpl->fileNumber++) + 
+                                     rotatedFilepath.substr(dotPos);
+                }
+            }
+            
+            pImpl->fileOut.open(rotatedFilepath, std::ios::app);
+            pImpl->currentFileSize = 0;
+        }
+    }
+    
     // Console output
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
@@ -51,6 +74,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+        pImpl->currentFileSize += output.size() + 1; // +1 for newline
     }
 }
 
@@ -71,13 +95,32 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close current file
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
+    
+    pImpl->filepath = filepath;
+    pImpl->fileOut.open(filepath, std::ios::app);
+    pImpl->currentFileSize = 0;
+    
+    // Reset file number for rotation
+    pImpl->fileNumber = 1;
+}
+
+void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+void ConsoleLogger::enableLogRotation(bool enable, size_t maxSizeMB) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->logRotationEnabled = enable;
+    pImpl->maxFileSize = maxSizeMB * 1024 * 1024;
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {

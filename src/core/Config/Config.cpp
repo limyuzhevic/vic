@@ -1,8 +1,9 @@
-#include "Config.hpp"
+#include "Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -24,11 +25,15 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,8 +53,24 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Empty key at line " + std::to_string(lineNumber) + " in config file");
+                continue;
+            }
+            
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Error parsing line " + std::to_string(lineNumber) + ": " + e.what());
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid format at line " + std::to_string(lineNumber) + ": '" + line + "' (expected key=value)");
         }
+    }
+    
+    if (pImpl->entries.empty()) {
+        NLM_LOG_WARNING("No valid configuration entries found in: " + filepath);
     }
     
     return true;
@@ -86,7 +107,34 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert config value to string
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; // Simplified - just start bracket
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>>) {
+                file << "["; // Simplified - just start bracket
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else {
+                file << arg; // For int, int64_t, double, bool
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -115,12 +163,42 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    // Basic key validation - allow alphanumeric, underscore, dash, dot
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            throw std::invalid_argument("Invalid config key: '" + key + "' (only alphanumeric, underscore, dash, and dot allowed)");
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        
+        // Validate that existing key matches new value type (basic check)
+        if (std::visit([](auto&& arg) -> bool {
+            using T = std::decay_t<decltype(arg)>;
+            // Basic type compatibility check
+            return (std::is_same_v<T, std::string> ||
+                   std::is_same_v<T, int> ||
+                   std::is_same_v<T, int64_t> ||
+                   std::is_same_v<T, double> ||
+                   std::is_same_v<T, bool> ||
+                   std::is_same_v<T, std::vector<int>> ||
+                   std::is_same_v<T, std::vector<double>> ||
+                   std::is_same_v<T, std::vector<std::string>>);
+        }, value)) {
+            // Type is valid
+        } else {
+            NLM_LOG_WARNING("Type mismatch for existing config key: '" + key + "' (may cause issues)");
+        }
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
