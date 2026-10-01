@@ -511,8 +511,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // The prediction system learns temporal sequences and predicts future states
+        pImpl->predictionSystem->update(this, currentStep, currentTime);
+        
+        // Get prediction error and use it for learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate plasticity (learning signal)
+        if (predictionError > 0.01f) {  // Only if error is significant
+            // Scale plasticity based on prediction error
+            // Higher prediction error = more learning
+            float errorModulation = std::min(2.0f, 1.0f + predictionError * 2.0f);
+            
+            // Apply error-based learning to synapses
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    // Add prediction error to synaptic weight
+                    // Positive error = strengthen (if excitatory)
+                    // Negative error = weaken (if inhibitory)
+                    if (syn->getType() == SynapseType::Excitatory && errorModulation > 1.0f) {
+                        float currentWeight = syn->getWeight();
+                        float weightChange = (errorModulation - 1.0f) * 0.01f;
+                        float newWeight = std::clamp(currentWeight + weightChange, -1.0f, 1.0f);
+                        syn->setWeight(newWeight);
+                    } else if (syn->getType() == SynapseType::Inhibitory && errorModulation < 1.0f) {
+                        float currentWeight = syn->getWeight();
+                        float weightChange = (1.0f - errorModulation) * 0.01f;
+                        float newWeight = std::clamp(currentWeight + weightChange, -1.0f, 1.0f);
+                        syn->setWeight(newWeight);
+                    }
+                }
+            }
+        }
+        
+        // Update working memory based on predictions
+        if (pImpl->workingMemory) {
+            // Store predictions in working memory for quick access
+            std::vector<NeuronId> predictionNeurons = pImpl->predictionSystem->getPredictionNeurons();
+            for (NeuronId neuronId : predictionNeurons) {
+                // Find corresponding neuron in the brain
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                pImpl->workingMemory->storeToNeuron(neuronId, 0.5f);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,13 +578,95 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract and categorize patterns from working memory
+        
+        // Get current neural activity patterns
+        std::vector<float> currentPatterns;
+        if (pImpl->workingMemory) {
+            // Sample from working memory to extract patterns
+            std::vector<NeuronId> activeNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : activeNeurons) {
+                // Find this neuron's activity level
+                float activity = 0.0f;
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                                break;
+                            }
+                        }
+                    }
+                }
+                currentPatterns.push_back(activity);
+            }
+        }
+        
+        // Update concept formation with current patterns
+        pImpl->conceptFormation->updateConcepts(currentPatterns, currentStep, currentTime);
+        
+        // Get formed concepts and apply to working memory
+        if (pImpl->conceptFormation) {
+            std::vector<std::vector<float>> concepts = pImpl->conceptFormation->getConcepts();
+            if (!concepts.empty()) {
+                // Store most relevant concept in working memory
+                std::vector<float> mostRelevant = concepts[0];
+                float relevance = pImpl->conceptFormation->getConceptRelevance();
+                
+                // Store in working memory if relevant
+                if (relevance > 0.3f) {
+                    pImpl->workingMemory->storePattern(mostRelevant);
+                }
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // ========== STEP 11.5: Apply neural planning ==========
+    if (pImpl->planner) {
+        // Use neural planner to evaluate potential actions
+        // The planner uses predictions to select optimal actions
+        
+        // Get current working memory content for context
+        std::vector<float> currentContext;
+        if (pImpl->workingMemory) {
+            currentContext = pImpl->workingMemory->getCurrentContext();
+        }
+        
+        // Get prediction system for forward planning
+        std::vector<float> predictions;
+        if (pImpl->predictionSystem) {
+            predictions = pImpl->predictionSystem->getCurrentPredictions();
+        }
+        
+        // Use planner to select action
+        // The planner evaluates potential actions based on:
+        // - Current neural state
+        // - Working memory content
+        // - Prediction about future states
+        bool actionSelected = pImpl->planner->planAction(
+            currentContext, predictions, currentStep, currentTime
+        );
+        
+        if (actionSelected) {
+            // Get planned action from planner
+            ActionType plannedAction = pImpl->planner->getSelectedAction();
+            float actionConfidence = pImpl->planner->getActionConfidence();
+            
+            // Apply planned action to motor system
+            // (In a full implementation, this would inject current into motor neurons)
+            if (actionConfidence > 0.5f) {
+                // Store planned action in episodic memory
+                if (pImpl->episodicMemory) {
+                    EpisodicMemoryItem plannedEpisode;
+                    plannedEpisode.timestamp = currentStep;
+                    plannedEpisode.action = plannedAction;
+                    plannedEpisode.confidence = actionConfidence;
+                    plannedEpisode.planned = true;
+                    pImpl->episodicMemory->storeEpisode(plannedEpisode);
+                }
+            }
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
