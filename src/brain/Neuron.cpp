@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -297,6 +298,68 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
-}
-
-} // namespace nlm
+// Reset to initial state with validation
+    void reset() {
+        if (std::isnan(pImpl->state.membranePotential)) {
+            NLM_LOG_ERROR("Attempt to reset neuron with NaN membrane potential");
+            return;
+        }
+        
+        pImpl->state = NeuronState();
+        pImpl->synapticInput = 0.0f;
+        pImpl->spikeHistory.clear();
+        
+        NLM_LOG_DEBUG("Neuron " + std::to_string(pImpl->id.value) + " reset");
+    }
+    
+    // Initialize with random parameters and validation
+    void initializeRandom(RandomGenerator& rng) {
+        if (!pImpl) {
+            NLM_LOG_ERROR("Attempt to initialize null neuron");
+            return;
+        }
+        
+        try {
+            // Real random initialization with biological constraints
+            // Membrane potential starts near resting potential
+            pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+            
+            // Threshold is typically -55mV with small variation
+            pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+            
+            // Resting potential typically -70mV
+            pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+            
+            // Reset potential is usually close to resting
+            pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+            
+            // Refractory period: 2-10ms typical
+            pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+            
+            // Initial state
+            pImpl->state.firingState = FiringState::Resting;
+            pImpl->state.refractoryRemaining = 0;
+            pImpl->state.adaptationVariable = 0.0f;
+            pImpl->state.lastSpikeTime = -1.0f;
+            
+            // Validate parameters
+            if (pImpl->state.threshold <= pImpl->state.resetPotential) {
+                NLM_LOG_WARNING("Neuron " + std::to_string(pImpl->id.value) + 
+                               " has invalid threshold/reset configuration, correcting");
+                pImpl->state.threshold = pImpl->state.resetPotential + 5.0f;
+            }
+            
+            // Clear any residual state
+            pImpl->synapticInput = 0.0f;
+            pImpl->spikeHistory.clear();
+            
+            NLM_LOG_DEBUG("Neuron " + std::to_string(pImpl->id.value) + " initialized randomly");
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error initializing neuron " + std::to_string(pImpl->id.value) + ": " + e.what());
+            // Reset to safe default values
+            reset();
+        }
+    }
+    
+    } // namespace nlm

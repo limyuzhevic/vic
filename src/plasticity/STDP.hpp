@@ -1,16 +1,23 @@
 #pragma once
 
 #include "PlasticityRule.hpp"
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Enhanced implementation with triplet rules, eligibility traces, and advanced features
 
 class STDP : public PlasticityRule {
 public:
     STDP();
     ~STDP() override;
+    
+    // Disable copying, enable moving
+    STDP(const STDP&) = delete;
+    STDP& operator=(const STDP&) = delete;
+    STDP(STDP&&) noexcept;
+    STDP& operator=(STDP&&) noexcept;
     
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
@@ -30,33 +37,26 @@ public:
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     
+    // Advanced STDP features
+    void enableAdvancedFeatures(bool tripletRules, bool localStdp, bool weightNormalization);
+    
+    // Eligibility trace management
+    void setEligibilityDecayRate(float rate);
+    
+    // Configuration and validation
+    void setMinMaxWeight(float minWeight, float maxWeight);
+    void getMinMaxWeight(float& minWeight, float& maxWeight) const;
+    
+    // Performance optimization
+    void setMaxSpikesPerSynapse(size_t maxSpikes);
+    void setMaxTraceHistory(size_t maxHistory);
+    
+    // Analysis and debugging
+    void logConfiguration() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
-};
-
-// Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
-class RewardModulatedSTDP : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "R-STDP"; }
-};
-
-// Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
-class TripletSTDP : public PlasticityRule {
-public:
-    void update(Synapse* synapse,
-                 const std::vector<Timestamp>& preSpikes,
-                 const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "TripletSTDP"; }
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

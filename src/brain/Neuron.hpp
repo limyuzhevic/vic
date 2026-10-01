@@ -133,9 +133,54 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Update neuron for one simulation step with enhanced LIF dynamics
     void step(Timestamp currentTime);
+    
+    // Enhanced LIF with adaptive threshold and spike-frequency adaptation
+    bool stepAdvancedLIF(Timestamp currentTime, TimestepDuration dt);
+    
+    // Biological neuron model parameters
+    struct BiologicalParameters {
+        double capacitance;           // Membrane capacitance (nF)
+        double timeConstant;          // Membrane time constant (ms)
+        double leakConductance;       // Leak conductance (nS)
+        double reversalPotential;     // Ion reversal potential (mV)
+        double sodiumConductance;     // Sodium channel conductance
+        double potassiumConductance;  // Potassium channel conductance
+        double calciumConductance;    // Calcium channel conductance
+        double inactivationRate;      // Channel inactivation rate
+        double recoveryRate;           // Channel recovery rate
+        double adaptationStrength;    // Spike-frequency adaptation strength
+        double thresholdAdaptation;   // Dynamic threshold adaptation
+    };
+    
+    // Set biological parameters
+    void setBiologicalParameters(const BiologicalParameters& params);
+    
+    // Get biological parameters
+    const BiologicalParameters& getBiologicalParameters() const;
+    
+    // Add stochasticity for biological realism
+    void setNoiseLevel(float level);
+    float getNoiseLevel() const;
+    
+    // Enable/disable different ion channel types
+    void enableIonChannel(IonChannelType type, bool enable);
+    bool isIonChannelEnabled(IonChannelType type) const;
+    
+    // Get current spike statistics
+    struct SpikeStatistics {
+        size_t totalSpikes;
+        float averageISI;        // Inter-spike interval
+        float firingRate;        // Firing rate (Hz)
+        float coefficientOfVariation;  // Regularity of firing
+    };
+    
+    SpikeStatistics getSpikeStatistics() const;
+    
+    // Get membrane potential derivatives (for analysis)
+    MembranePotential getVoltageDerivative() const;
+    MembranePotential getCurrentDerivative() const;
     
     // Reset to initial state
     void reset();

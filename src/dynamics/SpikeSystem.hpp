@@ -6,6 +6,7 @@
 #include <queue>
 #include <functional>
 #include <unordered_map>
+#include <string>
 
 namespace nlm {
 
@@ -20,6 +21,23 @@ struct DetailedSpikeEvent {
     DetailedSpikeEvent() : source(), timestamp(0.0), step(0), regionId(), populationId() {}
     DetailedSpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s, RegionId rid, PopulationId pid)
         : source(nid), timestamp(ts), step(s), regionId(rid), populationId(pid) {}
+};
+
+// Comprehensive spike statistics
+struct SpikeStatistics {
+    size_t totalSpikes;
+    float averageISI;        // Inter-spike interval
+    float firingRate;        // Firing rate (Hz)
+    float coefficientOfVariation;  // Regularity of firing
+    float minISI;            // Minimum inter-spike interval
+    float maxISI;            // Maximum inter-spike interval
+    size_t neuronsActive;    // Number of neurons that fired
+    float avgSpikeFrequency; // Average frequency across all neurons
+    
+    SpikeStatistics()
+        : totalSpikes(0), averageISI(0.0f), firingRate(0.0f),
+          coefficientOfVariation(0.0f), minISI(0.0f), maxISI(0.0f),
+          neuronsActive(0), avgSpikeFrequency(0.0f) {}
 };
 
 // Event-driven neural computation system
@@ -60,6 +78,10 @@ public:
     const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
     void clearHistory();
     
+    // Spike management
+    void setMaxHistorySize(size_t size);
+    void getStatistics(SpikeStatistics& stats) const;
+    
     // Get spike count
     size_t getSpikeCount() const;
     size_t getPendingSpikeCount() const;
@@ -72,9 +94,13 @@ public:
     // Reset
     void reset();
     
+    // Diagnostic and debugging
+    void logStatus() const;
+    std::string getDiagnosticInfo() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
