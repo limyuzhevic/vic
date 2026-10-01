@@ -103,11 +103,83 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
-    // Configuration flags
-    bool rewardModulationEnabled_;
-    bool structuralPlasticityEnabled_;
-    bool developmentEnabled_;
-    bool curiosityEnabled_;
+    // Advanced configuration parameters
+    struct AdvancedConfig {
+        // Neuromodulation parameters
+        float dopamineGain;           // Scaling factor for dopamine effects
+        float noveltyThreshold;       // Novelty level needed to trigger exploration
+        float curiosityLearningRate;  // How quickly curiosity adapts
+        float predictionErrorDecay;   // Decay rate for prediction error
+        
+        // Developmental parameters
+        double developmentalSpeed;    // How fast development progresses
+        float plasticityMaturationRate; // Rate of plasticity change during development
+        float structuralPlasticityThreshold; // Activity threshold for structural changes
+        
+        // Behavioral parameters
+        float explorationTemperature;  // Temperature parameter for exploration (higher = more random)
+        float rewardSensitivity;       // How sensitive the agent is to rewards
+        float noveltyAdaptationRate;   // Rate at which novelty detection adapts
+        
+        // Learning parameters
+        float rewardModulationStrength; // Strength of reward modulation effects
+        float eligibilityTraceDecay;   // Decay rate for eligibility traces
+        float synapticModulationDepth;  // Maximum possible synaptic weight change
+        
+        // Environmental interaction parameters
+        float sensoryIntegrationStrength; // How strongly sensory input affects behavior
+        float motorCommandThreshold;     // Minimum activity for action execution
+        float actionSelectionTemperature; // Temperature for action selection softmax
+        
+        // Meta-learning parameters
+        float metaLearningRate;        // Rate of meta-learning (learning how to learn)
+        float resetFrequency;         // How often to reset for fresh learning
+        float consolidationInterval;   // Time between memory consolidation events
+        
+        // Performance monitoring
+        float performanceEvaluationInterval; // How often to evaluate performance
+        bool enablePerformanceTracking;     // Whether to track and optimize performance
+        
+        AdvancedConfig()
+            : dopamineGain(1.0f)
+            , noveltyThreshold(0.5f)
+            , curiosityLearningRate(0.1f)
+            , predictionErrorDecay(0.95f)
+            , developmentalSpeed(1.0)
+            , plasticityMaturationRate(0.5f)
+            , structuralPlasticityThreshold(0.7f)
+            , explorationTemperature(1.0f)
+            , rewardSensitivity(1.0f)
+            , noveltyAdaptationRate(0.2f)
+            , rewardModulationStrength(1.0f)
+            , eligibilityTraceDecay(0.9f)
+            , synapticModulationDepth(0.1f)
+            , sensoryIntegrationStrength(1.0f)
+            , motorCommandThreshold(0.3f)
+            , actionSelectionTemperature(1.0f)
+            , metaLearningRate(0.01f)
+            , resetFrequency(1000.0)
+            , consolidationInterval(500.0f)
+            , performanceEvaluationInterval(100.0)
+            , enablePerformanceTracking(false) {}
+    };
+    
+    AdvancedConfig advancedConfig_;
+    
+    // Performance monitoring state
+    size_t performanceEvaluationCounter_;
+    float lastPerformanceScore_;
+    size_t stepsWithoutImprovement_;
+    
+    // Meta-learning state
+    float metaLearningProgress_;
+    std::vector<float> performanceHistory_;
+    std::vector<size_t> optimalActionCounts_;
+    
+    // Environment adaptation state
+    std::vector<float> environmentalStatistics_;
+    std::map<std::string, float> learnedResponseRates_;
+    std::map<std::string, float> environmentalSensitivity_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

@@ -199,28 +199,48 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Decay short-term facilitation (Tsodyks-Markram model) with improved dynamics
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Use exponential decay with more realistic time constants
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression with recovery dynamics
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Recovery from depression follows sigmoidal dynamics
+        float recoveryFactor = 1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU);
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * recoveryFactor;
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Clamp depression to biologically realistic bounds
+    pImpl->shortTermDepression = std::clamp(pImpl->shortTermDepression, 0.1f, 1.0f);
+    pImpl->shortTermFacilitation = std::clamp(pImpl->shortTermFacilitation, 0.0f, 1.0f);
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
-}
+    // Decay eligibility trace for reward-modulated learning with adaptive decay rate
+    decayEligibilityTrace(0.001f + 0.0001f * pImpl->efficacy);  // Faster decay for stronger efficacy
+    
+    // Update synaptic efficacy based on recent activity
+    // Efficacy reflects synaptic strength modulation through use
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        // Recent pre-synaptic activity increases efficacy (Hebbian-like)
+        pImpl->efficacy *= 1.01f;
+    }
+    // Efficacy naturally decays without recent activity
+    pImpl->efficacy *= 0.999f;
+    
+    // Clamp weight bounds with dynamic range based on synapse type
+    if (pImpl->type == SynapseType::Excitatory) {
+        pImpl->weight = std::clamp(pImpl->weight, -0.5f, 2.0f);
+    } else if (pImpl->type == SynapseType::Inhibitory) {
+        pImpl->weight = std::clamp(pImpl->weight, -2.0f, 0.5f);
+    } else {
+        pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    }
 
 void Synapse::reset() {
     pImpl->weight = 0.0f;

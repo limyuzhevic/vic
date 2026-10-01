@@ -59,6 +59,29 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
             }
         }
     }
+    
+    // Initialize performance monitoring state
+    performanceEvaluationCounter_ = 0;
+    lastPerformanceScore_ = 0.0f;
+    stepsWithoutImprovement_ = 0;
+    
+    // Initialize meta-learning state
+    metaLearningProgress_ = 0.0f;
+    performanceHistory_.reserve(1000);
+    optimalActionCounts_.reserve(10);
+    
+    // Initialize environment adaptation state
+    environmentalStatistics_.resize(10, 0.0f);  // For various environmental factors
+    learnedResponseRates_["approach"] = 0.5f;
+    learnedResponseRates_["avoid"] = 0.5f;
+    learnedResponseRates_["interact"] = 0.5f;
+    learnedResponseRates_["explore"] = 0.5f;
+    learnedResponseRates_["wait"] = 0.5f;
+    
+    environmentalSensitivity_["vision"] = 1.0f;
+    environmentalSensitivity_["touch"] = 1.0f;
+    environmentalSensitivity_["internal"] = 1.0f;
+    environmentalSensitivity_["proprioception"] = 1.0f;
 }
 
 AgentBrain::~AgentBrain() = default;
