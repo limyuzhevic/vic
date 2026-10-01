@@ -38,11 +38,13 @@ add_library(nlm_core STATIC
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
+    src/plasticity/PlasticityFactory.cpp
+    src/plasticity/RewardModulatedSTDP.cpp
+    src/plasticity/RewardModulatedSTDP.hpp
+    src/plasticity/TripletSTDP.cpp
+    src/plasticity/TripletSTDP.hpp
+    src/plasticity/BCMRule.cpp
+    src/plasticity/BCMRule.hpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
@@ -83,12 +85,13 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+    # Debug and visualization
+    src/debug/DebugInterface.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/debug>
     $<INSTALL_INTERFACE:include>
 )
 
