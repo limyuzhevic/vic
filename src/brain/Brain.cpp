@@ -598,18 +598,130 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Convert input to SensoryInput object for prediction system
+    std::unique_ptr<class SensoryInput> sensoryInputPtr;
+    
+    // Create a temporary vision input from the raw data for prediction
+    if (!values.empty()) {
+        auto vision = std::make_unique<class Vision>(1, values.size());
+        vision->setData(values);
+        sensoryInputPtr = std::move(vision);
+    }
+    
+    // Update prediction system if available
+    if (pImpl->predictionSystem && sensoryInputPtr) {
+        // Make prediction for next state based on current input
+        auto predictedState = pImpl->predictionSystem->predictNextState(*sensoryInputPtr);
+        
+        // Store prediction for integration with neuromodulation
+        if (predictedState) {
+            // Calculate prediction error for learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Use prediction error to influence neuromodulation
+            if (pImpl->dopamine && predictionError > 0.1f) {
+                pImpl->dopamine->signalPredictionError(predictionError);
+            }
+            
+            // Update prediction system with actual observation
+            pImpl->predictionSystem->updatePredictions(*predictedState, *sensoryInputPtr);
+            
+            // Train prediction model periodically
+            static size_t trainCounter = 0;
+            if (++trainCounter % 10 == 0) {
+                pImpl->predictionSystem->train(*sensoryInputPtr);
+            }
+        }
+    }
+    
+    // Enhanced working memory integration with prediction system
+    if (pImpl->workingMemory) {
+        // Create a working memory representation of the sensory input
+        std::vector<float> wmPattern;
+        wmPattern.reserve(values.size());
+        
+        for (size_t i = 0; i < values.size(); ++i) {
+            float normalizedValue = 0.0f;
+            if (i < numSensory) {
+                normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            }
+            wmPattern.push_back(normalizedValue);
+            
+            // Inject current into this sensory neuron
+            pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+            
+            // Enhanced working memory storage with prediction integration
+            if (normalizedValue > 0.5f) {
+                // Store in working memory with prediction error weighting
+                float weight = 1.0f;
+                if (pImpl->predictionSystem) {
+                    weight = pImpl->predictionSystem->getConfidence();
+                }
+                
+                pImpl->workingMemory->storeToNeuron(
+                    pImpl->sensoryNeurons[i]->getId(), 
+                    normalizedValue / 10.0f * weight
+                );
+                
+                // If prediction system is available, also store prediction error in working memory
+                if (pImpl->predictionSystem) {
+                    float predictionError = pImpl->predictionSystem->getPredictionError();
+                    if (predictionError > 0.1f) {
+                        // Store prediction error as additional working memory trace
+                        pImpl->workingMemory->storeToNeuron(
+                            pImpl->sensoryNeurons[i]->getId(), 
+                            predictionError * 0.5f
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Store the entire pattern in working memory
+        pImpl->workingMemory->store(wmPattern, 1.0f);
+        
+        // If working memory has capacity and there are prediction errors,
+        // use working memory to guide attentional selection
+        if (pImpl->workingMemory->getActiveTraces() > 0) {
+            // Get prediction error for novelty detection
+            if (pImpl->predictionSystem) {
+                float predictionError = pImpl->predictionSystem->getPredictionError();
+                if (predictionError > 0.1f) {
+                    // Novel input should increase attention
+                    if (pImpl->attention) {
+                        // Get working memory neurons as attention candidates
+                        std::vector<NeuronId> candidates = pImpl->workingMemory->getMemoryNeurons();
+                        if (!candidates.empty()) {
+                            // Focus attention on the most salient prediction error
+                            float maxError = 0.0f;
+                            NeuronId targetNeuron = candidates[0];
+                            
+                            for (const auto& neuron : candidates) {
+                                if (pImpl->predictionSystem->getConfidence() > maxError) {
+                                    maxError = pImpl->predictionSystem->getConfidence();
+                                    targetNeuron = neuron;
+                                }
+                            }
+                            
+                            pImpl->attention->focusOnRegion(targetNeuron.getId() / 1000);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback to basic working memory storage for backward compatibility
     for (size_t i = 0; i < numSensory; ++i) {
-        // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
         if (i < values.size()) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
-        // Inject current into this sensory neuron
+        // Inject current into this sensory neuron (fallback)
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
+        // Also store in working memory (fallback - with improved condition)
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
