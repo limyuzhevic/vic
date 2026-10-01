@@ -5,29 +5,88 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/CLI/CLI.hpp"
+#include "../core/CLI/CLIApplication.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
-namespace nlm {
+using namespace nlm;
 
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
-
-class Phase3Demo {
+class Phase3DemoApp : public CLIApplication {
 public:
-    Phase3Demo() {}
-    ~Phase3Demo() {}
-    
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+    Phase3DemoApp() : CLIApplication("nlm_phase3_demo", 
+        "NLM Phase 3: World Interaction Demo\n"
+        "Demonstrates: experience -> neural activity -> action -> consequence -> learning\n"
+        "The brain receives sensory input, produces actions, experiences consequences, "
+        "and modifies its synapses.") {
+        setVersion("Phase 3.0");
+        registerStandardArguments();
+        
+        // Add Phase 3 specific arguments
+        getParser().addArgument("episodes", "e", "Number of episodes", "5",
+                              CLI::validatePositiveInt, nullptr, false, "int");
+        getParser().addArgument("steps", "s", "Steps per episode", "200",
+                              CLI::validatePositiveInt, nullptr, false, "int");
+        getParser().addArgument("neuron-count", "n", "Number of neurons", "500",
+                              CLI::validatePositiveInt, nullptr, false, "int");
+    }
+
+    bool initialize() override {
+        if (parser.hasArgument("log-level")) {
+            auto levelOpt = parser.getArgument<std::string>("log-level");
+            if (levelOpt) {
+                logInfo("Log level set to: " + *levelOpt);
+            }
+        }
+        
+        if (parser.hasArgument("benchmark")) {
+            logInfo("Benchmark mode enabled");
+        }
+        
+        return true;
+    }
+
+    int execute() override {
+        // Parse Phase 3 specific arguments
+        int numEpisodes = 5;
+        int stepsPerEpisode = 200;
+        int neuronCount = 500;
+        
+        if (parser.hasArgument("episodes")) {
+            auto episodesOpt = parser.getArgument<int>("episodes");
+            if (episodesOpt) numEpisodes = *episodesOpt;
+        }
+        
+        if (parser.hasArgument("steps")) {
+            auto stepsOpt = parser.getArgument<int>("steps");
+            if (stepsOpt) stepsPerEpisode = *stepsOpt;
+        }
+        
+        if (parser.hasArgument("neuron-count")) {
+            auto neuronsOpt = parser.getArgument<int>("neuron-count");
+            if (neuronsOpt) neuronCount = *neuronsOpt;
+        }
+        
+        logInfo("Starting Phase 3 demo with " + std::to_string(numEpisodes) + 
+                " episodes, " + std::to_string(stepsPerEpisode) + " steps each");
+        
+        runDemo(numEpisodes, stepsPerEpisode, neuronCount);
+        
+        return 0;
+    }
+
+private:
+    void runDemo(int numEpisodes, int stepsPerEpisode, int neuronCount) {
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
         // Create configuration
         auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        configureEnvironment(config, neuronCount);
+        configureBrain(config, neuronCount);
         
         // Create world
         SimpleWorld world;
@@ -192,17 +251,20 @@ public:
         std::cout << "The brain received sensory input, produced actions,\n";
         std::cout << "experienced consequences, and modified its synapses.\n";
     }
-    
+
 private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
+    void configureEnvironment(std::shared_ptr<Config> config, int neuronCount) {
         config->set("environment_width", 20);
         config->set("environment_height", 20);
         config->set("vision_width", 16);
         config->set("vision_height", 16);
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1f);
     }
     
-    void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
+    void configureBrain(std::shared_ptr<Config> config, int neuronCount) {
+        config->set("neuron_count", neuronCount);
         config->set("region_count", 2);
         config->set("connection_probability", 0.1f);
         config->set("random_seed", 42u);
@@ -240,7 +302,10 @@ private:
     }
 };
 
-} // namespace nlm
+int main(int argc, char* argv[]) {
+    Phase3DemoApp app;
+    return app.run(argc, argv);
+}
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {

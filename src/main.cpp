@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/CLI/CLI.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -321,16 +322,78 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Helper function to convert log level string to enum
+LogLevel stringToLogLevel(const std::string& levelStr) {
+    std::string level = levelStr;
+    std::transform(level.begin(), level.end(), level.begin(), ::tolower);
+    
+    if (level == "debug") return LogLevel::Debug;
+    if (level == "info") return LogLevel::Info;
+    if (level == "warning") return LogLevel::Warning;
+    if (level == "error") return LogLevel::Error;
+    if (level == "critical") return LogLevel::Critical;
+    
+    // Default to info
+    return LogLevel::Info;
+}
+
 int main(int argc, char** argv) {
+    // Create CLI parser
+    nlm::CLIArgumentParser parser("nlm", "NLM Phase 2: Real Neural Computation - Neural Learning Machine");
+    parser.setVersion("Phase 2.0");
+    parser.setHelpText("NLM Phase 2 implements real spiking neural computation with LIF neurons, "
+                      "event-driven spike propagation, STDP and Hebbian plasticity, and structural plasticity. "
+                      "This phase demonstrates measurable synaptic changes through experience.");
+    
+    // Register standard arguments
+    nlm::GlobalCLI::registerStandardArguments(parser);
+    
+    // Add Phase 2 specific arguments
+    parser.addArgument("test", "", "Run specific test (1=connectivity, 2=plasticity, 3=stdp, 0=all)", "0",
+                     nlm::CLI::validatePositiveInt, nullptr, false, "int");
+    
+    // Parse command line
+    if (!parser.parse(argc, argv)) {
+        return 1;
+    }
+    
+    // Handle help/version
+    if (parser.hasArgument("help") || parser.hasArgument("h")) {
+        parser.printHelp();
+        return 0;
+    }
+    
+    if (parser.hasArgument("version") || parser.hasArgument("v")) {
+        parser.printVersion();
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with configurable level
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = LogLevel::Info;
+    
+    if (parser.hasArgument("log-level")) {
+        auto levelOpt = parser.getArgument<std::string>("log-level");
+        if (levelOpt) {
+            logLevel = stringToLogLevel(*levelOpt);
+        }
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    if (parser.hasArgument("log-file")) {
+        auto logFileOpt = parser.getArgument<std::string>("log-file");
+        if (logFileOpt) {
+            // TODO: Add file logging support
+            NLM_LOG_INFO("Log file output not yet implemented: " + *logFileOpt);
+        }
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -345,14 +408,10 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    if (parser.hasArgument("config")) {
+        auto configOpt = parser.getArgument<std::string>("config");
+        if (configOpt) {
+            configFile = *configOpt;
         }
     }
     
@@ -363,7 +422,22 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with --set arguments
+    if (parser.hasArgument("set")) {
+        auto setOpt = parser.getArgument<std::string>("set");
+        if (setOpt) {
+            // Parse --set key=value
+            size_t pos = setOpt->find('=');
+            if (pos != std::string::npos) {
+                std::string key = setOpt->substr(0, pos);
+                std::string value = setOpt->substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_INFO("Applied command line override: " + key + " = " + value);
+            }
+        }
+    }
+    
+    // Override with legacy --key=value arguments (for backward compatibility)
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
@@ -390,6 +464,20 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Handle benchmark mode
+    if (parser.hasArgument("benchmark")) {
+        NLM_LOG_INFO("Benchmark mode enabled");
+    }
+    
+    // Handle checkpoint file
+    if (parser.hasArgument("checkpoint")) {
+        auto checkpointOpt = parser.getArgument<std::string>("checkpoint");
+        if (checkpointOpt) {
+            NLM_LOG_INFO("Checkpoint file: " + *checkpointOpt);
+        }
+    }
+    
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -409,20 +497,42 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests based on --test argument
+    int testMode = 0;
+    if (parser.hasArgument("test")) {
+        auto testOpt = parser.getArgument<int>("test");
+        if (testOpt) {
+            testMode = *testOpt;
+        }
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    bool runAllTests = (testMode == 0);
+    bool runTest1 = (runAllTests || testMode == 1);
+    bool runTest2 = (runAllTests || testMode == 2);
+    bool runTest3 = (runAllTests || testMode == 3);
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (runTest1) {
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (runTest2) {
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
+    
+    if (runTest3) {
+        // Run Test 3: STDP verification
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
