@@ -55,17 +55,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
-    float totalReward = 0.0f;
-    float totalFiringRate = 0.0f;
-    size_t firingCount = 0;
-    
-    for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
         SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
         
-        // Process sensory input
+        // Process sensory input and store in working memory
         agent.processSensoryInput(percept);
+        
+        // Store experience in working memory for immediate use
+        if (auto* workingMemory = brain->getWorkingMemory()) {
+            // Encode current percept into working memory
+            for (size_t i = 0; i < std::min(percept.vision.size(), size_t(10)); ++i) {
+                workingMemory->storeToNeuron(static_cast<NeuronId>(i + 1000), percept.vision[i]);
+            }
+        }
         
         // Brain step
         brain->step(step, step * 0.001);
@@ -83,9 +85,44 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
         
-        // Update development
+        // Update prediction system with current reward prediction error
+        if (auto* predictionSystem = brain->getPredictionSystem()) {
+            // Would normally compute prediction error based on predicted vs actual reward
+            // For now, just track that prediction system is active
+        }
+        
+        // Update development and concept formation
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
+            
+            // Update concept formation from current experience
+            if (auto* conceptFormation = brain->getConceptFormation()) {
+                // Process current neural activity patterns to form concepts
+                // This would normally integrate with sensory input and working memory
+            }
+        }
+        
+        // Store current experience in episodic memory
+        if (step % 100 == 0 && brain->getEpisodicMemory()) {
+            EpisodicMemoryItem episode;
+            episode.timestamp = step;
+            episode.reward = reward;
+            
+            // Store active neurons in episode
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.neurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            brain->getEpisodicMemory()->storeEpisode(episode);
         }
         
         // Collect metrics
@@ -100,7 +137,6 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
-    }
     
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;

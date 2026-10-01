@@ -72,15 +72,30 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2 Demo (Legacy)
+
+```bash
+./nlm
+```
+
+This runs the Phase 2 neural computation demo (for backward compatibility).
+
+### Additional Demos
+
+```bash
+./nlm_phase3_demo
+./nlm_phase4_demo
+```
 
 ## Project Structure
 
@@ -121,11 +136,13 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Complete - Neural Core)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
+- Working memory (initial implementation)
+- Episodic memory (initial implementation)
 
 ### Phase 3 (Complete)
 - World interaction loop
