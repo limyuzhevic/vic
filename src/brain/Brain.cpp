@@ -401,9 +401,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
     
-    // ========== STEP 4: Update working memory ==========
+    // Update working memory with current neural activity
     if (pImpl->workingMemory) {
+        // Update working memory with current firing patterns
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Get working memory neurons for competition with attention
+        auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        // Store sensory input in working memory if available
+        if (pImpl->sensoryNeurons.size() > 0) {
+            for (size_t i = 0; i < std::min(pImpl->sensoryNeurons.size(), memoryNeurons.size()); ++i) {
+                pImpl->workingMemory->storeToNeuron(memoryNeurons[i], 
+                                                  neuron->getState().membranePotential);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -492,8 +504,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        // Store neurons that are firing OR have high activation
+                        bool isActive = neuron->isFiring() || 
+                                       std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f;
+                        
+                        if (isActive) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
@@ -511,15 +526,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory input
+        if (!pImpl->sensoryNeurons.empty()) {
+            pImpl->predictionSystem->update(pImpl->timestep);
+            
+            // Use working memory to inform predictions
+            if (pImpl->workingMemory) {
+                auto memory = pImpl->workingMemory->retrieve();
+                if (!memory.empty()) {
+                    pImpl->predictionSystem->incorporateMemory(memory);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
+        // Apply attention to working memory
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
@@ -528,8 +553,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Use attention winners and working memory content
+        std::vector<float> currentPattern;
+        if (pImpl->workingMemory) {
+            currentPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!currentPattern.empty()) {
+            pImpl->conceptFormation->update(currentPattern, pImpl->timestep);
+        }
+    }
+    
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        pImpl->planner->update(pImpl->timestep);
+        
+        // Incorporate working memory and episodic memory into planning
+        if (pImpl->workingMemory) {
+            std::vector<float> memory = pImpl->workingMemory->retrieve();
+            pImpl->planner->incorporateMemory(memory);
+        }
+        
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            auto recentEpisodes = pImpl->episodicMemory->getRecentEpisodes(5);
+            std::vector<std::vector<float>> episodePatterns;
+            for (const auto* episode : recentEpisodes) {
+                std::vector<float> pattern;
+                for (float activation : episode->neuronActivations) {
+                    pattern.push_back(activation);
+                }
+                episodePatterns.push_back(pattern);
+            }
+            pImpl->planner->incorporateExperiences(episodePatterns);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -711,6 +768,14 @@ std::unique_ptr<class Action> Brain::produceAction() {
         type = ActionType::MoveForward;
     }
     
+    // Try to use neural planner for better action selection
+    if (pImpl->planner) {
+        ActionType plannedAction = pImpl->planner->planAction(*this);
+        if (plannedAction != ActionType::Wait) {
+            type = plannedAction;
+        }
+    }
+    
     auto action = std::make_unique<Action>(type);
     
     return action;
@@ -752,11 +817,13 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
+        // Clear memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    if (pImpl->conceptFormation) pImpl->conceptFormation->reset();
+    if (pImpl->planner) pImpl->planner->reset();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -888,20 +955,26 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
-        }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
-        
+    // Read synapses
+    SynapseCheckpointData synapseData;
+    if (!reader.readSynapses(synapseData)) {
+        NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+        return false;
+    }
+    
+    // Apply synapse states - this is complex because we need to find matching synapses
+    // For now, just log the count
+    NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+    
+    // TODO: Implement episodic memory loading when data structure is finalized
+    // TODO: Implement working memory loading when data structure is finalized
+    // TODO: Implement associative memory loading when data structure is finalized
+    // TODO: Implement prediction system loading when data structure is finalized
+    // TODO: Implement cognition system loading when data structure is finalized
+    
+    NLM_LOG_INFO("Brain state loaded successfully");
+    return true;
+    
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
         return false;
