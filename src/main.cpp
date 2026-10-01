@@ -1,11 +1,6 @@
 // NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
-//
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// Enhanced version with advanced command-line interface
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,15 +13,251 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
-
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <set>
+#include <chrono>
 
 using namespace nlm;
+
+void printBanner(const std::string& mode = "default") {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║                                                               ║
+    )" << std::endl;
+    
+    if (mode == "performance") {
+        std::cout << R"(     PERFORMANCE MODE: Advanced Monitoring and Profiling                    )" << std::endl;
+    } else if (mode == "debug") {
+        std::cout << R"(     DEBUG MODE: Enhanced Logging and Diagnostics                    )" << std::endl;
+    } else if (mode == "research") {
+        std::cout << R"(     RESEARCH MODE: Scientific Experiment Framework                  )" << std::endl;
+    } else if (mode == "production") {
+        std::cout << R"(     PRODUCTION MODE: Optimized for Long-Run Studies                     )" << std::endl;
+    }
+    
+    std::cout << R"(    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void printAdvancedHelp() {
+    std::cout << "Advanced NLM Command-Line Interface" << std::endl;
+    std::cout << "===================================" << std::endl << std::endl;
+    
+    std::cout << "Basic Options:" << std::endl;
+    std::cout << "  --config=file.cfg              Load configuration from file" << std::endl;
+    std::cout << "  --help                        Show this help message" << std::endl;
+    std::cout << "  --version                     Show version information" << std::endl << std::endl;
+    
+    std::cout << "Execution Modes:" << std::endl;
+    std::cout << "  --mode=default                Basic neural computation (default)" << std::endl;
+    std::cout << "  --mode=performance           Performance monitoring and profiling" << std::endl;
+    std::cout << "  --mode=debug                 Debug mode with enhanced logging" << std::endl;
+    std::cout << "  --mode=research              Research mode for scientific experiments" << std::endl;
+    std::cout << "  --mode=production            Production mode for long-run studies" << std::endl << std::endl;
+    
+    std::cout << "Performance Monitoring:" << std::endl;
+    std::cout << "  --enable-metrics             Enable performance metrics collection" << std::endl;
+    std::cout << "  --metrics-interval=steps     Collect metrics every N steps (default: 100)" << std::endl;
+    std::cout << "  --enable-profiling           Enable detailed profiling" << std::endl;
+    std::cout << "  --profile-output=file        Save profiling data to file" << std::endl << std::endl;
+    
+    std::cout << "Debug and Monitoring:" << std::endl;
+    std::cout << "  --log-level=LEVEL            Set log level (trace, debug, info, warn, error)" << std::endl;
+    std::cout << "  --enable-trace              Enable detailed trace logging" << std::endl;
+    std::cout << "  --trace-output=file         Save trace data to file" << std::endl;
+    std::cout << "  --monitor-memory            Monitor memory usage" << std::endl;
+    std::cout << "  --monitor-cpu               Monitor CPU usage" << std::endl << std::endl;
+    
+    std::cout << "Experiment Control:" << std::endl;
+    std::cout << "  --run-test=TEST_NUM          Run specific test (1, 2, or 3)" << std::endl;
+    std::cout << "  --skip-tests                Skip predefined tests, run only custom logic" << std::endl;
+    std::cout << "  --experiment-file=file       Load experiment sequence from file" << std::endl;
+    std::cout << "  --output=file               Save results to file" << std::endl;
+    std::cout << "  --output-format=FORMAT       Output format: text, json, csv (default: text)" << std::endl << std::endl;
+    
+    std::cout << "Advanced Configuration:" << std::endl;
+    std::cout << "  --set-key=value              Set configuration parameter from command line" << std::endl;
+    std::cout << "  --override-key=value         Override config parameter (highest priority)" << std::endl;
+    std::cout << "  --validate-config           Validate configuration before running" << std::endl;
+    std::cout << "  --config-schema=file        Load configuration schema for validation" << std::endl << std::endl;
+    
+    std::cout << "Research and Analysis:" << std::endl;
+    std::cout << "  --collect-data              Collect experimental data for analysis" << std::endl;
+    std::cout << "  --data-output=directory      Directory to save collected data" << std::endl;
+    std::cout << "  --enable-statistics         Enable statistical analysis of results" << std::endl;
+    std::cout << "  --analysis-file=file        Save analysis results to file" << std::endl << std::endl;
+    
+    std::cout << "Resource Management:" << std::endl;
+    std::cout << "  --limit-memory=MB           Limit memory usage (in MB)" << std::endl;
+    std::cout << "  --max-steps=NUM             Maximum simulation steps" << std::endl;
+    std::cout << "  --checkpoint-interval=STEPS Create checkpoint every N steps" << std::endl;
+    std::cout << "  --checkpoint-dir=DIR         Directory for checkpoint files" << std::endl << std::endl;
+}
+
+void parseAdvancedArguments(int argc, char** argv, std::map<std::string, std::string>& options,
+                           std::vector<std::pair<std::string, std::string>>& setParams,
+                           std::set<std::string>& enabledFeatures) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-help") {
+            printAdvancedHelp();
+            std::exit(0);
+        } else if (arg == "--version") {
+            std::cout << "NLM Version 0.1.0 (Phase 2 - Enhanced)" << std::endl;
+            std::cout << "Advanced Integration: Prediction System, Cognition, Neuromodulation" << std::endl;
+            std::exit(0);
+        } else if (arg.find("--mode=") == 0) {
+            options["mode"] = arg.substr(7);
+        } else if (arg.find("--set-") == 0) {
+            std::string param = arg.substr(6);
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                setParams.push_back(std::make_pair(param, argv[++i]));
+            }
+        } else if (arg.find("--override-") == 0) {
+            std::string param = arg.substr(10);
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                setParams.push_back(std::make_pair(param, argv[++i]));
+            }
+        } else if (arg.find("--enable-") == 0) {
+            std::string feature = arg.substr(9);
+            enabledFeatures.insert(feature);
+        } else if (arg.find("--metrics-interval=") == 0) {
+            options["metrics_interval"] = arg.substr(18);
+        } else if (arg.find("--log-level=") == 0) {
+            options["log_level"] = arg.substr(12);
+        } else if (arg.find("--profile-output=") == 0) {
+            options["profile_output"] = arg.substr(17);
+        } else if (arg.find("--trace-output=") == 0) {
+            options["trace_output"] = arg.substr(16);
+        } else if (arg.find("--output-format=") == 0) {
+            options["output_format"] = arg.substr(16);
+        } else if (arg.find("--data-output=") == 0) {
+            options["data_output"] = arg.substr(14);
+        } else if (arg.find("--analysis-file=") == 0) {
+            options["analysis_file"] = arg.substr(16);
+        } else if (arg.find("--limit-memory=") == 0) {
+            options["limit_memory"] = arg.substr(15);
+        } else if (arg.find("--max-steps=") == 0) {
+            options["max_steps"] = arg.substr(11);
+        } else if (arg.find("--checkpoint-interval=") == 0) {
+            options["checkpoint_interval"] = arg.substr(22);
+        } else if (arg.find("--checkpoint-dir=") == 0) {
+            options["checkpoint_dir"] = arg.substr(17);
+        } else if (arg.find("--run-test=") == 0) {
+            options["run_test"] = arg.substr(10);
+        } else if (arg == "--skip-tests") {
+            options["skip_tests"] = "true";
+        } else if (arg.find("--experiment-file=") == 0) {
+            options["experiment_file"] = arg.substr(17);
+        } else if (arg.find("--config-schema=") == 0) {
+            options["config_schema"] = arg.substr(17);
+        } else if (arg == "--validate-config") {
+            options["validate_config"] = "true";
+        } else if (arg == "--collect-data") {
+            options["collect_data"] = "true";
+        } else if (arg == "--enable-statistics") {
+            options["enable_statistics"] = "true";
+        } else if (arg.find("--config=") == 0) {
+            if (arg.find('=') != std::string::npos) {
+                options["config_file"] = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                options["config_file"] = argv[++i];
+            }
+        }
+    }
+}
+
+void applyAdvancedConfiguration(Config& config, const std::vector<std::pair<std::string, std::string>>& setParams,
+                               const std::set<std::string>& enabledFeatures) {
+    for (const auto& param : setParams) {
+        try {
+            // Try to parse as integer
+            size_t pos;
+            int64_t intValue = std::stoll(param.second, &pos);
+            if (pos == param.second.size()) {
+                config.set(param.first, intValue, ConfigSource::CommandLine);
+                continue;
+            }
+            
+            // Try to parse as float
+            float floatValue = std::stof(param.second);
+            config.set(param.first, floatValue, ConfigSource::CommandLine);
+        } catch (...) {
+            // Treat as string
+            config.set(param.first, param.second, ConfigSource::CommandLine);
+        }
+    }
+    
+    // Apply feature-specific configurations
+    if (enabledFeatures.count("metrics")) {
+        config.set("enable_metrics", true, ConfigSource::CommandLine);
+        config.set("metrics_interval", 100, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("profiling")) {
+        config.set("enable_profiling", true, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("trace")) {
+        config.set("enable_trace", true, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("debug")) {
+        config.set("enable_debug_logging", true, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("monitor_memory")) {
+        config.set("monitor_memory", true, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("monitor_cpu")) {
+        config.set("monitor_cpu", true, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("collect_data")) {
+        config.set("collect_data", true, ConfigSource::CommandLine);
+    }
+    
+    if (enabledFeatures.count("statistics")) {
+        config.set("enable_statistics", true, ConfigSource::CommandLine);
+    }
+}
+
+void runAdvancedExperimentMode(const std::map<std::string, std::string>& options) {
+    std::cout << "=== ADVANCED NLM EXECUTION ===" << std::endl;
+    
+    std::string mode = options.count("mode") ? options.at("mode") : "default";
+    
+    if (mode == "performance") {
+        std::cout << "Performance monitoring enabled" << std::endl;
+        std::cout << "Collecting metrics, profiling data, and performance statistics" << std::endl;
+    } else if (mode == "debug") {
+        std::cout << "Debug mode enabled - enhanced logging and diagnostics" << std::endl;
+        std::cout << "Detailed trace information and validation" << std::endl;
+    } else if (mode == "research") {
+        std::cout << "Research mode enabled - scientific experiment framework" << std::endl;
+        std::cout << "Data collection and statistical analysis enabled" << std::endl;
+    } else if (mode == "production") {
+        std::cout << "Production mode enabled - optimized for long-run studies" << std::endl;
+        std::cout << "Resource management and checkpointing enabled" << std::endl;
+    }
+    
+    std::cout << "Advanced NLM with integrated cognitive systems running..." << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(

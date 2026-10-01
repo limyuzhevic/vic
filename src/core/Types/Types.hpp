@@ -183,10 +183,15 @@ enum class FiringState : uint8_t {
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
-
-} // namespace nlm
+// Developmental effects on different brain systems
+enum class DevelopmentalEffectType : uint8_t {
+    NeuralExcitability,
+    PlasticityRules,
+    Attention,
+    MemoryConsolidation,
+    Neuromodulation,
+    ConceptFormation,
+    PredictionSystem,
+    WorkingMemory,
+    EpisodicMemory
+};
