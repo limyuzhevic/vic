@@ -334,6 +334,27 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getAcetylcholineLevel() const {
+    // ACh level is derived from the brain's acetylcholine system
+    // For now, use a simplified approximation based on prediction error and reward
+    return std::min(1.0f, std::abs(predictionError_) * 0.5f + std::abs(expectedReward_) * 0.3f);
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    // NE level is derived from curiosity and novelty
+    return std::min(1.0f, curiosityLevel_ * 0.7f + noveltyLevel_ * 0.3f);
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    // 5-HT level is derived from reward prediction and satiety
+    return std::min(1.0f, std::abs(expectedReward_) * 0.5f);
+}
+
+float AgentBrain::getRewardLevel() const {
+    // Reward level is derived from accumulated reward
+    return std::min(1.0f, std::abs(expectedReward_) * 2.0f);
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

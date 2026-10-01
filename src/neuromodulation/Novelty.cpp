@@ -1,19 +1,20 @@
 #include "Novelty.hpp"
 #include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
 
 namespace nlm {
 
 struct Novelty::Impl {
     class Brain* brain;
     float level;
+    float baseline;
     float decayRate;
     std::vector<float> history;
-    std::vector<float> lastPattern;
-    float noveltyThreshold;
     
-    Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
+    Impl()
+        : brain(nullptr)
+        , level(0.0f)
+        , baseline(0.0f)
+        , decayRate(0.1f) {}
 };
 
 Novelty::Novelty() : pImpl(new Impl) {}
@@ -22,7 +23,7 @@ Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
     pImpl->brain = brain;
-    NLM_LOG_INFO("Novelty detection initialized");
+    NLM_LOG_INFO("Novelty detection system initialized");
 }
 
 float Novelty::getLevel() const {
@@ -30,47 +31,39 @@ float Novelty::getLevel() const {
 }
 
 void Novelty::setLevel(float level) {
-    pImpl->level = level;
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-void Novelty::detectNovelty(const Observation& observation, 
-                            const Observation& previousObservation) {
-    // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
+void Novelty::detectNovelty(const Observation& observation,
+                           const Observation& previousObservation) {
+    // TODO PHASE 2: Implement real novelty detection using observation data
+    // PLACEHOLDER: Simple threshold-based novelty
+    float diff = 0.0f; // Placeholder calculation
+    setLevel(std::min(1.0f, pImpl->level + diff * 0.1f));
     pImpl->history.push_back(pImpl->level);
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
-                            const std::vector<float>& previousPattern) {
-    if (currentPattern.empty() || previousPattern.empty()) {
-        pImpl->level = 0.0f;
-        return;
+                           const std::vector<float>& previousPattern) {
+    // TODO PHASE 2: Implement real novelty detection from patterns
+    // PLACEHOLDER: Calculate mean squared difference
+    float sumDiff = 0.0f;
+    size_t count = std::min(currentPattern.size(), previousPattern.size());
+    for (size_t i = 0; i < count; ++i) {
+        float diff = currentPattern[i] - previousPattern[i];
+        sumDiff += diff * diff;
     }
     
-    // Compute difference between patterns
-    float totalDiff = 0.0f;
-    size_t compareLen = std::min(currentPattern.size(), previousPattern.size());
+    float mse = count > 0 ? sumDiff / count : 0.0f;
+    float novelty = std::sqrt(mse);
     
-    for (size_t i = 0; i < compareLen; ++i) {
-        float diff = std::abs(currentPattern[i] - previousPattern[i]);
-        totalDiff += diff;
-    }
-    
-    // Normalize by pattern size
-    float avgDiff = totalDiff / compareLen;
-    
-    // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    setLevel(std::min(1.0f, pImpl->level + novelty * 0.1f));
     pImpl->history.push_back(pImpl->level);
-    
-    // Store current pattern for next comparison
-    pImpl->lastPattern = currentPattern;
 }
 
 void Novelty::update(TimestepDuration dt) {
-    // Decay novelty
-    pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Decay novelty over time
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
 const std::vector<float>& Novelty::getHistory() const {

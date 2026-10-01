@@ -1,13 +1,14 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Reward.hpp"
+
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 
 namespace nlm {
 
@@ -18,13 +19,17 @@ class SimulationClock;
 class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -106,6 +111,10 @@ public:
     // Apply developmental changes (called automatically in step)
     void develop();
     
+    // Helper methods for developmental integration
+    void applyNeuralExcitabilityEffects(float excitability);
+    void applyNeuromodulationSensitivityEffects(float sensitivity);
+    
     // Reset brain state
     void reset();
     
@@ -153,18 +162,15 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+    // ========== SEMANTIC MEMORY ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Semantic memory - knowledge and concepts
+    NeuralSemanticMemory* getSemanticMemory();
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // ========== PROCEDURAL MEMORY ==========
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
@@ -175,6 +181,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and working memory
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - social behavior and satiety
+    Serotonin* getSerotonin();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
@@ -183,6 +198,12 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Reward signal
+    Reward* getReward();
+    
+    // Reward signal
+    Reward* getReward();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

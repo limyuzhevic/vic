@@ -59,20 +59,23 @@ public:
     float getDecayRate() const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }
 
-    // Get neurons currently in working memory
-    const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
+    // Set consolidation strength based on developmental stage
+    void setConsolidationStrength(float strength) { consolidationStrength_ = strength; }
 
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
+    // Set working memory enhancement factor (from neuromodulators)
+    void setWorkingMemoryEnhancement(float enhancement) { workingMemoryEnhancement_ = enhancement; }
 
-    // Competition between memory traces
-    void runCompetition();
+    // Set decay rate based on developmental stage
+    void setDecayRate(float rate) { decayRate_ = rate; }
 
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
+    // Set consolidation strength based on developmental stage
+    void setConsolidationStrength(float strength) { consolidationStrength_ = strength; }
 
-    // Get overall memory activity level
-    float getMemoryActivity() const;
+    // Set working memory enhancement factor (from neuromodulators)
+    void setWorkingMemoryEnhancement(float enhancement) { workingMemoryEnhancement_ = enhancement; }
+
+    // Set decay rate based on developmental stage
+    void setDecayRate(float rate) { decayRate_ = rate; }
 
 private:
     // Create recurrent connection for maintenance
@@ -90,6 +93,8 @@ private:
     Brain* brain_;
     size_t capacity_;
     float decayRate_;
+    float consolidationStrength_;  // NEW: For developmental effects
+    float workingMemoryEnhancement_;  // NEW: For neuromodulatory effects
     
     // Memory content
     std::vector<NeuronId> memoryNeurons_;

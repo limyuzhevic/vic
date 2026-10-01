@@ -22,6 +22,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , consolidationStrength_(1.0f)
+    , workingMemoryEnhancement_(1.0f)
+    , currentDevelopmentStage_(0.0f)  // NEW: Development stage tracking
 {
 }
 
@@ -144,13 +147,41 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     runCompetition();
 }
 
-void NeuralWorkingMemory::clear() {
-    memoryNeurons_.clear();
-    memoryActivations_.clear();
-    memoryTimestamps_.clear();
-    activeTraces_.clear();
-    pImpl->maintenanceSynapses.clear();
-}
+// Set development stage effects on working memory
+    void setDevelopmentStageEffects(float stage) {
+        if (brain_) {
+            // Development stage affects working memory capacity and consolidation
+            float capacityMultiplier = 1.0f;
+            float consolidationMultiplier = 1.0f;
+            
+            if (stage < 0.2f) {  // Initial stage
+                capacityMultiplier = 1.0f;
+                consolidationMultiplier = 1.5f;
+            } else if (stage < 0.8f) {  // Critical/Maturation period
+                capacityMultiplier = 0.8f;
+                consolidationMultiplier = 1.2f;
+            } else {  // Adult/Aging stage
+                capacityMultiplier = 0.7f;
+                consolidationMultiplier = 0.9f;
+            }
+            
+            // Apply developmental effects
+            capacity_ = static_cast<size_t>(capacity_ * capacityMultiplier);
+            decayRate_ = decayRate_ * consolidationMultiplier;
+            
+            // Store development stage
+            currentDevelopmentStage_ = stage;
+        }
+    }
+
+    // Update with developmental stage consideration
+    void updateWithDevelopment(TimestepDuration dt, float developmentStage) {
+        // Apply developmental effects
+        setDevelopmentStageEffects(developmentStage);
+        
+        // Continue with normal update
+        update(dt);
+    }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
     for (auto& activation : memoryActivations_) {
@@ -414,13 +445,54 @@ void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salience
     }
 }
 
-void AttentionalSelection::reset() {
-    winners_.clear();
-    attendedRegions_.clear();
-    neuronSalience_.clear();
-    topDownBias_.clear();
-    bottomUpSalience_.clear();
-    pImpl->inhibitionLevel.clear();
-}
+// Set development stage effects on attention
+    void setDevelopmentStageEffects(float stage) {
+        if (brain_) {
+            // Development stage affects attention inhibition/excitation balance
+            float inhibitionMultiplier = 1.0f;
+            float excitationMultiplier = 1.0f;
+            float broadnessMultiplier = 1.0f;
+            
+            if (stage < 0.2f) {  // Initial stage
+                inhibitionMultiplier = 0.8f;
+                excitationMultiplier = 1.2f;
+                broadnessMultiplier = 1.5f;
+            } else if (stage < 0.8f) {  // Critical/Maturation period
+                inhibitionMultiplier = 1.2f;
+                excitationMultiplier = 0.9f;
+                broadnessMultiplier = 1.0f;
+            } else {  // Adult/Aging stage
+                inhibitionMultiplier = 1.5f;
+                excitationMultiplier = 0.8f;
+                broadnessMultiplier = 0.7f;
+            }
+            
+            // Apply developmental effects
+            inhibitionStrength_ = inhibitionStrength_ * inhibitionMultiplier;
+            excitationStrength_ = excitationStrength_ * excitationMultiplier;
+            competitionThreshold_ = competitionThreshold_ * broadnessMultiplier;
+            
+            // Store development stage
+            currentDevelopmentStage_ = stage;
+        }
+    }
 
-} // namespace nlm
+    // Update attention with developmental stage consideration
+    void updateWithDevelopment(TimestepDuration dt, float developmentStage) {
+        // Apply developmental effects
+        setDevelopmentStageEffects(developmentStage);
+        
+        // Decay salience and bias over time
+        for (auto& s : bottomUpSalience_) {
+            s *= 0.95f;
+        }
+        
+        for (auto& b : topDownBias_) {
+            b *= 0.98f;
+        }
+        
+        // Decay inhibition
+        for (auto& i : pImpl->inhibitionLevel) {
+            i *= 0.9f;
+        }
+    }

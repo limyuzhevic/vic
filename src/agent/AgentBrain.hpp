@@ -52,6 +52,18 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get acetylcholine level
+    float getAcetylcholineLevel() const;
+    
+    // Get norepinephrine level
+    float getNorepinephrineLevel() const;
+    
+    // Get serotonin level
+    float getSerotoninLevel() const;
+    
+    // Get reward level
+    float getRewardLevel() const;
+    
     // Reset agent for new episode
     void reset();
     

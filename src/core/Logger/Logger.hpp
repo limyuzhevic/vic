@@ -9,8 +9,13 @@
 
 namespace nlm {
 
+// Forward declarations
+class IErrorHandler;
+class NLMException;
+
 // Log severity levels
 enum class LogLevel {
+    Trace = -1,
     Debug = 0,
     Info = 1,
     Warning = 2,
@@ -103,13 +108,25 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Error handling integration
+    void setErrorHandler(std::shared_ptr<IErrorHandler> handler);
+    bool handleError(const std::exception& error);
+    
+    // Performance monitoring
+    void startPerformanceTimer(const std::string& operation);
+    void stopPerformanceTimer(const std::string& operation, bool success = true);
+    double getAverageOperationTime(const std::string& operation) const;
+    
+    // Debug mode
+    void enableDebugMode(bool enabled);
+    bool isDebugModeEnabled() const;
 
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
 #define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
@@ -128,6 +145,16 @@ public:
         return *this;
     }
     
+    template<typename T>
+    LogStream& operator<<(std::shared_ptr<T> ptr) {
+        if (ptr) {
+            oss_ << ptr.get();
+        } else {
+            oss_ << "nullptr";
+        }
+        return *this;
+    }
+    
 private:
     LogLevel level_;
     std::ostringstream oss_;
@@ -137,5 +164,14 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Convenience macros for error handling
+#define NLM_TRY_CATCH(rethrow) try { \
+        rethrow \
+    } catch (const std::exception& e) { \
+        if (nlm::Logger::getGlobal().handleError(e)) { \
+            throw; \
+        } \
+    }
 
 } // namespace nlm
