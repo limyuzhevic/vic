@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
 
 namespace nlm {
 
@@ -93,13 +96,15 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Helper functions
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
+    static std::string getCurrentTimestamp();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm
