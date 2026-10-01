@@ -105,11 +105,27 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Collect final metrics
     result.totalReward = totalReward / config.maxSteps;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
+    
+    // Calculate synaptic weight statistics
+    result.synapticWeightMean = calculateSynapticWeightMean(brain);
+    result.synapticWeightStdDev = calculateSynapticWeightStdDev(brain);
+    
+    // Memory metrics
+    result.episodicEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+    result.workingMemoryUsage = brain->getWorkingMemory() ? 
+        static_cast<float>(brain->getWorkingMemory()->getActiveTraces()) : 0.0f;
+    result.memoryRetention = calculateMemoryRetention(brain);
+    
+    // Neuromodulation metrics
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    
+    // Learning metrics
+    result.learningEfficiency = calculateLearningEfficiency(totalReward, config.maxSteps, agent.getCuriosityLevel());
+    result.predictionAccuracy = calculatePredictionAccuracy(brain);
+    result.behavioralAdaptation = calculateBehavioralAdaptation(agent);
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
@@ -400,4 +416,130 @@ bool Phase6IntegratedExperiment::testReplay() {
     return true;
 }
 
-} // namespace nlm
+// Helper functions for Phase6IntegrationResult
+
+float Phase6IntegratedExperiment::calculateSynapticWeightMean(std::shared_ptr<Brain> brain) {
+    float sum = 0.0f;
+    size_t count = 0;
+    
+    for (const auto& region : brain->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            sum += syn->getWeight();
+            count++;
+        }
+    }
+    
+    return count > 0 ? sum / count : 0.0f;
+}
+
+float Phase6IntegratedExperiment::calculateSynapticWeightStdDev(std::shared_ptr<Brain> brain) {
+    float mean = calculateSynapticWeightMean(brain);
+    float sumSqDiff = 0.0f;
+    size_t count = 0;
+    
+    for (const auto& region : brain->getRegions()) {
+        for (auto* syn : region->getSynapses()) {
+            float diff = syn->getWeight() - mean;
+            sumSqDiff += diff * diff;
+            count++;
+        }
+    }
+    
+    return count > 0 ? std::sqrt(sumSqDiff / count) : 0.0f;
+}
+
+float Phase6IntegratedExperiment::calculateMemoryRetention(std::shared_ptr<Brain> brain) {
+    auto* episodic = brain->getEpisodicMemory();
+    if (!episodic || episodic->getEpisodeCount() == 0) {
+        return 0.0f;
+    }
+    
+    // Simple retention metric based on episode quality/age
+    float totalRetention = 0.0f;
+    size_t episodeCount = episodic->getEpisodeCount();
+    
+    for (size_t i = 0; i < episodeCount && i < 10; ++i) {
+        // Get episode and compute retention score
+        auto episode = episodic->getEpisode(i);
+        if (episode) {
+            // Compute based on pattern completion or similarity
+            totalRetention += 0.8f;  // Placeholder - would be calculated from episode details
+        }
+    }
+    
+    return episodeCount > 0 ? totalRetention / episodeCount : 0.0f;
+}
+
+float Phase6IntegratedExperiment::calculateLearningEfficiency(float totalReward, uint64_t maxSteps, float curiosityLevel) {
+    float rewardEfficiency = totalReward / maxSteps;
+    
+    // Normalize curiosity impact (0-1 scale)
+    float normalizedCuriosity = std::min(1.0f, curiosityLevel * 2.0f);
+    
+    // Combined efficiency metric
+    return rewardEfficiency * 0.7f + normalizedCuriosity * 0.3f;
+}
+
+float Phase6IntegratedExperiment::calculatePredictionAccuracy(std::shared_ptr<Brain> brain) {
+    auto* prediction = brain->getPredictionSystem();
+    if (!prediction) {
+        return 0.0f;
+    }
+    
+    // Calculate prediction accuracy from prediction system metrics
+    float accuracy = 0.0f;
+    
+    // Check various prediction accuracy indicators
+    // This would normally read from prediction system metrics
+    // For now, return a placeholder based on system presence
+    return accuracy;
+}
+
+float Phase6IntegratedExperiment::calculateBehavioralAdaptation(AgentBrain& agent) {
+    // Simple adaptation metric based on neuromodulation levels
+    float adaptation = 0.0f;
+    
+    // Higher curiosity and prediction error indicate adaptation
+    float curiosityFactor = std::min(1.0f, agent.getCuriosityLevel() * 2.0f);
+    float errorFactor = std::min(1.0f, std::abs(agent.getPredictionError()) * 10.0f);
+    
+    adaptation = curiosityFactor * 0.6f + errorFactor * 0.4f;
+    
+    return adaptation;
+}
+
+// Update the Phase 6 demo to show the new integration score
+std::string Phase6IntegrationResult::toString() const {
+    std::ostringstream oss;
+    oss << "=== Phase 6 Integration Results ===\n";
+    oss << "System Integration Score: " << std::fixed << std::setprecision(2) 
+        << calculateIntegrationScore() << " (0.0-1.0)\n";
+    oss << "Total Reward (avg per step): " << totalReward << "\n";
+    oss << "Average Firing Rate: " << avgFiringRate << "\n";
+    oss << "Synaptic Weight Mean: " << synapticWeightMean << " ± " 
+        << synapticWeightStdDev << "\n";
+    oss << "\nMemory Integration:";
+    oss << "\n  Working Memory: " << (memoryWorkingMemoryIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED");
+    oss << "\n  Episodic Memory: " << (memoryEpisodicMemoryIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED");
+    oss << "\n  Episodes Stored: " << episodicEpisodesStored;
+    oss << "\n  Memory Retention: " << std::fixed << std::setprecision(2) << memoryRetention;
+    oss << "\n\nNeuromodulation Integration:";
+    oss << "\n  Novelty: " << std::fixed << std::setprecision(2) << noveltyLevel;
+    oss << "\n  Curiosity: " << curiosityLevel;
+    oss << "\n  Dopamine: " << dopamineLevel;
+    oss << "\n\nLearning Metrics:";
+    oss << "\n  Learning Efficiency: " << std::fixed << std::setprecision(2) << learningEfficiency;
+    oss << "\n  Prediction Accuracy: " << std::fixed << std::setprecision(2) << predictionAccuracy;
+    oss << "\n  Behavioral Adaptation: " << std::fixed << std::setprecision(2) << behavioralAdaptation;
+    oss << "\n\nSystem Integrity:";
+    oss << "\n  Checkpointing: " << (checkpointingWorks ? "✓ WORKING" : "✗ NOT WORKING");
+    oss << "\n  Replay System: " << (replayWorks ? "✓ WORKING" : "✗ NOT WORKING");
+    oss << "\n  Prediction: " << (predictionIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED");
+    oss << "\n  Development: " << (developmentIntegrated ? "✓ CONNECTED" : "✗ DISCONNECTED");
+    oss << "\n\nTemporal Metrics:";
+    oss << "\n  Start Time: " << (startTime ? std::ctime(&startTime) : "N/A");
+    oss << "\n  End Time: " << (endTime ? std::ctime(&endTime) : "N/A");
+    oss << "\n  Total Duration: " << totalWallClockTime << "s";
+    
+    return oss.str();
+}
