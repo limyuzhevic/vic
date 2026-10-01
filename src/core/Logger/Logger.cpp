@@ -8,9 +8,36 @@
 namespace nlm {
 
 struct ConsoleLogger::Impl {
+    /**
+     * @brief Minimum log level to output
+     * 
+     * Only log entries with level >= this value will be processed.
+     * Default is LogLevel::Info.
+     */
     LogLevel level = LogLevel::Info;
+    
+    /**
+     * @brief Flag indicating whether to use ANSI color codes
+     * 
+     * When enabled, log levels are displayed with terminal color codes.
+     * Default is true.
+     */
     bool useColors = true;
+    
+    /**
+     * @brief Output file stream for writing log entries
+     * 
+     * Log entries are appended to this file when set via setOutputFile().
+     * Default is closed.
+     */
     std::ofstream fileOut;
+    
+    /**
+     * @brief Mutex for thread-safe log operations
+     * 
+     * Ensures concurrent logging operations don't corrupt internal state
+     * or interleave output incorrectly.
+     */
     std::mutex mutex;
 };
 
@@ -49,8 +76,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            // Log file write error to stderr as fallback
+            std::cerr << "[ERROR] Failed to write to log file: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -71,7 +103,18 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    try {
+        // Ensure parent directory exists (basic implementation)
+        // For now, just attempt to open the file
+        pImpl->fileOut.open(filepath, std::ios::app);
+        
+        if (!pImpl->fileOut.is_open()) {
+            std::cerr << "[WARNING] Failed to open log file: " << filepath << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "[ERROR] Exception opening log file " << filepath << ": " << e.what() << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
@@ -102,9 +145,21 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+// Main Logger class
 struct Logger::Impl {
+    /**
+     * @brief Vector of logger sinks that receive log entries
+     * 
+     * Each logger sink (e.g., ConsoleLogger) processes log entries independently.
+     * Multiple loggers can be added for different output destinations.
+     */
     std::vector<std::shared_ptr<ILogger>> loggers;
+    
+    /**
+     * @brief Mutex for thread-safe access to loggers vector
+     * 
+     * Ensures concurrent logging operations don't corrupt internal state.
+     */
     std::mutex mutex;
 };
 

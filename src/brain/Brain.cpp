@@ -341,7 +341,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 3: Detect spikes and schedule spike events ==========
+    bool hasNewSpikes = false;
+    
+    // Step through each neuron
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -353,6 +355,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
+                    hasNewSpikes = true;
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
 
@@ -398,8 +401,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
+    // Only process spikes if there are actually new spikes
+    if (hasNewSpikes) {
+        pImpl->spikeSystem->processSpikes(currentStep);
+    }
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {

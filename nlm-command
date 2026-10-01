@@ -1,0 +1,63 @@
+#!/bin/bash
+# NLM Command Line Utility
+# Simple interface for running NLM experiments and utilities
+
+set -e
+
+echo "=== NLM - Neural Learning Machine ==="
+echo "Phase 6: Integrated Artificial Brain"
+echo ""
+
+echo "Available commands:"
+echo "  nlm-run          Run NLM simulation with default configuration"
+echo "  nlm-config       Display current configuration options"
+echo "  nlm-status       Show brain system status"
+echo "  nlm-experiment   Run specific experiments"
+echo "  nlm-help         Show this help message"
+echo ""
+
+case "$1" in
+    "nlm-run")
+        echo "Running NLM simulation..."
+        ./nlm
+        ;;
+    "nlm-config")
+        echo "=== NLM Configuration Options ==="
+        echo "neuron_count: Number of neurons (default: 500)"
+        echo "region_count: Number of brain regions (default: 1)"
+        echo "connection_probability: Synapse creation probability (default: 0.15)"
+        echo "stdp_ltp_weight: STDP long-term potentiation weight (default: 0.02)"
+        echo "stdp_ltd_weight: STDP long-term depression weight (default: 0.015)"
+        echo "enable_development: Enable developmental processes (default: true)"
+        echo "enable_checkpointing: Enable checkpoint save/load (default: false)"
+        ;;
+    "nlm-status")
+        echo "=== NLM System Status ==="
+        echo "This would display detailed status information about the neural system"
+        echo "Current implementation requires running the main executable for status"
+        ;;
+    "nlm-experiment")
+        echo "=== Available Experiments ==="
+        echo "  basic-connectivity: Test basic neural connectivity"
+        echo "  plasticity: Run plasticity learning experiment"
+        echo "  stdp-verification: Verify STDP mechanism"
+        echo "  integration: Run Phase 6 integration experiment"
+        echo "  memory: Test memory system functionality"
+        echo ""
+        echo "To run an experiment, use: nlm-experiment <experiment-name>"
+        ;;
+    "nlm-help")
+        echo "=== NLM Command Line Utility ==="
+        echo ""
+        echo "This utility provides a simple interface for interacting with NLM"
+        echo "neural system. For advanced usage, run the main executable directly."
+        echo ""
+        echo "See NLM documentation in docs/ for detailed information."
+        ;;
+    *)
+        echo "Usage: nlm-command <command>"
+        echo ""
+        echo "Run 'nlm-command nlm-help' for more information"
+        exit 1
+        ;;
+esac
