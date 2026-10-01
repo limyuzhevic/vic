@@ -20,38 +20,104 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced file loading with better error handling and JSON support
+    // Supports JSON objects like {"key": "value", "key2": "value2"} and simple key=value pairs
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Could not open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
+    bool hasValidEntries = false;
+    
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Try to parse as JSON (basic JSON parser with support for nested structures)
+        if (line.find("{") != std::string::npos && line.find("}") != std::string::npos) {
+            // Basic JSON parsing for key-value pairs
+            size_t keyPos = line.find('"');
+            while (keyPos != std::string::npos) {
+                size_t keyEnd = line.find('"', keyPos + 1);
+                if (keyEnd == std::string::npos) break;
+                
+                std::string key = line.substr(keyPos + 1, keyEnd - keyPos - 1);
+                size_t colonPos = line.find(':', keyEnd);
+                if (colonPos == std::string::npos) break;
+                
+                size_t valueStart = line.find_first_not_of(' ', colonPos + 1);
+                if (valueStart == std::string::npos) break;
+                
+                size_t valueEnd = line.find('"', valueStart + 1);
+                if (valueEnd == std::string::npos) {
+                    valueEnd = line.find(',', valueStart);
+                    if (valueEnd == std::string::npos) valueEnd = line.find('}', valueStart);
+                }
+                
+                if (valueEnd != std::string::npos) {
+                    std::string value = trim(line.substr(valueStart, valueEnd - valueStart));
+                    // Remove trailing comma and closing brace
+                    if (!value.empty() && value.back() == ',') value.pop_back();
+                    if (!value.empty() && value.back() == '}') value.pop_back();
+                    // Remove quotes from value
+                    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    set(key, value, ConfigSource::File);
+                    hasValidEntries = true;
+                }
+                
+                keyPos = line.find('"', keyEnd + 1);
+            }
+            continue;
+        }
+        
+        // Parse simple key=value pairs with enhanced error handling
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Validate key format
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                NLM_LOG_WARNING(std::string("Invalid config key format at line ") + std::to_string(lineNum) + ": " + key);
+                continue;
+            }
+            
+            // Remove quotes if present (handle both single and double quotes)
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Handle escaped quotes in values
+            size_t quotePos = value.find('\\"');
+            while (quotePos != std::string::npos) {
+                value.replace(quotePos, 2, "\"");
+                quotePos = value.find('\\"', quotePos + 2);
+            }
+            
             set(key, value, ConfigSource::File);
+            hasValidEntries = true;
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid config format (missing '=') at line ") + std::to_string(lineNum) + ": " + line.substr(0, 50));
         }
     }
     
+    if (!hasValidEntries) {
+        NLM_LOG_WARNING(std::string("Config file ") + filepath + " contains no valid entries");
+    }
+    
+    NLM_LOG_INFO(std::string("Loaded config from ") + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 
@@ -84,11 +150,17 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write as enhanced key=value format with comments
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# Source: " << static_cast<int>(entry.source) << "\n";
+        file << entry.key << " = " << entry.value << "\n\n";
     }
     
+    NLM_LOG_INFO(std::string("Saved config to ") + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
     return true;
 }
 

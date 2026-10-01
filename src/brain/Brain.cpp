@@ -511,8 +511,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
+        // Update prediction system with current sensory input
         // For now, just track prediction error history
+        // TODO: Actually use sensory input to train prediction system
+        
+        // Get current sensory state from working memory if available
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use active neurons as prediction targets
+            pImpl->predictionSystem->updatePrediction(
+                pImpl->workingMemory->getMemoryNeurons(),
+                pImpl->timestep
+            );
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +534,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Use attention to modulate concept formation
+        if (pImpl->conceptFormation) {
+            auto attentionalWeights = pImpl->attention->getAttentionWeights();
+            pImpl->conceptFormation->setAttentionWeights(attentionalWeights);
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding from working memory
+        if (pImpl->workingMemory) {
+            // Extract patterns from working memory
+            auto memoryTraces = pImpl->workingMemory->getMemoryTraces();
+            if (!memoryTraces.empty()) {
+                pImpl->conceptFormation->updateConcepts(
+                    memoryTraces,
+                    pImpl->timestep
+                );
+            }
+        }
+        
+        // Integrate with attention-modulated patterns
+        if (pImpl->attention) {
+            auto attendedNeurons = pImpl->attention->getAttendedNeurons();
+            pImpl->conceptFormation->processAttendedPatterns(attendedNeurons);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -586,6 +618,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+}
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
