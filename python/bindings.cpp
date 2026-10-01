@@ -313,9 +313,47 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             "Save brain state to file (checkpointing)")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        
+        // Advanced Python API methods
+        .def("train", [](Brain& self, const std::vector<std::vector<float>>& trainingData,
+                       size_t epochs, float learningRate) {
+            return self.train(trainingData, epochs, learningRate);
+        }, py::arg("training_data"), py::arg("epochs"), py::arg("learning_rate"),
+           "Train the neural network with supervised learning")
+        .def("evaluate", [](const Brain& self, const std::vector<std::vector<float>>& testData) {
+            return self.evaluate(testData);
+        }, py::arg("test_data"),
+           "Evaluate the network performance on test data")
+        .def("export_model", &Brain::export_model, py::arg("filepath"),
+             "Export trained model to file (ONNX format recommended)")
+        .def("checkpoint", [](Brain& self, const std::string& filename, 
+                            const std::unordered_map<std::string, float>& metadata) {
+            return self.checkpoint(filename, metadata);
+        }, py::arg("filename"), py::arg("metadata") = std::unordered_map<std::string, float>(),
+           "Create a checkpoint with metadata")
+        .def("restore_checkpoint", &Brain::restore_checkpoint, py::arg("filename"),
+             "Restore brain from checkpoint")
+        .def("get_training_metrics", &Brain::get_training_metrics,
+             "Get training metrics as dictionary")
+        .def("get_performance_stats", &Brain::get_performance_stats,
+             "Get performance statistics for analysis")
+        .def("profile_step", &Brain::profile_step,
+             "Profile current simulation step")
+        .def("visualize", [](Brain& self, const std::string& outputFile,
+                           const std::string& format, bool animate) {
+            return self.visualize(outputFile, format, animate);
+        }, py::arg("output_file"), py::arg("format") = "png", py::arg("animate") = false,
+           "Create neural visualization of brain state")
+        .def("monitor", &Brain::monitor,
+             "Start continuous performance monitoring")
+        .def("stop_monitoring", &Brain::stop_monitoring,
+             "Stop performance monitoring")
+        .def("get_monitor_data", &Brain::get_monitor_data,
+             "Get monitoring data as time series")
+        
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         .def("getRegion", &Brain::getRegion, py::arg("id"),

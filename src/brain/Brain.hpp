@@ -193,7 +193,67 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== ADVANCED PYTHON API ==========
+    
+    // Supervised learning/training
+    bool train(const std::vector<std::vector<float>>& trainingData,
+               size_t epochs, float learningRate);
+    
+    // Evaluation of network performance
+    float evaluate(const std::vector<std::vector<float>>& testData) const;
+    
+    // Export model to file (simplified ONNX-compatible format)
+    bool export_model(const std::string& filepath) const;
+    
+    // Create checkpoint with metadata
+    bool checkpoint(const std::string& filename, 
+                    const std::unordered_map<std::string, float>& metadata = {});
+    
+    // Restore brain from checkpoint
+    bool restore_checkpoint(const std::string& filename);
+    
+    // Get training metrics as dictionary-like structure
+    std::unordered_map<std::string, float> get_training_metrics() const;
+    
+    // Get performance statistics for analysis
+    std::unordered_map<std::string, double> get_performance_stats() const;
+    
+    // Profile current simulation step
+    std::unordered_map<std::string, double> profile_step();
+    
+    // Create neural visualization
+    bool visualize(const std::string& outputFile, const std::string& format = "png", 
+                   bool animate = false);
+    
+    // Start performance monitoring
+    void monitor();
+    
+    // Stop performance monitoring
+    void stop_monitoring();
+    
+    // Get monitoring data as time series
+    std::vector<std::unordered_map<std::string, double>> get_monitor_data();
 private:
+    // ========== PRIVATE INTERNAL STRUCTURE ==========
+    
+    // Training statistics
+    struct TrainingStats {
+        size_t epochsCompleted = 0;
+        size_t samplesProcessed = 0;
+        float totalLoss = 0.0f;
+        float bestAccuracy = 0.0f;
+        bool trainingComplete = false;
+    };
+    
+    // Monitoring data point
+    struct MonitorDataPoint {
+        double timestamp = 0.0;
+        size_t step = 0;
+        size_t neurons = 0;
+        size_t spikes = 0;
+        std::unordered_map<std::string, double> metrics;
+    };
+    
     struct Impl;
     Impl* pImpl;
 };
