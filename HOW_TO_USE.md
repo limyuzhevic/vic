@@ -99,18 +99,57 @@ python -m build
 pip install dist/*.whl
 ```
 
-### Verifying Installation
+### Verifying Installation with Error Handling
 
 ```python
 import pynlm
 
-# Check version
-print(pynlm.__version__)
+def verify_installation():
+    """Verify the NLM Python library installation with comprehensive error handling."""
+    try:
+        # Check version
+        print(f"NLM Python library version: {pynlm.__version__}")
+        
+        # Create a simple brain
+        config = pynlm.createDefaultConfig()
+        
+        # Validate configuration
+        if not config.has("brain.neuron_count"):
+            raise ValueError("Configuration is missing required brain parameters")
+        
+        brain = pynlm.createBrain(config)
+        
+        # Initialize with error checking
+        brain.initialize()
+        
+        # Verify brain is properly initialized
+        if brain.getTotalNeuronCount() <= 0:
+            raise ValueError("Brain initialized with no neurons")
+        
+        print(f"✓ Successfully created brain with {brain.getTotalNeuronCount()} neurons")
+        print(f"✓ Brain has {brain.getTotalSynapseCount()} synapses")
+        return True
+        
+    except ImportError as e:
+        print(f"❌ Import error - is pynlm properly installed? Error: {e}")
+        return False
+    except ValueError as e:
+        print(f"❌ Configuration error: {e}")
+        return False
+    except RuntimeError as e:
+        print(f"❌ Runtime error during brain initialization: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+# Run verification
+if verify_installation():
+    print("✓ Installation verified successfully!")
+else:
+    print("✗ Installation verification failed!")
 ```
 
 ---
@@ -184,76 +223,107 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Complete Agent Example with Error Handling
 
 ```python
 import pynlm
+import traceback
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_agent_simulation_safely(num_steps=1000):
+    """Run a complete agent simulation with comprehensive error handling and recovery."""
+    print(f"Starting agent simulation for {num_steps} steps...")
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
+    try:
+        # 1. Create configuration
+        config = pynlm.createDefaultConfig()
         
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
+        # 2. Create brain and initialize
+        brain = pynlm.createBrain(config)
+        brain.initialize()
         
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
+        # 3. Create agent brain interface
+        agent = pynlm.createAgentBrain(brain)
         
-        # Run brain step
-        brain.step(step)
+        # 4. Create and configure world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
         
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
+        # 5. Initialize agent with world
+        agent.initialize(world)
         
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+        # 6. Enable subsystems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
         
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
+        # 7. Run simulation loop with error handling
+        for step in range(num_steps):
+            try:
+                # Update world
+                world.update(timestep=0.1)
+                
+                # Get sensory input from world
+                percept = world.getSensoryPercept()
+                
+                # Process sensory input in brain
+                agent.processSensoryInput(percept)
+                
+                # Run brain step
+                brain.step(step)
+                
+                # Decode motor command from brain activity
+                motor_cmd = agent.decodeMotorCommand()
+                
+                # Apply motor command to world
+                world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+                
+                # Apply reward modulation
+                reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+                agent.applyRewardModulation(reward, 0.0)
+                
+                # Update development
+                agent.updateDevelopment(0.1)
+                
+                # Print progress
+                if step % 100 == 0:
+                    print(f"Step {step}:")
+                    print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+                    print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                    print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+                    print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+                    
+            except Exception as step_error:
+                print(f"❌ Error at step {step}: {step_error}")
+                print("Attempting to continue with next step...")
+                continue
         
-        # Update development
-        agent.updateDevelopment(0.1)
+        print("✓ Agent simulation completed successfully!")
+        return True
         
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    except Exception as e:
+        print(f"❌ Critical error in simulation: {e}")
+        traceback.print_exc()
+        
+        # Attempt recovery if possible
+        try:
+            if 'world' in locals():
+                world.reset()
+            if 'brain' in locals():
+                brain.reset()
+            print("✓ Attempted recovery - simulation can be restarted")
+        except:
+            print("⚠ Recovery failed - manual intervention required")
+        
+        return False
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run with error handling
+if run_agent_simulation_safely(1000):
+    print("🎉 Agent simulation completed successfully!")
+else:
+    print("💥 Agent simulation failed!")
 ```
 
 ### Key Classes and Methods

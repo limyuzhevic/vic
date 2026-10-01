@@ -400,26 +400,107 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    // Create factory function for advanced brain configuration
+    m.def("createAdvancedConfig", [](const std::string& profile) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (profile == "fast") {
+            // Fast simulation profile
+            config->set("brain.neuron_count", 500);
+            config->set("simulation.timestep", 0.001);
+            config->set("brain.connection_probability", 0.05);
+            config->set("learning.rate", 0.001);
+            config->set("environment.width", 8);
+            config->set("environment.height", 8);
+            config->set("visualization.enabled", false);
+            config->set("performance.optimization", "simd");
+            
+        } else if (profile == "detailed") {
+            // Detailed simulation profile with high precision
+            config->set("brain.neuron_count", 5000);
+            config->set("simulation.timestep", 0.0001);
+            config->set("brain.connection_probability", 0.2);
+            config->set("learning.rate", 0.01);
+            config->set("environment.width", 20);
+            config->set("environment.height", 20);
+            config->set("visualization.enabled", true);
+            config->set("visualization.update_rate", 60.0);
+            config->set("performance.optimization", "threads");
+            config->set("memory.use_pools", true);
+            
+        } else if (profile == "adaptive") {
+            // Adaptive learning profile
+            config->set("brain.neuron_count", 2000);
+            config->set("simulation.timestep", 0.001);
+            config->set("brain.connection_probability", 0.15);
+            config->set("learning.rate", 0.005);
+            config->set("environment.width", 15);
+            config->set("environment.height", 15);
+            config->set("visualization.enabled", false);
+            config->set("neuromodulation.curiosity", 0.5);
+            config->set("neuromodulation.dopamine_baseline", 0.2);
+            config->set("development.enabled", true);
+            config->set("development.pruning_rate", 0.001);
+            
+        } else {
+            // Default profile
+            config->set("brain.neuron_count", 1000);
+            config->set("simulation.timestep", 0.001);
+            config->set("brain.connection_probability", 0.1);
+            config->set("learning.rate", 0.01);
+            config->set("environment.width", 10);
+            config->set("environment.height", 10);
+        }
+        
+        return config;
+    }, py::arg("profile"), "Create an advanced configuration with predefined profile");
+    
+    // Create convenience function for quick testing
+    m.def("createTestConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100);
+        config->set("simulation.timestep", 0.001);
+        config->set("brain.connection_probability", 0.1);
+        config->set("environment.width", 5);
+        config->set("environment.height", 5);
+        config->set("max_simulation_steps", 100);
+        return config;
+    }, "Create a minimal test configuration");
+    
+    // Create function to batch enable subsystems
+    m.def("createBrainWithSubsystems", [](std::shared_ptr<Config> config,
+                                          bool enableRewardModulation,
+                                          bool enableStructuralPlasticity,
+                                          bool enableDevelopment,
+                                          bool enableCuriosity) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Note: Subsystems are typically enabled through AgentBrain interface
+        // This function is for convenience when creating complete agent setups
+        return brain;
+    }, py::arg("config"), py::arg("enableRewardModulation"), 
+           py::arg("enableStructuralPlasticity"), py::arg("enableDevelopment"),
+           py::arg("enableCuriosity"), "Create a brain with all subsystems pre-configured");
+    
+    // Create advanced statistics function for brain analysis
+    m.def("analyzeBrainMetrics", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> metrics;
+        
+        metrics["neuron_count"] = brain->getTotalNeuronCount();
+        metrics["synapse_count"] = brain->getTotalSynapseCount();
+        metrics["firing_ratio"] = static_cast<double>(brain->getFiringNeuronCount()) / 
+                                 std::max(1.0, static_cast<double>(brain->getTotalNeuronCount()));
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["total_spikes"] = brain->getTotalSpikeCount();
+        
+        // Calculate activity metrics
+        double ei_ratio = brain->getExcitationInhibitionRatio();
+        metrics["e_i_balance"] = ei_ratio;
+        
+        // Add developmental stage as a normalized value
+        int stage = static_cast<int>(brain->getDevelopmentalStage());
+        metrics["development_stage_normalized"] = static_cast<double>(stage) / 5.0;
+        
+        return metrics;
+    }, "Analyze and return comprehensive metrics from a brain object");

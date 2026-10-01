@@ -78,20 +78,15 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Validate configuration
+    bool validateConfig() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Validate specific key
+    template<typename T>
+    bool validateKey(const std::string& key, const T& expectedValue) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Get configuration errors
+    std::vector<std::string> getValidationErrors() const;
     
 private:
     struct Impl;

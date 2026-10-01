@@ -72,15 +72,48 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Basic Run (Default Configuration)
+
 ```bash
-./nlm_phase6_demo
+# Run with default configuration
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Custom Configuration
+
+```bash
+# Load custom configuration file
+./nlm --config=my_config.cfg
+
+# Alternative syntax
+./nlm --config my_config.cfg
+
+# Override configuration parameters
+./nlm --neuron_count=2000 --simulation_timestep=0.0001
+```
+
+### Command Line Arguments
+
+The NLM executable supports the following command-line options:
+
+| Option | Description |
+|--------|-------------|
+| `--config=file.cfg` or `--config file.cfg` | Load custom configuration file |
+| `--key=value` | Override configuration parameter |
+| `-h, --help` | Show help message |
+| `-v, --version` | Show version information |
+
+Examples:
+
+```bash
+# Load custom config and override parameters
+./nlm --config=experiment.cfg --neuron_count=1000 --max_simulation_steps=5000
+
+# Quick test with minimal configuration
+./nlm --config=test_config.cfg --neuron_count=100
+```
 
 ## Project Structure
 

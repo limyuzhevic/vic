@@ -24,51 +24,83 @@ That's it! NLM simulates all of this.
 
 ## Quick Start (Copy & Paste)
 
-### Example 1: Simplest Brain
+### Example 1: Simplest Brain with Error Handling
 
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+def create_and_run_simple_brain():
+    """Create a simple brain with complete error handling."""
+    try:
+        # Step 1: Make a brain
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        
+        # Step 2: Turn it on
+        brain.initialize()
+        
+        # Step 3: Make it think for 100 steps
+        for i in range(100):
+            brain.step(i)  # One step of thinking
+            
+        print(f"Done! Your brain thought {brain.getTotalSpikeCount()} times")
+        return True
+        
+    except Exception as e:
+        print(f"Error running brain: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+# Run with error handling
+if create_and_run_simple_brain():
+    print("Simulation completed successfully!")
+else:
+    print("Simulation failed!")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World with Error Handling
 
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
+def run_complete_simulation():
+    """Run a complete brain-world simulation with error handling."""
+    try:
+        # Create everything
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+        world.reset()
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Run for 50 steps
+        for step in range(50):
+            world.update(0.1)  # Update world
+            percept = world.getSensoryPercept()  # What does the agent see?
+            agent.processSensoryInput(percept)  # Brain sees it
+            brain.step(step)  # Brain thinks
+            action = agent.decodeMotorCommand()  # Brain decides action
+            world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+        
+        print("Simulation finished!")
+        print("Firing neurons:", brain.getFiringNeuronCount())
+        return True
+        
+    except Exception as e:
+        print(f"Error during simulation: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+# Run with error handling
+if run_complete_simulation():
+    print("Agent simulation completed successfully!")
+else:
+    print("Agent simulation failed!")
 ```
 
 ---
@@ -106,51 +138,122 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ## Common Patterns
 
-### Pattern 1: Run a Simulation
+### Pattern 1: Run a Simulation with Error Handling
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
+def run_simulation_with_error_handling(brain, world, agent, num_steps):
+    """Run a simulation with comprehensive error handling."""
+    try:
+        for step in range(num_steps):
+            try:
+                # 1. Update world
+                world.update(0.1)
+                
+                # 2. Get what the agent sees
+                percept = world.getSensoryPercept()
+                
+                # 3. Tell the brain
+                agent.processSensoryInput(percept)
+                
+                # 4. Brain thinks
+                brain.step(step)
+                
+                # 5. Get action from brain
+                action = agent.decodeMotorCommand()
+                
+                # 6. Do action in world
+                world.applyMotorCommand(action, world.getSimulationTime())
+                
+                # Log statistics periodically
+                if step % 100 == 0:
+                    print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+                    
+            except Exception as e:
+                print(f"Error at step {step}: {e}")
+                print("Continuing to next step...")
+                continue
+                
+        print(f"✓ Simulation completed {num_steps} steps successfully")
+        return True
         
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+    except Exception as e:
+        print(f"❌ Simulation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 # Use it like this:
-run_simulation(brain, world, agent, 1000)
+run_simulation_with_error_handling(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Brain Stats with Error Handling
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+def get_brain_stats_safely(brain, step_number):
+    """Get brain statistics with error handling."""
+    try:
+        # Just add these inside your loop:
+        print(f"Step {step_number}: Neurons firing: {brain.getFiringNeuronCount()}")
+        print(f"Step {step_number}: Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"Step {step_number}: Avg firing rate: {brain.getAverageFiringRate():.2f}")
+        print(f"Step {step_number}: Development stage: {brain.getDevelopmentalStage()}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error getting brain stats: {e}")
+        return False
+
+# Use it like this:
+for step in range(1000):
+    brain.step(step)
+    
+    # Just add these inside your loop:
+    if not get_brain_stats_safely(brain, step):
+        print("Failed to get brain stats - continuing...")
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features with Error Handling
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+def enable_brain_features_safely(agent):
+    """Enable brain features with error handling."""
+    features_enabled = []
+    features_failed = []
+    
+    # These are all optional:
+    feature_configs = [
+        ("Reward Modulation", lambda: agent.enableRewardModulation(True)),
+        ("Structural Plasticity", lambda: agent.enableStructuralPlasticity(True)),
+        ("Development", lambda: agent.enableDevelopment(True)),
+        ("Curiosity", lambda: agent.enableCuriosity(True)),
+    ]
+    
+    for feature_name, enable_func in feature_configs:
+        try:
+            enable_func()
+            features_enabled.append(feature_name)
+            print(f"✓ {feature_name} enabled successfully")
+        except Exception as e:
+            features_failed.append((feature_name, e))
+            print(f"❌ Failed to enable {feature_name}: {e}")
+    
+    print(f"\nFeatures enabled: {len(features_enabled)}")
+    for feature in features_enabled:
+        print(f"  ✓ {feature}")
+        
+    if features_failed:
+        print(f"\nFeatures failed: {len(features_failed)}")
+        for feature, error in features_failed:
+            print(f"  ✗ {feature}: {error}")
+    
+    return len(features_failed) == 0
+
+# Use it like this:
+if enable_brain_features_safely(agent):
+    print("All features enabled successfully!")
+else:
+    print("Some features failed to enable - check logs above")
 ```
 
 ---
@@ -287,11 +390,50 @@ print("Agent simulation complete!")
 
 ---
 
+### Command Line Usage
+
+When running the NLM executable from the command line, you can customize the brain configuration:
+
+```bash
+# Run with default configuration
+./nlm
+
+# Load custom configuration file
+./nlm --config=my_config.cfg
+
+# Override configuration parameters
+./nlm --neuron_count=2000 --simulation_timestep=0.0001
+
+# Show help information
+./nlm --help
+```
+
+The command line supports:
+
+| Option | Description |
+|--------|-------------|
+| `--config=file.cfg` or `--config file.cfg` | Load custom configuration file |
+| `--key=value` | Override configuration parameter |
+| `-h, --help` | Show help message |
+
+Examples:
+
+```bash
+# Quick test with minimal configuration
+./nlm --config=test_config.cfg --neuron_count=100
+
+# Run a larger brain with custom settings
+./nlm --config=experiment.cfg --neuron_count=5000 --max_simulation_steps=10000
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+
 
 That's it! You're now ready to use NLM.

@@ -326,6 +326,32 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Show help if requested
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h") {
+            printBanner();
+            std::cout << R"(
+Usage: nlm [--config=file.cfg|--config file.cfg] [--key=value] [other args]
+
+Options:
+  --config=file.cfg or --config file.cfg    Load custom configuration file
+  --key=value                                Set configuration key
+  -h, --help                                 Show this help message
+  -v, --version                              Show version information
+
+Examples:
+  nlm                                     Run with default config
+  nlm --config=my_config.cfg               Load custom config
+  nlm --neuron_count=2000                  Override neuron count
+  nlm --simulation_timestep=0.0001         Override timestep
+
+All other command line arguments in --key=value format will override
+configuration values loaded from the config file.
+)";
+            return 0;
+        }
+    }
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -360,11 +386,48 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
+    }
+    
+    // Validate configuration before using it
+    if (!config->validateConfig()) {
+        auto errors = config->getValidationErrors();
+        NLM_LOG_ERROR("Configuration validation failed:");
+        for (const auto& error : errors) {
+            NLM_LOG_ERROR("  " + error);
+        }
+        NLM_LOG_ERROR("Using default configuration instead.");
+        config->clear();
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Set default values for Phase 2
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
