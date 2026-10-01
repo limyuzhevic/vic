@@ -99,6 +99,17 @@ python -m build
 pip install dist/*.whl
 ```
 
+### Installing with Enhanced Python Bindings
+
+For the enhanced Python bindings (context managers, property-based access, etc.):
+
+```bash
+# Install with enhanced features
+pip install -e .  # Development mode with immediate access to enhancements
+```
+
+> **Note**: The enhanced Python bindings are available when using the modern installation methods via `pyproject.toml`. The enhanced features include context managers, property-based access, helper functions, and more Pythonic interfaces.
+
 ### Verifying Installation
 
 ```python
@@ -184,76 +195,168 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+---
+
+## Part 3.1: Enhanced Python API Features
+
+The NLM Python bindings now include enhanced features for a more Pythonic experience:
+
+### Context Managers for Automatic Resource Management
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
+# Create and use with automatic cleanup
+with pynlm.createBrain(pynlm.createDevelopmentConfig()) as brain:
     brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
+    # Brain state automatically reset on exit
+    for step in range(100):
         brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+    # Automatic cleanup when done
 
-# Run the simulation
-run_agent_simulation(1000)
+# World context manager
+with pynlm.createSimpleWorld() as world:
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    # World automatically reset on exit
+```
+
+### Property-Based Access
+
+Access attributes using Python properties for cleaner code:
+
+```python
+import pynlm
+
+config = pynlm.createDevelopmentConfig()
+print(f"Brain neurons: {config.brain_neuron_count_per_region}")  # Property access
+print(f"World width: {config.world_width}")
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+print(f"Total neurons: {brain.total_neuron_count}")  # Property access
+print(f"Firing neurons: {brain.firing_neuron_count}")
+```
+
+### Enhanced Factory Functions
+
+Create optimized configurations for different use cases:
+
+```python
+import pynlm
+
+# Development configuration (learning-focused)
+development_config = pynlm.createDevelopmentConfig()
+
+# Production configuration (stability-focused)
+production_config = pynlm.createProductionConfig()
+
+# Minimal configuration (quick testing)
+minimal_config = pynlm.createMinimalConfig()
+
+# All provide sensible defaults for specific use cases
+```
+
+### Helper Functions for Common Workflows
+
+High-level utilities for common tasks:
+
+```python
+import pynlm
+import numpy as np
+
+# Normalize sensory inputs
+normalized_data = pynlm.normalizeSensoryInput(sensor_readings, 0.0, 100.0)
+
+# Run complete simulation with helper functions
+def run_simulation(brain, world, max_steps=1000):
+    def step_callback(step, time):
+        print(f"Step {step}")
+        return True
+    
+    def action_callback(action):
+        world.applyMotorCommand(action, world.getSimulationTime())
+    
+    pynlm.runSimulationLoop(brain, world, max_steps, 0.1, step_callback, action_callback)
+
+# Validate configurations
+if not pynlm.validateConfig(config):
+    print("Configuration has errors!")
+```
+
+### Checkpoint Management
+
+Save and load brain states:
+
+```python
+import pynlm
+
+# Save a checkpoint
+brain = pynlm.createBrain(pynlm.createDevelopmentConfig())
+brain.initialize()
+pynlm.saveBrainCheckpoint(brain, "my_brain.pkl")
+
+# Load checkpoint
+loaded_brain = pynlm.createBrain(pynlm.createDevelopmentConfig())
+pynlm.loadBrainCheckpoint(loaded_brain, "my_brain.pkl")
+loaded_brain.initialize()
+```
+
+### Complete Example with Enhanced API
+
+```python
+import pynlm
+import numpy as np
+
+def enhanced_agent_simulation():
+    """Run an agent simulation using the enhanced Python API."""
+    
+    # Create development configuration
+    config = pynlm.createDevelopmentConfig()
+    
+    # Use context managers for automatic cleanup
+    with pynlm.createBrain(config) as brain:
+        brain.initialize()
+        
+        world = pynlm.createSimpleWorld()
+        with world:  # Auto reset on exit
+            world.configure(100, 100, 20, 20)
+            world.setAgentStart(50, 50)
+            
+            agent = pynlm.createAgentBrain(brain)
+            with agent:  # Auto reset on exit
+                agent.initialize(world)
+                agent.enableRewardModulation(True)
+                agent.enableCuriosity(True)
+                
+                # Run simulation using enhanced helper functions
+                def process_episode(step, time):
+                    # Get sensory input
+                    percept = world.getSensoryPercept()
+                    
+                    # Process with agent
+                    agent.processSensoryInput(percept)
+                    brain.step(step, time)
+                    
+                    # Choose action
+                    action = agent.decodeMotorCommand()
+                    world.applyMotorCommand(action, time)
+                    
+                    # Print progress
+                    if step % 50 == 0:
+                        print(f"Step {step}: {brain.firing_neuron_count} neurons firing")
+                    
+                    return step < 1000  # Run for 1000 steps
+                
+                def handle_action(action):
+                    world.applyMotorCommand(action, world.getSimulationTime())
+                
+                pynlm.runSimulationLoop(brain, world, 1000, 0.1, process_episode, handle_action)
+    
+    return "Simulation complete!"
+
+# Run enhanced simulation
+result = enhanced_agent_simulation()
+print(result)
 ```
 
 ### Key Classes and Methods
