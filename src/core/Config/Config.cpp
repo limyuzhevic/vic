@@ -6,17 +6,20 @@
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// Config class implementation
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : entries_() {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : entries_(std::move(other.entries_)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        entries_ = std::move(other.entries_);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -84,7 +87,7 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
+    for (const auto& entry : entries_) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
@@ -94,10 +97,10 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+    auto it = std::find_if(entries_.begin(), entries_.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
-    if (it == pImpl->entries.end()) {
+    if (it == entries_.end()) {
         return std::nullopt;
     }
     
@@ -115,14 +118,14 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+    auto it = std::find_if(entries_.begin(), entries_.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
-    if (it != pImpl->entries.end()) {
+    if (it != entries_.end()) {
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        entries_.emplace_back(key, value, source);
     }
 }
 
@@ -143,35 +146,35 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+    return std::any_of(entries_.begin(), entries_.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
+    entries_.erase(
+        std::remove_if(entries_.begin(), entries_.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
+        entries_.end()
     );
 }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
+    keys.reserve(entries_.size());
+    for (const auto& entry : entries_) {
         keys.push_back(entry.key);
     }
     return keys;
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    entries_.clear();
 }
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
+    oss << "Configuration (" << entries_.size() << " entries):\n";
+    for (const auto& entry : entries_) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;

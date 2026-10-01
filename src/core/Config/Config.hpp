@@ -92,14 +92,17 @@ public:
     
     // Get configuration summary
     std::string summary() const;
-    
+
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Member variables directly in class (instead of PIMPL)
+    std::vector<ConfigEntry> entries_;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Private constructor for global instance management
+    explicit Config(size_t initialCapacity = 0) : entries_(initialCapacity) {}
 };
 
 } // namespace nlm

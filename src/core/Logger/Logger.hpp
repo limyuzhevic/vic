@@ -57,8 +57,11 @@ public:
     void closeOutputFile();
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Member variables directly in class (instead of PIMPL)
+    LogLevel level_ = LogLevel::Info;
+    bool useColors_ = true;
+    std::ofstream fileOut_;
+    std::mutex mutex_;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;
@@ -105,8 +108,9 @@ public:
     static void setGlobal(std::shared_ptr<Logger> logger);
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Member variables directly in class (instead of PIMPL)
+    std::vector<std::shared_ptr<ILogger>> loggers_;
+    mutable std::mutex mutex_;
 };
 
 // Convenience macro for file/line/function info
