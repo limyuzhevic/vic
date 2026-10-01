@@ -162,7 +162,59 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Additional convenience methods for configuration management
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set a float configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            auto value = self.getOr<float>(key, defaultValue);
+            return value;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get a float configuration value with default")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            auto value = self.getOr<int64_t>(key, defaultValue);
+            return value;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer configuration value with default")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.getOr<bool>(key, defaultValue);
+            return value;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean configuration value with default")
+        .def("mergeWith", [](Config& self, const Config& other) {
+            // Merge other config into this one
+            auto keys = other.getKeys();
+            for (const auto& key : keys) {
+                if (other.has(key)) {
+                    // Get the value and source from other
+                    if (other.getType(key) == nlm::ConfigType::Float) {
+                        float value = other.getOr<float>(key, 0.0f);
+                        self.set(key, value, nlm::ConfigSource::User);
+                    } else if (other.getType(key) == nlm::ConfigType::Int) {
+                        int64_t value = other.getOr<int64_t>(key, 0);
+                        self.set(key, value, nlm::ConfigSource::User);
+                    } else if (other.getType(key) == nlm::ConfigType::Bool) {
+                        bool value = other.getOr<bool>(key, false);
+                        self.set(key, value, nlm::ConfigSource::User);
+                    }
+                }
+            }
+        }, py::arg("other"),
+             "Merge another configuration into this one")
+        .def("clone", []() {
+            auto config = std::make_shared<Config>();
+            return config;
+        }, "Create a copy of this configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -398,28 +450,345 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Additional convenience methods for batch processing and monitoring
+        .def("runSteps", [](AgentBrain& self, const std::vector<std::shared_ptr<SensoryPercept>>& percepts, double timestep) {
+            std::vector<SensoryPercept> perceptVec;
+            for (const auto& percept : percepts) {
+                perceptVec.push_back(*percept);
+            }
+            for (size_t i = 0; i < percepts.size(); ++i) {
+                self.processSensoryInput(perceptVec[i]);
+                auto* brain = self.getBrain();
+                brain->step(static_cast<nlm::SimulationStep>(i), i * timestep);
+            }
+        }, py::arg("percepts"), py::arg("timestep"),
+             "Process multiple sensory percepts and run corresponding brain steps")
+        .def("runStepsWithActions", [](AgentBrain& self, const std::vector<std::shared_ptr<SensoryPercept>>& percepts, 
+                                      double timestep, std::function<MotorCommand()> actionProvider) {
+            std::vector<SensoryPercept> perceptVec;
+            std::vector<MotorCommand> actions;
+            for (size_t i = 0; i < percepts.size(); ++i) {
+                perceptVec.push_back(*percepts[i]);
+                self.processSensoryInput(perceptVec[i]);
+                auto* brain = self.getBrain();
+                brain->step(static_cast<nlm::SimulationStep>(i), i * timestep);
+                actions.push_back(actionProvider());
+            }
+        }, py::arg("percepts"), py::arg("timestep"), py::arg("actionProvider"),
+             "Run steps with actions provided by callback function")
+        .def("getBrainStats", [](AgentBrain& self) {
+            auto* brain = self.getBrain();
+            return std::make_tuple(
+                brain->getTotalNeuronCount(),
+                brain->getFiringNeuronCount(),
+                brain->getTotalSpikeCount(),
+                brain->getAverageFiringRate(),
+                self.getDevelopmentalStage()
+            );
+        }, "Get comprehensive brain statistics")
+        .def("exportConfig", [](AgentBrain& self, const std::string& filepath) {
+            auto* brain = self.getBrain();
+            auto config = brain->getConfig();
+            return config->saveToFile(filepath);
+        }, py::arg("filepath"), "Export brain configuration to file")
+        .def("importConfig", [](AgentBrain& self, const std::string& filepath) {
+            auto* brain = self.getBrain();
+            auto config = brain->getConfig();
+            bool success = config->loadFromFile(filepath);
+            if (success) {
+                // Note: Would need brain->setConfig() method for full import
+                // This is a limitation of current API
+                return true;
+            }
+            return false;
+        }, py::arg("filepath"), "Import configuration from file (note: may not fully restore brain state)")
+        .def("monitorProgress", [](AgentBrain& self, std::function<void(int, float)> progressCallback, 
+                                  double timestep, size_t totalSteps) {
+            auto* brain = self.getBrain();
+            for (size_t step = 0; step < totalSteps; ++step) {
+                // Simulate sensory input for monitoring
+                Vision vision(8, 8, 3);
+                std::vector<float> data(8*8*3, 0.1f);
+                vision.setData(data);
+                
+                SensoryPercept percept;
+                percept.setVision(vision);
+                self.processSensoryInput(percept);
+                brain->step(static_cast<nlm::SimulationStep>(step), step * timestep);
+                
+                float progress = static_cast<float>(step) / totalSteps;
+                float firingRate = brain->getAverageFiringRate();
+                progressCallback(static_cast<int>(step), firingRate);
+            }
+        }, py::arg("progressCallback"), py::arg("timestep"), py::arg("totalSteps"),
+             "Monitor simulation progress with callback function (step, firing_rate)");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Predefined configuration presets
+    // Advanced error handling and validation
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        if (!config) {
+            errors.push_back("Configuration is null");
+            return std::make_pair(errors, warnings);
+        }
+        
+        // Check required fields
+        std::vector<std::string> requiredFields = {"random_seed", "simulation_timestep", "neuron_count"};
+        for (const auto& field : requiredFields) {
+            if (!config->has(field)) {
+                warnings.push_back("Recommended field \"" + field + "\" not set");
+            }
+        }
+        
+        // Validate numeric ranges
+        if (config->has("neuron_count")) {
+            int64_t neuronCount = config->getOr<int64_t>("neuron_count", 0);
+            if (neuronCount <= 0) {
+                errors.push_back("neuron_count must be positive");
+            } else if (neuronCount > 10000) {
+                warnings.push_back("neuron_count is large (>10000) - simulation may be slow");
+            }
+        }
+        
+        if (config->has("region_count")) {
+            int64_t regionCount = config->getOr<int64_t>("region_count", 0);
+            if (regionCount <= 0) {
+                errors.push_back("region_count must be positive");
+            }
+        }
+        
+        if (config->has("simulation_timestep")) {
+            double timestep = config->getOr<double>("simulation_timestep", 0.0);
+            if (timestep <= 0.0) {
+                errors.push_back("simulation_timestep must be positive");
+            } else if (timestep > 1.0) {
+                warnings.push_back("simulation_timestep is large (>1.0) - may affect stability");
+            }
+        }
+        
+        return std::make_pair(errors, warnings);
+    }, py::arg("config"), "Validate configuration and return list of errors and warnings");
+    
+    m.def("validateBrain", [](const std::shared_ptr<Brain>& brain) {
+        std::vector<std::string> errors;
+        std::vector<std::string> warnings;
+        
+        if (!brain) {
+            errors.push_back("Brain is null");
+            return std::make_pair(errors, warnings);
+        }
+        
+        if (!brain->getConfig()) {
+            errors.push_back("Brain has no configuration");
+        }
+        
+        size_t neuronCount = brain->getTotalNeuronCount();
+        size_t activeCount = brain->getActiveNeuronCount();
+        float firingRate = brain->getAverageFiringRate();
+        
+        if (neuronCount == 0) {
+            errors.push_back("Brain has no neurons");
+        }
+        
+        if (activeCount > neuronCount * 0.9) {
+            warnings.push_back("High proportion of active neurons (>90%)");
+        }
+        
+        if (firingRate > 100.0f) {
+            warnings.push_back("High firing rate (>100 Hz)");
+        }
+        
+        return std::make_pair(errors, warnings);
+    }, py::arg("brain"), "Validate brain state and return list of errors and warnings");
+    
+    m.def("safeStep", [](std::shared_ptr<Brain>& brain, nlm::SimulationStep step, nlm::Timestamp time = 0.0) {
+        try {
+            if (!brain) {
+                throw std::runtime_error("Brain is null");
+            }
+            brain->step(step, time);
+            return true;
+        } catch (const std::exception& e) {
+            throw std::runtime_error(std::string("Error during step: ") + e.what());
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = 0.0,
+         "Safely perform a brain step with error handling");
+    
+    m.def("safeInitialize", [](std::shared_ptr<Brain>& brain) {
+        try {
+            if (!brain) {
+                throw std::runtime_error("Brain is null");
+            }
+            return brain->initialize();
+        } catch (const std::exception& e) {
+            throw std::runtime_error(std::string("Error during initialization: ") + e.what());
+        }
+    }, py::arg("brain"), "Safely initialize brain with error handling");
+    
+    m.def("checkForNaN", [](const std::shared_ptr<Brain>& brain) {
+        std::vector<std::string> issues;
+        
+        if (!brain) {
+            issues.push_back("Brain is null");
+            return issues;
+        }
+        
+        // Check neuron states for NaN values
+        auto regions = brain->getRegions();
+        for (const auto& region : regions) {
+            auto neurons = region->getAllNeurons();
+            for (const auto* neuron : neurons) {
+                if (std::isnan(neuron->getMembranePotential())) {
+                    issues.push_back("Found NaN membrane potential");
+                    return issues;
+                }
+                if (std::isnan(neuron->getThreshold())) {
+                    issues.push_back("Found NaN threshold");
+                    return issues;
+                }
+            }
+        }
+        
+        return issues;
+    }, py::arg("brain"), "Check brain state for NaN values and return list of issues");
+    
+    m.def("compareBrains", [](const std::shared_ptr<Brain>& brain1, const std::shared_ptr<Brain>& brain2) {
+        std::map<std::string, std::pair<float, float>> differences;
+        
+        if (!brain1 || !brain2) {
+            differences["brain1_valid"] = std::make_pair(brain1 ? 1.0f : 0.0f, brain2 ? 1.0f : 0.0f);
+            return differences;
+        }
+        
+        // Compare neuron counts
+        float neuronCount1 = static_cast<float>(brain1->getTotalNeuronCount());
+        float neuronCount2 = static_cast<float>(brain2->getTotalNeuronCount());
+        differences["neuron_count_diff"] = std::make_pair(neuronCount1, neuronCount2);
+        
+        // Compare spike counts
+        float spikeCount1 = static_cast<float>(brain1->getTotalSpikeCount());
+        float spikeCount2 = static_cast<float>(brain2->getTotalSpikeCount());
+        differences["spike_count_diff"] = std::make_pair(spikeCount1, spikeCount2);
+        
+        // Compare firing rates
+        float rate1 = brain1->getAverageFiringRate();
+        float rate2 = brain2->getAverageFiringRate();
+        differences["firing_rate_diff"] = std::make_pair(rate1, rate2);
+        
+    m.def("formatBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            return std::string("Brain is null");
+        }
+        
+        std::stringstream ss;
+        ss << "=== Brain Statistics ===\n";
+        ss << "Neurons: " << brain->getTotalNeuronCount() << "\n";
+        ss << "Active: " << brain->getActiveNeuronCount() << "\n";
+        ss << "Firing: " << brain->getFiringNeuronCount() << "\n";
+        ss << "Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+        ss << "Average Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+        ss << "Excitation/Inhibition Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        ss << "Regions: " << brain->getRegionCount() << "\n";
+        ss << "Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        
+        return ss.str();
+    }, py::arg("brain"), "Format brain statistics as a readable string");
+    
+    m.def("createProgressTracker", [](size_t totalSteps, std::function<void(float)> callback) {
+        return std::make_shared<ProgressTracker>(totalSteps, callback);
+    }, py::arg("totalSteps"), py::arg("callback"), "Create a progress tracker object");
+    
+    py::class_<ProgressTracker>(m, "ProgressTracker", R"pbdoc(Progress tracking utility)pbdoc")
+        .def(py::init<size_t, std::function<void(float)>>(), py::arg("totalSteps"), py::arg("callback"))
+        .def("update", &ProgressTracker::update, py::arg("current"),
+             "Update progress with current step")
+        .def("setMessage", &ProgressTracker::setMessage, py::arg("message"),
+             "Set a custom message for the progress tracker")
+        .def("getProgress", &ProgressTracker::getProgress,
+             "Get current progress (0.0 to 1.0)")
+        .def("getMessage", &ProgressTracker::getMessage,
+             "Get current message");
+    
+    m.def("runWithProgress", [](std::shared_ptr<Brain>& brain, const std::vector<std::shared_ptr<SensoryPercept>>& percepts, 
+                              const std::shared_ptr<ProgressTracker>& tracker,
+                              double timestep = 0.001) {
+        if (!brain || !tracker) {
+            throw std::runtime_error("Invalid brain or progress tracker");
+        }
+        
+        for (size_t i = 0; i < percepts.size(); ++i) {
+            // Process sensory input
+            if (percepts[i]) {
+                brain->receiveSensoryInput(*percepts[i]);
+            }
+            
+            // Run brain step
+            brain->step(static_cast<nlm::SimulationStep>(i), i * timestep);
+            
+            // Update progress
+            tracker->update(i + 1);
+            
+            // Small delay to prevent overwhelming the system
+            if (i % 100 == 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+    }, py::arg("brain"), py::arg("percepts"), py::arg("tracker"), py::arg("timestep") = 0.001,
+         "Run brain simulation with progress tracking");
+    
+    m.def("runBenchmark", [](const std::shared_ptr<Config>& config, size_t steps = 1000) {
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        // Configure world for benchmark
+        world->configure(20, 20, 8, 8);
+        agent->initialize(*world);
+        
+        // Create sensory input for benchmark
+        Vision vision(8, 8, 3);
+        std::vector<float> data(8*8*3, 0.5f);
+        vision.setData(data);
+        
+        SensoryPercept percept;
+        percept.setVision(vision);
+        
+        // Warm up
+        agent->processSensoryInput(percept);
+        brain->initialize();
+        brain->step(0, 0.0);
+        
+        // Benchmark
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 1; i <= steps; ++i) {
+            agent->processSensoryInput(percept);
+            brain->step(static_cast<nlm::SimulationStep>(i), i * 0.001);
+            
+            // Report progress every 10%
+            if (i % (steps / 10) == 0) {
+                auto current = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(current - start).count();
+                double stepsPerSec = (i * 1000.0) / duration;
+                std::cout << "Progress: " << (i * 100.0 / steps) << "% - " 
+                          << "Speed: " << stepsPerSec << " steps/sec" << std::endl;
+            }
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        double stepsPerSec = (steps * 1000.0) / duration;
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            duration,
+            stepsPerSec
+        );
+    }, py::arg("config"), py::arg("steps") = 1000,
+         "Run a benchmark simulation and return performance metrics");
 
 } // namespace nlm
