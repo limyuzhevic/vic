@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Build options
+option(BUILD_ENHANCED_BINDINGS "Build enhanced Python bindings with Pythonic API" ON)
+option(BUILD_EXAMPLES "Build demonstration examples" ON)
+option(BUILD_TESTS "Build test suite" ON)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
