@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class PerformanceMonitor;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -193,9 +194,30 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== PERFORMANCE MONITORING ==========
+    
+    // Get performance metrics from the performance monitor
+    PerformanceMonitor::PerformanceMetrics getPerformanceMetrics() const;
+    
+    // Print performance report
+    void printPerformanceReport() const;
+    
+    // Print memory report
+    void printMemoryReport() const;
+    
+    // Print neural activity report
+    void printNeuralActivityReport() const;
+    
+    // Print memory system report
+    void printMemorySystemReport() const;
+    
+    // Print cognitive system report
+    void printCognitiveSystemReport() const;
+    
+    // Reset performance monitoring
+    void resetPerformanceMonitoring();
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm

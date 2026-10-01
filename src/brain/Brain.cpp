@@ -1,4 +1,4 @@
-#include "Brain.hpp"
+#include "../performance/PerformanceMonitor.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -78,6 +78,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Performance monitoring system
+    std::unique_ptr<PerformanceMonitor> performanceMonitor;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -151,6 +154,10 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize performance monitoring system
+        performanceMonitor = std::make_unique<PerformanceMonitor>();
+        performanceMonitor->initialize();
     }
     
     DevelopmentalStage developmentalStage;
@@ -403,6 +410,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Collect active neurons as working memory content
+        std::vector<NeuronId> activeNeurons;
+        std::vector<float> activations;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        activeNeurons.push_back(neuron->getId());
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        activations.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Store in working memory (using correct API)
+        if (!activeNeurons.empty() && !activations.empty()) {
+            // Working memory expects pattern vector, so combine activations
+            std::vector<float> pattern;
+            pattern.reserve(activations.size());
+            for (float act : activations) {
+                pattern.push_back(act);
+            }
+            pImpl->workingMemory->store(pattern, 1.0f);
+        }
+        
+        // Update working memory dynamics
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -513,6 +549,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +563,46 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+// ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract current brain state as pattern for concept learning
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                    currentPattern.push_back(activation);
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Extract simple features from pattern (for concept formation)
+            std::vector<float> features;
+            size_t patternSize = currentPattern.size();
+            if (patternSize >= 3) {
+                // Compute simple statistics: mean, variance, max
+                float sum = std::accumulate(currentPattern.begin(), currentPattern.end(), 0.0f);
+                float mean = sum / patternSize;
+                float variance = 0.0f;
+                for (float val : currentPattern) {
+                    float diff = val - mean;
+                    variance += diff * diff;
+                }
+                variance /= patternSize;
+                float max = *std::max_element(currentPattern.begin(), currentPattern.end());
+                float min = *std::min_element(currentPattern.begin(), currentPattern.end());
+                
+                features.push_back(mean);
+                features.push_back(variance);
+                features.push_back(max);
+                features.push_back(min);
+            }
+            
+            // Present current neural state to concept formation system
+            pImpl->conceptFormation->presentExperience(currentPattern, features, 0.0f, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -585,6 +658,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // Update performance monitoring
+    if (pImpl->performanceMonitor) {
+        // Collect current performance metrics
+        PerformanceMonitor::PerformanceMetrics& metrics = pImpl->performanceMonitor->getMetrics();
+        
+        // Update neural statistics
+        metrics.totalSpikes = getTotalSpikeCount();
+        metrics.activeNeurons = getActiveNeuronCount();
+        metrics.totalSynapses = getTotalSynapseCount();
+        metrics.pendingSpikes = getPendingSpikeEventCount();
+        
+        // Update memory system statistics
+        if (pImpl->workingMemory) {
+            metrics.workingMemorySize = pImpl->workingMemory->getActiveTraces();
+        }
+        if (pImpl->episodicMemory) {
+            metrics.episodicMemoryCount = pImpl->episodicMemory->getEpisodeCount();
+        }
+        
+        // Update cognitive system statistics
+        if (pImpl->conceptFormation) {
+            metrics.conceptCount = pImpl->conceptFormation->getConcepts().size();
+        }
+        
+        // Update performance metrics
+        metrics.averageFiringRate = getAverageFiringRate();
+        
+        // Calculate memory utilization (working memory / capacity)
+        if (pImpl->workingMemory) {
+            size_t capacity = pImpl->workingMemory->getCapacity();
+            if (capacity > 0) {
+                metrics.memoryUtilization = static_cast<float>(metrics.workingMemorySize) / capacity;
+            }
+        }
+        
+        // Calculate plasticity rate based on recent changes
+        // This is a simplified calculation - in a real system you'd track actual plasticity events
+        metrics.plasticityRate = 0.0f;
+        if (pImpl->stdp) {
+            // Check STDP activity (simplified)
+            metrics.plasticityRate += 0.001f; // Base STDP rate
+        }
+        if (pImpl->hebbian) {
+            // Check Hebbian activity (simplified)
+            metrics.plasticityRate += 0.001f; // Base Hebbian rate
+        }
+        
+        // Update the performance monitor
+        pImpl->performanceMonitor->update();
     }
 }
 
@@ -689,10 +813,115 @@ size_t Brain::getPendingSpikeEventCount() const {
     return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
 }
 
-std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+// ========== PERFORMANCE MONITORING ACCESSORS ==========
+
+// Get performance metrics from the performance monitor
+PerformanceMonitor::PerformanceMetrics Brain::getPerformanceMetrics() const {
+    PerformanceMonitor::PerformanceMetrics metrics;
     
+    if (pImpl->performanceMonitor) {
+        metrics = pImpl->performanceMonitor->getMetrics();
+    } else {
+        // If performance monitor is not available, return default values
+        metrics.totalSpikes = getTotalSpikeCount();
+        metrics.activeNeurons = getActiveNeuronCount();
+        metrics.totalSynapses = getTotalSynapseCount();
+        metrics.averageFiringRate = getAverageFiringRate();
+        metrics.pendingSpikes = getPendingSpikeEventCount();
+    }
+    
+    return metrics;
+}
+
+// Print performance report
+void Brain::printPerformanceReport() const {
+    if (pImpl->performanceMonitor) {
+        std::string report = pImpl->performanceMonitor->getPerformanceReport();
+        std::cout << report << std::endl;
+    } else {
+        std::cout << "Performance monitoring not available." << std::endl;
+    }
+}
+
+// Print memory report
+void Brain::printMemoryReport() const {
+    if (pImpl->performanceMonitor) {
+        std::string report = pImpl->performanceMonitor->getMemoryReport();
+        std::cout << report << std::endl;
+    } else {
+        std::cout << "Performance monitoring not available." << std::endl;
+    }
+}
+
+// Print neural activity report
+void Brain::printNeuralActivityReport() const {
+    if (pImpl->performanceMonitor) {
+        std::string report = pImpl->performanceMonitor->getNeuralActivityReport();
+        std::cout << report << std::endl;
+    } else {
+        std::cout << "Performance monitoring not available." << std::endl;
+    }
+}
+
+// Print memory system report
+void Brain::printMemorySystemReport() const {
+    if (pImpl->performanceMonitor) {
+        std::string report = pImpl->performanceMonitor->getMemorySystemReport();
+        std::cout << report << std::endl;
+    } else {
+        std::cout << "Performance monitoring not available." << std::endl;
+    }
+}
+
+// Print cognitive system report
+void Brain::printCognitiveSystemReport() const {
+    if (pImpl->performanceMonitor) {
+        std::string report = pImpl->performanceMonitor->getCognitiveSystemReport();
+        std::cout << report << std::endl;
+    } else {
+        std::cout << "Performance monitoring not available." << std::endl;
+    }
+}
+
+// Reset performance monitoring
+void Brain::resetPerformanceMonitoring() {
+    if (pImpl->performanceMonitor) {
+        pImpl->performanceMonitor->reset();
+    }
+}
+    // Improved action selection using NeuralPlanner
+    // The NeuralPlanner evaluates action sequences based on learned predictions
+    // and current neural state to select the most appropriate action
+    
+    if (pImpl->planner) {
+        // Extract current neural state for planning
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                    currentState.push_back(activation);
+                }
+            }
+        }
+        
+        if (!currentState.empty()) {
+            // Get current goal from NeuralPlanner
+            std::vector<float> goal = pImpl->planner->getCurrentGoal();
+            if (goal.empty()) {
+                // Default goal: maintain stability
+                goal = std::vector<float>(currentState.size(), 0.5f);
+            }
+            
+            // Let NeuralPlanner evaluate the best action
+            ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+            
+            // Create action from planned action
+            return std::make_unique<Action>(plannedAction);
+        }
+    }
+    
+    // Fallback: use simple motor neuron activity as before
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -705,15 +934,13 @@ std::unique_ptr<class Action> Brain::produceAction() {
         }
     }
     
-    // Return a simple action
+    // Return a simple action based on motor activity
     ActionType type = ActionType::Wait;
     if (firingMotor > 0) {
         type = ActionType::MoveForward;
     }
     
-    auto action = std::make_unique<Action>(type);
-    
-    return action;
+    return std::make_unique<Action>(type);
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
