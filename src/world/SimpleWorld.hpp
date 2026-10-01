@@ -2,6 +2,7 @@
 
 #include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
+#include "../agent/Action.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,6 +27,28 @@ struct WorldObject {
         : x(px), y(py), radius(r), type(t), value(v), active(true) {}
 };
 
+// Configuration structure for advanced world settings
+struct WorldConfig {
+    float width = 20.0f;
+    float height = 20.0f;
+    size_t visionWidth = 16;
+    size_t visionHeight = 16;
+    float maxEnergy = 100.0f;
+    float energyDecayRate = 0.01f;
+    float resourceEnergyGain = 30.0f;
+    float hazardDamage = 0.2f;
+    float movementSpeed = 3.0f;
+    float turnSpeed = 2.0f;
+    float visionFOV = M_PI / 2.0f;  // 90 degree FOV
+    float visionMaxRange = 8.0f;
+    float interactionRange = 1.0f;
+    bool enableWalls = false;
+    size_t resourceCount = 5;
+    size_t hazardCount = 3;
+    
+    WorldConfig() = default;
+};
+
 // Simple 2D world for NLM development
 // Provides sensory experience without semantic labels
 class SimpleWorld {
@@ -36,11 +59,17 @@ public:
     // Configuration
     void configure(float width, float height, size_t visionWidth, size_t visionHeight);
     
+    // Advanced configuration with validation
+    void configureAdvanced(const WorldConfig& config);
+    
     // Reset world to initial state
     void reset();
     
     // Set agent starting position
     void setAgentStart(float x, float y);
+    
+    // Set agent starting position with validation
+    void setAgentStartSafe(float x, float y);
     
     // Update world state (call each simulation step)
     void update(double timestep);
@@ -70,11 +99,24 @@ public:
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
     
-    // Energy settings
+    // Energy system
     float getMaxEnergy() const { return maxEnergy_; }
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    float getHazardDamage() const { return hazardDamage_; }
+    
+    // Movement parameters
+    float getMovementSpeed() const { return movementSpeed_; }
+    float getTurnSpeed() const { return turnSpeed_; }
+    
+    // Vision parameters
+    float getVisionFOV() const { return visionFOV_; }
+    float getVisionMaxRange() const { return visionMaxRange_; }
+    float getInteractionRange() const { return interactionRange_; }
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
     
     // Time
     double getSimulationTime() const { return simTime_; }
@@ -83,28 +125,77 @@ public:
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
     
+    // Object management
+    size_t getObjectCount() const { return objects_.size(); }
+    std::vector<WorldObject>& getObjects() { return objects_; }
+    
+    // Status checks
+    bool isPositionOccupied(float x, float y) const;
+    bool isAgentSafe(float x, float y) const;
+    float getAgentEnergyPercentage() const { return agent_.energy / maxEnergy_; }
+    
+    // Configuration helpers
+    bool validateConfig(const WorldConfig& config) const;
+    void printConfig() const;
+    
+    // Statistics and diagnostics
+    void logWorldStatus() const;
+    std::string getWorldInfo() const;
+    
+    // Reset object generation seed
+    void setObjectGenerationSeed(uint64_t seed) { objectGenerationSeed_ = seed; }
+    
 private:
-    // Generate vision from current view
+    // Enhanced generateVision with configurable parameters
     void generateVision();
     
-    // Check for collisions
+    // Check for collisions with enhanced detection
     void checkCollisions();
     
     // Interact with nearby objects
     ActionResult interact();
     
+    // Object generation with configurable parameters
+    void generateResources();
+    void generateHazards();
+    void generateWalls();
+    void generateObjects(WorldObjectType type, size_t count, float value, float radius);
+    
+    // Validation and safety checks
+    bool validateObjectPosition(float x, float y) const;
+    bool isWithinWorldBounds(float x, float y) const;
+    
+    // Enhanced random generation with thread safety
+    float generateRandomFloat(float min, float max) const;
+    float generateRandomFloatWeighted(float min, float max, float weight) const;
+    
+    // Collision detection
+    bool checkCollisionWithObject(float x, float y, const WorldObject& obj) const;
+    
+    // Movement with enhanced physics
+    void applyMovement(double timestep, float maxSpeed);
+    void applyRotation(double timestep, float maxAngularSpeed);
+    
+    // Energy and health management
+    void updateEnergy(double timestep);
+    void updateHealth(double timestep);
+    
+    // Vision with enhanced features
+    void generateVisionEnhanced();
+    void generateTouchEnhanced();
+    void generateInternalEnhanced();
+    void generateProprioceptionEnhanced();
+    
+    // Statistics tracking
+    void updateStatistics();
+    void resetStatistics();
+    
+    // Configuration
+    void applyConfig(const WorldConfig& config);
+    
     // World geometry
     float width_;
     float height_;
-    
-    // Agent
-    AgentBody agent_;
-    
-    // Objects in world
-    std::vector<WorldObject> objects_;
-    
-    // Sensory state
-    SensoryPercept sensory_;
     
     // Vision configuration
     size_t visionWidth_;
@@ -114,6 +205,26 @@ private:
     float maxEnergy_;
     float energyDecayRate_;
     float resourceEnergyGain_;
+    float hazardDamage_;
+    
+    // Movement parameters
+    float movementSpeed_;
+    float turnSpeed_;
+    
+    // Vision parameters
+    float visionFOV_;
+    float visionMaxRange_;
+    float interactionRange_;
+    
+    // Agent
+    AgentBody agent_;
+    double lastEnergyDepletion_;
+    
+    // Objects in world
+    std::vector<WorldObject> objects_;
+    
+    // Sensory state
+    SensoryPercept sensory_;
     
     // Simulation time
     double simTime_;
@@ -121,8 +232,31 @@ private:
     // Random seed
     uint64_t rngSeed_;
     
-    // Simple RNG state
-    uint64_t rngState_;
+    // Enhanced RNG state
+    mutable uint64_t rngState_;
+    uint64_t objectGenerationSeed_;
+    
+    // Statistics
+    struct WorldStatistics {
+        size_t objectsGenerated = 0;
+        size_t objectsConsumed = 0;
+        size_t collisions = 0;
+        float totalEnergyGained = 0.0f;
+        float totalDamageTaken = 0.0f;
+        double lastUpdateTime = 0.0;
+        
+        void reset() {
+            objectsGenerated = 0;
+            objectsConsumed = 0;
+            collisions = 0;
+            totalEnergyGained = 0.0f;
+            totalDamageTaken = 0.0f;
+            lastUpdateTime = 0.0;
+        }
+    };
+    
+    WorldStatistics stats_;
+    
     uint64_t nextRandom();
 };
 

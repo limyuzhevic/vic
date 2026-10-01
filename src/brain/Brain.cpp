@@ -93,6 +93,14 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        initializeCoreSystems();
+        initializeIntegratedSystems();
+        configurePlasticitySystems();
+        configureSimulationParameters();
+        initializeCheckpointManager();
+    }
+    
+    void Impl::initializeCoreSystems() {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
@@ -105,9 +113,9 @@ struct Brain::Impl {
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
+    }
+    
+    void Impl::initializeIntegratedSystems() {
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
@@ -129,29 +137,184 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
     }
+    
+    void Impl::initializeStepHandlers() {
+        // Register spike handlers for event-driven processing
+        spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++totalSpikesThisStep;
+            ++totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            // Find destination neuron and deliver synaptic input
+            for (auto& region : regions) {
+                auto neurons = region->getAllNeurons();
+                for (auto* neuron : neurons) {
+                    if (neuron->getId() == event.destination_neuron) {
+                        // Apply synaptic weight as current
+                        MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                        if (event.is_excitatory) {
+                            neuron->receiveExcitatoryInput(synapticCurrent);
+                        } else {
+                            neuron->receiveInhibitoryInput(-synapticCurrent);
+                        }
+                        return;
+                    }
+                }
+            }
+        });
+    }
+    
+    void Impl::initializeMemorySystems() {
+        if (workingMemory) {
+            workingMemory->initialize(nullptr);  // Brain instance passed later
+            workingMemory->setCapacity(config->getOr<size_t>("working_memory_capacity", 1000));
+        }
+        if (episodicMemory) {
+            episodicMemory->initialize(nullptr);
+            episodicMemory->setMaxEpisodes(config->getOr<size_t>("max_episodes", 1000));
+        }
+        if (associativeMemory) {
+            associativeMemory->initialize(nullptr);
+        }
+    }
+    
+    void Impl::initializeCognitionSystems() {
+        if (planner) {
+            planner->initialize(nullptr);
+            planner->setPlanningDepth(config->getOr<size_t>("planning_depth", 5));
+        }
+        if (conceptFormation) {
+            conceptFormation->initialize(nullptr);
+        }
+        if (attention) {
+            attention->initialize(nullptr);
+            attention->setInhibitionStrength(config->getOr<float>("attention_inhibition_strength", 0.5f));
+            attention->setExcitationStrength(config->getOr<float>("attention_excitation_strength", 1.5f));
+        }
+    }
+    
+    void Impl::initializeNeuromodulation() {
+        if (novelty) {
+            novelty->initialize(nullptr);
+        }
+        if (curiosity) {
+            curiosity->initialize(nullptr);
+        }
+    }
+    
+    struct Impl::ValidateResult {
+    bool success;
+    std::string message;
+};
+
+ValidateResult Impl::validateConfig(const std::shared_ptr<Config>& cfg) const {
+    ValidateResult result;
+    result.success = true;
+    result.message = "Configuration is valid";
+    
+    // Validate basic parameters
+    if (cfg->getOr<size_t>("neuron_count", 1000) == 0) {
+        result.success = false;
+        result.message = "Neuron count must be positive";
+    }
+    
+    if (cfg->getOr<size_t>("region_count", 1) == 0) {
+        result.success = false;
+        result.message = "Region count must be positive";
+    }
+    
+    float connectionProb = cfg->getOr<float>("connection_probability", 0.1f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        result.success = false;
+        result.message = "Connection probability must be between 0 and 1";
+    }
+    
+    double timestep = cfg->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        result.success = false;
+        result.message = "Simulation timestep must be between 0 and 1";
+    }
+    
+    // Validate plasticity parameters
+    float ltpWeight = cfg->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = cfg->getOr<float>("stdp_ltd_weight", 0.012f);
+    
+    if (ltpWeight <= 0.0f || ltdWeight <= 0.0f) {
+        result.success = false;
+        result.message = "STDP weights must be positive";
+    }
+    
+    // Validate neuromodulation parameters
+    float dopamineScale = cfg->getOr<float>("neuromod.dopamine.scale", 1.0f);
+    if (dopamineScale < 0.0f || dopamineScale > 10.0f) {
+        result.success = false;
+        result.message = "Dopamine scale must be between 0 and 10";
+    }
+    
+    return result;
+}
+
+bool Impl::validateMemorySystem() const {
+    // Validate memory system state
+    if (workingMemory && workingMemory->getCapacity() > 100000) {
+        NLM_LOG_WARNING("Working memory capacity is very large (" + 
+                        std::to_string(workingMemory->getCapacity()) + " traces)");
+    }
+    
+    if (episodicMemory && episodicMemory->getMaxEpisodes() > 10000) {
+        NLM_LOG_WARNING("Episodic memory capacity is very large (" + 
+                        std::to_string(episodicMemory->getMaxEpisodes()) + " episodes)");
+    }
+    
+    return true;
+}
+
+bool Impl::validateNeuromodulation() const {
+    // Validate neuromodulation system state
+    if (dopamine && dopamine->getLevel() > 2.0f) {
+        NLM_LOG_WARNING("Dopamine level is very high: " + std::to_string(dopamine->getLevel()));
+    }
+    
+    if (curiosity && curiosity->getLevel() > 1.0f) {
+        NLM_LOG_WARNING("Curiosity level exceeds normal range: " + std::to_string(curiosity->getLevel()));
+    }
+    
+    return true;
+}
+
+bool Impl::validateDevelopment() const {
+    // Validate development system state
+    DevelopmentalStage stage = developmentalStage;
+    
+    if (stage == DevelopmentalStage::Initial && currentStep > 100000) {
+        NLM_LOG_WARNING("Brain is in Initial developmental stage but has many steps: " + 
+                        std::to_string(currentStep));
+    }
+    
+    return true;
+}
+
+void Impl::validateAndLogSystemState() {
+    // Comprehensive validation and logging
+    ValidateResult configResult = validateConfig(config);
+    if (!configResult.success) {
+        NLM_LOG_ERROR("Configuration validation failed: " + configResult.message);
+    }
+    
+    validateMemorySystem();
+    validateNeuromodulation();
+    validateDevelopment();
+    
+    // Log system state for debugging
+    NLM_LOG_INFO("System state validation complete");
+    NLM_LOG_INFO("Current developmental stage: " + std::to_string(static_cast<int>(developmentalStage)));
+    NLM_LOG_INFO("Memory system active: " + std::to_string(workingMemory != nullptr));
+    NLM_LOG_INFO("Neuromodulation active: " + std::to_string(dopamine != nullptr));
+}
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
