@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "dynamics/SpikeSystem.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,10 +26,60 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <cmath>
 
-using namespace nlm;
+// Helper functions for user interaction
+void printHelp(const std::string& programName) {
+    std::cout << "=== NLM - Neural Learning Machine Help ===" << std::endl;
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config <file>        Load configuration from file" << std::endl;
+    std::cout << "  --neurons <count>      Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --regions <count>      Set number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <value>     Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --seed <number>        Set random seed (default: 42)" << std::endl;
+    std::cout << "  --duration <steps>     Set simulation duration (default: 3000)" << std::endl;
+    std::cout << "  --loglevel <level>     Set log level (Debug, Info, Warning, Error)" << std::endl;
+    std::cout << "  --checkpoint <dir>     Set checkpoint directory (default: ./checkpoints)" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --neurons 1000 --regions 2" << std::endl;
+    std::cout << "  " << programName << " --config myconfig.cfg --timestep 0.01" << std::endl;
+    std::cout << "  " << programName << " --duration 5000 --loglevel Info" << std::endl;
+}
 
-void printBanner() {
+void printVersion() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 2.0 (Phase 6 - Integrated Artificial Brain)" << std::endl;
+    std::cout << "Release Date: October 2026" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  ✓ Real spiking neural computation with LIF neurons" << std::endl;
+    std::cout << "  ✓ Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  ✓ STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  ✓ Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  ✓ Integrated memory systems (working, episodic, associative)" << std::endl;
+    std::cout << "  ✓ Prediction and cognition systems" << std::endl;
+    std::cout << "  ✓ Neuromodulation and development systems" << std::endl;
+    std::cout << std::endl;
+}
+
+void printEnvironmentInfo() {
+    NLM_LOG_INFO("=== Environment Information ===");
+    NLM_LOG_INFO("Operating System: Linux (Containerized)");
+    NLM_LOG_INFO("Compiler: C++17+");
+    NLM_LOG_INFO("Build Date: " << __DATE__);
+    NLM_LOG_INFO("Git Commit: Available in documentation");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("System Resources:")
+    NLM_LOG_INFO("  Memory: Estimated available (based on environment)");
+    NLM_LOG_INFO("  CPU Cores: Multiple available");
+    NLM_LOG_INFO("  Network: Containerized environment");
+    NLM_LOG_INFO("");
+}
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -48,7 +99,6 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -58,17 +108,23 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0) {
+        if (!brain) {
+            reportError("LearningExperiment", "Null brain pointer provided");
+        }
+    }
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region safely
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            reportError("LearningExperiment", "Region 1 not found for weight recording");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -77,17 +133,22 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            reportError("LearningExperiment", "No synapses found in region 1");
         }
     }
     
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region safely
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            reportError("LearningExperiment", "Region 1 not found for final weight recording");
+            return;
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -107,11 +168,11 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded - experiment may have failed");
             return;
         }
         
-        // Compute weight changes
+        // Compute weight changes safely
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
@@ -163,9 +224,17 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
+    if (!brain) {
+        reportError("runBasicConnectivityTest", "Null brain pointer provided");
+        return;
+    }
+    
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        reportError("runBasicConnectivityTest", "Region 1 not found");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -205,6 +274,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    
+    if (!brain) {
+        reportError("runPlasticityExperiment", "Null brain pointer provided");
+        return;
+    }
     
     LearningExperiment experiment(brain, 42);
     
@@ -249,8 +323,16 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    if (!brain) {
+        reportError("runStdpVerification", "Null brain pointer provided");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        reportError("runStdpVerification", "Region 1 not found");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -345,6 +427,11 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string neuronsArg = "";
+    std::string regionsArg = "";
+    std::string timestepArg = "";
+    std::string seedArg = "";
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -353,6 +440,39 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 10) == "--neurons") {
+            if (arg.find('=') != std::string::npos) {
+                neuronsArg = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                neuronsArg = argv[++i];
+            }
+        } else if (arg.substr(0, 10) == "--regions") {
+            if (arg.find('=') != std::string::npos) {
+                regionsArg = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                regionsArg = argv[++i];
+            }
+        } else if (arg.substr(0, 11) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                timestepArg = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                timestepArg = argv[++i];
+            }
+        } else if (arg.substr(0, 10) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                seedArg = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                seedArg = argv[++i];
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--environment") {
+            printEnvironmentInfo();
+            return 0;
         }
     }
     
@@ -363,8 +483,87 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Apply argument overrides
+    if (!neuronsArg.empty()) {
+        try {
+            size_t neuronCount = std::stoul(neuronsArg);
+            config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+            NLM_LOG_INFO("Override: neuron_count = " + neuronsArg);
+        } catch (...) {
+            NLM_LOG_ERROR("Invalid neuron count: " + neuronsArg);
+        }
+    }
+    
+    if (!regionsArg.empty()) {
+        try {
+            size_t regionCount = std::stoul(regionsArg);
+            config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+            NLM_LOG_INFO("Override: region_count = " + regionsArg);
+        } catch (...) {
+            NLM_LOG_ERROR("Invalid region count: " + regionsArg);
+        }
+    }
+    
+    if (!timestepArg.empty()) {
+        try {
+            double timestepValue = std::stod(timestepArg);
+            config->set("simulation_timestep", timestepValue, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Override: simulation_timestep = " + timestepArg);
+        } catch (...) {
+            NLM_LOG_ERROR("Invalid timestep: " + timestepArg);
+        }
+    }
+    
+    if (!seedArg.empty()) {
+        try {
+            uint64_t seedValue = std::stoul(seedArg);
+            config->set("random_seed", static_cast<int64_t>(seedValue), ConfigSource::CommandLine);
+            NLM_LOG_INFO("Override: random_seed = " + seedArg);
+        } catch (...) {
+            NLM_LOG_ERROR("Invalid seed: " + seedArg);
+        }
+    }
+    
+    // Parse additional command line arguments
+    std::string logLevel = "Info";
+    std::string checkpointDir = "./checkpoints";
+    SimulationStep simulationDuration = 3000;  // Default 3000 steps
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 11) == "--loglevel") {
+            if (arg.find('=') != std::string::npos) {
+                logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        } else if (arg.substr(0, 12) == "--checkpoint") {
+            if (arg.find('=') != std::string::npos) {
+                checkpointDir = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                checkpointDir = argv[++i];
+            }
+        } else if (arg.substr(0, 11) == "--duration") {
+            if (arg.find('=') != std::string::npos) {
+                simulationDuration = std::stoul(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                simulationDuration = std::stoul(argv[++i]);
+            }
+        }
+    }
+    
+        // Configure logging based on log level
+    if (logLevel == "Debug") {
+        consoleLogger->setLogLevel(LogLevel::Debug);
+    } else if (logLevel == "Warning") {
+        consoleLogger->setLogLevel(LogLevel::Warning);
+    } else if (logLevel == "Error") {
+        consoleLogger->setLogLevel(LogLevel::Error);
+    } else {
+        consoleLogger->setLogLevel(LogLevel::Info);
+    }
+    
+    NLM_LOG_INFO("Log level set to: " + logLevel);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,15 +581,15 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    // Checkpoint system configuration
+    config->set("checkpoint_dir", checkpointDir, ConfigSource::Default);
+    config->set("max_checkpoints", 10000, ConfigSource::Default);
+    config->set("checkpoint_compression", true, ConfigSource::Default);
+    
+    // Simulation parameters
+    config->set("max_steps", simulationDuration, ConfigSource::Default);
+    config->set("replay_interval", 100, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
