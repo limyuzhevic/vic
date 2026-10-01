@@ -5,7 +5,11 @@
 
 namespace nlm {
 
-struct Synapse::Impl {
+// Synapse implementation
+// The pImpl pattern ensures proper resource management
+// Neuron (or other accessors) holds only a pointer to the implementation
+// Move operations transfer ownership of the pImpl pointer
+// Copy operations are deleted to prevent shallow pointer copies
     SynapseId id;
     NeuronId sourceNeuron;
     NeuronId destinationNeuron;
@@ -62,15 +66,22 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-Synapse::~Synapse() = default;
+Synapse::~Synapse() {
+    delete pImpl;
+}
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(nullptr) {
+    if (other.pImpl) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

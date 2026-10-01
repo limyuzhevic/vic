@@ -32,8 +32,16 @@ struct LogEntry {
 class ILogger {
 public:
     virtual ~ILogger() = default;
+    
+    // Thread-safe logging interface
+    // Log entries may be processed concurrently from multiple threads
+    // All implementations must be thread-safe
     virtual void log(const LogEntry& entry) = 0;
+    
+    // Thread-safe level setting
     virtual void setLevel(LogLevel level) = 0;
+    
+    // Thread-safe level retrieval
     virtual LogLevel getLevel() const = 0;
 };
 
@@ -44,8 +52,14 @@ public:
     explicit ConsoleLogger(LogLevel level);
     ~ConsoleLogger() override;
     
+    // Thread-safe logging implementation
+    // Uses mutex to synchronize access to shared resources
     void log(const LogEntry& entry) override;
+    
+    // Thread-safe level setting
     void setLevel(LogLevel level) override;
+    
+    // Thread-safe level retrieval
     LogLevel getLevel() const override;
     
     // Enable/disable colors
@@ -57,6 +71,8 @@ public:
     void closeOutputFile();
     
 private:
+    // Thread safety: All operations are synchronized with mutex
+    // Single mutex protects all shared state (level, output streams, file handles)
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
@@ -70,40 +86,49 @@ public:
     Logger();
     ~Logger();
     
+    // Thread safety: All operations are synchronized with mutex
+    // Multiple threads can safely add/remove loggers, log messages, set/get levels
+    
     // Disable copying
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
     
-    // Add logger sink
+    // Thread-safe: Operation is synchronized with mutex
+    // addLogger may throw if memory allocation fails
     void addLogger(std::shared_ptr<ILogger> logger);
     
-    // Remove all loggers
+    // Thread-safe: Operation is synchronized with mutex
     void clearLoggers();
     
-    // Set minimum level for all loggers
+    // Thread-safe: Operation is synchronized with mutex
+    // Sets level on all loggers
     void setLevel(LogLevel level);
     
-    // Global logging functions
+    // Thread-safe: Operation is synchronized with mutex
+    // Log entry with file/line/function info for debugging
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
              const std::string& function = "");
     
-    // Convenience methods
+    // Convenience methods with thread-safe implementations
     void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
-    // Check if level is enabled
+    // Thread-safe: Operation is synchronized with mutex
+    // Checks if any logger is enabled for this level
     bool isEnabled(LogLevel level) const;
     
     // Get global logger instance
+    // Thread-safe: Static initialization is synchronized by the system
     static Logger& getGlobal();
     
     // Set global logger
+    // Thread-safe: All operations are synchronized with mutex
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

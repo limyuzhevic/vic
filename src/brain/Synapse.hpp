@@ -9,6 +9,9 @@ class Neuron;
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
+// Uses pImpl pattern for memory safety
+// Neuron holds sole ownership of implementation details
+// Move operations transfer ownership, copy operations are deleted to prevent shallow copies
 
 class Synapse {
 public:
@@ -81,6 +84,9 @@ public:
     void initializeRandom(class RandomGenerator& rng);
     
 private:
+    // pImpl pattern implementation
+    // Neuron holds sole ownership of the implementation details
+    // Move operations transfer ownership properly, copy operations are deleted
     struct Impl;
     Impl* pImpl;
 };

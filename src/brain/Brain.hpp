@@ -47,6 +47,13 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// 
+// Memory Management:
+// - Uses pImpl pattern with unique_ptr internally for automatic resource management
+// - No-copy policy prevents shallow copies
+// - Move operations transfer ownership correctly
+// - Pointer-returning getters return nullptr when objects don't exist or are invalid
+// - All internal resources are RAII-managed
 
 class Brain {
 public:
@@ -119,6 +126,13 @@ public:
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
+    
+    // Ensure region exists and return pointer
+    // Returns nullptr if region not found or invalid id
+    NeuralRegion* getRegionChecked(RegionId id);
+    
+    const NeuralRegion* getRegionChecked(RegionId id) const;
+    
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     

@@ -641,22 +641,42 @@ void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
 }
 
 SpikeSystem* Brain::getSpikeSystem() {
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Null pointer: pImpl or spikeSystem is null in getSpikeSystem()");
+        return nullptr;
+    }
     return pImpl->spikeSystem.get();
 }
 
 const SpikeSystem* Brain::getSpikeSystem() const {
+    if (!pImpl || !pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Null pointer: pImpl or spikeSystem is null in const getSpikeSystem()");
+        return nullptr;
+    }
     return pImpl->spikeSystem.get();
 }
 
 STDP* Brain::getSTDP() {
+    if (!pImpl || !pImpl->stdp) {
+        NLM_LOG_ERROR("Null pointer: pImpl or stdp is null in getSTDP()");
+        return nullptr;
+    }
     return pImpl->stdp.get();
 }
 
 Hebbian* Brain::getHebbian() {
+    if (!pImpl || !pImpl->hebbian) {
+        NLM_LOG_ERROR("Null pointer: pImpl or hebbian is null in getHebbian()");
+        return nullptr;
+    }
     return pImpl->hebbian.get();
 }
 
 StructuralPlasticity* Brain::getStructuralPlasticity() {
+    if (!pImpl || !pImpl->structuralPlasticity) {
+        NLM_LOG_ERROR("Null pointer: pImpl or structuralPlasticity is null in getStructuralPlasticity()");
+        return nullptr;
+    }
     return pImpl->structuralPlasticity.get();
 }
 
@@ -916,21 +936,49 @@ RegionId Brain::addRegion(const std::string& name) {
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
+    NLM_LOG_DEBUG("Looking up region with ID: " + std::to_string(id.index()));
+    
     for (auto& region : pImpl->regions) {
         if (region->getId() == id) {
+            NLM_LOG_DEBUG("Found region with ID: " + std::to_string(id.index()));
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Region with ID " + std::to_string(id.index()) + " not found");
     return nullptr;
 }
 
 const NeuralRegion* Brain::getRegion(RegionId id) const {
+    NLM_LOG_DEBUG("Looking up region with ID: " + std::to_string(id.index()) + " (const)");
+    
     for (const auto& region : pImpl->regions) {
         if (region->getId() == id) {
+            NLM_LOG_DEBUG("Found region with ID: " + std::to_string(id.index()));
             return region.get();
         }
     }
+    
+    NLM_LOG_WARNING("Region with ID " + std::to_string(id.index()) + " not found (const)");
     return nullptr;
+}
+
+NeuralRegion* Brain::getRegionChecked(RegionId id) {
+    NeuralRegion* region = getRegion(id);
+    if (!region) {
+        NLM_LOG_ERROR("Null pointer detected: getRegion() returned null for ID " + std::to_string(id.index()));
+        throw std::runtime_error("Region ID " + std::to_string(id.index()) + " not found");
+    }
+    return region;
+}
+
+const NeuralRegion* Brain::getRegionChecked(RegionId id) const {
+    const NeuralRegion* region = getRegion(id);
+    if (!region) {
+        NLM_LOG_ERROR("Null pointer detected: getRegion() returned null for ID " + std::to_string(id.index()) + " (const)");
+        throw std::runtime_error("Region ID " + std::to_string(id.index()) + " not found (const)");
+    }
+    return region;
 }
 
 size_t Brain::getRegionCount() const {
@@ -1003,43 +1051,73 @@ float Brain::getAverageFiringRate() const {
     return sum / static_cast<float>(pImpl->regions.size());
 }
 
-// ========== MEMORY SYSTEM ACCESSORS ==========
-
 NeuralWorkingMemory* Brain::getWorkingMemory() {
+    if (!pImpl || !pImpl->workingMemory) {
+        NLM_LOG_ERROR("Null pointer: pImpl or workingMemory is null in getWorkingMemory()");
+        return nullptr;
+    }
     return pImpl->workingMemory.get();
 }
 
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    if (!pImpl || !pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Null pointer: pImpl or episodicMemory is null in getEpisodicMemory()");
+        return nullptr;
+    }
     return pImpl->episodicMemory.get();
 }
 
 NeuralAssociativeMemory* Brain::getAssociativeMemory() {
+    if (!pImpl || !pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Null pointer: pImpl or associativeMemory is null in getAssociativeMemory()");
+        return nullptr;
+    }
     return pImpl->associativeMemory.get();
 }
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
 PredictionSystem* Brain::getPredictionSystem() {
+    if (!pImpl || !pImpl->predictionSystem) {
+        NLM_LOG_ERROR("Null pointer: pImpl or predictionSystem is null in getPredictionSystem()");
+        return nullptr;
+    }
     return pImpl->predictionSystem.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
 NeuralPlanner* Brain::getPlanner() {
+    if (!pImpl || !pImpl->planner) {
+        NLM_LOG_ERROR("Null pointer: pImpl or planner is null in getPlanner()");
+        return nullptr;
+    }
     return pImpl->planner.get();
 }
 
 ConceptFormation* Brain::getConceptFormation() {
+    if (!pImpl || !pImpl->conceptFormation) {
+        NLM_LOG_ERROR("Null pointer: pImpl or conceptFormation is null in getConceptFormation()");
+        return nullptr;
+    }
     return pImpl->conceptFormation.get();
 }
 
 AttentionalSelection* Brain::getAttention() {
+    if (!pImpl || !pImpl->attention) {
+        NLM_LOG_ERROR("Null pointer: pImpl or attention is null in getAttention()");
+        return nullptr;
+    }
     return pImpl->attention.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
+    if (!pImpl || !pImpl->developmentSystem) {
+        NLM_LOG_ERROR("Null pointer: pImpl or developmentSystem is null in getDevelopmentSystem()");
+        return nullptr;
+    }
     return pImpl->developmentSystem.get();
 }
 
@@ -1054,26 +1132,50 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 // ========== NEUROMODULATION SYSTEMS ==========
 
 Dopamine* Brain::getDopamine() {
+    if (!pImpl || !pImpl->dopamine) {
+        NLM_LOG_ERROR("Null pointer: pImpl or dopamine is null in getDopamine()");
+        return nullptr;
+    }
     return pImpl->dopamine.get();
 }
 
 Curiosity* Brain::getCuriosity() {
+    if (!pImpl || !pImpl->curiosity) {
+        NLM_LOG_ERROR("Null pointer: pImpl or curiosity is null in getCuriosity()");
+        return nullptr;
+    }
     return pImpl->curiosity.get();
 }
 
 Novelty* Brain::getNovelty() {
+    if (!pImpl || !pImpl->novelty) {
+        NLM_LOG_ERROR("Null pointer: pImpl or novelty is null in getNovelty()");
+        return nullptr;
+    }
     return pImpl->novelty.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
+    if (!pImpl || !pImpl->predictionError) {
+        NLM_LOG_ERROR("Null pointer: pImpl or predictionError is null in getPredictionErrorSignal()");
+        return nullptr;
+    }
     return pImpl->predictionError.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
+    if (!pImpl || !pImpl->config) {
+        NLM_LOG_ERROR("Null pointer: pImpl or config is null in getConfig()");
+        return nullptr;
+    }
     return pImpl->config;
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
+    if (!pImpl || !pImpl->rng) {
+        NLM_LOG_ERROR("Null pointer: pImpl or rng is null in getRandomGenerator()");
+        return nullptr;
+    }
     return pImpl->rng.get();
 }
 
