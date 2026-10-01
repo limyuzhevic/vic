@@ -6,8 +6,16 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/ParallelProcessing.hpp"
+#include "../performance/Performance.hpp"
 #include <memory>
 #include <string>
+#include <chrono>
+#include <thread>
+#include <atomic>
 
 namespace nlm {
 
@@ -28,6 +36,64 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+
+// Performance statistics structure
+struct BrainPerformanceStats {
+    // Performance metrics
+    double neuronsPerSecond;
+    double spikesPerSecond;
+    double synapticEventsPerSecond;
+    double realTimeFactor;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    size_t pendingSpikes;
+    size_t pendingDelayedSpikes;
+    float avgFiringRate;
+    float memoryUsageMB;
+    double stepTimeMs;
+    
+    // Latency measurements
+    double eventProcessingLatencyNs;
+    double memoryAllocationLatencyNs;
+    double neuralComputationLatencyNs;
+    
+    // Throughput measurements
+    size_t neuronsProcessed;
+    size_t synapsesUpdated;
+    size_t spikesProcessed;
+    
+    // Resource usage
+    size_t memoryPoolAllocated;
+    size_t memoryPoolUsed;
+    size_t eventQueueSize;
+    size_t parallelThreadsActive;
+};
+
+namespace nlm {
+
+// Forward declarations
+class Config;
+class RandomGenerator;
+class SimulationClock;
+class Logger;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class PredictionSystem;
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+class DevelopmentSystem;
+class Dopamine;
+class Curiosity;
+class Novelty;
+class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -184,14 +250,26 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+// Get current configuration
+    std::shared_ptr<const Config> getConfig() const;
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
     // Logging
     void logStatus() const;
+
+    // Performance statistics
+    BrainPerformanceStats getPerformanceStats() const;
     
 private:
     struct Impl;

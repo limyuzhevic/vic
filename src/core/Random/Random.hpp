@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -37,6 +38,20 @@ public:
     // Uniform integer in [min, max]
     uint32_t uniformInt(uint32_t min, uint32_t max);
     uint64_t uniformInt(uint64_t min, uint64_t max);
+    
+    // Helper function to avoid overload ambiguity
+    template<typename T>
+    T uniformInt(T min, T max) {
+        static_assert(std::is_integral_v<T>, "uniformInt requires integral type");
+        if (min > max) {
+            throw std::invalid_argument("min must be <= max");
+        }
+        if (min == max) {
+            return min;
+        }
+        std::uniform_int_distribution<T> dist(min, max);
+        return dist(engine());
+    }
     
     // Uniform real in [min, max)
     double uniformReal(double min, double max);
@@ -97,14 +112,6 @@ void RandomGenerator::shuffle(Container& container) {
     std::shuffle(container.begin(), container.end(), engine());
 }
 
-template<typename Container>
-auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
-    if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
-    }
-    auto it = container.begin();
-    std::advance(it, pickRandomIndex(container.size()));
-    return *it;
-}
+// Note: pickRandom implementation moved to .cpp file to avoid circular dependencies
 
 } // namespace nlm

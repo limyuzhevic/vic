@@ -38,6 +38,7 @@ uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
 }
 
+// Implementation of the basic uniformInt functions for type safety
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
@@ -107,6 +108,16 @@ bool RandomGenerator::randomBool() {
 
 uint32_t RandomGenerator::randomBit() {
     return uniformInt(0, 1);
+}
+
+template<typename Container>
+auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
+    if (container.empty()) {
+        throw std::runtime_error("Cannot pick from empty container");
+    }
+    auto it = container.begin();
+    std::advance(it, pickRandomIndex(container.size()));
+    return *it;
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {

@@ -1,16 +1,25 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include "../brain/Brain.hpp"
+#include "../environment/Observation.hpp"
+#include "../prediction/NeuralPrediction.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <vector>
+#include <algorithm>
 
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Computes reward from environmental states and integrates with neuromodulators
 
 class Reward {
 public:
     Reward();
     ~Reward();
+    
+    // Initialize with brain reference for neuromodulator integration
+    void initialize(Brain* brain);
     
     // Get current reward value
     float getValue() const;
@@ -23,12 +32,21 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
+    // Real reward computation based on prediction error and neuromodulator states
+    float computeReward(const Observation& observation);
     
-    // Reward history
+    // Get reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Get reward prediction error
+    float getRewardPredictionError() const { return pImpl->predictionError; }
+    
+    // Integrate with dopamine system
+    void integrateWithDopamine(float error, float learningRate = 0.1f);
+    
+    // Get neuromodulator influence on reward
+    float getNeuromodulatorInfluence() const;
     
 private:
     struct Impl;

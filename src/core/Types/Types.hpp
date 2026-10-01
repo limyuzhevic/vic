@@ -2,8 +2,15 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <functional>
 
 namespace nlm {
+
+// Forward declarations
+struct NeuronId;
+struct SynapseId;
+struct RegionId;
+struct PopulationId;
 
 // Strongly-typed identifiers for safety
 
@@ -188,5 +195,33 @@ constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
 constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+
+// Hash specializations for NLM types (must be in global namespace for std::unordered_map)
+// Note: Specializations of std::hash must be in the global namespace
+inline namespace nlm_hash {
+    template<> struct std::hash<nlm::NeuronId> {
+        size_t operator()(const nlm::NeuronId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<> struct std::hash<nlm::SynapseId> {
+        size_t operator()(const nlm::SynapseId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<> struct std::hash<nlm::RegionId> {
+        size_t operator()(const nlm::RegionId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+    
+    template<> struct std::hash<nlm::PopulationId> {
+        size_t operator()(const nlm::PopulationId& id) const {
+            return std::hash<uint64_t>{}(id.value);
+        }
+    };
+}
 
 } // namespace nlm

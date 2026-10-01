@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -70,9 +71,8 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+// Update synapse for one simulation step
+     void step(Timestamp currentTime);
     
     // Reset to initial state
     void reset();

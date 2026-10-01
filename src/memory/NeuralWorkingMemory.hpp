@@ -163,13 +163,34 @@ public:
     // Bottom-up attention (stimulus-driven)
     void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
 
+// Get attention winners
+    const std::vector<NeuronId>& getWinners() const { return winners_; }
+    
+    // Top-down attention (goal-directed)
+    void applyTopDownBias(NeuronId neuron, float biasStrength);
+    
+    // Bottom-up attention (stimulus-driven)
+    void applyBottomUpSalience(NeuronId neuron, float salienceStrength);
+    
     // Reset attention
     void reset();
-
+    
+    // Increase salience with neuromodulation
+    void increaseSalience(float additionalSalience);
+    
+    // Get current attention strength
+    float getAttentionStrength() const { return inhibitionStrength_ + excitationStrength_ * 0.5f; }
+    
+    // Set attention strength
+    void setAttentionStrength(float strength) { 
+        inhibitionStrength_ = strength * 0.4f; 
+        excitationStrength_ = strength * 1.6f; 
+    }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     float inhibitionStrength_;
     float excitationStrength_;

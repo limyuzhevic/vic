@@ -4,6 +4,7 @@
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
+#include "../sensory/InternalSignals.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
@@ -15,14 +16,37 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/ParallelProcessing.hpp"
+#include "../performance/Performance.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <chrono>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <memory>
 
+// Performance infrastructure forward declarations
 namespace nlm {
-
-struct Brain::Impl {
+    class NeuronPool;
+    class SynapsePool;
+    struct QueuedSpikeEvent;
+    class SpikeRingBuffer;
+    class DelayedSpikeQueue;
+    struct PriorityEventQueue;
+    class ParallelNeuralProcessor;
+    class VectorizedLIF;
+    
+    // Constants from EventQueue.hpp
+    constexpr size_t SPIKE_QUEUE_CAPACITY = 16384;
+    constexpr size_t DELAYED_SPIKE_BUCKETS = 1024;
+    constexpr size_t MAX_DELAY_STEPS = 100;
+}
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
@@ -65,93 +89,111 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
+    // Performance infrastructure
+    std::unique_ptr<NeuronPool> neuronPool;
+    std::unique_ptr<SynapsePool> synapsePool;
+    std::unique_ptr<ParallelNeuralProcessor> parallelProcessor;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // Event queues for optimized spike processing
+    SpikeRingBuffer spikeQueue_;
+    DelayedSpikeQueue delayedSpikeQueue_;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Performance monitoring
+    BrainPerformanceStats perfStats_;
+    std::chrono::high_resolution_clock::time_point lastStepTime_;
     
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    // SIMD vectorizer
+    VectorizedLIF lifVectorizer_;
+    
+    // Performance timing
+    struct TimingStats {
+        double neuronUpdateTime{0.0};
+        double synapseUpdateTime{0.0};
+        double spikeProcessTime{0.0};
+        double memoryAllocTime{0.0};
+        double eventQueueTime{0.0};
+        double simdComputeTime{0.0};
+        double parallelProcessTime{0.0};
+    } timingStats_;
+    
+    // Event tracking
+    size_t totalNeuronsProcessed{0};
+    size_t totalSynapsesUpdated{0};
+    size_t totalSpikesProcessed{0};
+    size_t memoryPoolAllocations{0};
+    size_t memoryPoolDeallocations{0};
+    
+    // SIMD configuration
+    bool simdEnabled_{true};
+    bool multithreadingEnabled_{true};
+    bool eventDrivenEnabled_{true};
+    bool sparseEnabled_{false};  // Not using sparse connectivity yet
+    
+    // Thread count for parallel processing
+    size_t threadCount_{std::thread::hardware_concurrency() > 0 ? 
+                      std::thread::hardware_concurrency() : 4};
+    
+
+    // Initialize plasticity systems
+    spikeSystem = std::make_unique<SpikeSystem>();
+    stdp = std::make_unique<STDP>();
+    hebbian = std::make_unique<Hebbian>();
+    structuralPlasticity = std::make_unique<StructuralPlasticity>();
+    
+    // Initialize working memory
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    workingMemory->initialize(this);
+    
+    // Initialize episodic memory
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    episodicMemory->initialize(this);
+    
+    // Initialize associative memory
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    associativeMemory->initialize(this);
+    
+    // Initialize prediction system
+    predictionSystem = std::make_unique<PredictionSystem>();
+    predictionSystem->initialize(this);
+    
+    // Initialize cognitive systems
+    planner = std::make_unique<NeuralPlanner>();
+    planner->initialize(this);
+    conceptFormation = std::make_unique<ConceptFormation>();
+    conceptFormation->initialize(this);
+    attention = std::make_unique<AttentionalSelection>();
+    attention->initialize(this);
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    predictionError->initialize(this);
+    novelty = std::make_unique<Novelty>();
+    novelty->initialize(this);
+    
+    // Configure STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_tau", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+    
+    // Get timestep
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config
+    replayInterval = config->getOr<size_t>("replay_interval", 100);
+    consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+    
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+}
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -182,20 +224,70 @@ bool Brain::initialize() {
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Configure performance features
+    pImpl->simdEnabled_ = pImpl->config->getOr<bool>("enable_simd", true);
+    pImpl->multithreadingEnabled_ = pImpl->config->getOr<bool>("enable_multithreading", true);
+    pImpl->eventDrivenEnabled_ = pImpl->config->getOr<bool>("enable_event_driven", true);
+    
+    // Set thread count for parallel processing
+    pImpl->threadCount_ = pImpl->config->getOr<size_t>("thread_count", 
+                     std::thread::hardware_concurrency() > 0 ? std::thread::hardware_concurrency() : 4);
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    NLM_LOG_INFO("Performance: SIMD enabled=" + std::to_string(pImpl->simdEnabled_) + 
+                 ", Multithreading enabled=" + std::to_string(pImpl->multithreadingEnabled_) + 
+                 ", Threads=" + std::to_string(pImpl->threadCount_));
+    
+    // Create performance infrastructure
+    pImpl->neuronPool = std::make_unique<NeuronPool>();
+    pImpl->synapsePool = std::make_unique<SynapsePool>();
+    
+    // Reserve memory pools
+    size_t neuronPoolSize = neuronCount * 2;  // Allow for some deallocation
+    size_t synapsePoolSize = neuronCount * 10;  // Approximate synapses per neuron
+    
+    pImpl->neuronPool->reserve(neuronPoolSize);
+    pImpl->synapsePool->reserve(synapsePoolSize);
+    
+    NLM_LOG_INFO("Memory pools initialized: neuron_pool_size=" + std::to_string(neuronPoolSize) + 
+                 ", synapse_pool_size=" + std::to_string(synapsePoolSize));
+    
+    // Create parallel processor if multithreading is enabled
+    if (pImpl->multithreadingEnabled_) {
+        pImpl->parallelProcessor = std::make_unique<ParallelNeuralProcessor>(pImpl->threadCount_);
+        NLM_LOG_INFO("Parallel processor initialized with " + std::to_string(pImpl->threadCount_) + " threads");
+    }
+    
+    // Create event queues for optimized spike processing
+    pImpl->spikeQueue_ = SpikeRingBuffer(SPIKE_QUEUE_CAPACITY);
+    pImpl->delayedSpikeQueue_ = DelayedSpikeQueue(DELAYED_SPIKE_BUCKETS, MAX_DELAY_STEPS);
+    
+    NLM_LOG_INFO("Event queues initialized: spike_queue_capacity=" + std::to_string(SPIKE_QUEUE_CAPACITY) + 
+                 ", delayed_spike_buckets=" + std::to_string(DELAYED_SPIKE_BUCKETS));
+    
+    // Initialize LIF vectorizer
+    lifVectorizer_.V_rest = -70.0f;
+    lifVectorizer_.V_reset = -70.0f;
+    lifVectorizer_.V_threshold = -55.0f;
+    lifVectorizer_.tau = 20.0f;
+    lifVectorizer_.C = 1.0f;
+    lifVectorizer_.dt = 0.001f;
+    lifVectorizer_.refractoryDecay = 5.0f;
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
     
-    // Create neurons across regions
+    // Create neurons across regions using memory pool
     size_t neuronsPerRegion = neuronCount / regionCount;
+    std::vector<NeuronId> neuronIds;
+    
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
+            // Add populations using pool-based neurons
             auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
             auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
@@ -243,21 +335,12 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
-    // Initialize cognition systems
+    // Initialize cognitive systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
     pImpl->conceptFormation->initialize(this);
-    
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -421,6 +504,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
+        // Concept-based rewards to neuromodulation
+        if (pImpl->conceptFormation && pImpl->attention) {
+            // Get concepts and attention level
+            auto concepts = pImpl->conceptFormation->getConcepts();
+            float attentionLevel = pImpl->attention->isEngaged() ? 1.0f : 0.0f;
+            
+            // Compute concept-based reward
+            float conceptBasedReward = 0.0f;
+            for (const auto& concept : concepts) {
+                if (concept.avgStability > 0.7f) {  // Stable concept
+                    // Use concept stability as a proxy for expected reward
+                    conceptBasedReward += concept.avgStability * concept.instances.size() * 0.01f;
+                    
+                    // Boost based on attention to this concept
+                    if (attentionLevel > 0.5f) {
+                        conceptBasedReward += 0.1f;
+                    }
+                }
+            }
+            
+            // Scale concept-based reward for neuromodulation
+            conceptBasedReward *= 0.5f;  // Reduce impact
+            
+            // Apply concept-based reward to dopamine
+            if (conceptBasedReward > 0.0f) {
+                // Signal concept-based reward prediction error
+                pImpl->dopamine->signalRewardPredictionError(conceptBasedReward);
+                
+                // Also apply to novelty detection
+                if (pImpl->novelty) {
+                    pImpl->novelty->update(pImpl->timestep);
+                }
+            }
+        }
+        
         // Apply dopamine effects on neural excitability
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
@@ -511,8 +629,143 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make predictions of next sensory states based on current sensory input
+        // This integrates prediction system with sensory processing flow
+        
+        // For now, we need to get the most recent sensory input
+        // In a real implementation, we would track the last sensory input
+        // For demonstration, we'll create a simple prediction based on neuron activity
+        
+        // Create a simple internal signal representing current sensory-like input
+        std::unique_ptr<SensoryInput> predictedState;
+        if (pImpl->predictionSystem) {
+            // Create a simple prediction based on current neural activity
+            // This simulates predicting next sensory state
+            auto internalSignals = std::make_unique<InternalSignals>();
+            
+            // Add signals from sensory neurons as prediction
+            for (Neuron* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                    internalSignals->addSignal(activation);
+                }
+            }
+            
+            // Store current as "actual" observation for prediction error
+            pImpl->predictionSystem->storePrediction(*internalSignals, *internalSignals, 0.0f);
+            
+            // Make prediction for next state (simple temporal variation)
+            predictedState = pImpl->predictionSystem->predictNextState(*internalSignals);
+            
+            // Update prediction with actual observation (compute prediction error)
+            pImpl->predictionSystem->updatePredictions(*predictedState, *internalSignals);
+            
+            // Get prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Connect prediction error to dopamine neuromodulation for scaled learning
+            if (pImpl->dopamine) {
+                // Scale prediction error for dopamine response
+                float scaledError = predictionError * 10.0f;  // Amplify for neuromodulatory effect
+                scaledError = std::max(0.0f, std::min(1.0f, scaledError));  // Clamp to [0,1]
+                
+                // Signal prediction error to dopamine system
+                pImpl->dopamine->signalRewardPredictionError(scaledError);
+                
+                // Apply prediction error to prediction error signal system
+                if (pImpl->predictionError) {
+                    pImpl->predictionError->computeError(pImpl->predictionSystem->getPredictionError(), scaledError);
+                }
+            }
+            
+            // INTEGRATE COGNITIVE SYSTEMS WITH PREDICTION
+            // Concept-based predictions influence prediction system
+            if (pImpl->conceptFormation && pImpl->attention && pImpl->planner) {
+                // Get current concepts
+                auto concepts = pImpl->conceptFormation->getConcepts();
+                
+                // Use concepts to inform predictions
+                for (const auto& concept : concepts) {
+                    if (concept.avgStability > 0.6f) {  // Stable concept
+                        // Concept provides context for prediction
+                        // Add concept-based prediction error if concept prediction differs from actual
+                        float conceptBasedPrediction = concept.avgStability;
+                        float conceptPredictionError = std::abs(conceptBasedPrediction - scaledError);
+                        
+                        // Scale concept prediction error for neuromodulation
+                        float conceptScaledError = conceptPredictionError * 5.0f;
+                        conceptScaledError = std::max(0.0f, std::min(1.0f, conceptScaledError));
+                        
+                        // Add concept-based reward prediction error to dopamine
+                        if (pImpl->dopamine) {
+                            // Scale for neuromodulatory effect
+                            float conceptDopamine = conceptScaledError * 0.5f;
+                            pImpl->dopamine->signalRewardPredictionError(conceptDopamine);
+                        }
+                    }
+                }
+                
+                // Attention influences prediction confidence
+                if (pImpl->attention->isEngaged()) {
+                    // High attention = higher prediction confidence
+                    // In a real implementation, would adjust prediction system parameters
+                    // For now, we just note the attention effect
+                }
+            }
+            
+            // Store prediction in episodic memory
+            if (pImpl->episodicMemory) {
+                EpisodicMemoryItem predictionEpisode;
+                predictionEpisode.timestamp = currentStep;
+                predictionEpisode.reward = (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+                predictionEpisode.predictionError = pImpl->predictionSystem->getPredictionError();
+                
+                // Store prediction pattern
+                const auto& predData = predictedState->getData();
+                for (float value : predData) {
+                    predictionEpisode.predictionPattern.push_back(value);
+                }
+                
+                const auto& actualData = internalSignals->getData();
+                for (float value : actualData) {
+                    predictionEpisode.actualPattern.push_back(value);
+                }
+                
+                // Store in episodic memory
+                pImpl->episodicMemory->storeEpisode(predictionEpisode);
+            }
+            
+            // Update confidence and store in working memory for memory predictions
+            float confidence = pImpl->predictionSystem->getConfidence();
+            pImpl->workingMemory->storeToNeuron(1, confidence * 0.1f);  // Store confidence signal
+            
+            // Use prediction error to modulate plasticity
+            if (pImpl->dopamine) {
+                float plasticityFactor = pImpl->dopamine->getPlasticityFactor();
+                // Scale plasticity based on prediction error
+                float errorPlasticityMod = 1.0f + (predictionError * 2.0f - 1.0f) * 0.5f;  // [-0.5, 1.5] range
+                errorPlasticityMod = std::max(0.1f, std::min(2.0f, errorPlasticityMod));
+                
+                // Apply error-based plasticity modulation
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        if (syn->getPlasticityFlags().stddp) {
+                            float currentWeight = syn->getWeight();
+                            // Apply prediction error-based weight adjustment
+                            currentWeight += predictionError * 0.001f * errorPlasticityMod;
+                            // Constrain weight to reasonable range
+                            currentWeight = std::max(-1.0f, std::min(1.0f, currentWeight));
+                            syn->setWeight(currentWeight);
+                        }
+                    }
+                }
+            }
+            
+            // Train prediction system with current observations
+            pImpl->predictionSystem->train(*internalSignals);
+        }
+        
+        NLM_LOG_DEBUG("Prediction system updated: error = " + std::to_string(pImpl->predictionSystem->getPredictionError()));
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +777,88 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Get attention level for logging
+        float attentionLevel = pImpl->attention->isEngaged() ? 1.0f : 0.0f;
+        
+        // Integrate attention with working memory and concept formation
+        if (pImpl->attention->isEngaged() && pImpl->conceptFormation) {
+            // Enhance concept activation when attention is engaged
+            auto concepts = pImpl->conceptFormation->getConcepts();
+            for (const auto& concept : concepts) {
+                if (concept.avgStability > 0.7f) {  // Stable concept
+                    // Boost working memory traces related to this concept
+                    if (pImpl->workingMemory && !concept.instances.empty()) {
+                        for (const auto& instance : concept.instances) {
+                            if (instance.lastObserved == pImpl->currentStep - 1) {
+                                // Recent instance - enhance attention
+                                pImpl->workingMemory->storeToNeuron(
+                                    static_cast<NeuronId>(30000 + concept.id), 
+                                    0.3f);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        
+        // Get current sensory input pattern (if available)
+        std::vector<float> sensoryPattern;
+        for (Neuron* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isFiring() || std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        // Get features from working memory
+        std::vector<float> features;
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuronId : memoryNeurons) {
+                float feature = 0.0f;
+                for (const auto& region : pImpl->regions) {
+                    for (const auto& pop : region->getPopulations()) {
+                        for (Neuron* neuron : pop->getNeurons()) {
+                            if (neuron->getId() == neuronId) {
+                                feature = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                                break;
+                            }
+                        }
+                    }
+                }
+                features.push_back(feature);
+            }
+        }
+        
+        // Get reward from dopamine
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            sensoryPattern, features, reward, pImpl->currentStep);
+        
+        // Store concept-based reward in working memory for neuromodulation
+        if (conceptId > 0) {
+            pImpl->workingMemory->storeToNeuron(
+                static_cast<NeuronId>(20000 + conceptId), 
+                reward * 0.1f);
+        }
+        
+        // Update attention based on newly formed concepts
+        if (conceptId > 0 && pImpl->attention) {
+            // Enhance attention to novel concepts
+            std::vector<float> conceptFocus(sensoryPattern.size(), 0.0f);
+            for (size_t i = 0; i < conceptFocus.size(); ++i) {
+                conceptFocus[i] = (i < sensoryPattern.size()) ? sensoryPattern[i] * 2.0f : 0.0f;
+            }
+            pImpl->attention->setFocus(conceptFocus);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -689,29 +1018,166 @@ size_t Brain::getPendingSpikeEventCount() const {
     return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
 }
 
-std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+BrainPerformanceStats Brain::getPerformanceStats() const {
+    BrainPerformanceStats stats;
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
+    // Calculate neurons per second based on step count and neurons
+    static std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - startTime).count();
+    if (duration > 0) {
+        stats.neuronsPerSecond = static_cast<double>(pImpl->totalNeuronsProcessed) / duration;
     }
     
-    // Calculate activity of motor neuron groups
-    size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
-        if (neuron->isFiring()) {
-            ++firingMotor;
+    // Calculate spikes per second
+    if (duration > 0) {
+        stats.spikesPerSecond = static_cast<double>(pImpl->totalSpikesTotal) / duration;
+    }
+    
+    // Get active neuron count
+    stats.activeNeurons = pImpl->sensoryNeurons.size() + pImpl->motorNeurons.size();
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            stats.activeNeurons += pop->getActiveCount();
         }
     }
     
-    // Return a simple action
-    ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    // Get firing neuron count
+    stats.firingNeurons = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            stats.firingNeurons += pop->getFiringCount();
+        }
     }
     
-    auto action = std::make_unique<Action>(type);
+    // Get pending spike counts from event queues
+    stats.pendingSpikes = pImpl->spikeQueue_.size();
+    stats.pendingDelayedSpikes = pImpl->delayedSpikeQueue_.pendingCount();
+    
+    // Calculate average firing rate
+    size_t totalNeurons = 0;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            totalNeurons += pop->getSize();
+        }
+    }
+    if (totalNeurons > 0) {
+        stats.avgFiringRate = static_cast<float>(stats.firingNeurons) / static_cast<float>(totalNeurons);
+    }
+    
+    // Calculate memory usage from pools
+    if (pImpl->neuronPool) {
+        stats.memoryUsageMB = (pImpl->neuronPool->memoryUsage() + pImpl->synapsePool->memoryUsage()) / (1024.0f * 1024.0f);  // Convert to MB
+    }
+    
+    // Get real-time factor (simulated time / real time)
+    // This would require tracking elapsed real time during simulation
+    stats.realTimeFactor = 1.0;  // Placeholder
+    
+    // Event processing latency (placeholder - would need detailed timing)
+    stats.eventProcessingLatencyNs = 0.0;
+    
+    // Computational throughput
+    stats.synapticEventsPerSecond = 0.0;  // Would need to track
+    
+    // Step time (would need to track during step)
+    stats.stepTimeMs = 0.0;  // Would need to track
+    
+    // Pool statistics
+    if (pImpl->neuronPool) {
+        stats.memoryPoolAllocated = pImpl->neuronPool->allocatedCount();
+        stats.memoryPoolUsed = pImpl->synapsePool->allocatedCount();
+    }
+    
+    // Event queue size
+    stats.eventQueueSize = stats.pendingSpikes + stats.pendingDelayedSpikes;
+    
+    // Parallel threads active (placeholder)
+    stats.parallelThreadsActive = pImpl->multithreadingEnabled_ ? pImpl->threadCount_ : 0;
+    
+    return stats;
+}
+    // Use NeuralPlanner to plan actions based on current brain state
+    // This replaces simple motor neuron activity with cognitive planning
+    
+    if (!pImpl->planner) {
+        // Fallback to simple action if planner not available
+        if (pImpl->motorNeurons.empty()) {
+            return std::make_unique<Action>(ActionType::Wait);
+        }
+        
+        // Simple action selection based on motor neuron activity
+        size_t firingMotor = 0;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                ++firingMotor;
+            }
+        }
+        
+        ActionType type = ActionType::Wait;
+        if (firingMotor > 0) {
+            type = ActionType::MoveForward;
+        }
+        
+        auto action = std::make_unique<Action>(type);
+        return action;
+    }
+    
+    // Create state representation for planner (from sensory and working memory)
+    std::vector<float> currentState;
+    
+    // Add sensory neuron activity
+    for (Neuron* neuron : pImpl->sensoryNeurons) {
+        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        currentState.push_back(activity);
+    }
+    
+    // Add working memory activity
+    if (pImpl->workingMemory) {
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        for (NeuronId neuronId : memoryNeurons) {
+            float activity = 0.0f;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (Neuron* neuron : pop->getNeurons()) {
+                        if (neuron->getId() == neuronId) {
+                            activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                            break;
+                        }
+                    }
+                }
+            }
+            currentState.push_back(activity);
+        }
+    }
+    
+    // Add motor neuron activity as bias
+    for (Neuron* neuron : pImpl->motorNeurons) {
+        float activity = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+        currentState.push_back(activity);
+    }
+    
+    // Ensure state has minimum size (at least enough for 6 action types)
+    if (currentState.size() < 6) {
+        while (currentState.size() < 6) {
+            currentState.push_back(0.0f);
+        }
+    }
+    
+    // Use planner to determine best action
+    ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+    
+    // Update planner with actual outcome (will be updated later based on feedback)
+    // For now, create action based on planned type
+    auto action = std::make_unique<Action>(plannedAction);
+    
+    // Store action in working memory for learning
+    if (pImpl->workingMemory) {
+        size_t actionIdx = static_cast<size_t>(plannedAction);
+        if (actionIdx < 10) {
+            pImpl->workingMemory->storeToNeuron(static_cast<NeuronId>(10000 + actionIdx), 0.5f);
+        }
+    }
     
     return action;
 }
@@ -752,11 +1218,15 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    // Reset cognitive systems
+    if (pImpl->planner) pImpl->planner->clearCache();
+    if (pImpl->conceptFormation) pImpl->conceptFormation->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->clearHistory();
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1100,6 +1570,14 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    
+    // Prediction system status
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction system active: yes");
+        NLM_LOG_INFO("Prediction error: " + std::to_string(pImpl->predictionSystem->getPredictionError()));
+        NLM_LOG_INFO("Prediction confidence: " + std::to_string(pImpl->predictionSystem->getConfidence()));
+        NLM_LOG_INFO("Prediction error history size: " + std::to_string(pImpl->predictionSystem->getErrorHistory().size()));
     }
     
     // Development status
