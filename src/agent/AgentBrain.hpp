@@ -69,6 +69,31 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== COGNITION SYSTEM INTEGRATION ==========
+    
+    // Access to cognition systems
+    NeuralPlanner* getPlanner() { return brain_ ? brain_->getPlanner() : nullptr; }
+    ConceptFormation* getConceptFormation() { return brain_ ? brain_->getConceptFormation() : nullptr; }
+    AttentionalSelection* getAttention() { return brain_ ? brain_->getAttention() : nullptr; }
+    
+    // Use concept formation to understand current situation
+    void updateConcepts(const std::vector<float>& sensoryState);
+    
+    // Get current concepts
+    std::vector<float> getCurrentConcepts() const;
+    
+    // Check if concept matches known patterns
+    bool conceptMatches(const std::vector<float>& pattern, float threshold = 0.7f) const;
+    
+    // Apply attention to focus processing on important neurons/synapses
+    void applyAttention(const std::vector<NeuronId>& competitors, float inhibitionStrength = 0.5f);
+    
+    // Get attentional winners
+    std::vector<NeuronId> getAttentionalWinners() const;
+    
+    // Get attention focus
+    std::vector<RegionId> getAttendedRegions() const;
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +137,14 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Concept formation state
+    std::vector<float> currentConcepts_;
+    std::vector<float> conceptStability_;
+    
+    // Attention state
+    std::vector<NeuronId> attentionalWinners_;
+    std::vector<RegionId> attendedRegions_;
 };
 
 } // namespace nlm

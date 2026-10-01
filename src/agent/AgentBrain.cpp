@@ -152,11 +152,63 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
+    // Try to use neural planner for goal-directed action selection
+    auto* planner = brain_->getPlanner();
+    if (planner && curiosityLevel_ > 0.1f) {
+        // Get current sensory state as vector for planning
+        std::vector<float> currentState;
+        currentState.reserve(getSensoryInputSize());
+        
+        // Extract current sensory state from neurons
+        // This is a simplified version - full implementation would use
+        // actual sensory observations from environment
+        for (size_t i = 0; i < sensoryVision_.size() && i < 256; ++i) {
+            if (sensoryVision_[i]) {
+                const auto& state = sensoryVision_[i]->getState();
+                currentState.push_back(
+                    std::abs(state.membranePotential - state.restingPotential) / 20.0f);
+            }
+        }
+        
+        // Add other sensory inputs if available
+        for (size_t i = 0; i < sensoryTouch_.size() && i < 8; ++i) {
+            if (sensoryTouch_[i]) {
+                const auto& state = sensoryTouch_[i]->getState();
+                currentState.push_back(
+                    std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+            }
+        }
+        
+        // Use planner to suggest action based on current state
+        ActionType plannedAction = planner->planAction(currentState, 0.5f);
+        
+        // Convert planned action to MotorCommand
+        switch (plannedAction) {
+            case ActionType::MoveForward: return MotorCommand::MoveForward;
+            case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+            case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+            case ActionType::TurnRight: return MotorCommand::TurnRight;
+            case ActionType::Interact: return MotorCommand::Interact;
+            case ActionType::LookLeft: return MotorCommand::LookLeft;
+            case ActionType::LookRight: return MotorCommand::LookRight;
+            default: break;
+        }
+    }
+    
+    // Fall back to basic motor decoding if planner not available or curiosity too low
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Apply attentional selection if available
+    auto* attention = brain_->getAttention();
+    if (attention && attention->getWinners().size() > 0) {
+        // Check if attention is focused on a specific action region
+        // This would require mapping attention winners to motor commands
+        // For now, we just acknowledge attention exists
     }
     
     return decoded;
@@ -238,14 +290,24 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Get prediction error from brain's prediction system if available
+    float brainPredictionError = 0.0f;
+    auto* predictionSystem = brain_->getPredictionSystem();
+    if (predictionSystem) {
+        brainPredictionError = predictionSystem->getPredictionError();
+    }
+    
+    // Use brain prediction error if available, otherwise use reward-predicted reward
+    float actualPredictionError = std::abs(brainPredictionError) > 0.001f ? 
+        brainPredictionError : (reward - predictedReward);
+    
+    predictionError_ = actualPredictionError;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
     // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    dopamineLevel_ = actualPredictionError;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
@@ -266,17 +328,22 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // Modulate plasticity based on dopamine and prediction error
+    // Positive prediction error (better than expected) increases learning rate
+    float plasticityMod = 0.5f + 0.5f * dopamineLevel_;
+    plasticityMod = std::clamp(plasticityMod, 0.1f, 2.0f);
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+        stdp->setLTPWeight(0.01f * plasticityMod);
+        stdp->setLTDWeight(0.012f * plasticityMod);
     }
+    
+    // Update curiosity based on both prediction error and novelty
+    float curiosityFromPredError = std::abs(actualPredictionError) * 0.5f;
+    curiosityLevel_ = noveltyLevel_ * 2.0f + curiosityFromPredError * 0.5f;
+    curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
@@ -334,17 +401,69 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+float AgentBrain::getPredictionError() const {
+    return predictionError_;
+}
+
+void AgentBrain::updateConcepts(const std::vector<float>& sensoryState) {
+    auto* conceptFormation = getConceptFormation();
+    if (!conceptFormation) return;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Use concept formation to process current sensory state
+    // This helps the agent form and recognize patterns
+    currentConcepts_ = sensoryState;
+    
+    // Update concept stability based on novelty and attention
+    if (noveltyLevel_ > 0.5f) {
+        // High novelty = opportunity for new concept formation
+        for (size_t i = 0; i < currentConcepts_.size(); ++i) {
+            conceptStability_[i] = std::max(conceptStability_[i], 0.5f);
+        }
+    } else {
+        // Decay concept stability over time
+        for (size_t i = 0; i < currentConcepts_.size(); ++i) {
+            conceptStability_[i] *= 0.95f;
+        }
+    }
+}
+
+std::vector<float> AgentBrain::getCurrentConcepts() const {
+    return currentConcepts_;
+}
+
+bool AgentBrain::conceptMatches(const std::vector<float>& pattern, float threshold) const {
+    if (currentConcepts_.empty()) return false;
+    
+    if (currentConcepts_.size() != pattern.size()) return false;
+    
+    // Compute pattern similarity to current concepts
+    float similarity = 0.0f;
+    for (size_t i = 0; i < currentConcepts_.size(); ++i) {
+        float diff = std::abs(currentConcepts_[i] - pattern[i]);
+        similarity += (1.0f - std::min(diff, 1.0f));
+    }
+    
+    return similarity / currentConcepts_.size() >= threshold;
+}
+
+void AgentBrain::applyAttention(const std::vector<NeuronId>& competitors, float inhibitionStrength) {
+    auto* attention = getAttention();
+    if (!attention) return;
+    
+    // Apply attention to select important competitors
+    attention->processCompetition(competitors, inhibitionStrength);
+    
+    // Store attentional winners
+    attentionalWinners_ = attention->getWinners();
+    attendedRegions_ = attention->getAttendedRegions();
+}
+
+std::vector<NeuronId> AgentBrain::getAttentionalWinners() const {
+    return attentionalWinners_;
+}
+
+std::vector<RegionId> AgentBrain::getAttendedRegions() const {
+    return attendedRegions_;
 }
 
 } // namespace nlm
