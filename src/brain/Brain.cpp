@@ -4,6 +4,7 @@
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
 #include "../sensory/SensoryInput.hpp"
+#include "../sensory/InternalSignals.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
@@ -78,6 +79,9 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Novelty detection: store previous working memory pattern
+    std::vector<float> prevMemoryPattern;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,6 +96,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , prevMemoryPattern()
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -409,27 +414,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
+        // Use working memory changes as novelty source
+        if (pImpl->workingMemory) {
+            auto memoryContent = pImpl->workingMemory->retrieve();
+            if (!memoryContent.empty()) {
+                if (pImpl->prevMemoryPattern.empty()) {
+                    pImpl->prevMemoryPattern = memoryContent;
+                    pImpl->novelty->setLevel(0.0f);
+                } else {
+                    pImpl->novelty->detectNovelty(memoryContent, pImpl->prevMemoryPattern);
+                    pImpl->prevMemoryPattern = memoryContent;
+                }
+            }
+        }
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+    // Update curiosity with novelty and prediction error
+    if (pImpl->curiosity && pImpl->novelty && pImpl->dopamine) {
+        float predictionError = pImpl->dopamine->getPlasticityFactor() - 1.0f;  // Approximate prediction error
+        pImpl->curiosity->update(pImpl->novelty->getLevel(), predictionError, pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update dopamine with reward prediction error
     if (pImpl->dopamine) {
+        // Simulate reward based on memory activity
+        float memoryActivity = 0.0f;
+        if (pImpl->workingMemory) {
+            memoryActivity = pImpl->workingMemory->getMemoryActivity();
+        }
+        
+        // Simple reward signal based on memory activity
+        if (memoryActivity > 0.5f) {
+            pImpl->dopamine->signalReward(0.5f + memoryActivity * 0.5f);
+        }
+        
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
+                    // Positive dopamine increases excitability (lower effective threshold)
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
@@ -437,14 +465,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // Apply dopamine to plasticity
+        pImpl->applyNeuromodulation(*pImpl->dopamine);
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
-    float plasticityMod = 1.0f;
-    if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    // TODO PHASE 2: Implement proper neuromodulation integration
+    // Acetylcholine (ACh) - modulates attention and working memory
+    if (pImpl->attention) {
+        // ACh increases attention stability and working memory precision
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->setDecayRate(0.005f);
+            pImpl->attention->setInhibitionStrength(0.3f);
+            pImpl->attention->setExcitationStrength(2.0f);
+        }
     }
+    
+    // Norepinephrine (NE) - modulates arousal and vigilance
+    // Could be implemented as response to novelty and unexpected events
+    
+    // Serotonin (5-HT) - modulates mood and impulsivity
+    // Could be implemented as baseline signal affecting overall excitability
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
@@ -510,9 +551,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Create a simplified sensory input from current neural activity
+        // For now, use working memory content as proxy for sensory state
+        if (pImpl->workingMemory) {
+            auto memoryContent = pImpl->workingMemory->retrieve();
+            if (!memoryContent.empty()) {
+                // Create InternalSignals as concrete sensory input
+                auto internalSignals = std::make_unique<InternalSignals>();
+                for (float value : memoryContent) {
+                    internalSignals->addSignal(value);
+                }
+                
+                // Make prediction for next timestep
+                auto prediction = pImpl->predictionSystem->predictNextState(*internalSignals);
+                
+                if (prediction) {
+                    // Compute prediction error if we have actual sensory data
+                    // For now, just train with current state (self-prediction)
+                    pImpl->predictionSystem->updatePredictions(*prediction, *internalSignals);
+                    pImpl->predictionSystem->train(*internalSignals);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
