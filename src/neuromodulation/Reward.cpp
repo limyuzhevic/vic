@@ -33,8 +33,26 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // Real reward computation based on observation features
+    // For now, implement a simple heuristic: higher value for denser regions
+    if (!observation.gridData.empty()) {
+        float totalValue = 0.0f;
+        for (float cell : observation.gridData) {
+            totalValue += cell;
+        }
+        
+        float avgValue = totalValue / observation.gridData.size();
+        
+        // Reward based on density and value distribution
+        float reward = avgValue * (1.0f + std::min(1.0f, totalValue / 100.0f));
+        
+        // Add stochastic component
+        float noise = (rand() % 200 - 100) / 1000.0f; // ±0.1 noise
+        reward = std::max(0.0f, reward + noise);
+        
+        return reward;
+    }
+    
     return 0.0f;
 }
 

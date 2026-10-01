@@ -287,6 +287,134 @@ print("Agent simulation complete!")
 
 ---
 
+---
+
+## Advanced Usage Examples
+
+### Advanced Example 1: Performance Monitoring
+
+```python
+import pynlm
+
+# Create and initialize
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create performance monitor
+monitor = pynlm.createPerformanceMonitor()
+
+# Run with monitoring
+monitor_result = pynlm.runSimulationWithMonitoring(brain, monitor, 500)
+
+print(f"Completed {monitor_result.stepsCompleted} steps")
+print(f"Total spikes: {monitor_result.totalSpikes}")
+print(f"Average CPU time per step: {monitor_result.avgCPUTimePerStep:.4f} seconds")
+print(f"Final firing rate: {monitor_result.finalFiringRate:.2f}")
+print(f"Max spikes in a single step: {monitor_result.maxSpikesInStep}")
+```
+
+### Advanced Example 2: Batch Processing
+
+```python
+import pynlm
+
+def run_batch_training(num_episodes=100):
+    """Run multiple training episodes with batch processing"""
+    
+    # Configuration for batch training
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", "500")
+    config.set("plasticity.stdp.enable", "true")
+    config.set("neuromod.curiosity.enable", "true")
+    
+    batch_results = []
+    
+    for episode in range(num_episodes):
+        print(f"Running episode {episode + 1}/{num_episodes}")
+        
+        # Create new brain for each episode
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create agent with learning enabled
+        world = pynlm.createSimpleWorld()
+        world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+        world.reset()
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning subsystems
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        
+        # Run batch simulation
+        result = pynlm.runBatchSimulation(
+            brain, world, agent, 
+            numSteps=200,
+            enableNeuromodulation=True,
+            enableDevelopment=True,
+            enableCuriosity=True
+        )
+        
+        batch_results.append(result)
+        
+        # Log results
+        if episode % 10 == 0:
+            print(f"  Episode {episode + 1}: {result.stepsCompleted} steps, "
+                  f"{result.totalSpikes} spikes, avg firing rate: {result.finalFiringRate:.2f}")
+    
+    # Analyze batch results
+    print(f"\nBatch Training Complete!")
+    print(f"Average steps per episode: {sum(r.stepsCompleted for r in batch_results) / len(batch_results):.1f}")
+    print(f"Average total spikes per episode: {sum(r.totalSpikes for r in batch_results) / len(batch_results):.1f}")
+    print(f"Average final firing rate: {sum(r.finalFiringRate for r in batch_results) / len(batch_results):.2f}")
+    
+    return batch_results
+
+# Run batch training
+results = run_batch_training(50)
+```
+
+### Advanced Example 3: Configuration Management
+
+```python
+import pynlm
+import json
+import os
+
+# Create optimized configuration
+config = pynlm.createOptimizedConfig("balanced")
+
+# Export configuration to JSON
+config.saveToFile("my_config.json")
+
+# Load configuration from file
+loaded_config = pynlm.loadConfigFromJSON("my_config.json")
+
+# Load configuration from dictionary
+dict_config = {
+    "brain.neuron_count": "1000",
+    "brain.synapse_density": "0.15",
+    "neuromod.curiosity.enable": "true",
+    "plasticity.stdp.enable": "true"
+}
+
+from_dict_config = pynlm.createConfigFromDict(dict_config)
+
+# Convert to dictionary for easy analysis
+config_dict = pynlm.configToDict(config)
+print("Configuration parameters:", len(config_dict))
+for key, value in config_dict.items():
+    print(f"  {key}: {value}")
+
+# Create brain with loaded configuration
+brain = pynlm.createBrain(loaded_config)
+brain.initialize()
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +422,5 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its advanced features.
+

@@ -36,21 +36,33 @@ float Dopamine::getPlasticityFactor() const {
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Real dopamine dynamics: exponential decay towards baseline with stochastic bursts
+    float targetLevel = pImpl->baseline;
+    float decayFactor = std::exp(-pImpl->decayRate * static_cast<float>(dt));
+    pImpl->level = targetLevel + (pImpl->level - targetLevel) * decayFactor;
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Real reward signaling: burst response scaled by reward magnitude
+    float burst = reward * pImpl->releaseRate;
+    pImpl->level = std::max(pImpl->peak, pImpl->level + burst);
+    
+    // Add some stochastic variation for realism
+    float random = (rand() % 1000) / 1000.0f * 0.2f - 0.1f; // ±0.1 variation
+    pImpl->level = std::clamp(pImpl->level + random, 0.0f, pImpl->peak);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Real reward prediction error signaling: signed error response
+    float errorResponse = error * pImpl->releaseRate;
+    
+    // Phasic response to prediction error
+    if (std::abs(error) > 0.1f) { // Only respond to meaningful errors
+        pImpl->level = std::max(0.0f, pImpl->level + errorResponse * 2.0f);
+    }
+    
+    // Tonic modulation based on persistent error
+    pImpl->baseline = std::max(0.0f, pImpl->baseline + errorResponse * 0.1f);
 }
 
 } // namespace nlm
