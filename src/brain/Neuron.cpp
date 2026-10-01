@@ -37,14 +37,17 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // Ensure source pImpl is set to null after move to prevent double deletion
     other.pImpl = nullptr;
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
+        // Delete current implementation before transferring ownership
         delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
+        // Set source to null to prevent double deletion
         other.pImpl = nullptr;
     }
     return *this;
@@ -262,7 +265,18 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    if (stepLIF(currentTime, dt)) {
+        // Neuron fired during this step
+        // This could be used for spike detection, plasticity, etc.
+    }
+}
+
+void Neuron::step(Timestamp currentTime, TimestepDuration dt) {
+    // Enhanced LIF step with configurable timestep
+    if (stepLIF(currentTime, dt)) {
+        // Neuron fired during this step
+        // This could be used for spike detection, plasticity, etc.
+    }
 }
 
 void Neuron::reset() {

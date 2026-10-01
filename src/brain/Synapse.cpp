@@ -64,14 +64,17 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // Ensure source pImpl is set to null after move to prevent double deletion
     other.pImpl = nullptr;
 }
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
+        // Delete current implementation before transferring ownership
         delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
+        // Set source to null to prevent double deletion
         other.pImpl = nullptr;
     }
     return *this;
@@ -192,10 +195,11 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
+    // Enhanced synaptic dynamics implementation:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
+    // 4. Handle spike timing-dependent plasticity
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     

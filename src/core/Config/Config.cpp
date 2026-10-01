@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +20,110 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return loadFromJSON(filepath);
+    }
+    // Try YAML
+    else if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yaml") {
+        return loadFromYAML(filepath);
+    }
+    // Fallback to simple key=value format
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    try {
+        nlohmann::json json;
+        file >> json;
+        
+        clear();
+        
+        if (json.is_object()) {
+            for (auto it = json.begin(); it != json.end(); ++it) {
+                std::string key = it.key();
+                ConfigSource source = ConfigSource::File;
+                std::string description = "";
+                
+                // Convert JSON value to ConfigValue
+                ConfigValue configValue;
+                if (it.value().is_boolean()) {
+                    configValue = it.value().get<bool>();
+                    description = "Boolean configuration value";
+                } else if (it.value().is_number_integer()) {
+                    configValue = it.value().get<int>();
+                    description = "Integer configuration value";
+                } else if (it.value().is_number_unsigned()) {
+                    configValue = it.value().get<uint64_t>();
+                    description = "Unsigned integer configuration value";
+                } else if (it.value().is_number()) {
+                    configValue = it.value().get<double>();
+                    description = "Floating point configuration value";
+                } else if (it.value().is_string()) {
+                    configValue = it.value().get<std::string>();
+                    description = "String configuration value";
+                } else if (it.value().is_array()) {
+                    // Handle arrays
+                    auto arr = it.value();
+                    if (arr.empty()) {
+                        description = "Empty array configuration value";
+                        configValue = std::vector<int>{};
+                    } else if (arr[0].is_number_integer()) {
+                        std::vector<int> vec;
+                        vec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            vec.push_back(item.get<int>());
+                        }
+                        configValue = vec;
+                        description = "Integer array configuration value";
+                    } else if (arr[0].is_number()) {
+                        std::vector<double> vec;
+                        vec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            vec.push_back(item.get<double>());
+                        }
+                        configValue = vec;
+                        description = "Float array configuration value";
+                    } else if (arr[0].is_string()) {
+                        std::vector<std::string> vec;
+                        vec.reserve(arr.size());
+                        for (const auto& item : arr) {
+                            vec.push_back(item.get<std::string>());
+                        }
+                        configValue = vec;
+                        description = "String array configuration value";
+                    } else {
+                        description = "Unknown array configuration value";
+                        configValue = std::vector<int>{};
+                    }
+                } else {
+                    description = "Unknown configuration value type";
+                    configValue = "";
+                }
+                
+                set(key, configValue, source, description);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO: Implement YAML parsing with a YAML library (e.g., yaml-cpp)
+    // For now, fall back to simple file parser
+    return loadFromSimpleFile(filepath);
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +188,16 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -127,19 +238,19 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, ConfigValue(value), source, "String configuration value");
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, ConfigValue(value), source, "Integer configuration value");
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, ConfigValue(value), source, "Floating point configuration value");
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set(key, ConfigValue(value), source, "Boolean configuration value");
 }
 
 bool Config::has(const std::string& key) const {
@@ -197,6 +308,19 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+        it->description = description;
+    } else {
+        pImpl->entries.emplace_back(key, value, source, description);
+    }
 }
 
 // Explicit template instantiations

@@ -161,14 +161,17 @@ Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+Brain::Brain(Brain&& other) noexcept : pImpl(std::move(other.pImpl)) {
+    // Ensure source pImpl is set to null after move to prevent double deletion
     other.pImpl = nullptr;
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
+        // Delete current implementation before transferring ownership
         delete pImpl;
-        pImpl = other.pImpl;
+        pImpl = std::move(other.pImpl);
+        // Set source to null to prevent double deletion
         other.pImpl = nullptr;
     }
     return *this;
