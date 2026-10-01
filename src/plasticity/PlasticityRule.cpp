@@ -10,57 +10,43 @@ void PlasticityRule::setEnabled(bool enabled) {
     enabled_ = enabled;
 }
 
-struct HebbianRule::Impl {
-    float learningRate;
-    
-    Impl() : learningRate(0.01f) {}
-};
-
-HebbianRule::HebbianRule() : pImpl(new Impl) {}
-
-HebbianRule::~HebbianRule() = default;
-
-void HebbianRule::update(Synapse* synapse,
-                          const std::vector<Timestamp>& preSpikes,
-                          const std::vector<Timestamp>& postSpikes,
-                          TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
-            }
-        }
-    }
-    
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
-    }
+// Factory implementation
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createSTDP() {
+    return std::make_shared<STDP>();
 }
 
-void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    synapse->addToWeight(delta);
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createHebbian() {
+    return std::make_shared<HebbianRule>();
 }
 
-const char* HebbianRule::getName() const {
-    return "Hebbian";
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createBCM() {
+    return std::make_shared<BCMRule>();
 }
 
-void HebbianRule::setLearningRate(float rate) {
-    pImpl->learningRate = rate;
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createAntiHebbian() {
+    return std::make_shared<AntiHebbianRule>();
 }
 
-float HebbianRule::getLearningRate() const {
-    return pImpl->learningRate;
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createOja() {
+    return std::make_shared<OjaRule>();
+}
+
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createBMU() {
+    return std::make_shared<BMURule>();
+}
+
+std::vector<std::string> PlasticityRuleFactory::getAvailableRuleNames() {
+    return {"STDP", "Hebbian", "BCM", "AntiHebbian", "Oja", "BMU"};
+}
+
+std::shared_ptr<PlasticityRule> PlasticityRuleFactory::createFromName(const std::string& name) {
+    if (name == "STDP") return createSTDP();
+    if (name == "Hebbian") return createHebbian();
+    if (name == "BCM") return createBCM();
+    if (name == "AntiHebbian") return createAntiHebbian();
+    if (name == "Oja") return createOja();
+    if (name == "BMU") return createBMU();
+    return nullptr;
 }
 
 } // namespace nlm
