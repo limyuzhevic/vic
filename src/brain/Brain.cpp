@@ -483,36 +483,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
+            // Finalize current episode if one exists
+            if (auto* currentEpisode = pImpl->episodicMemory->getCurrentEpisode()) {
+                currentEpisode->timestamp = currentStep;
+                currentEpisode->reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                pImpl->episodicMemory->storeEpisode(*currentEpisode);
+                pImpl->episodicMemory->endCurrentEpisode();
             }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Generate predictions for next states
+        pImpl->predictionSystem->computePredictions();
+        
+        // Update prediction error based on sensory input
+        if (pImpl->dopamine) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            pImpl->dopamine->updatePredictionError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +521,14 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form concepts
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Integrate with working memory
+        if (pImpl->workingMemory) {
+            auto workingMemoryContent = pImpl->workingMemory->retrieve();
+            pImpl->conceptFormation->integrateWorkingMemory(workingMemoryContent);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
