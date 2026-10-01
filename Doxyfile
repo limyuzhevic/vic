@@ -1,0 +1,348 @@
+# Doxygen configuration file for NLM (Neural Learning Machine)
+# Generated according to Doxygen best practices for C++ projects
+
+# Project related configuration options
+PROJECT_NAME           = NLM
+PROJECT_NUMBER         = 1.0
+PROJECT_BRIEF          = "Neural Learning Machine - Spiking Neural Network Simulator"
+PROJECT_URL            = https://github.com/nlm-project/nlm
+PROJECT_LOGO           = "../docs/logo.png"
+OUTPUT_DIRECTORY       = "../docs/doxygen"
+CREATE_SUBDIRS         = NO
+
+# Warning and progress messages
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_FORMAT            = "$file:$line: $msg"
+WARN_LOGFILE           = "../docs/doxygen/warnings.log"
+
+# Input files
+INPUT                  = 
+                         ../src/core/Config/Config.hpp
+                         ../src/core/Random/Random.hpp
+                         ../src/core/Logger/Logger.hpp
+                         ../src/core/SimulationClock/SimulationClock.hpp
+                         ../src/brain/Brain.hpp
+                         ../src/brain/Neuron.hpp
+                         ../src/brain/NeuralPopulation.hpp
+                         ../src/brain/NeuralRegion.hpp
+                         ../src/brain/Synapse.hpp
+                         ../src/dynamics/NeuralDynamics.hpp
+                         ../src/plasticity/PlasticityRule.hpp
+                         ../src/plasticity/STDP.hpp
+                         ../src/plasticity/Hebbian.hpp
+                         ../src/plasticity/StructuralPlasticity.hpp
+                         ../src/development/DevelopmentSystem.hpp
+                         ../src/development/Maturation.hpp
+                         ../src/development/Pruning.hpp
+                         ../src/development/Synaptogenesis.hpp
+                         ../src/neuromodulation/Dopamine.hpp
+                         ../src/neuromodulation/Curiosity.hpp
+                         ../src/neuromodulation/Novelty.hpp
+                         ../src/neuromodulation/PredictionError.hpp
+                         ../src/neuromodulation/Reward.hpp
+                         ../src/memory/NeuralWorkingMemory.hpp
+                         ../src/memory/NeuralEpisodicMemory.hpp
+                         ../src/prediction/NeuralPrediction.hpp
+                         ../src/prediction/PredictionSystem.hpp
+                         ../src/cognition/ConceptFormation.hpp
+                         ../src/cognition/NeuralPlanner.hpp
+                         ../src/sensory/Audio.hpp
+                         ../src/sensory/Vision.hpp
+                         ../src/sensory/InternalSignals.hpp
+                         ../src/sensory/SensoryInput.hpp
+                         ../src/motor/Action.hpp
+                         ../src/motor/MotorSystem.hpp
+                         ../src/core/Exceptions/*.hpp
+                         ../src/core/Types/Types.hpp
+                         "../src/*.md"
+
+# Configuration options common to all modules
+EXCLUDE                = "*/build/*" 
+                         "*/test/*" 
+                         "*/tests/*"
+                         "*/.git/*"
+                         "*/.vscode/*"
+                         "*/.kilocode/*"
+                         "*/docs/doxygen/*"
+
+# The defining macro that marks visibility
+HAVE_DOT               = NO
+
+# Internal references
+INTERNAL_DOCS          = NO
+
+# Case sensitivity in file names
+CASE_SENSE_NAMES       = YES
+
+# Table of Contents generation
+GENERATE_TOC_DOC       = YES
+TOC_INCLUDE_FILES      = "index.md"
+
+# Multi-level links
+GENERATE_AUTOMATIC_MEMBERS = YES
+
+# Layout settings
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_RTF          = NO
+GENERATE_XML          = NO
+GENERATE_DOCSET       = NO
+GENERATE_PHPDOC       = NO
+GENERATE_PRESCAN      = NO
+
+# API reference generation
+GENERATE_APIREF       = YES
+HAVE_NBWP             = NO
+
+# Index generation
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_RTF          = NO
+GENERATE_XML          = NO
+GENERATE_MAN          = NO
+GENERATE_DOCSET       = NO
+GENERATE_PHPDOC       = NO
+GENERATE_PRESCAN      = NO
+
+# JavaScript based features
+GENERATE_ECLIPSEHELP  = NO
+GENERATE_QUICKDEF    = NO
+
+# Configuration options related to the class/view feature
+ENABLE_PREPROCESSING  = YES
+
+# Configuration options related to the alphabetical index of file names
+SORT_BRIEF_DOCS       = NO
+SORT_GROUPED_MEMBERS_FIRST = YES
+SORT_MEMBER_DOCS       = NO
+SORT_MEMBER_DOCS    = YES
+SORT_BRIEF_DOCS      = NO
+SORT_GROUPED_MEMBERS_FIRST = YES
+SORT_MEMBER_DOCS      = NO
+
+# Source file and external reference formatting
+DISABLE_INDEX        = NO
+ENUM_VALUES_PER_LINE = 4
+GENERATE_ANCILLARY_FILES = YES
+USE_WINDOWS_ENCRYPTION = NO
+
+# Configuration options related to the search engine
+SEARCHENGINE          = YES
+SEARCHENGINE_URL      = "https://search.github.com/search?q=$q%26q=site%3Agithub.com%2Fnlm-project%2Fnlm"
+SEARCH_PAGER          = "../src/docs/doxygen/search.html"
+SEARCHDATA_FILE      = "searchdata.js"
+EXTERNAL_SEARCH     = NO
+SEARCH_DB_PATH       = ""
+SEARCH_RELOAD_CONFIG = NO
+
+# Configuration options related to the dot tool
+CLASS_GRAPH           = YES
+COLLABORATION_GRAPH   = YES
+GROUP_GRAPHS          = YES
+UML_LOOK              = NO
+UML_LIMIT_NARROW      = NO
+TEMPLATE_RELATIONS   = YES
+INCLUDE_GRAPH         = YES
+INCLUDED_BY_GRAPH     = YES
+CALL_GRAPH           = YES
+CALLED_BY_GRAPH      = YES
+GRAPHICAL_HIERARCHY  = YES
+DIRECTORY_GRAPH      = YES
+DIRECTORY_GRAPH     = YES
+DOT_IMAGE_FORMAT     = PNG
+DOT_FONTSIZE         = 14
+DOT_FONTPATH         = ""
+MAX_DOT_GRAPH_DEPTH  = 1000
+DOTFILE_DIRS         = ""
+DOT_GRAPH_MAX_NODES  = 50
+MAX_DOT_GRAPH_DEPTH  = 1000
+DOT_FONTSIZE         = 14
+
+# Configuration options general
+ALPHABETICAL_INDEX   = YES
+GENERATE_LAMARCKIAN  = NO
+GENERATE_TESTLIST    = YES
+GENERATE_TESTLIST    = YES
+GENERATE_BUGLIST     = YES
+GENERATE_BUGLIST     = YES
+GENERATE_EXEMPLIST  = YES
+GENERATE_EXEMPLIST  = YES
+GENERATE_REFFILE    = YES
+GENERATE_REFFILE    = YES
+GENERATE_HTML       = YES
+GENERATE_LATEX      = NO
+GENERATE_RTF       = NO
+GENERATE_XML       = NO
+GENERATE_MAN       = NO
+GENERATE_DOCSET     = NO
+GENERATE_PHPDOC     = NO
+GENERATE_PRESCAN    = NO
+
+# Configuration options related to input
+SOURCE_BROWSER       = YES
+INLINE_SOURCES       = NO
+STRIP_CODE_COMMENTS  = YES
+STRIP_FROM_PATH      = ""
+INCLUDE_PATH         = ""
+INCLUDE_FILE_PATTERNS = ""
+FILTER_SOURCE_FILES  = NO
+FILTER_PATTERNS      = ""
+FILTER_SOURCE_PATTERNS = "*.py"
+
+# Configuration options related to source code
+SOURCE_BROWSER       = YES
+INLINE_SOURCES       = NO
+STRIP_CODE_COMMENTS  = YES
+STRIP_FROM_PATH      = ""
+INCLUDE_PATH         = ""
+INCLUDE_FILE_PATTERNS = ""
+FILTER_SOURCE_FILES  = NO
+FILTER_PATTERNS      = ""
+FILTER_SOURCE_PATTERNS = "*.py"
+
+# Configuration options related to the warning system
+WARNINGS            = YES
+WARN_IF_UNDOCUMENTED = YES
+WARN_IF_DOC_ERROR   = YES
+WARN_NO_PARAMDOC    = YES
+WARN_DOCSTYLE       = "0"
+
+# Configuration options related to doxygen
+doxygen_output      = "../docs/doxygen"
+GENERATE_HTML       = YES
+GENERATE_LATEX      = NO
+GENERATE_RTF       = NO
+GENERATE_XML       = NO
+GENERATE_MAN       = NO
+GENERATE_DOCSET     = NO
+GENERATE_PHPDOC     = NO
+GENERATE_PRESCAN    = NO
+
+# Configuration options related to the HTML output
+GENERATE_HTML         = YES
+HTML_OUTPUT          = "html"
+HTML_FILE_EXTENSION  = ".html"
+HTML_HEADER         = "../docs/doxygen/html_header.html"
+HTML_FOOTER         = "../docs/doxygen/html_footer.html"
+HTML_STYLESHEET     = "../docs/doxygen/style.css"
+HTML_COLORSTYLE     = "DARK"
+HTML_COLORSTYLE_HUE = 220
+HTML_COLORSTYLE_SAT = 100
+HTML_EXTRA_FILES    = "../docs/doxygen/logo.png"
+HTML_EXTRA_STYLESHEET = "../docs/doxygen/custom.css"
+HTML_EXTRA_FILES    = ""
+
+# Configuration options related to the LaTeX output
+GENERATE_LATEX       = NO
+LATEX_OUTPUT        = "latex"
+LATEX_BATCHMODE     = NO
+LATEX_HIDE_INDICES   = NO
+LATEX_MAKEINDEX      = "makeindex"
+LATEX_EXTENSIONS     = ""
+
+# Configuration options related to the RTF output
+GENERATE_RTF        = NO
+RTF_OUTPUT          = "rtf"
+RTF_SOURCE_FILTER   = ""
+
+# Configuration options related to the XML output
+GENERATE_XML        = YES
+XML_OUTPUT          = "xml"
+XML_SCHEMA          = ""
+XML_DCLIMB          = YES
+
+# Configuration options related to the DOCSET output
+GENERATE_DOCSET     = YES
+DOCSET_FEEDNAME     = "NLM Documentation"
+DOCSET_BUNDLE_ID    = "org.nlm.documentation"
+DOCSET_PUBLISHER_ID = "org.nlm"
+DOCSET_PUBLISHER_NAME = "NLM Project"
+DOCSET_HTML         = "YES"
+DOCSET_INCLUDE_PATH = ""
+DOCSET_JS_MODULE    = "module-search-index.js"
+
+# Configuration options for the Index
+GENERATE_INDEX_NO_GLOBAL = YES
+
+# Configuration options related to the HTML help generator
+GENERATE_HTMLHELP    = YES
+CHM_FILE            = "../docs/NLM.chm"
+HHC_LOCATION        = ""
+GENERATE_CHI        = NO
+
+# Configuration options related to the Makefile generation
+GENERATE_MAKEFILE   = NO
+GENERATE_COMPACT     = YES
+
+# Configuration options related to post-processing
+CASE_SENSE_NAMES    = YES
+
+# Doxygen will parse all input files listed here
+INPUT               = ../src
+
+# This tag specifies the encoding used by the input files
+FILE_ENCODING        = UTF-8
+
+# Configuration section related to source directory
+EXCLUDE_PATTERNS     = "*.py"
+
+# Configuration options related to the include relation
+HIDE_UNDOC_CLASSES  = YES
+HIDE_UNDOC_MEMBERS  = YES
+HIDE_UNDOC_ENUMVALUES = YES
+HIDE_UNDOC_FILES     = YES
+HIDE_UNDOC_NAMESPACES = YES
+
+# Configuration options related to the doxygen logo
+QUIET              = YES
+BRIEF_MEMBER_DESC   = YES
+REPEAT_BRIEF        = YES
+ABBREVIATE_BRIEF    = "The $name class represents ..."
+
+# Configuration options related to the class diagram
+CLASS_GRAPH          = YES
+COLLABORATION_GRAPH  = YES
+GROUP_GRAPHS          = YES
+UML_LOOK              = NO
+UML_LIMIT_NARROW      = NO
+TEMPLATE_RELATIONS   = YES
+INCLUDE_GRAPH        = YES
+INCLUDED_BY_GRAPH    = YES
+CALL_GRAPH           = YES
+CALLED_BY_GRAPH      = YES
+GRAPHICAL_HIERARCHY  = YES
+DIRECTORY_GRAPH      = YES
+
+# Configuration options related to the documented files
+GENERATE_HTML      = YES
+GENERATE_LATEX     = NO
+GENERATE_RTF      = NO
+GENERATE_XML      = NO
+GENERATE_MAN      = NO
+GENERATE_DOCSET    = NO
+GENERATE_PHPDOC    = NO
+GENERATE_PRESCAN   = NO
+
+# Configuration options related to the generated docs
+GENERATE_INDEX_NO_GLOBAL = NO
+GENERATE_HTML_HELP = YES
+CHM_FILE = "../docs/NLM.chm"
+HHC_LOCATION = ""
+GENERATE_CHI = NO
+GENERATE_HTML = YES
+HTML_OUTPUT = "html"
+HTML_FILE_EXTENSION = ".html"
+HTML_COLORSTYLE = "LIGHT"
+
+# Configuration options related to the images
+DOT_IMAGE_FORMAT = PNG
+DOT_FONTSIZE = 14
+
+# Configuration options related to the source code
+STRIP_FROM_PATH = ""
+STRIP_FROM_INC_PATH = ""

@@ -7,10 +7,8 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Exceptions/NLMException.hpp"
+#include "core/Exceptions/ExceptionUtils.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -356,41 +354,40 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    try {
+        // Load config from file (ignore if not found)
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration.");
+        }
+        
+        // Override with command line args
+        config->loadFromArgs(argc, argv);
+        
+        // Set default values for Phase 2
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        
+        // STDP parameters
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+    } catch (const ConfigurationError& e) {
+        NLM_LOG_ERROR(formatException(e));
+        return 1;
+    } catch (const NLMException& e) {
+        NLM_LOG_ERROR(formatException(e));
+        return 1;
+    };
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

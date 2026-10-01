@@ -1,192 +1,98 @@
+#ifndef NLM_CORE_H
+#define NLM_CORE_H
+
+// Core component interface library
+// Provides fundamental types, utilities, and base classes for all NLM components
+
 #pragma once
 
-#include <cstdint>
-#include <type_traits>
+#include <memory>
+#include <chrono>
+#include <atomic>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <functional>
+#include <optional>
+#include <variant>
 
 namespace nlm {
+namespace core {
 
-// Strongly-typed identifiers for safety
+// Forward declarations for internal use
+class Logger;
+class SimulationClock;
 
-// Neuron identifier
-struct NeuronId {
-    uint64_t value;
-    
-    constexpr NeuronId() : value(0) {}
-    explicit constexpr NeuronId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const NeuronId& other) const = default;
-    constexpr bool operator!=(const NeuronId& other) const = default;
-    constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+// Core exception hierarchy
+class NLMException : public std::exception {
+protected:
+    std::string message_;
+public:
+    explicit NLMException(const std::string& message) : message_(message) {}
+    virtual ~NLMException() = default;
+    virtual const char* what() const noexcept override { return message_.c_str(); }
 };
 
-// Synapse identifier
-struct SynapseId {
-    uint64_t value;
-    
-    constexpr SynapseId() : value(0) {}
-    explicit constexpr SynapseId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const SynapseId& other) const = default;
-    constexpr bool operator!=(const SynapseId& other) const = default;
-    constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+class ConfigurationException : public NLMException {
+public:
+    explicit ConfigurationException(const std::string& message) : NLMException("ConfigurationError: " + message) {}
 };
 
-// Region identifier
-struct RegionId {
-    uint64_t value;
-    
-    constexpr RegionId() : value(0) {}
-    explicit constexpr RegionId(uint64_t v) : value(v) {}
-    
-    constexpr bool operator==(const RegionId& other) const = default;
-    constexpr bool operator!=(const RegionId& other) const = default;
-    constexpr bool operator<(const RegionId& other) const { return value < other.value; }
-    
-    constexpr uint64_t index() const { return value; }
+// Type aliases for common types
+using Timestamp = std::chrono::time_point<std::chrono::steady_clock>;
+using Duration = std::chrono::duration<double>;
+using NodeId = uint64_t;
+using Weight = double;
+using Probability = double;
+using TimeStep = double;
+
+// Thread-safe counter
+class AtomicCounter {
+private:
+    std::atomic<uint64_t> counter_;
+public:
+    AtomicCounter() : counter_(0) {}
+    uint64_t increment() { return ++counter_; }
+    uint64_t get() const { return counter_; }
+    void reset() { counter_ = 0; }
 };
 
-// Population identifier
-struct PopulationId {
-    uint64_t value;
+// Smart pointer typedefs
+template<typename T>
+using UniquePtr = std::unique_ptr<T>;
+
+template<typename T>
+using SharedPtr = std::shared_ptr<T>;
+
+template<typename T>
+using WeakPtr = std::weak_ptr<T>;
+
+// Result type for error handling
+enum class Result { SUCCESS, FAILURE, PARTIAL, TIMEOUT };
+
+template<typename T>
+class ResultWrapper {
+public:
+    ResultWrapper(Result result, const T& data) : result_(result), data_(data) {}
+    ResultWrapper(Result result) : result_(result) {}
     
-    constexpr PopulationId() : value(0) {}
-    explicit constexpr PopulationId(uint64_t v) : value(v) {}
+    bool success() const { return result_ == Result::SUCCESS; }
+    bool failure() const { return result_ == Result::FAILURE; }
+    bool partial() const { return result_ == Result::PARTIAL; }
+    bool timeout() const { return result_ == Result::TIMEOUT; }
     
-    constexpr bool operator==(const PopulationId& other) const = default;
-    constexpr bool operator!=(const PopulationId& other) const = default;
-    constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
+    const T& data() const { return data_; }
+    T& data() { return data_; }
     
-    constexpr uint64_t index() const { return value; }
+private:
+    Result result_;
+    T data_;
 };
 
-// Simulation step counter
-using SimulationStep = uint64_t;
-
-// Simulation time in seconds (floating point)
-using Timestamp = double;
-
-// Timestep duration in seconds
-using TimestepDuration = double;
-
-// Index types for arrays
-using NeuronIndex = uint64_t;
-using SynapseIndex = uint64_t;
-using PopulationIndex = uint64_t;
-using RegionIndex = uint64_t;
-
-// Synaptic weight type
-using SynapticWeight = float;
-
-// Membrane potential type
-using MembranePotential = float;
-
-// Neuron firing rate type
-using FiringRate = float;
-
-// Connection delay in simulation steps
-using Delay = uint32_t;
-
-// Typed enums for neuron types
-enum class NeuronType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Sensory,
-    Motor,
-    Internal
-};
-
-// Typed enums for synapse types
-enum class SynapseType : uint8_t {
-    Excitatory,
-    Inhibitory,
-    Modulatory,
-    Electrical,
-    GapJunction
-};
-
-// Synaptic plasticity state flags
-struct PlasticityFlags {
-    bool hebbian : 1;
-    bool stdp : 1;
-    bool reward_modulated : 1;
-    bool structural : 1;
-    bool eligible : 1;
-    
-    constexpr PlasticityFlags() : hebbian(false), stdp(false), 
-                                  reward_modulated(false), structural(false), 
-                                  eligible(false) {}
-};
-
-// Developmental state
-enum class DevelopmentalStage : uint8_t {
-    Initial,
-    CriticalPeriod,
-    Maturation,
-    Adult,
-    Aging
-};
-
-// Spike event for event-driven computation
-struct SpikeEvent {
-    NeuronId source_neuron;
-    Timestamp timestamp;
-    SimulationStep step;
-    
-    SpikeEvent() : source_neuron(), timestamp(0.0), step(0) {}
-    SpikeEvent(NeuronId nid, Timestamp ts, SimulationStep s)
-        : source_neuron(nid), timestamp(ts), step(s) {}
-};
-
-// Delayed spike event for synaptic transmission with delay
-struct DelayedSpikeEvent {
-    NeuronId source_neuron;
-    NeuronId destination_neuron;
-    SynapseId synapse_id;
-    SynapticWeight weight;  // Weight at time of spike (frozen)
-    SynapseType synapse_type;
-    Timestamp timestamp;      // When spike occurs
-    Timestamp delivery_time;  // When spike reaches destination (timestamp + delay)
-    SimulationStep step;      // Current simulation step
-    SimulationStep delivery_step;  // Step when spike should be delivered
-    bool is_excitatory;  // Cached for quick lookup
-    
-    DelayedSpikeEvent()
-        : source_neuron(), destination_neuron(), synapse_id()
-        , weight(0.0f), synapse_type(SynapseType::Excitatory)
-        , timestamp(0.0), delivery_time(0.0), step(0), delivery_step(0)
-        , is_excitatory(true) {}
-    
-    DelayedSpikeEvent(NeuronId src, NeuronId dst, SynapseId syn,
-                      SynapticWeight w, SynapseType type,
-                      Timestamp ts, Timestamp delivery, SimulationStep s, SimulationStep deliveryS)
-        : source_neuron(src), destination_neuron(dst), synapse_id(syn)
-        , weight(w), synapse_type(type)
-        , timestamp(ts), delivery_time(delivery)
-        , step(s), delivery_step(deliveryS)
-        , is_excitatory(type == SynapseType::Excitatory) {}
-};
-
-// Action potential state
-enum class FiringState : uint8_t {
-    Resting,
-    Active,
-    Refractory,
-    Inhibited
-};
-
-// Generic handle types for efficiency
-using NeuronHandle = uint64_t;
-using SynapseHandle = uint64_t;
-
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
-
+} // namespace core
 } // namespace nlm
+
+#endif // NLM_CORE_H
