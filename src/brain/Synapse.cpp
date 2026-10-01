@@ -130,14 +130,22 @@ bool Synapse::isInhibitory() const {
 void Synapse::recordPreSpike(Timestamp timestamp) {
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+        // Use rotate to avoid iterator invalidation
+        std::rotate(pImpl->preSpikeHistory.begin(), 
+                   pImpl->preSpikeHistory.begin() + (pImpl->preSpikeHistory.size() - Impl::MAX_SPIKE_HISTORY),
+                   pImpl->preSpikeHistory.end());
+        pImpl->preSpikeHistory.resize(Impl::MAX_SPIKE_HISTORY);
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+        // Use rotate to avoid iterator invalidation
+        std::rotate(pImpl->postSpikeHistory.begin(), 
+                   pImpl->postSpikeHistory.begin() + (pImpl->postSpikeHistory.size() - Impl::MAX_SPIKE_HISTORY),
+                   pImpl->postSpikeHistory.end());
+        pImpl->postSpikeHistory.resize(Impl::MAX_SPIKE_HISTORY);
     }
 }
 

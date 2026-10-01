@@ -150,7 +150,12 @@ void Neuron::clearTotalCurrent() {
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        // Use erase-remove idiom or rotate to avoid iterator invalidation
+        // Move first elements to end and truncate to maintain order
+        std::rotate(pImpl->spikeHistory.begin(), 
+                   pImpl->spikeHistory.begin() + (pImpl->spikeHistory.size() - Impl::MAX_SPIKE_HISTORY),
+                   pImpl->spikeHistory.end());
+        pImpl->spikeHistory.resize(Impl::MAX_SPIKE_HISTORY);
     }
 }
 

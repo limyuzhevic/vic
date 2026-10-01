@@ -1,11 +1,13 @@
 #include "Random.hpp"
 #include <stdexcept>
+#include <mutex>
 
 namespace nlm {
 
 struct RandomGenerator::Impl {
     std::mt19937_64 gen;
     uint64_t currentSeed;
+    mutable std::mutex mutex;  // Protect access to the random number generator
     
     Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
 };
@@ -22,7 +24,7 @@ RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        delete pImpl;  // Safe even if pImpl is nullptr
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -30,15 +32,18 @@ RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
 }
 
 void RandomGenerator::seed(uint64_t seed) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->gen.seed(seed);
     pImpl->currentSeed = seed;
 }
 
 uint64_t RandomGenerator::getSeed() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->currentSeed;
 }
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
@@ -50,6 +55,7 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 }
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
     }
@@ -61,6 +67,7 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
     }
@@ -69,6 +76,7 @@ double RandomGenerator::uniformReal(double min, double max) {
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (min >= max) {
         throw std::invalid_argument("min must be < max");
     }
@@ -77,26 +85,31 @@ float RandomGenerator::uniformReal(float min, float max) {
 }
 
 double RandomGenerator::normal(double mean, double stddev) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::normal_distribution<double> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::normal(float mean, float stddev) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::normal_distribution<float> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 bool RandomGenerator::bernoulli(double p) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::bernoulli_distribution dist(p);
     return dist(pImpl->gen);
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
 }
@@ -110,6 +123,7 @@ uint32_t RandomGenerator::randomBit() {
 }
 
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (n == 0) {
         throw std::invalid_argument("Cannot pick from zero items");
     }
@@ -117,6 +131,7 @@ uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
 }
 
 void RandomGenerator::fillBytes(void* data, size_t size) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     uint8_t* bytes = static_cast<uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
         bytes[i] = static_cast<uint8_t>(uniformInt(0, 255));
@@ -124,10 +139,12 @@ void RandomGenerator::fillBytes(void* data, size_t size) {
 }
 
 std::mt19937_64& RandomGenerator::engine() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->gen;
 }
 
 const std::mt19937_64& RandomGenerator::engine() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->gen;
 }
 

@@ -68,7 +68,11 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         
         // Trim history if needed
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
-            pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+            // Use rotate to avoid iterator invalidation
+            std::rotate(pImpl->spikeHistory.begin(), 
+                       pImpl->spikeHistory.begin() + (pImpl->spikeHistory.size() - pImpl->maxHistorySize),
+                       pImpl->spikeHistory.end());
+            pImpl->spikeHistory.resize(pImpl->maxHistorySize);
         }
         
         // Call handlers

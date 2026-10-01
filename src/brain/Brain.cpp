@@ -78,9 +78,8 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
+Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -99,6 +98,18 @@ struct Brain::Impl {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
+        
+        // Initialize plasticity systems
+        spikeSystem = std::make_unique<SpikeSystem>();
+        stdp = std::make_unique<STDP>();
+        hebbian = std::make_unique<Hebbian>();
+        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // Ensure rng is properly initialized before any other operations
+        if (!rng) {
+            rng = std::make_unique<RandomGenerator>(seed);
+        }
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
