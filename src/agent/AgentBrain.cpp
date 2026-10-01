@@ -5,8 +5,27 @@
 
 namespace nlm {
 
+namespace {
+    constexpr float DEFAULT_SENSORY_NOVELTY_DECAY = 0.95f;
+    constexpr float MAX_NOVELTY_LEVEL = 1.0f;
+    constexpr float MIN_NOVELTY_LEVEL = 0.0f;
+    constexpr float DEFAULT_EXPLORATION_THRESHOLD = 0.3f;
+    constexpr float MAX_EXPLORATION_CHANCE = 0.3f;
+    constexpr size_t MAX_MOTOR_GROUPS = 6;
+    constexpr size_t MAX_SENSORY_GROUPS = 4;
+    
+    bool isValidNeuron(Neuron* neuron) {
+        return neuron != nullptr;
+    }
+    
+    NeuronType getNeuronTypeSafely(NeuralPopulation* pop) {
+        if (!pop) return NeuronType::Unknown;
+        return pop->getNeuronType();
+    }
+}
+
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
-    : brain_(brain)
+    : brain_(std::move(brain))
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -18,46 +37,158 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
-    , sensoryNoveltyDecay_(0.99f)
+    , sensoryNoveltyDecay_(DEFAULT_SENSORY_NOVELTY_DECAY)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
+    // Validate input
+    if (!brain_) {
+        NLM_LOG_ERROR("AgentBrain initialized with null brain pointer");
+        return;
+    }
+    
+    // Initialize neuron groups with error checking
+    initializeNeuronGroups();
+}
+
+void AgentBrain::initializeNeuronGroups() {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot initialize neuron groups: brain is null");
+        return;
+    }
+    
+    // Ensure all neuron group vectors are empty before initialization
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    
+    // Iterate through brain regions and populations safely
+    for (const auto& region : brain_->getRegions()) {
+        if (!region) continue;
+        
+        for (const auto& pop : region->getPopulations()) {
+            if (!pop) continue;
+            
+            NeuronType type = getNeuronTypeSafely(pop.get());
+            
+            if (type == NeuronType::Motor) {
+                distributeMotorNeurons(pop.get());
+            } else if (type == NeuronType::Sensory) {
+                distributeSensoryNeurons(pop.get());
             }
         }
+    }
+    
+    // Log initialization summary
+    NLM_LOG_INFO("AgentBrain neuron group initialization complete:");
+    NLM_LOG_INFO("  Motor groups: " + std::to_string(motorForward_.size() + motorBackward_.size() + 
+                  motorTurnLeft_.size() + motorTurnRight_.size() + 
+                  motorInteract_.size() + motorWait_.size()) + " neurons");
+    NLM_LOG_INFO("  Sensory groups: " + std::to_string(sensoryVision_.size() + 
+                  sensoryTouch_.size() + sensoryInternal_.size() + 
+                  sensoryProprioception_.size()) + " neurons");
+}
+
+void AgentBrain::distributeMotorNeurons(NeuralPopulation* population) {
+    if (!population) return;
+    
+    for (Neuron* neuron : population->getNeurons()) {
+        if (!isValidNeuron(neuron)) continue;
+        
+        // Check if already distributed
+        if (isMotorNeuronDistributed(neuron)) continue;
+        
+        // Assign to motor group based on distribution algorithm
+        assignToMotorGroup(neuron);
+    }
+}
+
+void AgentBrain::distributeSensoryNeurons(NeuralPopulation* population) {
+    if (!population) return;
+    
+    for (Neuron* neuron : population->getNeurons()) {
+        if (!isValidNeuron(neuron)) continue;
+        
+        // Check if already distributed
+        if (isSensoryNeuronDistributed(neuron)) continue;
+        
+        // Assign to sensory group based on distribution algorithm
+        assignToSensoryGroup(neuron);
+    }
+}
+
+bool AgentBrain::isMotorNeuronDistributed(Neuron* neuron) const {
+    if (!neuron) return true;
+    
+    // Check all motor groups
+    return std::any_of(motorForward_.begin(), motorForward_.end(), 
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(motorBackward_.begin(), motorBackward_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(motorTurnLeft_.begin(), motorTurnLeft_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(motorTurnRight_.begin(), motorTurnRight_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(motorInteract_.begin(), motorInteract_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(motorWait_.begin(), motorWait_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; });
+}
+
+bool AgentBrain::isSensoryNeuronDistributed(Neuron* neuron) const {
+    if (!neuron) return true;
+    
+    // Check all sensory groups
+    return std::any_of(sensoryVision_.begin(), sensoryVision_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(sensoryTouch_.begin(), sensoryTouch_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(sensoryInternal_.begin(), sensoryInternal_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; }) ||
+           std::any_of(sensoryProprioception_.begin(), sensoryProprioception_.end(),
+                      [neuron](const Neuron* n) { return n == neuron; });
+}
+
+void AgentBrain::assignToMotorGroup(Neuron* neuron) {
+    if (!neuron) return;
+    
+    // Calculate current distribution index
+    size_t idx = motorForward_.size() + motorBackward_.size() + 
+                 motorTurnLeft_.size() + motorTurnRight_.size() +
+                 motorInteract_.size() + motorWait_.size();
+    
+    // Assign to appropriate group
+    switch (idx % MAX_MOTOR_GROUPS) {
+        case 0: motorForward_.push_back(neuron); break;
+        case 1: motorBackward_.push_back(neuron); break;
+        case 2: motorTurnLeft_.push_back(neuron); break;
+        case 3: motorTurnRight_.push_back(neuron); break;
+        case 4: motorInteract_.push_back(neuron); break;
+        case 5: motorWait_.push_back(neuron); break;
+        default: NLM_LOG_WARNING("Unexpected motor group assignment index: " + std::to_string(idx));
+    }
+}
+
+void AgentBrain::assignToSensoryGroup(Neuron* neuron) {
+    if (!neuron) return;
+    
+    // Calculate current distribution index
+    size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                 sensoryInternal_.size() + sensoryProprioception_.size();
+    
+    // Assign to appropriate group
+    switch (idx % MAX_SENSORY_GROUPS) {
+        case 0: sensoryVision_.push_back(neuron); break;
+        case 1: sensoryTouch_.push_back(neuron); break;
+        case 2: sensoryInternal_.push_back(neuron); break;
+        case 3: sensoryProprioception_.push_back(neuron); break;
+        default: NLM_LOG_WARNING("Unexpected sensory group assignment index: " + std::to_string(idx));
     }
 }
 
@@ -238,6 +369,13 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     
+    // Input validation
+    if (std::isnan(reward) || std::isnan(predictedReward)) {
+        NLM_LOG_WARNING("Invalid reward values: reward=" + std::to_string(reward) + 
+                        ", predictedReward=" + std::to_string(predictedReward));
+        return;
+    }
+    
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
@@ -250,9 +388,24 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
-    // Apply to all synapses with eligibility traces
+    // Apply reward modulation to all synapses
+    applyRewardToSynapses();
+    
+    // Modulate plasticity based on dopamine level
+    modulatePlasticityBasedOnDopamine();
+}
+
+void AgentBrain::applyRewardToSynapses() {
+    if (!brain_) return;
+    
+    size_t modifiedSynapses = 0;
+    
     for (const auto& region : brain_->getRegions()) {
+        if (!region) continue;
+        
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -262,32 +415,94 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 
                 // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
+                
+                modifiedSynapses++;
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
+    if (modifiedSynapses > 0) {
+        NLM_LOG_DEBUG("Applied reward modulation to " + std::to_string(modifiedSynapses) + " synapses");
+    }
+}
+
+void AgentBrain::modulatePlasticityBasedOnDopamine() {
+    if (!brain_) return;
+    
+    // Calculate plasticity factor based on dopamine level
     // Positive dopamine increases plasticity, negative decreases
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
+    // Apply to STDP system if available
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+    
+    // Update structural plasticity rates if enabled
+    updateStructuralPlasticityRates();
+}
+
+void AgentBrain::updateStructuralPlasticityRates() {
+    if (!brain_ || !structuralPlasticityEnabled_) return;
+    
+    auto* sp = brain_->getStructuralPlasticity();
+    if (!sp) return;
+    
+    // Higher synaptogenesis in early development (based on plasticity modifier)
+    float synRate = 0.0001f * plasticityModifier_;
+    // Higher pruning in mature brain (plasticity modifier < 1.0)
+    float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+    
+    sp->setSynaptogenesisRate(synRate);
+    sp->setPruningRate(pruneRate);
+}
+
+DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+    if (!brain_) return DevelopmentalStage::Initial;
+    return brain_->getDevelopmentalStage();
+}
+
+// Callback for when brain changes - trigger updates
+void AgentBrain::onBrainChange() {
+    if (!brain_) {
+        NLM_LOG_ERROR("onBrainChange called with null brain");
+        return;
+    }
+    
+    // Re-initialize neuron groups when brain becomes available
+    initializeNeuronGroups();
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
     if (!brain_ || !developmentEnabled_) return;
     
+    // Input validation
+    if (timestep < 0.0) {
+        NLM_LOG_WARNING("Negative timestep provided to updateDevelopment: " + std::to_string(timestep));
+        timestep = 0.0;
+    }
+    
     developmentalAge_ += timestep;
     
-    // Simple developmental stages based on age
-    // This is a biologically inspired approximation
+    // Update developmental stage based on age
+    updateDevelopmentalStage();
+    
+    // Update structural plasticity based on development
+    if (structuralPlasticityEnabled_) {
+        updateStructuralPlasticityRates();
+    }
+}
+
+void AgentBrain::updateDevelopmentalStage() {
+    if (!brain_) return;
+    
+    // Biologically inspired developmental stages
+    // Approximate time-based progression
     if (developmentalAge_ < 60.0) {  // ~1 minute
-        plasticityModifier_ = 1.0f;  // High plasticity
+        plasticityModifier_ = 1.0f;  // High plasticity in initial phase
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
     } else if (developmentalAge_ < 300.0) {  // ~5 minutes
         plasticityModifier_ = 0.8f;
@@ -299,23 +514,36 @@ void AgentBrain::updateDevelopment(double timestep) {
         plasticityModifier_ = 0.2f;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
     }
+}
+
+void AgentBrain::reset() {
+    // Reset all internal state to initial values
+    resetNeuromodulationState();
+    resetDevelopmentState();
+    resetSensoryState();
     
-    // Structural plasticity changes with development
-    if (structuralPlasticityEnabled_) {
-        auto* sp = brain_->getStructuralPlasticity();
-        if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
-            sp->setSynaptogenesisRate(synRate);
-            sp->setPruningRate(pruneRate);
-        }
+    // Re-initialize with current brain if available
+    if (brain_) {
+        initializeNeuronGroups();
     }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
-    return brain_->getDevelopmentalStage();
+void AgentBrain::resetNeuromodulationState() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+}
+
+void AgentBrain::resetDevelopmentState() {
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+}
+
+void AgentBrain::resetSensoryState() {
+    // Clear previous vision data
+    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
 float AgentBrain::getNeuromodulationLevel() const {
@@ -335,16 +563,108 @@ float AgentBrain::getPredictionError() const {
 }
 
 void AgentBrain::reset() {
+    // Reset all internal state to initial values
+    resetNeuromodulationState();
+    resetDevelopmentState();
+    resetSensoryState();
+    
+    // Re-initialize with current brain if available
+    if (brain_) {
+        initializeNeuronGroups();
+    }
+}
+
+void AgentBrain::resetNeuromodulationState() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+}
+
+void AgentBrain::resetDevelopmentState() {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
-    
-    // Clear previous vision
+}
+
+void AgentBrain::resetSensoryState() {
+    // Clear previous vision data
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Debug utility method for inspecting agent state
+void AgentBrain::logDebugInfo() const {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot log debug info: brain is null");
+        return;
+    }
+    
+    NLM_LOG_DEBUG("=== AgentBrain Debug Info ===");
+    NLM_LOG_DEBUG("Neuromodulation Levels:");
+    NLM_LOG_DEBUG("  Dopamine: " + std::to_string(dopamineLevel_));
+    NLM_LOG_DEBUG("  Curiosity: " + std::to_string(curiosityLevel_));
+    NLM_LOG_DEBUG("  Novelty: " + std::to_string(noveltyLevel_));
+    NLM_LOG_DEBUG("  Prediction Error: " + std::to_string(predictionError_));
+    
+    NLM_LOG_DEBUG("Development State:");
+    NLM_LOG_DEBUG("  Age: " + std::to_string(developmentalAge_));
+    NLM_LOG_DEBUG("  Plasticity Modifier: " + std::to_string(plasticityModifier_));
+    
+    NLM_LOG_DEBUG("Neuron Distribution:");
+    NLM_LOG_DEBUG("  Motor neurons: " + std::to_string(motorForward_.size() + motorBackward_.size() +
+                  motorTurnLeft_.size() + motorTurnRight_.size() +
+                  motorInteract_.size() + motorWait_.size()));
+    NLM_LOG_DEBUG("  Sensory neurons: " + std::to_string(sensoryVision_.size() + 
+                  sensoryTouch_.size() + sensoryInternal_.size() +
+                  sensoryProprioception_.size()));
+}
+
+// Configuration validation utility
+bool AgentBrain::validateConfiguration() const {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot validate configuration: brain is null");
+        return false;
+    }
+    
+    // Check for critical components
+    if (brain_->getWorkingMemory() == nullptr) {
+        NLM_LOG_WARNING("Working memory not available");
+    }
+    
+    if (brain_->getEpisodicMemory() == nullptr) {
+        NLM_LOG_WARNING("Episodic memory not available");
+    }
+    
+    if (brain_->getDopamine() == nullptr) {
+        NLM_LOG_WARNING("Dopamine system not available");
+    }
+    
+    if (brain_->getCuriosity() == nullptr) {
+        NLM_LOG_WARNING("Curiosity system not available");
+    }
+    
+    if (brain_->getPredictionSystem() == nullptr) {
+        NLM_LOG_WARNING("Prediction system not available");
+    }
+    
+    if (brain_->getDevelopmentSystem() == nullptr) {
+        NLM_LOG_WARNING("Development system not available");
+    }
+    
+    // Validate neuromodulator ranges
+    if (dopamineLevel_ < -1.0f || dopamineLevel_ > 1.0f) {
+        NLM_LOG_WARNING("Dopamine level out of expected range: " + std::to_string(dopamineLevel_));
+    }
+    
+    if (curiosityLevel_ < 0.0f || curiosityLevel_ > 1.0f) {
+        NLM_LOG_WARNING("Curiosity level out of expected range: " + std::to_string(curiosityLevel_));
+    }
+    
+    if (noveltyLevel_ < 0.0f || noveltyLevel_ > 1.0f) {
+        NLM_LOG_WARNING("Novelty level out of expected range: " + std::to_string(noveltyLevel_));
+    }
+    
+    return true;
 }
 
 } // namespace nlm
