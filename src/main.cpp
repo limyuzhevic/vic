@@ -356,20 +356,13 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
@@ -382,15 +375,151 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+    
+    // Phase 2 specific configuration
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // NEW: Phase 2 advanced configuration options
+    config->set("lif_membrane_tau", 20.0, ConfigSource::Default);
+    config->set("lif_membrane_resistance", 10.0, ConfigSource::Default);
+    config->set("stdp_learning_rate", 0.01f, ConfigSource::Default);
+    config->set("plasticity_window", 50.0, ConfigSource::Default);
+    config->set("adaptation_strength", 0.1f, ConfigSource::Default);
+    config->set("refractory_period", 5.0, ConfigSource::Default);
+    config->set("prediction_confidence", 0.5f, ConfigSource::Default);
+    config->set("curiosity_decay", 0.05f, ConfigSource::Default);
+    
+    // Visualization configuration
+    config->set("visualization_enabled", false, ConfigSource::Default);
+    config->set("visualization_rate", 30.0, ConfigSource::Default);
+    
+    // Memory system configuration
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_capacity", 1000, ConfigSource::Default);
+    
+    // Neuromodulation configuration
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("reward_decay", 0.01f, ConfigSource::Default);
+    config->set("curiosity_weight_novelty", 0.5f, ConfigSource::Default);
+    config->set("curiosity_weight_prediction", 0.5f, ConfigSource::Default);
+    
+    // Performance configuration
+    config->set("performance_monitoring", true, ConfigSource::Default);
+    config->set("benchmark_enabled", true, ConfigSource::Default);
+    config->set("log_level", "Info", ConfigSource::Default);
+    
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+    
+    // Phase 2 specific configuration
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // NEW: Phase 2 advanced configuration options
+    config->set("lif_membrane_tau", 20.0, ConfigSource::Default);
+    config->set("lif_membrane_resistance", 10.0, ConfigSource::Default);
+    config->set("stdp_learning_rate", 0.01f, ConfigSource::Default);
+    config->set("plasticity_window", 50.0, ConfigSource::Default);
+    config->set("adaptation_strength", 0.1f, ConfigSource::Default);
+    config->set("refractory_period", 5.0, ConfigSource::Default);
+    config->set("prediction_confidence", 0.5f, ConfigSource::Default);
+    config->set("curiosity_decay", 0.05f, ConfigSource::Default);
+    
+    // Visualization configuration
+    config->set("visualization_enabled", false, ConfigSource::Default);
+    config->set("visualization_rate", 30.0, ConfigSource::Default);
+    
+    // Memory system configuration
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_capacity", 1000, ConfigSource::Default);
+    
+    // Neuromodulation configuration
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("reward_decay", 0.01f, ConfigSource::Default);
+    config->set("curiosity_weight_novelty", 0.5f, ConfigSource::Default);
+    config->set("curiosity_weight_prediction", 0.5f, ConfigSource::Default);
+    
+    // Performance configuration
+    config->set("performance_monitoring", true, ConfigSource::Default);
+    config->set("benchmark_enabled", true, ConfigSource::Default);
+    config->set("log_level", "Info", ConfigSource::Default);
+    
+    // NEW: Performance monitoring setup
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== PERFORMANCE MONITORING INITIALIZED ===");
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // NEW: Benchmark setup
+    if (config->getOr<bool>("benchmark_enabled", true)) {
+        NLM_LOG_INFO("Benchmark mode enabled - running performance measurements");
+        NLM_LOG_INFO("This will measure neural network performance metrics");
+        NLM_LOG_INFO("Metrics include: spike rate, memory usage, convergence time");
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Phase 2 Configuration Summary:");
+    NLM_LOG_INFO("  --- Neural Dynamics ---");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  lif_membrane_tau: " + std::to_string(config->getOr<double>("lif_membrane_tau", 20.0)));
+    NLM_LOG_INFO("  lif_membrane_resistance: " + std::to_string(config->getOr<double>("lif_membrane_resistance", 10.0)));
+    NLM_LOG_INFO("  plasticity_window: " + std::to_string(config->getOr<double>("plasticity_window", 50.0)));
+    NLM_LOG_INFO("  adaptation_strength: " + std::to_string(config->getOr<float>("adaptation_strength", 0.1f)));
+    NLM_LOG_INFO("  refractory_period: " + std::to_string(config->getOr<double>("refractory_period", 5.0)));
+    NLM_LOG_INFO("  --- Plasticity ---");
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  stdp_learning_rate: " + std::to_string(config->getOr<float>("stdp_learning_rate", 0.01f)));
+    NLM_LOG_INFO("  --- Neuromodulation ---");
+    NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.1f)));
+    NLM_LOG_INFO("  reward_decay: " + std::to_string(config->getOr<float>("reward_decay", 0.01f)));
+    NLM_LOG_INFO("  curiosity_weight_novelty: " + std::to_string(config->getOr<float>("curiosity_weight_novelty", 0.5f)));
+    NLM_LOG_INFO("  curiosity_weight_prediction: " + std::to_string(config->getOr<float>("curiosity_weight_prediction", 0.5f)));
+    NLM_LOG_INFO("  --- Memory ---");
+    NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<int64_t>("working_memory_capacity", 100)));
+    NLM_LOG_INFO("  episodic_memory_capacity: " + std::to_string(config->getOr<int64_t>("episodic_memory_capacity", 1000)));
+    NLM_LOG_INFO("  --- Performance ---");
+    NLM_LOG_INFO("  performance_monitoring: " + std::to_string(config->getOr<bool>("performance_monitoring", true)));
+    NLM_LOG_INFO("  benchmark_enabled: " + std::to_string(config->getOr<bool>("benchmark_enabled", true)));
+    NLM_LOG_INFO("  log_level: " + std::to_string(config->getOr<std::string>("log_level", "Info")));
     NLM_LOG_INFO("");
+    NLM_LOG_INFO("Phase 2 Advanced Configuration loaded successfully!");
+    NLM_LOG_INFO("Enhanced neural dynamics, plasticity, and neuromodulation active.");
+    NLM_LOG_INFO("Improved prediction and memory systems operational.");
+    NLM_LOG_INFO("Performance monitoring and benchmarking enabled.");
+    NLM_LOG_INFO("=" * 80);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

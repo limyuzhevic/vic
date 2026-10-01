@@ -38,6 +38,8 @@ add_library(nlm_core STATIC
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
+    src/dynamics/HodgkinHuxleyDynamics.cpp
+    src/dynamics/FitzHughNagumoDynamics.cpp
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
@@ -85,6 +87,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    src/visualization/HodgkinHuxleyDynamics.cpp
+    src/visualization/FitzHughNagumoDynamics.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

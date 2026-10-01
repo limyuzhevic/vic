@@ -21,38 +21,56 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced version with better error handling and format detection
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
+    // Detect file format by first non-comment line
     std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
+    bool isJSON = false;
+    bool isYAML = false;
+    
+    // Read first 10 lines to detect format
+    for (int i = 0; i < 10 && std::getline(file, line); ++i) {
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Check for JSON format (starts with { or [)
+        if (line[0] == '{' || line[0] == '[') {
+            isJSON = true;
+            break;
         }
+        
+        // Check for YAML format (key: value)
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos && colonPos > 0) {
+            size_t keyLen = line.find_last_not_of(' ', colonPos - 1) - colonPos + 1;
+            if (keyLen > 0) {
+                isYAML = true;
+                break;
+            }
+        }
+        break;
     }
     
-    return true;
+    // Reset file to beginning
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    
+    if (isJSON) {
+        return loadFromJSON(file, filepath);
+    } else if (isYAML) {
+        return loadFromYAML(file, filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(file, filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -199,17 +217,299 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
 } // namespace nlm
+
+// JSON parsing implementation
+namespace {
+
+// Simple JSON parser for basic NLM configuration
+bool parseJSONString(const std::string& jsonStr, std::string& key, ConfigValue& value) {
+    // Remove whitespace
+    std::string trimmed = trim(jsonStr);
+    
+    if (trimmed.empty() || trimmed[0] != '"') {
+        return false;
+    }
+    
+    size_t keyEnd = trimmed.find('"', 1);
+    if (keyEnd == std::string::npos) {
+        return false;
+    }
+    
+    key = trimmed.substr(1, keyEnd - 1);
+    
+    // Find value after colon
+    size_t colonPos = trimmed.find(':', keyEnd + 1);
+    if (colonPos == std::string::npos) {
+        return false;
+    }
+    
+    std::string valueStr = trim(trimmed.substr(colonPos + 1));
+    
+    // Parse value based on type
+    if (valueStr.front() == '\"' && valueStr.back() == '\"') {
+        // String value
+        value = trim(valueStr.substr(1, valueStr.size() - 2));
+    } else if (valueStr == "true" || valueStr == "false") {
+        // Boolean value
+        value = (valueStr == "true");
+    } else if (std::isdigit(valueStr.front()) || (valueStr.front() == '-' && std::isdigit(valueStr[1]))) {
+        // Numeric value
+        if (valueStr.find('.') != std::string::npos) {
+            // Float value
+            value = std::stod(valueStr);
+        } else {
+            // Integer value (try int64_t first)
+            try {
+                value = std::stoll(valueStr);
+            } catch (...) {
+                // Fall back to double
+                value = std::stod(valueStr);
+            }
+        }
+    } else {
+        // Unknown type, treat as string
+        value = valueStr;
+    }
+    
+    return true;
+}
+
+} // namespace
+
+bool Config::loadFromJSON(std::ifstream& file, const std::string& filepath) {
+    NLM_LOG_INFO("Loading JSON configuration from: " + filepath);
+    
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple JSON object parsing (for basic key-value pairs)
+    // This is a minimal implementation - in production would use nlohmann::json
+    
+    // Remove whitespace and newlines
+    std::string jsonStr = trim(content);
+    if (jsonStr.empty() || jsonStr[0] != '{') {
+        NLM_LOG_ERROR("Invalid JSON format in config file: " + filepath);
+        return false;
+    }
+    
+    // Remove braces
+    jsonStr = jsonStr.substr(1, jsonStr.size() - 2);
+    
+    // Parse key-value pairs (simplified)
+    size_t pos = 0;
+    while (pos < jsonStr.size()) {
+        // Find next key
+        size_t keyStart = jsonStr.find('"', pos);
+        if (keyStart == std::string::npos) {
+            break;
+        }
+        
+        size_t keyEnd = jsonStr.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = jsonStr.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find colon after key
+        size_t colonPos = jsonStr.find(':', keyEnd + 1);
+        if (colonPos == std::string::npos) {
+            break;
+        }
+        
+        // Find value
+        size_t valueStart = jsonStr.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        // Parse value based on first character
+        ConfigValue value;
+        if (valueStart < jsonStr.size() && jsonStr[valueStart] == '"') {
+            // String value
+            size_t valueEnd = jsonStr.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string valueStr = jsonStr.substr(valueStart + 1, valueEnd - valueStart - 1);
+            value = valueStr;
+            pos = valueEnd + 1;
+        } else if (valueStart < jsonStr.size() && jsonStr[valueStart] == 't') {
+            // Boolean true
+            value = true;
+            pos = valueStart + 4; // "true"
+        } else if (valueStart < jsonStr.size() && jsonStr[valueStart] == 'f') {
+            // Boolean false
+            value = false;
+            pos = valueStart + 5; // "false"
+        } else {
+            // Number - parse until comma or }
+            size_t valueEnd = jsonStr.find_first_of(",}", valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = jsonStr.size();
+            }
+            std::string valueStr = trim(jsonStr.substr(valueStart, valueEnd - valueStart));
+            
+            try {
+                // Try to parse as integer
+                if (valueStr.find('.') != std::string::npos) {
+                    value = std::stod(valueStr);
+                } else {
+                    value = std::stoll(valueStr);
+                }
+            } catch (...) {
+                // Fall back to string
+                value = valueStr;
+            }
+            
+            pos = valueEnd;
+        }
+        
+        set(key, value, ConfigSource::File);
+        
+        // Skip comma or whitespace
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++;
+        }
+        
+        // Skip whitespace
+        while (pos < jsonStr.size() && (jsonStr[pos] == ' ' || jsonStr[pos] == '\n')) {
+            pos++;
+        }
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(getKeys().size()) + " configuration entries from JSON");
+    return true;
+}
+
+bool Config::loadFromYAML(std::ifstream& file, const std::string& filepath) {
+    NLM_LOG_INFO("Loading YAML configuration from: " + filepath);
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        // Parse YAML key: value format
+        size_t colonPos = line.find(':');
+        if (colonPos == std::string::npos || colonPos == 0) {
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, colonPos));
+        std::string valueStr = trim(line.substr(colonPos + 1));
+        
+        ConfigValue value;
+        
+        // Parse value based on type
+        if (valueStr.empty()) {
+            continue;
+        } else if (valueStr.front() == '\"' && valueStr.back() == '\"') {
+            // String value (quoted)
+            value = valueStr.substr(1, valueStr.size() - 2);
+        } else if (valueStr == "true" || valueStr == "false") {
+            // Boolean value
+            value = (valueStr == "true");
+        } else if (std::isdigit(valueStr.front()) || 
+                   (valueStr.front() == '-' && std::isdigit(valueStr[1]))) {
+            // Numeric value
+            if (valueStr.find('.') != std::string::npos || 
+                valueStr.find('e') != std::string::npos || 
+                valueStr.find('E') != std::string::npos) {
+                value = std::stod(valueStr);
+            } else {
+                try {
+                    value = std::stoll(valueStr);
+                } catch (...) {
+                    value = std::stod(valueStr);
+                }
+            }
+        } else {
+            // Try to parse as list (YAML array)
+            if (valueStr.front() == '[' && valueStr.back() == ']') {
+                std::string listStr = valueStr.substr(1, valueStr.size() - 2);
+                std::vector<double> list;
+                
+                size_t listPos = 0;
+                while (listPos < listStr.size()) {
+                    size_t nextComma = listStr.find(',', listPos);
+                    if (nextComma == std::string::npos) {
+                        nextComma = listStr.size();
+                    }
+                    
+                    std::string item = trim(listStr.substr(listPos, nextComma - listPos));
+                    if (!item.empty()) {
+                        try {
+                            if (item.find('.') != std::string::npos || 
+                                item.find('e') != std::string::npos || 
+                                item.find('E') != std::string::npos) {
+                                list.push_back(std::stod(item));
+                            } else {
+                                list.push_back(std::stoll(item));
+                            }
+                        } catch (...) {
+                            // Skip invalid items
+                        }
+                    }
+                    
+                    listPos = nextComma + 1;
+                    while (listPos < listStr.size() && 
+                           (listStr[listPos] == ' ' || listStr[listPos] == '\t')) {
+                        listPos++;
+                    }
+                }
+                
+                if (!list.empty()) {
+                    value = list;
+                }
+            } else {
+                // Unknown type, treat as string
+                value = valueStr;
+            }
+        }
+        
+        set(key, value, ConfigSource::File);
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(getKeys().size()) + " configuration entries from YAML");
+    return true;
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file, const std::string& filepath) {
+    NLM_LOG_INFO("Loading simple format configuration from: " + filepath);
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs (backward compatibility)
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(getKeys().size()) + " configuration entries from simple format");
+    return true;
+}

@@ -15,37 +15,66 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // REAL LIF Dynamics Implementation
+    // Biophysical model with adaptive threshold and refractory period
     
     const auto& state = neuron->getState();
     
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
-    
     float V = neuron->getMembranePotential();
     float V_rest = state.restingPotential;
-    float I = neuron->getTotalCurrent();
-    float tau = pImpl->membraneTimeConstant;
-    float R = pImpl->membraneResistance;
+    float I_total = neuron->getTotalCurrent();
+    float tau_membrane = pImpl->membraneTimeConstant;
+    float R_membrane = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // Membrane potential dynamics with exponential decay
+    // dV/dt = (-(V - V_rest) + R*I) / tau + I_leak
+    float alpha = static_cast<float>(dt) / tau_membrane;
+    float V_leak = (V - V_rest) * alpha;
+    float V_input = (R_membrane * I_total) * alpha;
     
-    // Check for firing
-    if (shouldFire(neuron)) {
-        neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+    // Update membrane potential
+    V += V_input - V_leak;
+    
+    // Adaptive threshold mechanism (rate-coding)
+    if (neuron->getAdaptationVariable() > 0.0f) {
+        V += neuron->getAdaptationVariable() * alpha;  // Spike-frequency adaptation
     }
     
-    // Refractory mechanism
-    if (neuron->isRefractory()) {
+    // Clamp to reasonable bounds
+    V = std::max(V, state.resetPotential);
+    V = std::min(V, state.threshold);
+    
+    neuron->setMembranePotential(V);
+    
+    // Check for firing threshold crossing
+    if (V >= state.threshold && !neuron->isRefractory()) {
+        neuron->setFiringState(FiringState::Active);
+        
+        // Record spike with current simulation time
+        // (dt is used as time since last step)
+        neuron->recordSpike(static_cast<Timestamp>(dt));
+        
+        // Implement spike-triggered processes
+        neuron->setAdaptationVariable(state.adaptationIncrement);
+        neuron->setRefractory(state.refractoryDuration);
+        
+        // Reset membrane potential after spike
         neuron->setMembranePotential(state.resetPotential);
     }
     
-    // Clear current for next step
+    // Update refractory timer
+    if (neuron->isRefractory()) {
+        neuron->updateRefractory(dt);
+        // Keep at reset potential during refractory period
+        neuron->setMembranePotential(state.resetPotential);
+    }
+    
+    // Decay adaptation variable
+    if (neuron->getAdaptationVariable() > 0.0f) {
+        neuron->setAdaptationVariable(std::max(0.0f, neuron->getAdaptationVariable() - 0.01f * static_cast<float>(dt)));
+    }
+    
+    // Clear injected current for next step
     neuron->clearTotalCurrent();
 }
 

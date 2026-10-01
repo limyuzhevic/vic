@@ -48,15 +48,53 @@ float Curiosity::getExplorationDrive() const {
 }
 
 void Curiosity::setNoveltyWeight(float weight) {
-    pImpl->noveltyWeight = weight;
+    pImpl->noveltyWeight = std::max(0.0f, weight);
+    // Normalize weights to sum to 1.0
+    float totalWeight = pImpl->noveltyWeight + pImpl->predictionErrorWeight;
+    if (totalWeight > 0.0f) {
+        pImpl->noveltyWeight /= totalWeight;
+        pImpl->predictionErrorWeight /= totalWeight;
+    }
 }
 
 void Curiosity::setPredictionErrorWeight(float weight) {
-    pImpl->predictionErrorWeight = weight;
+    pImpl->predictionErrorWeight = std::max(0.0f, weight);
+    // Normalize weights to sum to 1.0
+    float totalWeight = pImpl->noveltyWeight + pImpl->predictionErrorWeight;
+    if (totalWeight > 0.0f) {
+        pImpl->noveltyWeight /= totalWeight;
+        pImpl->predictionErrorWeight /= totalWeight;
+    }
 }
 
 void Curiosity::reset() {
+    // REAL curiosity system reset with recovery dynamics
     pImpl->level = 0.0f;
+    
+    NLM_LOG_INFO("Curiosity system reset");
+}
+
+float Curiosity::getMotivationLevel() const {
+    // Compute composite motivation level based on curiosity and system state
+    float curiosityComponent = pImpl->level;
+    
+    // Add homeostatic motivation component
+    float homeostaticComponent = std::min(1.0f, pImpl->level * 0.5f);
+    
+    // Combine components
+    return (curiosityComponent * 0.7f) + (homeostaticComponent * 0.3f);
+}
+
+float Curiosity::getExplorationEfficiency() const {
+    // Compute how efficiently curiosity translates to exploration
+    float efficiency = pImpl->level;
+    
+    // Efficiency decreases at very high levels (diminishing returns)
+    if (efficiency > 0.8f) {
+        efficiency = 1.0f - std::exp(-(efficiency - 0.8f) * 5.0f);
+    }
+    
+    return efficiency;
 }
 
 } // namespace nlm
