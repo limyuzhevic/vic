@@ -14,10 +14,8 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
-void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
+void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt, Timestamp currentTime) {
+    // Implement real integrate-and-fire dynamics
     const auto& state = neuron->getState();
     
     // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
@@ -37,7 +35,7 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     // Check for firing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(currentTime);
     }
     
     // Refractory mechanism

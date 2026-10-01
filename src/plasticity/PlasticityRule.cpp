@@ -24,26 +24,40 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // Implement real Hebbian learning based on spike timing
+    // LTP (Long-Term Potentiation): Pre before Post (pre < post)
+    // LTD (Long-Term Depression): Post before Pre (post < pre)
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
+    // Calculate symmetric spike time differences
+    float totalLTP = 0.0f;  // Long-Term Potentiation
+    float totalLTD = 0.0f;  // Long-Term Depression
+    
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+            float timeDiff = post - pre;
+            
+            if (timeDiff > 0.0f) {
+                // Pre before Post: LTP
+                // Maximum effect at ~20ms, decays beyond that
+                float ltp = std::exp(-timeDiff / 20.0f) * pImpl->learningRate;
+                totalLTP += ltp;
+            } else if (timeDiff < 0.0f) {
+                // Post before Pre: LTD
+                // Maximum effect at ~20ms, decays beyond that
+                float ltd = std::exp(timeDiff / 20.0f) * pImpl->learningRate;
+                totalLTD += ltd;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Apply net weight change (LTP - LTD)
+    float netChange = totalLTP - totalLTD;
+    if (netChange != 0.0f) {
+        applyWeightChange(synapse, netChange);
     }
 }
 

@@ -28,8 +28,30 @@ public:
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
     
+    // Get action preferences (internal use)
+    const std::unordered_map<ActionType, float>& getActionPreferences() const;
+
 private:
-    struct Impl;
+    struct Impl {
+        std::vector<ActionType> availableActions;
+        std::vector<const Action*> actionHistory;
+        std::unordered_map<ActionType, float> actionPreferences;
+        
+        Impl() {
+            availableActions = {
+                ActionType::MoveForward,
+                ActionType::MoveBackward,
+                ActionType::MoveLeft,
+                ActionType::MoveRight,
+                ActionType::TurnLeft,
+                ActionType::TurnRight,
+                ActionType::Look,
+                ActionType::Interact,
+                ActionType::Wait
+            };
+        }
+    };
+
     std::unique_ptr<Impl> pImpl;
 };
 
