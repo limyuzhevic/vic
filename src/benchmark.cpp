@@ -1,7 +1,7 @@
 // NLM Performance Benchmark
 // Measures simulation performance for different network sizes
 
-#include "core/Config/Config.hpp"
+#include "core/Config/ConfigManager.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -33,7 +33,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
               << steps << " steps..." << std::flush;
     
     // Create configuration
-    auto config = std::make_shared<Config>();
+    auto config = std::make_shared<ConfigManager>();
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.1f, ConfigSource::Default);

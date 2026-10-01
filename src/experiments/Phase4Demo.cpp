@@ -2,7 +2,7 @@
 #include <memory>
 #include <iomanip>
 #include <sstream>
-#include "core/Config/Config.hpp"
+#include "core/Config/ConfigManager.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
 #include "agent/AgentBrain.hpp"
@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Create configuration
-    auto config = std::make_shared<Config>();
+    auto config = std::make_shared<ConfigManager>();
     config->set("neuron_count", size_t(1000));
     config->set("region_count", size_t(2));
     config->set("connection_probability", 0.1f);

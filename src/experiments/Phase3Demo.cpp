@@ -3,7 +3,7 @@
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
-#include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigManager.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <iostream>
 #include <fstream>
@@ -25,7 +25,7 @@ public:
         std::cout << "===========================================\n\n";
         
         // Create configuration
-        auto config = std::make_shared<Config>();
+        auto config = std::make_shared<ConfigManager>();
         configureEnvironment(config);
         configureBrain(config);
         

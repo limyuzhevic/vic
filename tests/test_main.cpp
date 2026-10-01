@@ -4,12 +4,18 @@
 #include <iostream>
 #include <cassert>
 
+#include "tests/test_enhanced_config.h" // New header for enhanced config tests
+
 // Forward declarations of test functions
 namespace test_types {
     void runAll();
 }
 
 namespace test_config {
+    void runAll();
+}
+
+namespace test_enhanced_config {
     void runAll();
 }
 

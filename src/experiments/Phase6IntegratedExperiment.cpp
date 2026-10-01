@@ -1,5 +1,5 @@
 #include "Phase6IntegratedExperiment.hpp"
-#include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigManager.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
@@ -24,7 +24,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                  std::to_string(config.maxSteps) + " steps");
     
     // Create configuration
-    auto cfg = std::make_shared<Config>();
+    auto cfg = std::make_shared<ConfigManager>();
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);

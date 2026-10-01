@@ -12,7 +12,7 @@
 namespace nlm {
 
 // Forward declarations
-class Config;
+class ConfigManager;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
@@ -51,7 +51,7 @@ struct InterRegionConnection {
 class Brain {
 public:
     // Create brain with configuration
-    explicit Brain(std::shared_ptr<Config> config);
+    explicit Brain(std::shared_ptr<ConfigManager> config);
     
     ~Brain();
     
@@ -185,7 +185,7 @@ public:
     PredictionError* getPredictionErrorSignal();
     
     // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    std::shared_ptr<const ConfigManager> getConfig() const;
     
     // Get random generator
     RandomGenerator* getRandomGenerator();

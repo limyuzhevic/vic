@@ -7,7 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
+#include "core/Config/ConfigManager.hpp"
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     // Load configuration
-    auto config = std::make_shared<Config>();
+    auto config = std::make_shared<ConfigManager>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";

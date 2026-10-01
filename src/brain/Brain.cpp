@@ -1,5 +1,5 @@
 #include "Brain.hpp"
-#include "../core/Config/Config.hpp"
+#include "../core/Config/ConfigManager.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
@@ -23,7 +23,7 @@
 namespace nlm {
 
 struct Brain::Impl {
-    std::shared_ptr<Config> config;
+    std::shared_ptr<ConfigManager> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
@@ -78,7 +78,7 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
-    Impl(std::shared_ptr<Config> cfg)
+    Impl(std::shared_ptr<ConfigManager> cfg)
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
