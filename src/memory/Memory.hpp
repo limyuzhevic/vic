@@ -12,27 +12,26 @@ namespace nlm {
 class WorkingMemory {
 public:
     WorkingMemory();
-    ~WorkingMemory();
+    virtual ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    virtual void store(NeuronId neuron, float value) = 0;
     
     // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    virtual float retrieve(NeuronId neuron) const = 0;
     
     // Check if item exists
-    bool contains(NeuronId neuron) const;
+    virtual bool contains(NeuronId neuron) const = 0;
     
     // Clear all
-    void clear();
+    virtual void clear() = 0;
     
     // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    virtual size_t getCapacity() const = 0;
+    virtual size_t getCurrentSize() const = 0;
     
     // Decay all items
-    void decay(float decayRate);
+    virtual void decay(float decayRate) = 0;
     
 private:
     struct Impl;
@@ -54,25 +53,25 @@ struct EpisodicMemoryItem {
 class EpisodicMemory {
 public:
     EpisodicMemory();
-    ~EpisodicMemory();
+    virtual ~EpisodicMemory();
     
     // Store episode
-    void storeEpisode(const EpisodicMemoryItem& episode);
+    virtual void storeEpisode(const EpisodicMemoryItem& episode) = 0;
     
     // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    virtual EpisodicMemoryItem retrieveEpisode(size_t index) const = 0;
     
     // Get episode count
-    size_t getEpisodeCount() const;
+    virtual size_t getEpisodeCount() const = 0;
     
     // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    virtual std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const = 0;
     
     // Clear all
-    void clear();
+    virtual void clear() = 0;
     
     // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    virtual void consolidate(float relevanceThreshold) = 0;
     
 private:
     struct Impl;
@@ -85,22 +84,22 @@ private:
 class SemanticMemory {
 public:
     SemanticMemory();
-    ~SemanticMemory();
+    virtual ~SemanticMemory();
     
     // Store fact
-    void storeFact(const std::string& key, const std::string& value);
+    virtual void storeFact(const std::string& key, const std::string& value) = 0;
     
     // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
+    virtual std::string retrieveFact(const std::string& key) const = 0;
     
     // Check if fact exists
-    bool hasFact(const std::string& key) const;
+    virtual bool hasFact(const std::string& key) const = 0;
     
     // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
+    virtual std::vector<std::pair<std::string, std::string>> getAllFacts() const = 0;
     
     // Clear all
-    void clear();
+    virtual void clear() = 0;
     
 private:
     struct Impl;
@@ -121,22 +120,22 @@ struct Skill {
 class ProceduralMemory {
 public:
     ProceduralMemory();
-    ~ProceduralMemory();
+    virtual ~ProceduralMemory();
     
     // Learn skill
-    void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
+    virtual void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) = 0;
     
     // Retrieve skill
-    Skill* getSkill(const std::string& name);
+    virtual Skill* getSkill(const std::string& name) = 0;
     
     // Get all skills
-    std::vector<Skill*> getAllSkills();
+    virtual std::vector<Skill*> getAllSkills() = 0;
     
     // Update proficiency
-    void updateProficiency(const std::string& name, float delta);
+    virtual void updateProficiency(const std::string& name, float delta) = 0;
     
     // Clear all
-    void clear();
+    virtual void clear() = 0;
     
 private:
     struct Impl;
@@ -149,22 +148,22 @@ private:
 class AssociativeMemory {
 public:
     AssociativeMemory();
-    ~AssociativeMemory();
+    virtual ~AssociativeMemory();
     
     // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
+    virtual void associate(NeuronId a, NeuronId b, float strength) = 0;
     
     // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
+    virtual std::vector<NeuronId> getAssociations(NeuronId neuron) const = 0;
     
     // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
+    virtual float getAssociationStrength(NeuronId a, NeuronId b) const = 0;
     
     // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
+    virtual void updateAssociation(NeuronId a, NeuronId b, float delta) = 0;
     
     // Clear all
-    void clear();
+    virtual void clear() = 0;
     
 private:
     struct Impl;

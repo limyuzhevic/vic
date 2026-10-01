@@ -155,41 +155,55 @@ void Synapse::clearHistory() {
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
+        if (!pImpl) {
+            static PlasticityFlags dummy;
+            return dummy;
+        }
+        return pImpl->plasticityFlags;
+    }
 
-void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
+    void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+        if (!pImpl) return;
+        pImpl->plasticityFlags.hebbian = hebbian;
+        pImpl->plasticityFlags.stdp = stdp;
+        pImpl->plasticityFlags.reward_modulated = rewardModulated;
+    }
 
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
-}
+    const PlasticityFlags& Synapse::getPlasticityFlags() const {
+        if (!pImpl) {
+            static const PlasticityFlags dummy;
+            return dummy;
+        }
+        return pImpl->plasticityFlags;
+    }
 
-float Synapse::getEligibilityTrace() const {
-    return pImpl->eligibilityTrace;
-}
+    float Synapse::getEligibilityTrace() const {
+        if (!pImpl) return 0.0f;
+        return pImpl->eligibilityTrace;
+    }
 
-void Synapse::setEligibilityTrace(float trace) {
-    pImpl->eligibilityTrace = trace;
-}
+    void Synapse::setEligibilityTrace(float trace) {
+        if (!pImpl) return;
+        pImpl->eligibilityTrace = trace;
+    }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
-    pImpl->eligibilityTrace *= (1.0f - decayRate);
-    if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
-        pImpl->eligibilityTrace = 0.0f;
+        if (!pImpl) return;
+        pImpl->eligibilityTrace *= (1.0f - decayRate);
+        if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
+            pImpl->eligibilityTrace = 0.0f;
+        }
     }
-}
 
-float Synapse::getEfficacy() const {
-    return pImpl->efficacy;
-}
+    float Synapse::getEfficacy() const {
+        if (!pImpl) return 1.0f;
+        return pImpl->efficacy;
+    }
 
-void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
-}
+    void Synapse::setEfficacy(float efficacy) {
+        if (!pImpl) return;
+        pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+    }
 
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
