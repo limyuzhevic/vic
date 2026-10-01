@@ -137,6 +137,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+    
     // Decay weak traces
     decayWeakTraces();
     

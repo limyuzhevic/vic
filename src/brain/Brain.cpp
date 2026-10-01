@@ -75,10 +75,9 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Current goal for neural planner
+    std::vector<float> currentPlannerGoal_;
     
-    Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
@@ -92,6 +91,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentPlannerGoal_(100, 0.0f)  // 100-dimensional state space
+        , sensoryState_(100, 0.0f)  // Initialize sensory state
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -149,6 +150,10 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
+        // Initialize current goal for neural planner (start with simple position goal)
+        currentPlannerGoal_ = std::vector<float>(100, 0.0f);  // 100-dimensional state space
+        currentPlannerGoal_[0] = 1.0f;  // Look for position 0
+        
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
     }
@@ -189,6 +194,10 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         addRegion("Region_" + std::to_string(i + 1));
     }
+    
+    // Initialize current goal for planner (start with simple position goal)
+    currentPlannerGoal_ = std::vector<float>(100, 0.0f);  // 100-dimensional state space
+    currentPlannerGoal_[0] = 1.0f;  // Look for position 0
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
@@ -254,6 +263,21 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // ========== INTEGRATE NEURAL PLANNER ==========
+    if (pImpl->planner) {
+        // Set initial goal for planner
+        std::vector<float> initialGoal(100, 0.0f);  // 100-dimensional state space
+        initialGoal[0] = 1.0f;  // Look for position 0
+        pImpl->planner->setCurrentGoal(initialGoal);
+        
+        // Initialize action qualities
+        for (size_t i = 0; i < 10; ++i) {  // 10 action types
+            pImpl->planner->setActionQuality(
+                static_cast<ActionType>(i), 
+                0.5f);  // Initial neutral confidence
+        }
+    }
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -511,8 +535,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory state and neural activity
+        // The prediction system computes sensory predictions and prediction errors
+        // This is crucial for learning and action selection
+        
+        // Update prediction based on current sensory state
+        if (!pImpl->sensoryState_.empty()) {
+            pImpl->predictionSystem->updatePrediction(pImpl->sensoryState_);
+        }
+        
+        // Compute prediction error signal
+        float predictionError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predictionError = pImpl->predictionSystem->computePredictionError();
+        }
+        
+        // Apply prediction error to neuromodulation (affects learning)
+        if (predictionError > 0.0f) {
+            // High prediction error suggests novel experience - increase learning
+            if (pImpl->curiosity) {
+                float curiosityLevel = pImpl->curiosity->getLevel();
+                // Boost curiosity for exploration
+                if (curiosityLevel < 0.5f) {
+                    pImpl->curiosity->setLevel(std::min(0.5f, curiosityLevel + 0.1f));
+                }
+            }
+        }
+        
+        // Also influence dopamine for reward prediction error
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            // Apply prediction error to dopamine
+            float errorInfluence = predictionError * 0.5f - 0.25f;  // Shift to [-0.125, 0.125]
+            dopamineLevel += errorInfluence;
+            pImpl->dopamine->setLevel(std::clamp(dopamineLevel, 0.0f, 1.0f));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +585,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity patterns for concept formation
+        std::vector<float> currentPattern;
+        currentPattern.reserve(100);  // 100-dimensional state space
+        
+        // Sample neural activity from different regions
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* neuron : neurons) {
+                if (neuron->isFiring()) {
+                    float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                    currentPattern.push_back(std::clamp(activation, 0.0f, 1.0f));
+                }
+            }
+        }
+        
+        // Pad or truncate to 100 dimensions
+        if (currentPattern.size() < 100) {
+            currentPattern.resize(100, 0.0f);
+        } else if (currentPattern.size() > 100) {
+            currentPattern.resize(100);
+        }
+        
+        // Form features from the neural pattern
+        std::vector<float> features = currentPattern;
+        
+        // Present experience to concept formation
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, features, 
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentStep
+        );
+        
+        // Log concept discovery if new
+        if (conceptId > 0 && conceptId <= pImpl->conceptFormation->getConceptCount()) {
+            NLM_LOG_INFO("New concept discovered: ID " + std::to_string(conceptId) + 
+                         " with stability " + std::to_string(pImpl->conceptFormation->getConceptStability(conceptId)));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -597,6 +688,15 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Store sensory state for the neural planner
+    pImpl->sensoryState_.clear();
+    pImpl->sensoryState_.reserve(values.size());
+    for (size_t i = 0; i < values.size() && i < 100; ++i) {
+        // Normalize input value to range [0, 1] for planner
+        float normalizedValue = static_cast<float>(values[i]) / 255.0f;  // Assuming 0-255 input range
+        pImpl->sensoryState_.push_back(normalizedValue);
+    }
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -690,9 +790,39 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // IMPROVED ACTION SELECTION using Neural Planner
+    // The neural planner evaluates action sequences and selects the best action
+    // based on predicted rewards and current state
     
+    if (!pImpl->motorNeurons.empty() && pImpl->planner) {
+        // Get current sensory state from the last input
+        // This would normally come from the sensory system
+        std::vector<float> currentState;
+        if (!sensoryState_.empty()) {
+            currentState = sensoryState_;
+        } else {
+            // Default state if none available
+            currentState = std::vector<float>(100, 0.0f);
+        }
+        
+        // Get reward signal from dopamine system
+        float targetReward = 0.5f;  // Default target reward
+        if (pImpl->dopamine) {
+            targetReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Use neural planner to select the best action
+        ActionType plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Create and return the action
+        auto action = std::make_unique<Action>(plannedAction);
+        
+        // Update planner based on actual outcome
+        // This will be called by the environment after action execution
+        return action;
+    }
+    
+    // Fallback to simple motor-based selection if planner not available
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
@@ -895,9 +1025,62 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
+        // Apply synapse states - match synapses by source and destination neurons
+        size_t synapseIdx = 0;
+        for (const auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Check if this synapse matches checkpoint data
+                    if (syn->getSourceNeuron().index() == synapseData.sourceNeuron[synapseIdx] &&
+                        syn->getDestinationNeuron().index() == synapseData.destinationNeuron[synapseIdx]) {
+                        // Apply synapse properties from checkpoint
+                        syn->setWeight(synapseData.weight[synapseIdx]);
+                        
+                        if (synapseIdx < synapseData.delay.size()) {
+                            syn->setDelay(synapseData.delay[synapseIdx]);
+                        }
+                        
+                        if (synapseIdx < synapseData.synapseType.size()) {
+                            syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                        }
+                        
+                        if (synapseIdx < synapseData.plasticityFlags.size()) {
+                            // Set plasticity flags
+                            syn->setPlasticityFlags(synapseData.plasticityFlags[synapseIdx]);
+                        }
+                        
+                        if (synapseIdx < synapseData.eligibilityTrace.size()) {
+                            syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                        }
+                        
+                        if (synapseIdx < synapseData.efficacy.size()) {
+                            syn->setEfficacy(synapseData.efficacy[synapseIdx]);
+                        }
+                        
+                        if (synapseIdx < synapseData.shortTermDepression.size()) {
+                            syn->setShortTermDepression(synapseData.shortTermDepression[synapseIdx]);
+                        }
+                        
+                        if (synapseIdx < synapseData.shortTermFacilitation.size()) {
+                            syn->setShortTermFacilitation(synapseData.shortTermFacilitation[synapseIdx]);
+                        }
+                        
+                        synapseIdx++;
+                    }
+                }
+            }
+        }
+        
+        // Check if there are any remaining synapse data (synapses added after last save)
         // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        if (synapseIdx < synapseData.weight.size()) {
+            NLM_LOG_INFO("Checkpoint contained " + std::to_string(synapseIdx) + 
+                         " synapses that matched, " + std::to_string(synapseData.weight.size() - synapseIdx) + 
+                         " synapses from checkpoint were not found in current brain");
+        }
+        
+        NLM_LOG_INFO("Brain state loaded successfully");
+        return true;
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
