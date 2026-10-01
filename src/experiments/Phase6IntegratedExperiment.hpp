@@ -15,13 +15,7 @@
  * that all systems interact properly.
  */
 
-#include "../experiments/Experiment.hpp"
-#include "../experiments/Metrics.hpp"
-#include <vector>
-#include <string>
-#include <memory>
-#include <functional>
-#include <unordered_map>
+#include "../core/Config/ConfigConstants.hpp"
 
 namespace nlm {
 
@@ -86,10 +80,10 @@ struct Phase6Config {
     std::string checkpointPath;
     
     Phase6Config()
-        : maxSteps(10000)
-        , neuronCount(1000)
-        , regionCount(1)
-        , connectionProbability(0.1f)
+        : maxSteps(ConfigConstants::DEFAULT_EXPERIMENT_MAX_STEPS)
+        , neuronCount(ConfigConstants::DEFAULT_NEURON_COUNT)
+        , regionCount(ConfigConstants::DEFAULT_REGION_COUNT)
+        , connectionProbability(ConfigConstants::DEFAULT_CONNECTION_PROBABILITY)
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)

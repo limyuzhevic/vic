@@ -1,3 +1,6 @@
+// Refactored Phase6IntegratedExperiment
+// Improved API and cleaner organization for easier extension
+
 #include "Phase6IntegratedExperiment.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -6,6 +9,8 @@
 #include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 namespace nlm {
 
