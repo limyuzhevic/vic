@@ -247,11 +247,44 @@ int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: " << argv[0] << " [options]\n";
+            std::cout << "Options:\n";
+            std::cout << "  --episodes N      Number of episodes (default: 5)\n";
+            std::cout << "  --steps-per-episode N  Steps per episode (default: 200)\n";
+            std::cout << "  --help, -h        Show this help message\n";
+            std::cout << "\nExample: " << argv[0] << " --episodes 10 --steps-per-episode 500\n";
+            return 0;
+        }
+        
+        if (arg.substr(0, 11) == "--episodes=") {
+            try {
+                numEpisodes = std::stoi(arg.substr(11));
+                if (numEpisodes < 1) {
+                    std::cerr << "Error: Episode count must be positive\n";
+                    return 1;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid episode count: " << arg.substr(11) << "\n";
+                return 1;
+            }
+        }
+        
+        if (arg.substr(0, 20) == "--steps-per-episode=") {
+            try {
+                stepsPerEpisode = std::stoi(arg.substr(20));
+                if (stepsPerEpisode < 1) {
+                    std::cerr << "Error: Steps per episode must be positive\n";
+                    return 1;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid steps per episode: " << arg.substr(20) << "\n";
+                return 1;
+            }
+        }
     }
     
     nlm::Phase3Demo demo;

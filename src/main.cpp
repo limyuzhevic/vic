@@ -28,24 +28,27 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]\n";
+    std::cout << "\nNLM Neural Learning Machine - Phase 2 Demo\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help, -h                 Show this help message\n";
+    std::cout << "  --config=FILE, -c FILE      Load configuration from FILE\n";
+    std::cout << "  --neuron-count=N           Set number of neurons (default: 500)\n";
+    std::cout << "  --region-count=N           Set number of brain regions (default: 1)\n";
+    std::cout << "  --connection-prob=P        Set connection probability (default: 0.15)\n";
+    std::cout << "  --random-seed=N            Set random seed for reproducibility (default: 42)\n";
+    std::cout << "  --simulation-timestep=T     Set simulation timestep (default: 0.001)\n";
+    std::cout << "  --stdp-ltp=W               Set STDP LTP weight (default: 0.02)\n";
+    std::cout << "  --stdp-ltd=W               Set STDP LTD weight (default: 0.015)\n";
+    std::cout << "  --stdp-tau=T               Set STDP time constant (default: 20.0)\n";
+    std::cout << "  --synaptogenesis-RATE      Set synaptogenesis rate (default: 0.0001)\n";
+    std::cout << "  --pruning-RATE             Set pruning rate (default: 0.00001)\n";
+    std::cout << "  --log-level=L              Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)\n";
+    std::cout << "\nExamples:\n";
+    std::cout << "  " << programName << " --neuron-count=1000 --region-count=2\n";
+    std::cout << "  " << programName << " --config=myconfig.cfg --random-seed=123\n";
+    std::cout << "  " << programName << " -c custom.cfg -h\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,7 +325,23 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Print banner and parse command line arguments
     printBanner();
+    
+    // Check for help flag
+    bool showHelp = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+            break;
+        }
+    }
+    
+    if (showHelp) {
+        printUsage(argv[0]);
+        return 0;
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -331,6 +350,27 @@ int main(int argc, char** argv) {
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Override log level from command line if specified
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 11) == "--log-level=") {
+            std::string level = arg.substr(11);
+            if (level == "DEBUG") {
+                consoleLogger->setLevel(LogLevel::Debug);
+            } else if (level == "INFO") {
+                consoleLogger->setLevel(LogLevel::Info);
+            } else if (level == "WARNING") {
+                consoleLogger->setLevel(LogLevel::Warning);
+            } else if (level == "ERROR") {
+                consoleLogger->setLevel(LogLevel::Error);
+            } else if (level == "CRITICAL") {
+                consoleLogger->setLevel(LogLevel::Critical);
+            } else {
+                NLM_LOG_WARNING("Unknown log level: " + level + ", using INFO");
+            }
+        }
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -366,21 +406,41 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (only if not already set)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // STDP parameters (only if not already set)
+    if (!config->has("stdp_ltp_weight")) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_ltd_weight")) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_tau")) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters (only if not already set)
+    if (!config->has("synaptogenesis_rate")) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (!config->has("pruning_rate")) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -390,6 +450,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

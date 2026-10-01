@@ -7,12 +7,38 @@ struct RandomGenerator::Impl {
     std::mt19937_64 gen;
     uint64_t currentSeed;
     
+    Impl() : currentSeed(0) {
+        // Initialize with seed 0, will be updated by RandomGenerator constructor
+    }
+    
     Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
 };
 
 RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
 
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
+RandomGenerator::RandomGenerator() : pImpl(new Impl()) {
+    try {
+        // Use std::random_device for seed, with fallback to time-based seed
+        uint64_t seed;
+        std::random_device rd;
+        seed = rd();
+        
+        // If random_device fails, use a combination of time and process ID
+        if (rd.entropy() == 0) {
+            seed = static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) ^ 
+                   static_cast<uint64_t>(getpid());
+        }
+        
+        pImpl->gen.seed(seed);
+        pImpl->currentSeed = seed;
+    } catch (...) {
+        // Ultimate fallback to a fixed but different seed
+        pImpl->gen.seed(0);
+        pImpl->currentSeed = 0;
+        // Log warning (need to include logger header)
+        std::cerr << "[WARNING] Failed to initialize random generator with hardware entropy, using fallback seed" << std::endl;
+    }
+}
 
 RandomGenerator::~RandomGenerator() = default;
 

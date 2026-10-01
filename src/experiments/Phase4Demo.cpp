@@ -13,7 +13,6 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
 
@@ -43,7 +42,18 @@ int main(int argc, char* argv[]) {
     // Parse command line arguments
     size_t numTrials = 50;
     if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+        try {
+            numTrials = std::stoull(argv[1]);
+            if (numTrials == 0) {
+                std::cerr << "Error: Number of trials must be positive\n";
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid number of trials: " << argv[1] << "\n";
+            std::cout << "\nUsage: " << argv[0] << " [number_of_trials]\n";
+            std::cout << "  number_of_trials: Number of trials to run (default: 50)\n";
+            return 1;
+        }
     }
     
     // Create configuration

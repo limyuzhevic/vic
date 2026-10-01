@@ -34,7 +34,16 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    
+    // Handle potential null pointer from localtime
+    struct tm tm_buf;
+    struct tm* tm_ptr = std::localtime(&time);
+    if (tm_ptr != nullptr) {
+        oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    } else {
+        // Fallback to simple timestamp if localtime fails
+        oss << "[timestamp invalid]";
+    }
     
     oss << " " << entry.message;
     
