@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""
+NLM Command Line Interface (nlmc)
+================================
+
+This script provides common operations for NLM (Neural Learning Machine) users,
+including brain initialization, simulation running, configuration management,
+benchmarking, and statistical analysis.
+
+Usage: nlmc [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  create-brain    Create and initialize a new brain
+  run-sim        Run simulations with different configurations
+  compare-configs Compare configuration files
+  benchmark      Benchmark performance
+  analyze-stats  Analyze brain statistics
+  create-experiment Create experimental configurations
+  list-configs    List available configurations
+  help           Show help message
+"""
+
+import argparse
+import logging
+import sys
+import time
+import json
+import os
+from pathlib import Path
+from typing import Optional, Dict, Any
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logger = logging.getLogger(__name__)
+
+class NLMCLI:
+    """Main NLM CLI application class."""
+    
+    def __init__(self):
+        # Get the directory where this script is located
+        script_dir = Path(__file__).parent
+        self.basedir = script_dir
+        self.configs_dir = self.basedir / "configs"
+        self.data_dir = self.basedir / "data"
+        self.data_dir.mkdir(exist_ok=True)
+    
+    def create_brain(self, neuron_count: int = 1000, config_file: Optional[str] = None,
+                    output_file: Optional[str] = None, verbose: bool = False):
+        """Create and initialize a new brain."""
+        logger.info(f"Creating brain with {neuron_count} neurons")
+        
+        # Create configuration
+        if config_file:
+            logger.info(f"Loading configuration from {config_file}")
+            # TODO: Implement config loading from file
+        
+        # Initialize brain (placeholder for actual brain creation)
+        brain_config = {
+            "neuron_count": neuron_count,
+            "region_count": 2,
+            "connection_probability": 0.1,
+            "plasticity_learning_rate": 0.01,
+            "timestamp": time.time()
+        }
+        
+        if output_file:
+            logger.info(f"Saving brain configuration to {output_file}")
+            with open(output_file, 'w') as f:
+                json.dump(brain_config, f, indent=2)
+        
+        logger.info("Brain creation completed successfully")
+        return brain_config
+    
+    def run_sim(self, config_file: str, steps: int = 1000, output_file: Optional[str] = None,
+                verbose: bool = False):
+        """Run simulations with different configurations."""
+        logger.info(f"Running simulation with config {config_file} for {steps} steps")
+        
+        # TODO: Implement actual simulation running
+        simulation_results = {
+            "config": config_file,
+            "steps": steps,
+            "start_time": time.time(),
+            "end_time": time.time() + steps * 0.001,  # Placeholder
+            "status": "completed",
+            "neurons_fired": int(steps * 0.15)  # Placeholder
+        }
+        
+        if output_file:
+            logger.info(f"Saving simulation results to {output_file}")
+            with open(output_file, 'w') as f:
+                json.dump(simulation_results, f, indent=2)
+        
+        logger.info("Simulation completed successfully")
+        return simulation_results
+    
+    def compare_configs(self, config_file1: str, config_file2: str):
+        """Compare two configuration files."""
+        logger.info(f"Comparing configurations: {config_file1} vs {config_file2}")
+        
+        # TODO: Implement actual config comparison
+        with open(config_file1, 'r') as f:
+            config1 = json.load(f) if config_file1.endswith('.json') else self._parse_config(config_file1)
+        
+        with open(config_file2, 'r') as f:
+            config2 = json.load(f) if config_file2.endswith('.json') else self._parse_config(config_file2)
+        
+        differences = self._find_config_differences(config1, config2)
+        
+        logger.info("Configuration comparison completed")
+        return differences
+    
+    def benchmark(self, config_file: str, steps: int = 100, iterations: int = 5):
+        """Benchmark performance."""
+        logger.info(f"Benchmarking config {config_file} for {iterations} iterations")
+        
+        # TODO: Implement actual benchmarking
+        times = []
+        for i in range(iterations):
+            start_time = time.time()
+            # Placeholder for simulation run
+            time.sleep(0.1)  # Simulate work
+            end_time = time.time()
+            times.append(end_time - start_time)
+        
+        avg_time = sum(times) / len(times)
+        results = {
+            "config": config_file,
+            "iterations": iterations,
+            "steps_per_iteration": steps,
+            "times": times,
+            "average_time": avg_time,
+            "steps_per_second": steps / avg_time if avg_time > 0 else 0
+        }
+        
+        logger.info(f"Benchmark completed. Average: {avg_time:.3f}s per iteration")
+        return results
+    
+    def analyze_stats(self, brain_file: str):
+        """Analyze brain statistics."""
+        logger.info(f"Analyzing brain statistics from {brain_file}")
+        
+        # TODO: Implement actual stats analysis
+        with open(brain_file, 'r') as f:
+            brain_data = json.load(f)
+        
+        stats = {
+            "neuron_count": brain_data.get("neuron_count", 0),
+            "connection_probability": brain_data.get("connection_probability", 0.0),
+            "plasticity_rate": brain_data.get("plasticity_learning_rate", 0.0),
+            "regions": brain_data.get("region_count", 0),
+            "analysis_timestamp": time.time()
+        }
+        
+        logger.info(f"Analysis completed. Stats: {stats}")
+        return stats
+    
+    def create_experiment(self, base_config: str, name: str, parameters: Dict[str, Any],
+                          output_dir: Optional[str] = None):
+        """Create experimental configurations."""
+        logger.info(f"Creating experiment '{name}' based on {base_config}")
+        
+        # TODO: Implement experiment configuration creation
+        with open(base_config, 'r') as f:
+            base_config_data = json.load(f) if base_config.endswith('.json') else self._parse_config(base_config)
+        
+        # Apply parameter modifications
+        experiment_config = base_config_data.copy()
+        experiment_config.update(parameters)
+        experiment_config["experiment_name"] = name
+        experiment_config["creation_time"] = time.time()
+        
+        if output_dir:
+            output_path = Path(output_dir)
+            output_path.mkdir(exist_ok=True)
+            config_file = output_path / f"{name}.json"
+            with open(config_file, 'w') as f:
+                json.dump(experiment_config, f, indent=2)
+            logger.info(f"Experiment configuration saved to {config_file}")
+        
+        logger.info(f"Experiment '{name}' created successfully")
+        return experiment_config
+    
+    def list_configs(self, pattern: Optional[str] = None):
+        """List available configurations."""
+        logger.info("Listing available configurations")
+        
+        if not self.configs_dir.exists():
+            logger.warning(f"Configs directory not found: {self.configs_dir}")
+            return []
+        
+        configs = list(self.configs_dir.glob("*.json")) + list(self.configs_dir.glob("*.cfg"))
+        
+        if pattern:
+            configs = [c for c in configs if pattern.lower() in c.name.lower()]
+        
+        for config in configs:
+            stat = config.stat()
+            print(f"{config.name} - {stat.st_size} bytes - {time.strftime('%Y-%m-%d %H:%M', time.localtime(stat.st_mtime))}")
+        
+        return configs
+    
+    def _parse_config(self, file_path: str) -> Dict[str, Any]:
+        """Parse configuration file (simple key=value format)."""
+        config = {}
+        with open(file_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        
+                        # Try to convert to appropriate type
+                        if value.isdigit():
+                            value = int(value)
+                        elif value.replace('.', '', 1).isdigit():
+                            value = float(value)
+                        elif value.lower() in ('true', 'false'):
+                            value = value.lower() == 'true'
+                        
+                        config[key] = value
+        return config
+    
+    def _find_config_differences(self, config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+        """Find differences between two configurations."""
+        all_keys = set(config1.keys()) | set(config2.keys())
+        differences = {}
+        
+        for key in all_keys:
+            val1 = config1.get(key, "[missing]")
+            val2 = config2.get(key, "[missing]")
+            
+            if val1 != val2:
+                differences[key] = {"file1": val1, "file2": val2}
+        
+        return differences
+
+def main():
+    """Main CLI entry point."""
+    cli = NLMCLI()
+    
+    parser = argparse.ArgumentParser(
+        description="NLM Command Line Interface - Common operations for NLM users",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    # Global options
+    parser.add_argument('-v', '--verbose', action='store_true',
+                       help="Enable verbose logging")
+    parser.add_argument('--quiet', action='store_true',
+                       help="Suppress output")
+    
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Create brain command
+    brain_parser = subparsers.add_parser('create-brain', help='Create and initialize a new brain')
+    brain_parser.add_argument('neuron_count', type=int, nargs='?', default=1000,
+                             help='Number of neurons to create (default: 1000)')
+    brain_parser.add_argument('--config-file', '-c', help='Configuration file path')
+    brain_parser.add_argument('--output-file', '-o', help='Output file for brain configuration')
+    
+    # Run simulation command
+    sim_parser = subparsers.add_parser('run-sim', help='Run simulations with different configurations')
+    sim_parser.add_argument('config_file', help='Configuration file path')
+    sim_parser.add_argument('--steps', '-s', type=int, default=1000,
+                           help='Number of simulation steps (default: 1000)')
+    sim_parser.add_argument('--output-file', '-o', help='Output file for simulation results')
+    
+    # Compare configs command
+    compare_parser = subparsers.add_parser('compare-configs', help='Compare configuration files')
+    compare_parser.add_argument('config_file1', help='First configuration file')
+    compare_parser.add_argument('config_file2', help='Second configuration file')
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser('benchmark', help='Benchmark performance')
+    benchmark_parser.add_argument('config_file', help='Configuration file for benchmarking')
+    benchmark_parser.add_argument('--steps', '-s', type=int, default=100,
+                                help='Number of steps per iteration (default: 100)')
+    benchmark_parser.add_argument('--iterations', '-i', type=int, default=5,
+                                help='Number of iterations (default: 5)')
+    
+    # Analyze stats command
+    stats_parser = subparsers.add_parser('analyze-stats', help='Analyze brain statistics')
+    stats_parser.add_argument('brain_file', help='Brain data file path')
+    
+    # Create experiment command
+    exp_parser = subparsers.add_parser('create-experiment', help='Create experimental configurations')
+    exp_parser.add_argument('base_config', help='Base configuration file')
+    exp_parser.add_argument('name', help='Experiment name')
+    exp_parser.add_argument('--parameters', nargs='+', help='Parameter modifications (format: key=value)')
+    exp_parser.add_argument('--output-dir', '-o', help='Output directory for experiment configs')
+    
+    # List configs command
+    list_parser = subparsers.add_parser('list-configs', help='List available configurations')
+    list_parser.add_argument('--pattern', '-p', help='Pattern to filter configuration files')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Configure logging based on verbosity
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    elif args.quiet:
+        logger.setLevel(logging.ERROR)
+    
+    # Execute command
+    try:
+        if args.command == 'create-brain':
+            parameters = {
+                'neuron_count': args.neuron_count,
+                'config_file': args.config_file,
+                'output_file': args.output_file,
+                'verbose': args.verbose
+            }
+            result = cli.create_brain(**parameters)
+            print(f"Brain created successfully. Neuron count: {result['neuron_count']}")
+            
+        elif args.command == 'run-sim':
+            parameters = {
+                'config_file': args.config_file,
+                'steps': args.steps,
+                'output_file': args.output_file,
+                'verbose': args.verbose
+            }
+            result = cli.run_sim(**parameters)
+            print(f"Simulation completed. Steps: {result['steps']}, Neurons fired: {result['neurons_fired']}")
+            
+        elif args.command == 'compare-configs':
+            differences = cli.compare_configs(args.config_file1, args.config_file2)
+            print(f"Found {len(differences)} differences:")
+            for key, diff in differences.items():
+                print(f"  {key}: {diff['file1']} -> {diff['file2']}")
+                
+        elif args.command == 'benchmark':
+            results = cli.benchmark(args.config_file, args.steps, args.iterations)
+            print(f"Benchmark results:")
+            print(f"  Average time: {results['average_time']:.3f}s per iteration")
+            print(f"  Steps per second: {results['steps_per_second']:.1f}")
+            
+        elif args.command == 'analyze-stats':
+            stats = cli.analyze_stats(args.brain_file)
+            print(f"Brain statistics:")
+            for key, value in stats.items():
+                print(f"  {key}: {value}")
+                
+        elif args.command == 'create-experiment':
+            # Parse parameters from key=value format
+            params = {}
+            if args.parameters:
+                for param in args.parameters:
+                    if '=' in param:
+                        key, value = param.split('=', 1)
+                        # Try to convert to appropriate type
+                        if value.isdigit():
+                            value = int(value)
+                        elif value.replace('.', '', 1).isdigit():
+                            value = float(value)
+                        elif value.lower() in ('true', 'false'):
+                            value = value.lower() == 'true'
+                        params[key] = value
+            
+            result = cli.create_experiment(args.base_config, args.name, params, args.output_dir)
+            print(f"Experiment '{args.name}' created successfully")
+            
+        elif args.command == 'list-configs':
+            cli.list_configs(args.pattern)
+            
+        else:
+            parser.print_help()
+            
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)
+if __name__ == '__main__':
+    main()

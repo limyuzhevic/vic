@@ -6,11 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
-
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
@@ -71,20 +66,26 @@ add_library(nlm_core STATIC
     src/sensory/Audio.cpp
     src/sensory/InternalSignals.cpp
     # Prediction
-    src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
+    src/prediction/PredictionSystem.cpp
     # Motor
     src/motor/MotorSystem.cpp
+    src/motor/Action.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Advanced Features
+    src/advanced/AdvancedBrain.cpp
+    src/advanced/AdvancedPlasticity.cpp
+    src/advanced/AdvancedSimulation.cpp
+    src/advanced/AdvancedAnalysis.cpp
+    src/advanced/AdvancedConfig.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
