@@ -1,8 +1,25 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <nlohmann/json.hpp>
+
+namespace nlohmann {
+    template<typename T>
+    struct adl_serializer<std::optional<T>> {
+        static void to_json(json& j, const std::optional<T>& opt) {
+            if (opt) {
+                j = *opt;
+            } else {
+                j = nullptr;
+            }
+        }
+
+        static void from_json(const json& j, std::optional<T>& opt) {
+            if (!j.is_null()) {
+                opt = j.get<T>();
+            } else {
+                opt = std::nullopt;
+            }
+        }
+    };
+}
 
 namespace nlm {
 
@@ -19,37 +36,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try to parse as JSON first
+    bool parsed = tryParseJSON(content);
+    
+    if (!parsed) {
+        // Fallback to simple key=value format
+        parseSimpleFormat(content);
     }
     
     return true;
@@ -84,10 +86,34 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Write JSON format configuration file
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\"";
+        
+        // Write value based on type
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << " : \"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << " : " << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << " : " << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format as float to match original precision
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(6) << arg;
+                file << " : " << oss.str();
+            } else {
+                file << " : " << arg;
+            }
+        }, entry.value);
+        
+        file << (i < pImpl->entries.size() - 1 ? "," : "") << "\n";
     }
+    file << "}\n";
     
     return true;
 }
@@ -210,6 +236,68 @@ template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::tryParseJSON(const std::string& content) {
+    try {
+        auto json = nlohmann::json::parse(content);
+        if (!json.is_object()) {
+            return false;
+        }
+        
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            const auto& value = it.value();
+            
+            if (value.is_string()) {
+                set(key, value.get<std::string>(), ConfigSource::File);
+            } else if (value.is_boolean()) {
+                set(key, value.get<bool>(), ConfigSource::File);
+            } else if (value.is_number_integer()) {
+                set(key, value.get<int64_t>(), ConfigSource::File);
+            } else if (value.is_number_unsigned()) {
+                set(key, static_cast<int64_t>(value.get<uint64_t>()), ConfigSource::File);
+            } else if (value.is_number()) {
+                set(key, value.get<double>(), ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        // JSON parsing failed, fallback to simple format
+        return false;
+    }
+}
 
-} // namespace nlm
+void Config::parseSimpleFormat(const std::string& content) {
+    std::istringstream stream(content);
+    std::string line;
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = Config::trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = Config::trim(line.substr(0, pos));
+            std::string value = Config::trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+}
+
+// Friend function for tryParseJSON
+bool tryParseJSON(const std::string& content, Config& config);
+
+// Friend function for parseSimpleFormat
+void parseSimpleFormat(const std::string& content, Config& config);
+
