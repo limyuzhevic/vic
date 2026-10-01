@@ -152,8 +152,38 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("set", (void (Config::*)(const std::string&, const std::string&, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a string configuration value")
+        .def("set", (void (Config::*)(const std::string&, int, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set an integer configuration value")
+        .def("set", (void (Config::*)(const std::string&, double, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a double configuration value")
+        .def("set", (void (Config::*)(const std::string&, bool, ConfigSource)) &Config::set,
+             py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set a boolean configuration value")
+        .def("get", (std::optional<int> (Config::*)(const std::string&) const) &Config::get<int>,
+             py::arg("key"), "Get an integer configuration value")
+        .def("get", (std::optional<double> (Config::*)(const std::string&) const) &Config::get<double>,
+             py::arg("key"), "Get a double configuration value")
+        .def("get", (std::optional<bool> (Config::*)(const std::string&) const) &Config::get<bool>,
+             py::arg("key"), "Get a boolean configuration value")
+        .def("get", (std::optional<std::string> (Config::*)(const std::string&) const) &Config::get<std::string>,
+             py::arg("key"), "Get a string configuration value")
+        .def("getOr", (int (Config::*)(const std::string&, const int&) const) &Config::getOr<int>,
+             py::arg("key"), py::arg("defaultValue"), "Get an integer configuration value with default")
+        .def("getOr", (double (Config::*)(const std::string&, const double&) const) &Config::getOr<double>,
+             py::arg("key"), py::arg("defaultValue"), "Get a double configuration value with default")
+        .def("getOr", (bool (Config::*)(const std::string&, const bool&) const) &Config::getOr<bool>,
+             py::arg("key"), py::arg("defaultValue"), "Get a boolean configuration value with default")
+        .def("getOr", (std::string (Config::*)(const std::string&, const std::string&) const) &Config::getOr<std::string>,
+             py::arg("key"), py::arg("defaultValue"), "Get a string configuration value with default")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,

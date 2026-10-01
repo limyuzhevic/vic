@@ -35,6 +35,10 @@ dev = [
     "numpy>=1.20",
 ]
 
+[project.scripts]
+"nlm-test" = "python -m pytest"
+"nlm-examples" = "python examples/quick_start.py"
+
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
