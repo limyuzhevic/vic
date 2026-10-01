@@ -1,0 +1,56 @@
+# Core dependencies for NLM Python bindings
+
+# Scientific computing
+numpy>=1.20
+pandas>=1.3.0
+
+# Visualization (optional)
+matplotlib>=3.7.0
+
+# Development and testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+isort>=5.0.0
+mypy>=1.0.0
+flake8>=6.0.0
+
+# Code quality
+ruff>=0.1.0
+pre-commit>=3.5.0
+
+# Documentation
+sphinx>=6.0.0
+sphinx-rtd-theme>=2.0.0
+sphinx-autodoc-typehints>=2.0.0
+
+# Environment (optional)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Performance monitoring
+memory-profiler>=0.61.0
+psutil>=5.5.0
+
+# Data handling
+h5py>=3.8.0
+netCDF4>=1.6.0
+
+# Advanced features
+pyyaml>=6.0.0
+jsonpatch>=1.32
+jsonschema>=4.17.0
+
+# Development tools (optional)
+ladder>=0.4.0
+watchdog>=3.0.0
+
+# Test dependencies (for CI)
+pytest-xdist>=3.2.0
+pytest-timeout>=2.2.0
+pytest-randomly>=3.1.0
+
+# Environment specification for reproducibility
+python-version = ">=3.8,<3.13"
+platform = "linux"

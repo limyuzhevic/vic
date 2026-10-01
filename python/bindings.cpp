@@ -160,6 +160,60 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // Type-specific getters
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) return *val;
+            throw std::runtime_error("Configuration key not found or wrong type: " + key);
+        }, py::arg("key"), "Get integer configuration value")
+        
+        .def("getDouble", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val) return *val;
+            throw std::runtime_error("Configuration key not found or wrong type: " + key);
+        }, py::arg("key"), "Get double configuration value")
+        
+        .def("getString", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val) return *val;
+            throw std::runtime_error("Configuration key not found or wrong type: " + key);
+        }, py::arg("key"), "Get string configuration value")
+        
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val) return *val;
+            throw std::runtime_error("Configuration key not found or wrong type: " + key);
+        }, py::arg("key"), "Get boolean configuration value")
+        
+        // Template versions for generic access
+        .def("get", [](const Config& self, const std::string& key) {
+            // Return a Python dictionary with type information
+            py::dict result;
+            
+            auto int_val = self.get<int>(key);
+            if (int_val) {
+                result["int"] = *int_val;
+            }
+            
+            auto double_val = self.get<double>(key);
+            if (double_val) {
+                result["double"] = *double_val;
+            }
+            
+            auto string_val = self.get<std::string>(key);
+            if (string_val) {
+                result["string"] = *string_val;
+            }
+            
+            auto bool_val = self.get<bool>(key);
+            if (bool_val) {
+                result["bool"] = *bool_val;
+            }
+            
+            return result;
+        }, py::arg("key"), "Get configuration value with type detection")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -398,23 +452,33 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Set configuration method for Python compatibility
+        .def("setInt", &Config::set, py::arg("key"), py::arg("value"),
+             "Set integer configuration value")
+        .def("setDouble", &Config::set, py::arg("key"), py::arg("value"),
+             "Set double configuration value")
+        .def("setString", &Config::set, py::arg("key"), py::arg("value"),
+             "Set string configuration value")
+        .def("setBool", &Config::set, py::arg("key"), py::arg("value"),
+             "Set boolean configuration value")
+        
+        // Simplified set method that accepts Python types
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            if (value.is(py::int_())) {
+                self.set(key, value.cast<int64_t>());
+            } else if (value.is(py::float_())) {
+                self.set(key, value.cast<double>());
+            } else if (value.is(py::str())) {
+                self.set(key, value.cast<std::string>());
+            } else if (value.is(py::bool_())) {
+                self.set(key, value.cast<bool>());
+            } else {
+                throw py::type_error("Unsupported configuration value type");
+            }
+        }, py::arg("key"), py::arg("value"), 
+           "Set configuration value (Pythonic interface)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
