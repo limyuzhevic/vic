@@ -111,8 +111,10 @@ public:
                     case MotorCommand::MoveBackward: metrics.backwardCount++; break;
                     case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
                     case MotorCommand::TurnRight: metrics.turnRightCount++; break;
+                    case MotorCommand::LookLeft: metrics.lookLeftCount++; break;
+                    case MotorCommand::LookRight: metrics.lookRightCount++; break;
                     case MotorCommand::Interact: metrics.interactCount++; break;
-                    default: metrics.waitCount++; break;
+                    case MotorCommand::Wait: metrics.waitCount++; break;
                 }
                 
                 // Print periodic updates
@@ -148,6 +150,8 @@ public:
                       << ", bwd=" << metrics.backwardCount
                       << ", left=" << metrics.turnLeftCount
                       << ", right=" << metrics.turnRightCount
+                      << ", lookLeft=" << metrics.lookLeftCount
+                      << ", lookRight=" << metrics.lookRightCount
                       << ", interact=" << metrics.interactCount
                       << ", wait=" << metrics.waitCount
                       << "\n\n";
@@ -165,6 +169,8 @@ public:
             std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
             std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
             std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
+            std::cout << "  Look actions: " << first.lookLeftCount + first.lookRightCount << " -> " 
+                      << (last.lookLeftCount + last.lookRightCount) << "\n";
             std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";
             
             // Calculate behavior change

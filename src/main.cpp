@@ -48,6 +48,204 @@ void printBanner() {
     )" << std::endl;
 }
 
+// Utility functions to reduce code duplication and improve organization
+
+// Helper function to parse command line arguments
+std::string parseArgValue(int argc, char** argv, const std::string& flag) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == flag && i + 1 < argc) {
+            return std::string(argv[i + 1]);
+        } else if (arg.substr(0, flag.size()) == flag && arg.find('=') != std::string::npos) {
+            return arg.substr(arg.find('=') + 1);
+        }
+    }
+    return "";
+}
+
+// Helper function to parse float argument
+float parseFloatArg(int argc, char** argv, const std::string& flag, float defaultValue) {
+    std::string value = parseArgValue(argc, argv, flag);
+    if (!value.empty()) {
+        try {
+            return std::stof(value);
+        } catch (...) {
+            // If parsing fails, use default value
+            return defaultValue;
+        }
+    }
+    return defaultValue;
+}
+
+// Helper function to parse int argument
+int parseIntArg(int argc, char** argv, const std::string& flag, int defaultValue) {
+    std::string value = parseArgValue(argc, argv, flag);
+    if (!value.empty()) {
+        try {
+            return std::stoi(value);
+        } catch (...) {
+            // If parsing fails, use default value
+            return defaultValue;
+        }
+    }
+    return defaultValue;
+}
+
+// Helper function to parse boolean argument
+bool parseBoolArg(int argc, char** argv, const std::string& flag) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == flag) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Helper function to log configuration parameters
+void logConfigParameters(const std::shared_ptr<Config>& config) {
+    if (!config) return;
+    
+    NLM_LOG_INFO("Configuration Summary:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+}
+
+// Helper function to validate configuration parameters
+bool validateConfigParameters(const std::shared_ptr<Config>& config) {
+    if (!config) return false;
+    
+    bool isValid = true;
+    
+    // Validate timestep
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        NLM_LOG_WARNING("Invalid simulation timestep: " + std::to_string(timestep) + ". Using default 0.001");
+        isValid = false;
+    }
+    
+    // Validate neuron count
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    if (neuronCount <= 0) {
+        NLM_LOG_WARNING("Invalid neuron count: " + std::to_string(neuronCount) + ". Using default 500");
+        isValid = false;
+    }
+    
+    // Validate region count
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0) {
+        NLM_LOG_WARNING("Invalid region count: " + std::to_string(regionCount) + ". Using default 1");
+        isValid = false;
+    }
+    
+    // Validate connection probability
+    float connProb = config->getOr<float>("connection_probability", 0.15f);
+    if (connProb < 0.0f || connProb > 1.0f) {
+        NLM_LOG_WARNING("Invalid connection probability: " + std::to_string(connProb) + ". Using default 0.15");
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+// Helper function to create a configuration with command-line overrides
+std::shared_ptr<Config> createConfigWithOverrides(int argc, char** argv) {
+    auto config = std::make_shared<Config>();
+    
+    // Parse command line arguments
+    std::string seedStr = parseArgValue(argc, argv, "--seed");
+    if (!seedStr.empty()) {
+        try {
+            int64_t seed = std::stoll(seedStr);
+            config->set("random_seed", seed, ConfigSource::CommandLine);
+        } catch (...) {
+            NLM_LOG_WARNING("Invalid seed value: " + seedStr + ". Using default 42");
+        }
+    }
+    
+    float timestep = parseFloatArg(argc, argv, "--timestep", 0.001f);
+    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    
+    int64_t neuronCount = parseIntArg(argc, argv, "--neurons", 500);
+    config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+    
+    int64_t regionCount = parseIntArg(argc, argv, "--regions", 1);
+    config->set("region_count", regionCount, ConfigSource::CommandLine);
+    
+    float connProb = parseFloatArg(argc, argv, "--connect", 0.15f);
+    config->set("connection_probability", connProb, ConfigSource::CommandLine);
+    
+    // Apply fast mode if specified
+    if (parseBoolArg(argc, argv, "--fast-mode")) {
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::CommandLine);
+        config->set("simulation_timestep", 0.01, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Fast mode enabled: reduced neuron count and timestep");
+    }
+    
+    return config;
+}
+
+void printHelp() {
+    printBanner();
+    std::cout << R"(
+USAGE:
+  ./nlm [OPTIONS]
+
+OPTIONS:
+  --help                     Show this help message and exit
+  --version                  Show version information
+  --config <file>            Load configuration from file (default: configs/default.cfg)
+  --seed <number>            Set random seed (default: 42)
+  --timestep <value>         Set simulation timestep in seconds (default: 0.001)
+  --neurons <count>          Set number of neurons (default: 500)
+  --regions <count>          Set number of brain regions (default: 1)
+  --connect <probability>    Set connection probability (default: 0.15)
+  --fast-mode                Run in reduced mode for faster testing (fewer neurons, shorter simulation)
+
+EXAMPLES:
+  ./nlm --config myconfig.cfg
+  ./nlm --seed 123 --neurons 1000 --timestep 0.0001 --fast-mode
+  ./nlm --help
+
+ENVIRONMENT:
+  NLM_LOG_LEVEL    Set log level (DEBUG, INFO, WARNING, ERROR)
+  NLM_HOME         Custom configuration directory
+
+For more information about NLM and Phase 2 capabilities, visit:
+  https://github.com/neural-learning-machine/nlm
+
+  )" << std::endl;
+}
+
+void printVersion() {
+    printBanner();
+    std::cout << R"(
+NLM Phase 2: Real Neural Computation
+Version: 2.0.0
+Build: Development Build
+
+Implemented:
+  - Leaky Integrate-and-Fire (LIF) neuron dynamics
+  - Event-driven spike propagation with synaptic delays
+  - Spike-Timing-Dependent Plasticity (STDP)
+  - Hebbian plasticity rules
+  - Structural plasticity (synaptogenesis/pruning)
+  - Neuromodulation (dopamine, reward prediction error)
+  - Learning experiments with measurable synaptic changes
+
+License: MIT
+Copyright (c) 2026 NLM Development Team
+
+  )" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -322,6 +520,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version flags first
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        }
+    }
+
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
