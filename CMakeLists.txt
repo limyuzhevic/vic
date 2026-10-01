@@ -55,11 +55,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -74,11 +70,11 @@ add_library(nlm_core STATIC
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
+    src/motor/Action.cpp
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -106,6 +102,12 @@ add_library(nlm_world STATIC
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
