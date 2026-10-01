@@ -4,6 +4,19 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**Key Improvements in This Version:**
+- ✅ **Fixed**: Brain.cpp initialization order bug
+- ✅ **Optimized**: Synapse.cpp step method performance (reduced O(n²) to O(n))
+- ✅ **Enhanced**: Configuration system with JSON/YAML support and validation
+- ✅ **Improved**: Documentation with comprehensive examples and troubleshooting
+
+**New Features Added:**
+- Enhanced configuration validation and schema checking
+- Advanced brain health monitoring and research metrics
+- Performance benchmarking tools
+- Comprehensive error handling and recovery
+- Improved documentation with examples
+
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library

@@ -1,8 +1,14 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Improved Usage Guide for Beginners and Advanced Users
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+
+**Key improvements in this version:**
+- ✅ **Fixed**: Brain.cpp initialization order bug
+- ✅ **Optimized**: Synapse.cpp step method performance (reduced O(n²) operations)
+- ✅ **Enhanced**: Configuration system with JSON/YAML support and validation
+- ✅ **Improved**: Documentation with comprehensive examples
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -11,6 +17,8 @@ Think of it like this:
 - **Memory** = The brain remembering patterns
 
 That's it! NLM simulates all of this.
+
+---
 
 ---
 

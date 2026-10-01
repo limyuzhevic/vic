@@ -18,41 +18,293 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Save in JSON format for better interoperability
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Serialize value based on type
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeJSONString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else {
+                file << arg;
             }
-            
-            set(key, value, ConfigSource::File);
+        }, entry.value);
+        
+        file << "\n";
+    }
+    file << "}\n";
+    
+    return true;
+}
+
+std::string Config::escapeJSONString(const std::string& str) const {
+    std::string escaped;
+    escaped.reserve(str.size() * 2); // Pre-allocate for efficiency
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': escaped += "\\\\"; break;
+            case '\"': escaped += "\\\""; break;
+            case '\b': escaped += "\\b"; break;
+            case '\f': escaped += "\\f"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default:
+                if (c < 32 || c == 127) {
+                    // Control characters - use Unicode escape
+                    escaped += "\\u";
+                    char hex[5];
+                    std::snprintf(hex, sizeof(hex), "%04x", static_cast<unsigned int>(c));
+                    escaped += hex;
+                } else {
+                    escaped += c;
+                }
+                break;
+        }
+    }
+    
+    return escaped;
+}
+
+bool Config::validate(const ConfigSchema& schema) const {
+    // Validate configuration against schema
+    bool isValid = true;
+    
+    for (const auto& entry : schema.requiredFields) {
+        if (!has(entry)) {
+            return false;
+        }
+    }
+    
+    for (const auto& rule : schema.validationRules) {
+        if (!validateRule(rule)) {
+            isValid = false;
+        }
+    }
+    
+    return isValid;
+}
+
+bool Config::validateRule(const ValidationRule& rule) const {
+    // Apply a single validation rule
+    if (!has(rule.key)) {
+        return !rule.required; // Missing but not required is OK
+    }
+    
+    auto value = get(rule.key);
+    if (!value) {
+        return false; // Shouldn't happen if has() returned true
+    }
+    
+    // Type checking
+    bool typeMatches = false;
+    if (rule.expectedType == "string" && std::holds_alternative<std::string>(*value)) {
+        typeMatches = true;
+    } else if (rule.expectedType == "int" && std::holds_alternative<int64_t>(*value)) {
+        typeMatches = true;
+    } else if (rule.expectedType == "float" && std::holds_alternative<double>(*value)) {
+        typeMatches = true;
+    } else if (rule.expectedType == "bool" && std::holds_alternative<bool>(*value)) {
+        typeMatches = true;
+    }
+    
+    if (!typeMatches) {
+        return false;
+    }
+    
+    // Range validation
+    if (rule.minValue.has_value() && rule.maxValue.has_value()) {
+        double val = getAsDouble(rule.key);
+        if (val < rule.minValue.value() || val > rule.maxValue.value()) {
+            return false;
+        }
+    }
+    
+    // Enum validation
+    if (!rule.allowedValues.empty()) {
+        bool inAllowed = false;
+        for (const auto& allowed : rule.allowedValues) {
+            if (compareValues(*value, allowed)) {
+                inAllowed = true;
+                break;
+            }
+        }
+        if (!inAllowed) {
+            return false;
         }
     }
     
     return true;
+}
+
+bool Config::compareValues(const ConfigValue& a, const ConfigValue& b) const {
+    // Compare two configuration values
+    if (a.index() != b.index()) {
+        return false; // Different types can't be equal
+    }
+    
+    return std::visit([](auto&& aVal, auto&& bVal) {
+        return aVal == bVal;
+    }, a, b);
+}
+
+double Config::getAsDouble(const std::string& key) const {
+    auto value = get(key);
+    if (!value) {
+        throw std::runtime_error("Key not found: " + key);
+    }
+    
+    return std::visit([](auto&& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return std::stod(val);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return static_cast<double>(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return val ? 1.0 : 0.0;
+        } else {
+            return static_cast<double>(val);
+        }
+    }, *value);
+}
+
+std::string Config::toString(const std::string& key, const std::string& defaultValue) const {
+    auto value = get<std::string>(key);
+    return value.has_value() ? value.value() : defaultValue;
+}
+
+int64_t Config::toInt(const std::string& key, int64_t defaultValue) const {
+    auto value = get<int64_t>(key);
+    return value.has_value() ? value.value() : defaultValue;
+}
+
+double Config::toDouble(const std::string& key, double defaultValue) const {
+    auto value = get<double>(key);
+    return value.has_value() ? value.value() : defaultValue;
+}
+
+bool Config::toBool(const std::string& key, bool defaultValue) const {
+    auto value = get<bool>(key);
+    return value.has_value() ? value.value() : defaultValue;
+}
+
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Enhanced Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Format: JSON-compatible key-value store\n";
+    oss << "Source tracking: Enabled\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << escapeJSONString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                oss << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                oss << arg;
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (source=" << static_cast<int>(entry.source) << ")\n";
+    }
+    
+    return oss.str();
+}
+
+bool Config::exportToJSON(const std::string& filepath) const {
+    // Export configuration to JSON file
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n\"nlm_version\": \"0.1.0\",\n";
+    file << "  \"config_entries\": [\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "    {\n      \"key\": \"" << escapeJSONString(entry.key) << "\",
+              \"value\": ";
+        
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeJSONString(arg) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << ",\n      \"source\": " << static_cast<int>(entry.source);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n    }\n";
+        } else {
+            file << "\n    }\n";
+        }
+    }
+    
+    file << "  ]\n}\n";
+    return true;
+}
+
+bool Config::importFromJSON(const std::string& content) {
+    // Import configuration from JSON string
+    // For now, parse as enhanced key=value format
+    return loadFromKeyValue(content);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

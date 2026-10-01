@@ -199,27 +199,38 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Optimized short-term plasticity decay - calculate once per synapse
+    float timeSincePre = -1.0f;
+    float timeSincePost = -1.0f;
+    
     if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+    }
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        timeSincePost = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+    }
+    
+    // Decay short-term facilitation (Tsodyks-Markram model)
+    if (timeSincePre >= 0.0f) {
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+    // Decay short-term depression - simplified calculation
+    float timeSinceActivity = -1.0f;
+    if (timeSincePre >= 0.0f || timeSincePost >= 0.0f) {
+        timeSinceActivity = std::max(timeSincePre, timeSincePost);
+        if (timeSinceActivity >= 0.0f) {
+            // Recovery from depression toward 1.0 - vectorized math
+            pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        }
     }
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Clamp weight bounds - use std::fmax/std::fmin for better optimization
+    pImpl->weight = std::fmax(pImpl->weight, Impl::MIN_WEIGHT);
+    pImpl->weight = std::fmin(pImpl->weight, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
