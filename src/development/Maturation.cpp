@@ -1,47 +1,62 @@
 #include "Maturation.hpp"
+#include "../core/Config/Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
 
 namespace nlm {
 
 struct Maturation::Impl {
-    float progress;
-    MembranePotential matureThreshold;
-    MembranePotential matureRestingPotential;
-    float matureTimeConstant;
+    class Brain* brain;
+    float baselinePlasticity;
+    float developmentRate;
+    std::vector<float> ageFactors;
     
-    Impl() 
-        : progress(0.0f)
-        , matureThreshold(-55.0f)
-        , matureRestingPotential(-70.0f)
-        , matureTimeConstant(20.0f) {}
+    Impl() : brain(nullptr), baselinePlasticity(1.0f), developmentRate(0.001f) {}
 };
 
 Maturation::Maturation() : pImpl(new Impl) {}
 
 Maturation::~Maturation() = default;
 
-float Maturation::getProgress() const {
-    return pImpl->progress;
+void Maturation::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("Maturation system initialized");
 }
 
-void Maturation::setProgress(float progress) {
-    pImpl->progress = std::clamp(progress, 0.0f, 1.0f);
+void Maturation::update(TimestepDuration dt) {
+    if (!pImpl->brain) return;
+    
+    // Age-dependent plasticity modulation
+    // Plasticity decreases as brain matures (from 1.0 to 0.1)
+    pImpl->baselinePlasticity = std::max(0.1f, 1.0f - pImpl->developmentRate * dt);
+    
+    // Update developmental factors
+    if (pImpl->ageFactors.empty()) {
+        pImpl->ageFactors.reserve(100);
+        for (int i = 0; i < 100; ++i) {
+            pImpl->ageFactors.push_back(1.0f - i * 0.01f); // Linear decay
+        }
+    }
+    
+    NLM_LOG_DEBUG("Maturation update: baseline plasticity = " + 
+                  std::to_string(pImpl->baselinePlasticity));
 }
 
-void Maturation::update(Brain* brain, SimulationStep currentStep) {
-    // TODO PHASE 2: Implement real maturation
-    // PLACEHOLDER: Progress increases over simulation time
+float Maturation::getBaselinePlasticity() const {
+    return pImpl->baselinePlasticity;
 }
 
-MembranePotential Maturation::getMatureThreshold() const {
-    return pImpl->matureThreshold;
+void Maturation::setDevelopmentRate(float rate) {
+    pImpl->developmentRate = std::max(0.0f, std::min(rate, 0.01f));
 }
 
-MembranePotential Maturation::getMatureRestingPotential() const {
-    return pImpl->matureRestingPotential;
+float Maturation::getDevelopmentRate() const {
+    return pImpl->developmentRate;
 }
 
-float Maturation::getMatureTimeConstant() const {
-    return pImpl->matureTimeConstant;
+void Maturation::reset() {
+    pImpl->baselinePlasticity = 1.0f;
+    pImpl->ageFactors.clear();
 }
 
 } // namespace nlm
