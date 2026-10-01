@@ -198,6 +198,87 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
 
+    // Memory System Bindings
+    
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory for temporary information storage)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"))
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"))
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"))
+        .def("clear", &WorkingMemory::clear)
+        .def("getCapacity", &WorkingMemory::getCapacity)
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize)
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"));
+
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Item representing a stored experience)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("sensoryState", &EpisodicMemoryItem::sensoryState)
+        .def_readwrite("positionX", &EpisodicMemoryItem::positionX)
+        .def_readwrite("positionY", &EpisodicMemoryItem::positionY)
+        .def_readwrite("orientation", &EpisodicMemoryItem::orientation)
+        .def_readwrite("action", &EpisodicMemoryItem::action)
+        .def_readwrite("reward", &EpisodicMemoryItem::reward)
+        .def_readwrite("energy", &EpisodicMemoryItem::energy)
+        .def_readwrite("novelty", &EpisodicMemoryItem::novelty)
+        .def_readwrite("resultingSensoryState", &EpisodicMemoryItem::resultingSensoryState)
+        .def_readwrite("resultingReward", &EpisodicMemoryItem::resultingReward)
+        .def_readwrite("activeNeurons", &EpisodicMemoryItem::activeNeurons)
+        .def_readwrite("neuronActivations", &EpisodicMemoryItem::neuronActivations)
+        .def_readwrite("age", &EpisodicMemoryItem::age);
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system for storing experiences)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"))
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"))
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount)
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"))
+        .def("clear", &EpisodicMemory::clear)
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"))
+        .def("enableReplay", &EpisodicMemory::enableReplay, py::arg("enable"))
+        .def("isReplayEnabled", &EpisodicMemory::isReplayEnabled)
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"))
+        .def("getEpisodesForReplay", &EpisodicMemory::getEpisodesForReplay, py::arg("count"));
+
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory for knowledge and facts)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"))
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"))
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"))
+        .def("getAllFacts", &SemanticMemory::getAllFacts)
+        .def("clear", &SemanticMemory::clear);
+
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Procedural memory for learned skills and habits)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"))
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"))
+        .def("getAllSkills", &ProceduralMemory::getAllSkills)
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"))
+        .def("clear", &ProceduralMemory::clear);
+
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory for relationships between representations)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate, py::arg("neuronA"), py::arg("neuronB"), py::arg("strength") = 1.0f)
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"))
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, py::arg("neuronA"), py::arg("neuronB"))
+        .def("updateAssociation", &AssociativeMemory::updateAssociation, py::arg("neuronA"), py::arg("neuronB"), py::arg("delta"))
+        .def("clear", &AssociativeMemory::clear);
+
+    // Prediction System Bindings
+    
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for forward models)pbdoc")
+        .def(py::init<>())
+        .def("predict", [](PredictionSystem& self, const std::vector<float>& sensoryInput) {
+            return self.predict(sensoryInput);
+        }, py::arg("sensoryInput"))
+        .def("getPrediction", &PredictionSystem::getPrediction)
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getConfidence", &PredictionSystem::getConfidence)
+        .def("reset", &PredictionSystem::reset)
+        .def("enableTraining", &PredictionSystem::enableTraining, py::arg("enable"))
+        .def("isTraining", &PredictionSystem::isTraining)
+        .def("train", &PredictionSystem::train, py::arg("targetState"));
+
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
         .def(py::init<ActionType>(), py::arg("type"))
@@ -288,6 +369,80 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
+    // Concept Formation and Cognitive System Bindings
+    
+    py::class_<ConceptInstance>(m, "ConceptInstance", R"pbdoc(Instance of a discovered concept)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("pattern", &ConceptInstance::pattern)
+        .def_readwrite("features", &ConceptInstance::features)
+        .def_readwrite("observationCount", &ConceptInstance::observationCount)
+        .def_readwrite("lastObserved", &ConceptInstance::lastObserved)
+        .def_readwrite("avgReward", &ConceptInstance::avgReward)
+        .def_readwrite("stability", &ConceptInstance::stability);
+
+    py::class_<DiscoveredConcept>(m, "DiscoveredConcept", R"pbdoc(A concept discovered from experience)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("id", &DiscoveredConcept::id)
+        .def_readwrite("prototype", &DiscoveredConcept::prototype)
+        .def_readwrite("instances", &DiscoveredConcept::instances)
+        .def_readwrite("categoryHint", &DiscoveredConcept::categoryHint)
+        .def_readwrite("associatedConceptIds", &DiscoveredConcept::associatedConceptIds)
+        .def_readwrite("totalObservations", &DiscoveredConcept::totalObservations)
+        .def_readwrite("avgStability", &DiscoveredConcept::avgStability);
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(System that discovers concepts from experience)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"))
+        .def("presentExperience", &ConceptFormation::presentExperience,
+             py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("currentTime"))
+        .def("getMatchingConcept", &ConceptFormation::getMatchingConcept,
+             py::arg("pattern"), py::arg("similarityThreshold") = 0.7f)
+        .def("getConcepts", &ConceptFormation::getConcepts)
+        .def("getConcept", &ConceptFormation::getConcept, py::arg("conceptId"))
+        .def("getConceptPrototype", &ConceptFormation::getConceptPrototype, py::arg("conceptId"))
+        .def("getConceptInstances", &ConceptFormation::getConceptInstances, py::arg("conceptId"))
+        .def("getConceptStability", &ConceptFormation::getConceptStability, py::arg("conceptId"))
+        .def("getConceptCount", &ConceptFormation::getConceptCount)
+        .def("mergeConcepts", &ConceptFormation::mergeConcepts, py::arg("conceptA"), py::arg("conceptB"))
+        .def("updateConcept", &ConceptFormation::updateConcept,
+             py::arg("conceptId"), py::arg("newPattern"), py::arg("features"), py::arg("reward"))
+        .def("computeSimilarity", &ConceptFormation::computeSimilarity,
+             py::arg("a"), py::arg("b"))
+        .def("isNovel", &ConceptFormation::isNovel,
+             py::arg("pattern"), py::arg("similarityThreshold") = 0.7f)
+        .def("findConceptForPattern", &ConceptFormation::findConceptForPattern, py::arg("pattern"))
+        .def("clear", &ConceptFormation::clear)
+        .def("getGeneralizationAbility", &ConceptFormation::getGeneralizationAbility, py::arg("conceptId"))
+        .def("setFormationThreshold", &ConceptFormation::setFormationThreshold, py::arg("t"))
+        .def("setStabilityWindow", &ConceptFormation::setStabilityWindow, py::arg("w"));
+
+    py::class_<PlanningCandidate>(m, "PlanningCandidate", R"pbdoc(A potential action sequence)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("actions", &PlanningCandidate::actions)
+        .def_readwrite("predictedStates", &PlanningCandidate::predictedStates)
+        .def_readwrite("expectedReward", &PlanningCandidate::expectedReward)
+        .def_readwrite("confidence", &PlanningCandidate::confidence)
+        .def_readwrite("depth", &PlanningCandidate::depth);
+
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(System that plans multi-step actions)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"))
+        .def("planAction", &NeuralPlanner::planAction,
+             py::arg("currentState"), py::arg("targetReward") = 0.5f)
+        .def("evaluateSequence", &NeuralPlanner::evaluateSequence,
+             py::arg("actions"), py::arg("startState"))
+        .def("getPlanningDepth", &NeuralPlanner::getPlanningDepth)
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"))
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence)
+        .def("updatePlanQuality", &NeuralPlanner::updatePlanQuality,
+             py::arg("plannedActions"), py::arg("actualActions"), py::arg("actualReward"))
+        .def("clearCache", &NeuralPlanner::clearCache)
+        .def("setActionQuality", &NeuralPlanner::setActionQuality,
+             py::arg("action"), py::arg("quality"))
+        .def("getCurrentGoal", &NeuralPlanner::getCurrentGoal)
+        .def("setCurrentGoal", &NeuralPlanner::setCurrentGoal, py::arg("goal"))
+        .def("wasRecentPlanSuccessful", &NeuralPlanner::wasRecentPlanSuccessful);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
