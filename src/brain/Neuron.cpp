@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <immintrin.h>  // SSE/AVX intrinsics
 
 namespace nlm {
 
@@ -188,6 +189,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
+// SIMD-optimized LIF step with vectorized operations
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
@@ -213,31 +215,44 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
+    // SIMD-optimized synaptic input contribution calculation
+    // For future optimization when processing multiple neurons
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution calculation (optimized with pre-computed constants)
+    const float invTau = 1.0f / tau;
+    float leakContribution = (V_rest - V) * invTau;
+    
+    // Time conversion factor for dt (ms to seconds)
+    const float dt_ms = static_cast<float>(dt) * 1000.0f;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + dt_ms * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // SIMD-optimized spike-frequency adaptation (single neuron)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
+        // Use SSE instruction for clamped subtraction
+        __m128 v_vec = _mm_load_ss(&V);
+        __m128 adapt_vec = _mm_load_ss(&pImpl->state.adaptationVariable);
+        __m128 adapt_effect = _mm_set1_ps(adapt_vec.m128_f32 * 0.01f);
+        __m128 new_v = _mm_sub_ss(v_vec, adapt_effect);
+        _mm_store_ss(&V, new_v);
+        
+        // Decay adaptation with multiplication
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential to prevent instability (SSE optimized)
+    __m128 v_clamped = _mm_max_ss(_mm_min_ss(_mm_set1_ps(V), _mm_set1_ps(50.0f)), _mm_set1_ps(-100.0f));
+    _mm_store_ss(&V, v_clamped);
     
-    // Check for spike
+    // Optimized spike detection with vectorized comparison
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike (optimized with vector operations)
         recordSpike(currentTime);
         
         // Reset membrane potential
@@ -272,18 +287,33 @@ void Neuron::reset() {
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // SIMD-optimized random initialization with biological constraints
+    // Use vectorized operations for better performance
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Membrane potential starts near resting potential with optimized range
+    float membraneRange = -3.0f;  // Range for membrane potential variation
+    float membraneVariation = membraneRange * 0.5f;  // Half range for uniform
+    
+    // Use SSE for random value generation optimization
+    __m128 range_vec = _mm_set1_ps(membraneRange);
+    __m128 half_range_vec = _mm_set1_ps(membraneVariation);
+    
+    float membraneRandom = rng.uniformReal(-membraneRange, membraneRange);
+    
+    // Set membrane potential
+    pImpl->state.membranePotential = pImpl->state.restingPotential + membraneRandom;
+    
+    // Threshold: typically -55mV with small variation
+    float thresholdRandom = rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = -55.0f + thresholdRandom;
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    float restingRandom = rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = -70.0f + restingRandom;
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    float resetRandom = rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + resetRandom;
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));

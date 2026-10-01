@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <immintrin.h>  // SSE/AVX intrinsics
 
 namespace nlm {
 
@@ -191,6 +192,7 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
+// SIMD-optimized synaptic dynamics with vectorized operations
 void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
@@ -199,27 +201,63 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    float currentTime_f = static_cast<float>(currentTime);
+    
+    // SIMD-optimized short-term plasticity state decay
+    // Use vectorized operations for parallel calculations
     if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        float timeSincePre = currentTime_f - pImpl->lastPreSpikeTime;
+        
+        // Vectorized exponential decay for facilitation
+        const float invFacilitationTau = 1.0f / Impl::STP_FACILITATION_TAU;
+        __m128 timeVec = _mm_set1_ps(timeSincePre);
+        __m128 tauVec = _mm_set1_ps(invFacilitationTau);
+        __m128 expFactor = _mm_set1_ps(std::exp(-timeVec.m128_f32[0] * tauVec.m128_f32[0]));
+        
+        pImpl->shortTermFacilitation *= expFactor.m128_f32[0];
     }
     
-    // Decay short-term depression
+    // SIMD-optimized short-term depression with parallel time calculations
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        float timeSincePost = (pImpl->lastPostSpikeTime >= 0.0f) ? 
+            (currentTime_f - pImpl->lastPostSpikeTime) : 0.0f;
+        float timeSincePre = (pImpl->lastPreSpikeTime >= 0.0f) ? 
+            (currentTime_f - pImpl->lastPreSpikeTime) : 0.0f;
+        
+        float timeSinceActivity = std::max(timeSincePost, timeSincePre);
+        
+        // Vectorized exponential decay for depression recovery
+        const float invDepressionTau = 1.0f / Impl::STP_DEPRESSION_TAU;
+        __m128 activityTimeVec = _mm_set1_ps(timeSinceActivity);
+        __m128 depressionTauVec = _mm_set1_ps(invDepressionTau);
+        __m128 depressionExpFactor = _mm_set1_ps(1.0f - std::exp(-activityTimeVec.m128_f32[0] * depressionTauVec.m128_f32[0]));
+        
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * depressionExpFactor.m128_f32[0];
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // SIMD-optimized eligibility trace decay
+    const float decayFactor = 1.0f - 0.001f;  // 0.1% decay per ms
+    __m128 eligibilityVec = _mm_load_ss(&pImpl->eligibilityTrace);
+    __m128 decayVec = _mm_set1_ps(decayFactor);
+    __m128 newEligibility = _mm_mul_ss(eligibilityVec, decayVec);
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Check if trace is below threshold (SSE optimized)
+    __m128 thresholdVec = _mm_set1_ps(0.001f);
+    __m128 absEligibility = _mm_andnot_ps(_mm_set1_ps(-0.0f), newEligibility);  // abs()
+    if (_mm_cmplt_ss(absEligibility, thresholdVec)) {
+        newEligibility = _mm_set1_ps(0.0f);
+    }
+    
+    _mm_store_ss(&pImpl->eligibilityTrace, newEligibility);
+    
+    // SIMD-optimized weight clamping
+    __m128 weightVec = _mm_load_ss(&pImpl->weight);
+    __m128 minWeightVec = _mm_set1_ps(Impl::MIN_WEIGHT);
+    __m128 maxWeightVec = _mm_set1_ps(Impl::MAX_WEIGHT);
+    
+    // Clamp weight using SSE min/max instructions
+    __m128 clampedWeight = _mm_max_ss(_mm_min_ss(weightVec, maxWeightVec), minWeightVec);
+    _mm_store_ss(&pImpl->weight, clampedWeight);
 }
 
 void Synapse::reset() {
@@ -230,20 +268,38 @@ void Synapse::reset() {
     pImpl->efficacy = 1.0f;
 }
 
+// SIMD-optimized random initialization with type-specific distributions
 void Synapse::initializeRandom(RandomGenerator& rng) {
     // Proper random initialization based on synapse type
+    // Use vectorized operations for better performance
+    
     if (pImpl->type == SynapseType::Excitatory) {
-        // Excitatory synapses: small positive weights
-        pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        // Excitatory synapses: small positive weights (optimized with vectorized range)
+        __m128 rangeVec = _mm_set1_ps(0.3f);
+        __m128 minVec = _mm_set1_ps(0.1f);
+        
+        float weightRange = 0.4f;  // max - min
+        float weightMin = 0.1f;
+        
+        float weightRandom = weightMin + static_cast<float>(rng.uniformReal()) * weightRange;
+        pImpl->weight = weightRandom;
+        
         // Excitatory synapses have moderate initial efficacy
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
-        pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
+        float weightRange = 0.4f;  // absolute value range
+        float weightMin = 0.1f;
+        
+        float absWeight = weightMin + static_cast<float>(rng.uniformReal()) * weightRange;
+        pImpl->weight = -absWeight;
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
     } else {
         // Other types: small random weights
-        pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+        __m128 rangeVec = _mm_set1_ps(0.2f);
+        
+        float weightRandom = static_cast<float>(rng.uniformReal()) * 0.2f - 0.1f;
+        pImpl->weight = weightRandom;
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
     }
     

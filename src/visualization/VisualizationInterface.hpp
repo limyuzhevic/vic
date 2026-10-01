@@ -1,52 +1,103 @@
 #pragma once
 
-#include <string>
+#include "../core/Types/Types.hpp"
+#include "../brain/Brain.hpp"
 #include <vector>
-#include <memory>
+#include <string>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// VisualizationInterface: Real-time visualization of neural activity and system state
+//
+// Provides comprehensive visualization capabilities including:
+// - Network topology displays (brain regions and connectivity)
+// - Activity maps (real-time neural firing patterns)
+// - Spike raster plots (spike timing and patterns)
+// - Weight distribution histograms (synaptic weight analysis)
+// - System statistics (performance metrics and indicators)
+// - Region information (detailed regional statistics)
+// - Neurons per region displays (population visualization)
+//
+// Features:
+// - Real-time updates synchronized with simulation
+// - Console-based ASCII art visualization
+// - Color-coded activity representations
+// - Multiple visualization modes
+// - Configurable update rates
+// - Export capabilities for analysis
+
 class VisualizationInterface {
 public:
     VisualizationInterface();
     ~VisualizationInterface();
     
-    // Initialize visualization
+    // Initialization
     bool initialize();
     
-    // Update visualization data
+    // Main update/render loop
     void update();
-    
-    // Render current state
     void render();
     
-    // Close visualization
+    // Control methods
     void close();
-    
-    // Check if visualization is active
     bool isActive() const;
-    
-    // Set update rate
     void setUpdateRate(double hz);
     double getUpdateRate() const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Visualization targets
+    void visualizeNetwork(const Brain& brain);
+    void visualizeActivity(const Brain& brain);
+    void visualizeSpikes(const std::vector<SpikeEvent>& spikes);
+    void visualizeWeights(const Brain& brain);
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    // Configuration methods
+    void setShowNetworkTopology(bool show) { pImpl->showNetworkTopology = show; }
+    void setShowActivityMaps(bool show) { pImpl->showActivityMaps = show; }
+    void setShowSpikeRasters(bool show) { pImpl->showSpikeRasters = show; }
+    void setShowWeightDistributions(bool show) { pImpl->showWeightDistributions = show; }
+    void setShowStatistics(bool show) { pImpl->showStatistics = show; }
+    void setShowRegionInfo(bool show) { pImpl->showRegionInfo = show; }
+    void setShowNeuronsPerRegion(bool show) { pImpl->showNeuronsPerRegion = show; }
+    void setUseColors(bool use) { pImpl->useColors = use; }
     
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    // Get configuration
+    bool getShowNetworkTopology() const { return pImpl->showNetworkTopology; }
+    bool getShowActivityMaps() const { return pImpl->showActivityMaps; }
+    bool getShowSpikeRasters() const { return pImpl->showSpikeRasters; }
+    bool getShowWeightDistributions() const { return pImpl->showWeightDistributions; }
+    bool getShowStatistics() const { return pImpl->showStatistics; }
+    bool getShowRegionInfo() const { return pImpl->showRegionInfo; }
+    bool getShowNeuronsPerRegion() const { return pImpl->showNeuronsPerRegion; }
+    bool getUseColors() const { return pImpl->useColors; }
     
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    // Console size configuration
+    void setConsoleSize(int width, int height) {
+        pImpl->consoleWidth = width;
+        pImpl->consoleHeight = height;
+    }
+    
+protected:
+    // Visualization rendering methods (protected for extensibility)
+    void printHeader();
+    int renderNetworkTopology(int startLine);
+    int renderActivityMaps(int startLine);
+    int renderSpikeRasters(int startLine);
+    int renderWeightDistributions(int startLine);
+    int renderStatistics(int startLine);
+    int renderRegionInfo(int startLine);
+    int renderNeuronsPerRegion(int startLine);
+    void printFooter(int currentLine);
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Reference to current brain for visualization
+    const Brain* brain_;
+    
+    // Helper methods
+    const char* stageToString(DevelopmentalStage stage) const;
+    const char* motorCommandToString(MotorCommand cmd) const;
 };
 
 } // namespace nlm
