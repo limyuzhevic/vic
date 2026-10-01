@@ -196,6 +196,33 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Phase 6: INTEGRATED ARTIFICIAL BRAIN LOOP - extracted step methods
+    void initializeStepState(SimulationStep currentStep, Timestamp currentTime);
+    void processDelayedSpikes();
+    void updateNeuronDynamics();
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory();
+    void updateNeuromodulation();
+    void applyPlasticityRules();
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories();
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    
+    // Helper methods for improved code organization
+    void registerSpikeHandlers();
+    void configureCheckpointManager();
+    std::vector<Neuron*> collectSensoryNeurons();
+    std::vector<Neuron*> collectMotorNeurons();
+    void setupMemorySystems();
+    void setupCognitionSystems();
+    void setupNeuromodulationSystems();
+    void setupDevelopmentSystem();
+    void configurePlasticityParameters();
 };
 
 } // namespace nlm

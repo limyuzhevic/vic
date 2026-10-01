@@ -227,8 +227,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
-    
-    // Clamp membrane potential to prevent instability
+    \n    // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
     // Check for spike
@@ -257,6 +256,27 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     pImpl->synapticInput = 0.0f;
     
     return fired;
+}
+
+// Get spike history count for quick access
+size_t Neuron::getSpikeHistoryCount() const {
+    return pImpl->spikeHistory.size();
+}
+
+// Check if neuron has spiked recently
+bool Neuron::hasRecentSpike(Timestamp currentTime, Timestamp windowMs) const {
+    if (pImpl->spikeHistory.empty()) return false;
+    Timestamp latestSpike = pImpl->spikeHistory.back();
+    return (currentTime - latestSpike) <= windowMs;
+}
+
+// Apply synaptic input from a single synapse
+void Neuron::applySynapticInput(SynapticWeight weight, bool isExcitatory) {
+    if (isExcitatory) {
+        receiveExcitatoryInput(weight * 10.0f);  // Scale factor
+    } else {
+        receiveInhibitoryInput(weight * 10.0f);  // Scale factor
+    }
 }
 
 void Neuron::step(Timestamp currentTime) {
