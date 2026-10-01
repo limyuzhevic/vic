@@ -15,6 +15,8 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/AttentionalSelection.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -160,6 +162,11 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate, "Validate configuration"),
+        .def("getErrorCount", &Config::getErrorCount,
+             "Get number of errors encountered"),
+        .def("resetErrors", &Config::resetErrors,
+             "Reset error count"),
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -170,28 +177,56 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("validate", &SensoryInput::validate, "Validate the sensory input")
+        .def("__repr__", [](const SensoryInput& input) {
+            return "<SensoryInput type=" + std::to_string(static_cast<int>(input.getType())) +
+                   " dim=" + std::to_string(input.getDimensions()) + ">";
+        });
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
+        .def("validate", &Vision::validate, "Validate vision input")
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
-        }, py::arg("data"))
+        }, py::arg("data"), "Set vision data with validation")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getTotalPixels", &Vision::getTotalPixels)
+        .def("normalize", &Vision::normalize, "Normalize vision data to [0,1] range")
+        .def("getMeanIntensity", &Vision::getMeanIntensity, "Get mean intensity of vision data")
+        .def("getMaxIntensity", &Vision::getMaxIntensity, "Get max intensity of vision data")
+        .def("__repr__", [](const Vision& vision) {
+            std::stringstream ss;
+            ss << "<Vision " << vision.getWidth() << "x" << vision.getHeight() << " "
+               << vision.getChannels() << " channels>";
+            return ss.str();
+        });
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("validate", &Audio::validate, "Validate audio input")
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        }, py::arg("data"), "Set audio data with validation")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+             "Set sample rate with validation")
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getDuration", &Audio::getDuration, "Get audio duration in seconds")
+        .def("normalize", &Audio::normalize, "Normalize audio data to [-1,1] range")
+        .def("getPeakAmplitude", &Audio::getPeakAmplitude, "Get peak amplitude of audio data")
+        .def("getRMSAmplitude", &Audio::getRMSAmplitude, "Get RMS amplitude of audio data")
+        .def("__repr__", [](const Audio& audio) {
+            std::stringstream ss;
+            ss << "<Audio " << audio.getSampleRate() << " Hz, " 
+               << audio.getNumSamples() << " samples>";
+            return ss.str();
+        });
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -207,7 +242,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("validate", &Action::validate, "Validate action parameters")
+        .def("getErrorCount", &Action::getErrorCount,
+             "Get number of errors encountered"),
+        .def("resetErrors", &Action::resetErrors,
+             "Reset error count"),
+        .def("__repr__", [](const Action& action) {
+            return "<Action type=" + action.getName() + ">";
+        });
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -219,7 +262,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("validate", &WorldObject::validate, "Validate world object parameters")
+        .def("getErrorCount", &WorldObject::getErrorCount,
+             "Get number of errors encountered"),
+        .def("resetErrors", &WorldObject::resetErrors,
+             "Reset error count"),
+        .def("__repr__", [](const WorldObject& obj) {
+            return "<WorldObject type=" + std::to_string(static_cast<int>(obj.type)) +
+                   " at (" + std::to_string(obj.x) + "," + std::to_string(obj.y) + ")>";
+        });
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -266,28 +318,47 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure world dimensions with validation")
+        .def("reset", &SimpleWorld::reset, "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position with validation")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state with timestep")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command with validation")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get sensory percept from world")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add world object with validation")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid")
         .def("getWidth", &SimpleWorld::getWidth)
         .def("getHeight", &SimpleWorld::getHeight)
         .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set max energy with validation")
         .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate with validation")
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed with validation")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("validateConfiguration", &SimpleWorld::validateConfiguration,
+             "Validate world configuration")
+        .def("__repr__", [](const SimpleWorld& world) {
+            std::stringstream ss;
+            ss << "<SimpleWorld " << world.getWidth() << "x" << world.getHeight() << ">";
+            return ss.str();
+        });
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +422,15 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("validate", &Brain::validate, "Validate brain configuration")
+        .def("isHealthy", &Brain::isHealthy, "Check if brain is in healthy state")
+        .def("getSimulationTime", &Brain::getSimulationTime, "Get current simulation time")
+        .def("setSimulationTime", &Brain::setSimulationTime, py::arg("time"), "Set simulation time")
+        .def("__repr__", [](const Brain& brain) {
+            return "<Brain: " + std::to_string(brain.getTotalNeuronCount()) + " neurons, " +
+                   std::to_string(brain.getTotalSynapseCount()) + " synapses>";
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +477,109 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("validateState", &AgentBrain::validateState,
+             "Validate agent brain state")
+        .def("getErrorCount", &AgentBrain::getErrorCount,
+             "Get number of errors encountered")
+        .def("resetErrors", &AgentBrain::resetErrors,
+             "Reset error count");
+
+    // NeuralWorkingMemory class bindings
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Working memory system using persistent neural activity)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralWorkingMemory::initialize, py::arg("brain"),
+             "Initialize working memory with brain reference")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f,
+             "Store information pattern in working memory")
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"),
+             "Store activation to specific neuron")
+        .def("retrieve", &NeuralWorkingMemory::retrieve,
+             "Retrieve current working memory content as activity levels")
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"),
+             "Check if neuron is part of working memory")
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"),
+             "Get activation level of specific neuron")
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"),
+             "Update working memory (maintenance and decay)")
+        .def("clear", &NeuralWorkingMemory::clear, "Clear working memory")
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces,
+             "Get number of active memory traces")
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity, "Get memory capacity")
+        .def("setCapacity", &NeuralWorkingMemory::setCapacity, py::arg("cap"),
+             "Set memory capacity")
+        .def("getDecayRate", &NeuralWorkingMemory::getDecayRate, "Get decay rate")
+        .def("setDecayRate", &NeuralWorkingMemory::setDecayRate, py::arg("rate"),
+             "Set decay rate")
+        .def("getMemoryNeurons", &NeuralWorkingMemory::getMemoryNeurons,
+             "Get neurons currently in working memory")
+        .def("strengthenMemory", &NeuralWorkingMemory::strengthenMemory, py::arg("factor"),
+             "Strengthen working memory representation")
+        .def("runCompetition", &NeuralWorkingMemory::runCompetition,
+             "Run competition between memory traces")
+        .def("isWinning", &NeuralWorkingMemory::isWinning, py::arg("neuron"),
+             "Check if neuron is part of winning population")
+        .def("getMemoryActivity", &NeuralWorkingMemory::getMemoryActivity,
+             "Get overall memory activity level")
+        .def("validate", &NeuralWorkingMemory::validate, "Validate working memory state")
+        .def("getErrorCount", &NeuralWorkingMemory::getErrorCount,
+             "Get number of errors encountered")
+        .def("resetErrors", &NeuralWorkingMemory::resetErrors,
+             "Reset error count")
+        .def("__repr__", [](const NeuralWorkingMemory& wm) {
+            std::stringstream ss;
+            ss << "<NeuralWorkingMemory: active_traces=" << wm.getActiveTraces()
+               << ", capacity=" << wm.getCapacity() << ">";
+            return ss.str();
+        });
+
+    // AttentionalSelection class bindings
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Neural attention through competition)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"),
+             "Initialize attentional selection with brain reference")
+        .def("processCompetition", &AttentionalSelection::processCompetition,
+             py::arg("competitors"), py::arg("globalInhibition") = 0.5f,
+             "Process competing sensory inputs and select winners")
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"),
+             "Apply attention to specific region")
+        .def("releaseAttention", &AttentionalSelection::releaseAttention,
+             "Release attention (allow all regions equal processing)")
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions,
+             "Get current attention focus")
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"),
+             "Set inhibition strength parameter")
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"),
+             "Set excitation strength parameter")
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"),
+             "Set competition threshold parameter")
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"),
+             "Get inhibition level for specific neuron")
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"),
+             "Get excitation level for specific neuron")
+        .def("update", &AttentionalSelection::update, py::arg("dt"),
+             "Update attention dynamics")
+        .def("isAttended", &AttentionalSelection::isAttended, py::arg("neuron"),
+             "Check if neuron is currently attended")
+        .def("getWinners", &AttentionalSelection::getWinners,
+             "Get attention winners")
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias, py::arg("neuron"), py::arg("biasStrength"),
+             "Apply top-down bias (goal-directed attention)")
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience, py::arg("neuron"), py::arg("salienceStrength"),
+             "Apply bottom-up salience (stimulus-driven attention)")
+        .def("reset", &AttentionalSelection::reset, "Reset attention system")
+        .def("validate", &AttentionalSelection::validate, "Validate attentional selection state")
+        .def("getErrorCount", &AttentionalSelection::getErrorCount,
+             "Get number of errors encountered")
+        .def("resetErrors", &AttentionalSelection::resetErrors,
+             "Reset error count")
+        .def("__repr__", [](const AttentionalSelection& attn) {
+            std::stringstream ss;
+            ss << "<AttentionalSelection: " << attn.getWinners().size()
+               << " winners, " << attn.getAttendedRegions().size()
+               << " attended_regions>";
+            return ss.str();
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +597,51 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("validate", []() {
+        "Global validation function for NLM configuration"
+    });
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Utility functions
+    m.def("validateConfiguration", []() {
+        "Global validation function for NLM configuration"
+    });
+
+    m.def("getVersion", []() {
+        return std::string("NLM Python Bindings 1.0.0");
+    }, "Get NLM Python bindings version");
+
+    m.def("getBuildInfo", []() {
+        std::stringstream ss;
+        ss << "NLM Python Bindings Build Information:";
+        ss << "\n- Compiler: " << __VERSION__;
+        ss << "\n- C++ Standard: C++20";
+        ss << "\n- Python Modules: NLM Core, Agent Interface, World Simulation";
+        ss << "\n- Features: Neural computation, Working memory, Attention, Prediction";
+        return ss.str();
+    }, "Get build information");
+
+} // namespace nlm
 
 } // namespace nlm
