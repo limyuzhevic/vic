@@ -49,6 +49,8 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
+    NLM_LOG_DEBUG("Processing " + std::to_string(pImpl->pendingSpikes.size()) + " immediate spikes");
+    
     // Process all pending immediate spikes
     while (!pImpl->pendingSpikes.empty()) {
         SpikeEvent event = pImpl->pendingSpikes.front();
@@ -79,9 +81,46 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
+    /*
+     * Spike Timing and Delay Processing
+     * 
+     * This function processes spikes that are scheduled for delayed delivery.
+     * Delayed spikes are used for synaptic transmission with realistic transmission delays.
+     * 
+     * Event-driven architecture:
+     * - Neuron spikes are recorded with exact timestamps
+     * - Synaptic transmission delays are modeled as step-based delays
+     * - Spikes are delivered to postsynaptic neurons at calculated delivery times
+     * 
+     * Mathematical formulation:
+     *   Delay(Δt) = synaptic_delay + transmission_delay + variability
+     *   Delivery_step = current_step + ceil(Delay(Δt) / timestep)
+     * 
+     * Algorithm:
+     * 1. Find all spikes scheduled for delivery at current step
+     * 2. For each delayed spike:
+     *    - Apply synaptic dynamics (short-term plasticity, depression, etc.)
+     *    - Deliver synaptic input to postsynaptic neurons
+     *    - Update post-synaptic membrane potentials
+     * 3. Clean up processed spikes
+     * 
+     * Biological relevance:
+     * - Models synaptic transmission delays (typically 1-5 ms)
+     * - Supports spike-timing dependent phenomena
+     * - Enables realistic network dynamics
+     * 
+     * Performance considerations:
+     * - Uses step-based lookup for efficient spike retrieval
+     * - Limits memory usage with history trimming
+     * - Supports parallel processing of independent spike events
+     */
+    
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
+        NLM_LOG_DEBUG(std::to_string(it->second.size()) + " delayed spikes delivered at step " + 
+                     std::to_string(currentStep) + ", time " + std::to_string(currentTime) + "ms");
+        
         // Process all spikes scheduled for this step
         for (const auto& delayedEvent : it->second) {
             // Call delayed spike handlers (these will deliver synaptic input)

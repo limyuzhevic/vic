@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include "NLMError.hpp"
 
 namespace nlm {
 
@@ -88,7 +89,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Template implementations
@@ -100,7 +101,7 @@ void RandomGenerator::shuffle(Container& container) {
 template<typename Container>
 auto RandomGenerator::pickRandom(const Container& container) -> typename Container::const_reference {
     if (container.empty()) {
-        throw std::runtime_error("Cannot pick from empty container");
+        NLM_THROW_VALIDATION("Cannot pick from empty container");
     }
     auto it = container.begin();
     std::advance(it, pickRandomIndex(container.size()));
