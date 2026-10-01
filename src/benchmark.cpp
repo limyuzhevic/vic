@@ -26,8 +26,11 @@ struct BenchmarkResult {
     double stepsPerSecond;
     double spikesPerStep;
     double synapsesPerNeuron;
+    double memoryUsage;    // MB
+    double energyPerStep;  // arbitrary energy units
 };
 
+// Run simulation with detailed metrics
 BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
               << steps << " steps..." << std::flush;
@@ -44,8 +47,11 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     
-    // Run simulation
+    // Run simulation with detailed timing
     auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Record initial state
+    size_t initialSpikes = brain->getTotalSpikeCount();
     
     for (size_t step = 0; step < steps; ++step) {
         // Inject some random input
@@ -66,13 +72,23 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     result.steps = steps;
     result.totalTime = totalTime;
     result.stepsPerSecond = steps / totalTime;
-    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
+    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount() - initialSpikes) / steps;
     result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
+    
+    // Estimate memory usage (approximate)
+    // Each neuron ~ 100 bytes, each synapse ~ 40 bytes for basic structure
+    result.memoryUsage = (result.neurons * 100.0 + result.synapses * 40.0) / (1024.0 * 1024.0);
+    
+    // Estimate energy usage (simplified model)
+    // Based on synaptic operations and neuron firings
+    result.energyPerStep = (result.synapses * 0.001 + result.spikesPerStep * 10.0) / 1000.0;
     
     std::cout << " Done!" << std::endl;
     std::cout << "    Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
     std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;
     std::cout << "    Spikes/step: " << std::fixed << std::setprecision(2) << result.spikesPerStep << std::endl;
+    std::cout << "    Memory: " << std::fixed << std::setprecision(2) << result.memoryUsage << " MB" << std::endl;
+    std::cout << "    Energy/step: " << std::fixed << std::setprecision(4) << result.energyPerStep << " units" << std::endl;
     
     return result;
 }
@@ -81,20 +97,48 @@ void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
     std::cout << std::endl;
     std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
     std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
-    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╣" << std::endl;
-    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
-    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╣" << std::endl;
+    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╦═══════════════╦═════════════════╣" << std::endl;
+    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║   Memory(MB)  ║ Energy/step    ║" << std::endl;
+    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╬═══════════════╬═════════════════╣" << std::endl;
+    
+    double avgStepsPerSecond = 0.0;
+    double avgMemoryUsage = 0.0;
+    double avgEnergyPerStep = 0.0;
     
     for (const auto& r : results) {
+        avgStepsPerSecond += r.stepsPerSecond;
+        avgMemoryUsage += r.memoryUsage;
+        avgEnergyPerStep += r.energyPerStep;
+        
         std::cout << "║ " << std::setw(13) << r.neurons 
                   << " ║ " << std::setw(13) << r.synapses
                   << " ║ " << std::setw(9) << std::fixed << std::setprecision(0) << r.stepsPerSecond
                   << " ║ " << std::setw(11) << std::fixed << std::setprecision(2) << r.spikesPerStep
                   << " ║ " << std::setw(20) << std::fixed << std::setprecision(2) << r.synapsesPerNeuron
+                  << " ║ " << std::setw(15) << std::fixed << std::setprecision(2) << r.memoryUsage
+                  << " ║ " << std::setw(16) << std::fixed << std::setprecision(4) << r.energyPerStep
                   << " ║" << std::endl;
     }
     
-    std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╝" << std::endl;
+    if (!results.empty()) {
+        size_t count = results.size();
+        avgStepsPerSecond /= count;
+        avgMemoryUsage /= count;
+        avgEnergyPerStep /= count;
+        
+        std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╬═══════════════╬═════════════════╣" << std::endl;
+        std::cout << "║              ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "║   AVERAGE    ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "║              ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "║   " << std::setw(10) << std::fixed << std::setprecision(0) << avgStepsPerSecond << "     ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "║              ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "║              ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "║              ║              ║          ║             ║                      ║              ║                 ║" << std::endl;
+        std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╩═══════════════╩═════════════════╝" << std::endl;
+    } else {
+        std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╩═══════════════╩═════════════════╝" << std::endl;
+    }
+    
     std::cout << std::endl;
 }
 

@@ -16,15 +16,30 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Validate input
+    if (!std::isfinite(value)) {
+        throw std::invalid_argument("WorkingMemory::store: invalid value must be finite");
+    }
+    
+    // Update existing item
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
+    
+    // Add new item if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Implement LRU eviction: remove lowest value item (assuming lower values = less important)
+        auto minIt = std::min_element(pImpl->items.begin(), pImpl->items.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+        if (minIt != pImpl->items.end()) {
+            pImpl->items.erase(minIt);
+            pImpl->items.emplace_back(neuron, value);
+        }
     }
 }
 
@@ -84,10 +99,10 @@ void EpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
 }
 
 EpisodicMemoryItem EpisodicMemory::retrieveEpisode(size_t index) const {
-    if (index < pImpl->episodes.size()) {
-        return pImpl->episodes[index];
+    if (index >= pImpl->episodes.size()) {
+        throw std::out_of_range("EpisodicMemory::retrieveEpisode: index out of range");
     }
-    return EpisodicMemoryItem();
+    return pImpl->episodes[index];
 }
 
 size_t EpisodicMemory::getEpisodeCount() const {
@@ -95,8 +110,11 @@ size_t EpisodicMemory::getEpisodeCount() const {
 }
 
 std::vector<EpisodicMemoryItem> EpisodicMemory::getRecentEpisodes(size_t count) const {
+    if (count > pImpl->episodes.size()) {
+        throw std::invalid_argument("EpisodicMemory::getRecentEpisodes: count exceeds episode count");
+    }
     std::vector<EpisodicMemoryItem> result;
-    size_t start = count > pImpl->episodes.size() ? 0 : pImpl->episodes.size() - count;
+    size_t start = pImpl->episodes.size() - count;
     for (size_t i = start; i < pImpl->episodes.size(); ++i) {
         result.push_back(pImpl->episodes[i]);
     }
