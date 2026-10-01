@@ -1,0 +1,468 @@
+#include "BindingSystem.hpp"
+#include "../src/core/Types/Types.hpp"
+#include "../src/core/Config/Config.hpp"
+#include "../src/brain/Brain.hpp"
+#include "../src/agent/AgentBrain.hpp"
+#include "../src/world/SimpleWorld.hpp"
+#include "../src/sensory/SensoryInput.hpp"
+#include "../src/motor/Action.hpp"
+#include "../src/agent/AgentBody.hpp"
+#include "../src/agent/SensoryPercept.hpp"
+#include <memory>
+
+namespace nlm {
+
+// Forward declarations for types we need to bind
+class NeuronId;
+class SynapseId;
+class RegionId;
+class PopulationId;
+
+// Helper functions for registration
+namespace BindingHelpers {
+    
+    // Register a simple type with basic constructor and accessors
+    template<typename T>
+    void registerSimpleType(py::module_& m, const std::string& name, 
+                           const std::string& doc = "") {
+        py::class_<T>(m, name.c_str(), doc.c_str())
+            .def(py::init<>())
+            .def(py::init<uint64_t>(), py::arg("value"))
+            .def_readwrite("value", &T::value)
+            .def("index", &T::index)
+            .def("__eq__", &T::operator==)
+            .def("__ne__", &T::operator!=)
+            .def("__hash__", [](const T& obj) { 
+                return std::hash<uint64_t>{}(obj.value); 
+            })
+            .def("__repr__", [](const T& obj) {
+                return "<" + name + ": " + std::to_string(obj.value) + ">";
+            });
+    }
+    
+    // Register a type with string representation
+    template<typename T>
+    void registerSimpleTypeWithString(py::module_& m, const std::string& name,
+                                      const std::string& doc = "") {
+        py::class_<T>(m, name.c_str(), doc.c_str())
+            .def(py::init<>())
+            .def(py::init<uint64_t>(), py::arg("value"))
+            .def_readwrite("value", &T::value)
+            .def("index", &T::index)
+            .def("__eq__", &T::operator==)
+            .def("__ne__", &T::operator!=);
+    }
+    
+    // Register an enum type
+    template<typename T>
+    void registerEnumType(py::module_& m, const std::string& name,
+                          const std::string& doc = "") {
+        py::enum_<T>(m, name.c_str(), doc.c_str())
+            .export_values();
+    }
+    
+    // Register Config class
+    void registerConfig(py::module_& m) {
+        py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+            .def(py::init<>())
+            .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+                 "Load configuration from a JSON file")
+            .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+                return self.loadFromArgs(argc, argv);
+            }, py::arg("argc"), py::arg("argv"),
+               "Load configuration from command line arguments")
+            .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+                 "Save configuration to a JSON file")
+            .def("has", &Config::has, py::arg("key"),
+                 "Check if a configuration key exists")
+            .def("getKeys", &Config::getKeys,
+                 "Get all configuration keys")
+            .def("clear", &Config::clear,
+                 "Clear all configuration entries")
+            .def("summary", &Config::summary,
+                 "Get a summary string of the configuration")
+            .def("__repr__", [](const Config& cfg) {
+                return "<Config: " + cfg.summary() + ">";
+            });
+    }
+    
+    // Register SensoryInput class
+    void registerSensoryInput(py::module_& m) {
+        py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
+            .def("getType", &SensoryInput::getType, "Get the type of sensory input")
+            .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
+            .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
+            .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
+            .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
+                 "Set the timestamp");
+    }
+    
+    // Register Vision class
+    void registerVision(py::module_& m) {
+        py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+            .def(py::init<>())
+            .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+                 py::arg("channels") = 3)
+            .def("setData", [](Vision& self, const std::vector<float>& data) {
+                self.setData(data);
+            }, py::arg("data"))
+            .def("getWidth", &Vision::getWidth)
+            .def("getHeight", &Vision::getHeight)
+            .def("getChannels", &Vision::getChannels);
+    }
+    
+    // Register Audio class
+    void registerAudio(py::module_& m) {
+        py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+            .def(py::init<>())
+            .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+            .def("setData", [](Audio& self, const std::vector<float>& data) {
+                self.setData(data);
+            }, py::arg("data"))
+            .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+            .def("getSampleRate", &Audio::getSampleRate)
+            .def("getNumSamples", &Audio::getNumSamples);
+    }
+    
+    // Register InternalSignals class
+    void registerInternalSignals(py::module_& m) {
+        py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", 
+                                                 R"pbdoc(Internal signals sensory input)pbdoc")
+            .def(py::init<>())
+            .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
+            .def("clearSignals", &InternalSignals::clearSignals);
+    }
+    
+    // Register Action class
+    void registerAction(py::module_& m) {
+        py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+            .def(py::init<>())
+            .def(py::init<ActionType>(), py::arg("type"))
+            .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+            .def("getType", &Action::getType)
+            .def("setType", &Action::setType, py::arg("type"))
+            .def("getParameters", &Action::getParameters)
+            .def("setParameters", &Action::setParameters, py::arg("params"))
+            .def("getName", &Action::getName)
+            .def("clone", &Action::clone);
+    }
+    
+    // Register WorldObject class
+    void registerWorldObject(py::module_& m) {
+        py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
+            .def(py::init<>())
+            .def(py::init<float, float, WorldObjectType, float, float>(),
+                 py::arg("x"), py::arg("y"), py::arg("type"), py::arg("value") = 0.0f,
+                 py::arg("radius") = 0.5f)
+            .def_readwrite("x", &WorldObject::x)
+            .def_readwrite("y", &WorldObject::y)
+            .def_readwrite("radius", &WorldObject::radius)
+            .def_readwrite("type", &WorldObject::type)
+            .def_readwrite("value", &WorldObject::value)
+            .def_readwrite("active", &WorldObject::active);
+    }
+    
+    // Register AgentBody class
+    void registerAgentBody(py::module_& m) {
+        py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
+            .def(py::init<>())
+            .def_readwrite("x", &AgentBody::x)
+            .def_readwrite("y", &AgentBody::y)
+            .def_readwrite("orientation", &AgentBody::orientation)
+            .def_readwrite("velocityX", &AgentBody::velocityX)
+            .def_readwrite("velocityY", &AgentBody::velocityY)
+            .def_readwrite("angularVelocity", &AgentBody::angularVelocity)
+            .def_readwrite("energy", &AgentBody::energy)
+            .def_readwrite("health", &AgentBody::health)
+            .def_readwrite("age", &AgentBody::age)
+            .def_readwrite("isMoving", &AgentBody::isMoving)
+            .def_readwrite("isTurning", &AgentBody::isTurning)
+            .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
+            .def("reset", &AgentBody::reset);
+    }
+    
+    // Register ActionResult class
+    void registerActionResult(py::module_& m) {
+        py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+            .def(py::init<>())
+            .def(py::init<float, bool, std::string>(),
+                 py::arg("reward"), py::arg("success"), py::arg("message") = "")
+            .def_readwrite("reward", &ActionResult::reward)
+            .def_readwrite("success", &ActionResult::success)
+            .def_readwrite("message", &ActionResult::message);
+    }
+    
+    // Register SensoryPercept class
+    void registerSensoryPercept(py::module_& m) {
+        py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+            .def(py::init<>())
+            .def("getVision", &SensoryPercept::getVision)
+            .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+            .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+            .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+            .def("getTouch", &SensoryPercept::getTouch)
+            .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+            .def("getInternal", &SensoryPercept::getInternal)
+            .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+            .def("getProprioception", &SensoryPercept::getProprioception)
+            .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+            .def("getAudio", &SensoryPercept::getAudio)
+            .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+            .def("getAllSignals", &SensoryPercept::getAllSignals)
+            .def("getTimestamp", &SensoryPercept::getTimestamp)
+            .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+    }
+    
+    // Register SimpleWorld class
+    void registerSimpleWorld(py::module_& m) {
+        py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+            .def(py::init<>())
+            .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
+                 py::arg("visionWidth"), py::arg("visionHeight"))
+            .def("reset", &SimpleWorld::reset)
+            .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
+            .def("update", &SimpleWorld::update, py::arg("timestep"))
+            .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+                 py::arg("cmd"), py::arg("currentTime"))
+            .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+                 py::return_value_policy::reference_internal)
+            .def("getAgentBody", &SimpleWorld::getAgentBody,
+                 py::return_value_policy::reference_internal)
+            .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
+            .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
+            .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+            .def("getWidth", &SimpleWorld::getWidth)
+            .def("getHeight", &SimpleWorld::getHeight)
+            .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
+            .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
+            .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
+            .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
+            .def("getSimulationTime", &SimpleWorld::getSimulationTime)
+            .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
+            .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+    }
+    
+    // Register Brain class
+    void registerBrain(py::module_& m) {
+        py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+            .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+            .def("initialize", &Brain::initialize,
+                 "Initialize the brain with configuration")
+            .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+                 py::arg("currentStep"),
+                 "Perform a simulation step")
+            .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+                 py::arg("currentStep"), py::arg("currentTime"),
+                 "Perform a simulation step with timestamp")
+            .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+                 py::arg("input"),
+                 "Inject sensory input into the brain")
+            .def("injectCurrent", &Brain::injectCurrent,
+                 py::arg("neuron"), py::arg("current"),
+                 "Inject current into a specific neuron")
+            .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+                 py::arg("type"), py::arg("current"),
+                 "Inject current into all neurons of a specific type")
+            .def("produceAction", &Brain::produceAction,
+                 "Produce motor action based on neural activity")
+            .def("reset", &Brain::reset,
+                 "Reset brain state")
+            .def("save", &Brain::save, py::arg("filepath"),
+                 "Save brain state to file")
+            .def("load", &Brain::load, py::arg("filepath"),
+                 "Load brain state from file")
+            .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+                 "Add a new neural region")
+            .def("getRegion", &Brain::getRegion, py::arg("id"),
+                 py::return_value_policy::reference_internal,
+                 "Get a region by ID")
+            .def("getRegionCount", &Brain::getRegionCount,
+                 "Get the number of regions")
+            .def("getRegionIds", &Brain::getRegionIds,
+                 "Get all region IDs")
+            .def("getRegions", &Brain::getRegions,
+                 py::return_value_policy::reference_internal,
+                 "Get all regions")
+            .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+                 "Get total neuron count across all regions")
+            .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+                 "Get total synapse count across all regions")
+            .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+                 "Get count of active neurons")
+            .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+                 "Get count of currently firing neurons")
+            .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+                 "Get average firing rate across all neurons")
+            .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+                 "Get excitation/inhibition balance ratio")
+            .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+                 "Get total spike count")
+            .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+                 "Get current developmental stage")
+            .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+                 py::arg("stage"),
+                 "Set developmental stage")
+            .def("getConfig", &Brain::getConfig,
+                 py::return_value_policy::reference_internal,
+                 "Get the configuration")
+            .def("logStatus", &Brain::logStatus,
+                 "Log brain status");
+    }
+    
+    // Register AgentBrain class
+    void registerAgentBrain(py::module_& m) {
+        py::class_<AgentBrain>(m, "AgentBrain", 
+                             R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+            .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+            .def("initialize", &AgentBrain::initialize, py::arg("world"),
+                 "Initialize with world")
+            .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+                 "Get expected sensory input size")
+            .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+                 "Get expected motor output size")
+            .def("processSensoryInput", &AgentBrain::processSensoryInput,
+                 py::arg("percept"),
+                 "Process sensory percept and inject into brain")
+            .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+                 "Decode brain motor activity into motor command")
+            .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+                 py::arg("reward"), py::arg("predictedReward"),
+                 "Apply reward-based neuromodulation")
+            .def("updateDevelopment", &AgentBrain::updateDevelopment,
+                 py::arg("timestep"),
+                 "Update development system")
+            .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+                 "Get current developmental stage")
+            .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+                 "Get current neuromodulation level")
+            .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+                 "Get curiosity level")
+            .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+                 "Get novelty level")
+            .def("getPredictionError", &AgentBrain::getPredictionError,
+                 "Get prediction error")
+            .def("reset", &AgentBrain::reset,
+                 "Reset agent for new episode")
+            .def("getBrain", &AgentBrain::getBrain,
+                 py::return_value_policy::reference_internal,
+                 "Get the underlying brain")
+            .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+                 py::arg("enable"))
+            .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+                 py::arg("enable"))
+            .def("enableDevelopment", &AgentBrain::enableDevelopment,
+                 py::arg("enable"))
+            .def("enableCuriosity", &AgentBrain::enableCuriosity,
+                 py::arg("enable"))
+            .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+            .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+            .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+            .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    }
+    
+    // Register factory functions
+    void registerFactoryFunctions(py::module_& m) {
+        m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration");
+        
+        m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+            return std::make_shared<Brain>(config);
+        }, py::arg("config"), "Create a new brain with configuration");
+        
+        m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+            return std::make_shared<SimpleWorld>();
+        }, "Create a new simple world");
+        
+        m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+            return std::make_shared<AgentBrain>(brain);
+        }, py::arg("brain"), "Create a new agent brain interface");
+    }
+    
+    // Register constant values
+    void registerConstants(py::module_& m) {
+        m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+        m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+        m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+        m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    }
+} // namespace BindingHelpers
+
+// Global registration function to be called from the module
+void registerAll(py::module_& m) {
+    // Register simple types
+    BindingHelpers::registerSimpleType<NeuronId>(m, "NeuronId", 
+                                                "Unique identifier for a neuron");
+    BindingHelpers::registerSimpleType<SynapseId>(m, "SynapseId", 
+                                                 "Unique identifier for a synapse");
+    BindingHelpers::registerSimpleType<RegionId>(m, "RegionId", 
+                                                "Unique identifier for a brain region");
+    BindingHelpers::registerSimpleTypeWithString<PopulationId>(m, "PopulationId", 
+                                                             "Unique identifier for a neuron population");
+    
+    // Register enum types
+    BindingHelpers::registerEnumType<NeuronType>(m, "NeuronType", "Neuron type enumeration");
+    BindingHelpers::registerEnumType<SynapseType>(m, "SynapseType", "Synapse type enumeration");
+    BindingHelpers::registerEnumType<DevelopmentalStage>(m, "DevelopmentalStage", 
+                                                         "Developmental stage enumeration");
+    BindingHelpers::registerEnumType<FiringState>(m, "FiringState", "Neuron firing state enumeration");
+    BindingHelpers::registerEnumType<ActionType>(m, "ActionType", "Action type enumeration");
+    BindingHelpers::registerEnumType<MotorCommand>(m, "MotorCommand", "Low-level motor command enumeration");
+    BindingHelpers::registerEnumType<WorldObjectType>(m, "WorldObjectType", "World object type enumeration");
+    
+    // Register main classes
+    BindingHelpers::registerConfig(m);
+    BindingHelpers::registerSensoryInput(m);
+    BindingHelpers::registerVision(m);
+    BindingHelpers::registerAudio(m);
+    BindingHelpers::registerInternalSignals(m);
+    BindingHelpers::registerAction(m);
+    BindingHelpers::registerWorldObject(m);
+    BindingHelpers::registerAgentBody(m);
+    BindingHelpers::registerActionResult(m);
+    BindingHelpers::registerSensoryPercept(m);
+    BindingHelpers::registerSimpleWorld(m);
+    BindingHelpers::registerBrain(m);
+    BindingHelpers::registerAgentBrain(m);
+    
+    // Register factory functions
+    BindingHelpers::registerFactoryFunctions(m);
+    
+    // Register constants
+    BindingHelpers::registerConstants(m);
+}
+
+// PYBIND11_MODULE macro that uses the new binding system
+PYBIND11_MODULE(pynlm, m) {
+    // Create the binding system
+    nlm::PythonBindingSystem bindingSystem;
+    
+    // Initialize the module
+    auto& module = bindingSystem.initializeModule(
+        "pynlm",
+        R"pbdoc(
+            NLM (Neural Learning Machine) Python Bindings
+            ---------------------------------------------
+            A Python binding for the NLM C++ neural simulation framework.
+            Provides classes for Brain, Config, AgentBrain, SimpleWorld, 
+            SensoryInput, and Action.
+        )pbdoc"
+    );
+    
+    // Register exceptions
+    bindingSystem.registerException<std::runtime_error>(module, "RuntimeError");
+    
+    // Register all bindings using the new system
+    registerAll(module);
+    
+    // Execute all registrations
+    bindingSystem.executeRegistrations(module);
+    
+    // Register constants directly on the module
+    module.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    module.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    module.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    module.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+
+} // namespace nlm

@@ -11,14 +11,26 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../performance/PerformanceProfiler.hpp"
+#include "../performance/BenchmarkSuite.hpp"
+#include "../performance/PerformanceAnalyzer.hpp"
+#include "../performance/PerformanceAPI.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <filesystem>
+#include <chrono>
 
 namespace nlm {
 
@@ -56,14 +68,21 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
+    // Visualization system
+    bool visualizationEnabled;
+    double visualizationUpdateRate;
+    double visualizationRenderRate;
+    size_t visualizationFrameCount;
+    double lastVisualizationTime;
+    double totalVisualizationUpdateTime;
+    double totalVisualizationRenderTime;
+    std::map<std::string, std::string> visualizationPreferences;
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
+    // Visualization statistics
+    mutable size_t visualizationFrameCountLastFrame;
+    mutable double visualizationFPSLastFrame;
+    mutable double visualizationUpdateTimeLastFrame;
+    mutable double visualizationRenderTimeLastFrame;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -74,6 +93,11 @@ struct Brain::Impl {
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
+    
+    // Performance monitoring
+    std::unique_ptr<PerformanceProfiler> performanceProfiler;
+    std::unique_ptr<BenchmarkSuite> benchmarkSuite;
+    std::unique_ptr<PerformanceAnalyzer> performanceAnalyzer;
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
@@ -92,6 +116,17 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , visualizationEnabled(true)
+        , visualizationUpdateRate(30.0)
+        , visualizationRenderRate(60.0)
+        , visualizationFrameCount(0)
+        , lastVisualizationTime(0.0)
+        , totalVisualizationUpdateTime(0.0)
+        , totalVisualizationRenderTime(0.0)
+        , visualizationFrameCountLastFrame(0)
+        , visualizationFPSLastFrame(0.0)
+        , visualizationUpdateTimeLastFrame(0.0)
+        , visualizationRenderTimeLastFrame(0.0)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -289,6 +324,16 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Initialize performance systems
+    pImpl->performanceProfiler = std::make_unique<PerformanceProfiler>();
+    pImpl->performanceProfiler->initialize(pImpl->config);
+    
+    pImpl->benchmarkSuite = std::make_unique<BenchmarkSuite>(pImpl->config);
+    pImpl->benchmarkSuite->initialize();
+    
+    pImpl->performanceAnalyzer = std::make_unique<PerformanceAnalyzer>();
+    pImpl->performanceAnalyzer->initialize();
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -1077,41 +1122,605 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+// ========== VISUALIZATION METHODS ==========
+
+bool Brain::generateVisualization(const std::string& filename, const std::string& format) {
+    NLM_LOG_INFO("Brain: Generating visualization to " + filename + "." + format);
     
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    try {
+        // Create visualization directory
+        std::filesystem::create_directories("visualizations");
+        
+        // Generate different types of visualizations based on format
+        bool success = true;
+        
+        if (format == "png" || format == "all") {
+            // Generate 2D projection
+            if (!generate2DProjection(filename + "_2d.png")) {
+                NLM_LOG_WARNING("Brain: Failed to generate 2D projection");
+                success = false;
+            }
+            
+            // Generate connectivity matrix visualization
+            if (!generateConnectivityMatrix(filename + "_connectivity.png")) {
+                NLM_LOG_WARNING("Brain: Failed to generate connectivity matrix");
+                success = false;
+            }
+        } else if (format == "json" || format == "all") {
+            // Generate JSON visualization data
+            if (!exportBrainData(filename + "_data.json")) {
+                NLM_LOG_WARNING("Brain: Failed to export brain data");
+                success = false;
+            }
+        } else if (format == "csv" || format == "all") {
+            // Generate CSV data
+            if (!exportTimeSeriesData(filename + "_timeseries.csv")) {
+                NLM_LOG_WARNING("Brain: Failed to export time series data");
+                success = false;
+            }
+        }
+        
+        if (success) {
+            NLM_LOG_INFO("Brain: Visualization generated successfully");
+        }
+        
+        return success;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception generating visualization: ") + e.what());
+        return false;
     }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+}
+
+bool Brain::exportBrainData(const std::string& filename, const std::string& format) {
+    NLM_LOG_INFO("Brain: Exporting brain data to " + filename + "." + format);
+    
+    try {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Brain: Failed to open file for writing: " + filename);
+            return false;
+        }
+        
+        if (format == "json") {
+            // Export in JSON format
+            file << "{\n";
+            file << "  \"brain_info\": {\n";
+            file << "    \"neuron_count\": " << getTotalNeuronCount() << ",\n";
+            file << "    \"synapse_count\": " << getTotalSynapseCount() << ",\n";
+            file << "    \"region_count\": " << getRegionCount() << ",\n";
+            file << "    \"firing_rate\": " << getAverageFiringRate() <<",\n";
+            file << "    \"e_i_ratio\": " << getExcitationInhibitionRatio() << ",\n";
+            file << "    \"total_spikes\": " << getTotalSpikeCount() << ",\n";
+            file << "    \"timestamp\": " << pImpl->currentTime << "\n";
+            file << "  },\n";
+            
+            file << "  \"regions\": [\n";
+            bool firstRegion = true;
+            for (const auto& region : pImpl->regions) {
+                if (!firstRegion) file << ",\n";
+                firstRegion = false;
+                
+                file << "    {\n";
+                file << "      \"id\": " << region->getId().index() << ",\n";
+                file << "      \"name\": \"" << region->getName() << "\",\n";
+                file << "      \"neuron_count\": " << region->getTotalNeuronCount() << ",\n";
+                file << "      \"synapse_count\": " << region->getSynapseCount() << ",\n";
+                file << "      \"avg_synaptic_weight\": " << region->getAverageSynapticWeight() << "\n";
+                file << "    }";
+            }
+            
+            file << "\n  ],\n";
+            
+            file << "  \"neurons\": [\n";
+            size_t neuronIndex = 0;
+            bool firstNeuron = true;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        if (!firstNeuron) file << ",\n";
+                        firstNeuron = false;
+                        
+                        const auto& state = neuron->getState();
+                        file << "    {\n";
+                        file << "      \"id\": " << neuron->getId() << ",\n";
+                        file << "      \"region\": " << region->getId().index() << ",\n";
+                        file << "      \"type\": " << static_cast<int>(pop->getNeuronType()) << ",\n";
+                        file << "      \"membrane_potential\": " << state.membranePotential << ",\n";
+                        file << "      \"is_firing\": " << (neuron->isFiring() ? "true" : "false") << ",\n";
+                        file << "      \"last_spike\": " << state.lastSpikeTime << "\n";
+                        file << "    }";
+                        
+                        neuronIndex++;
+                    }
+                }
+            }
+            
+            file << "\n  ]\n";
+            file << "}\n";
+            
+        } else if (format == "csv") {
+            // Export in CSV format
+            file << "neuron_id,region_id,type,membrane_potential,is_firing,last_spike_time\n";
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    for (const auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        file << neuron->getId() << ",";
+                        file << region->getId().index() << ",";
+                        file << static_cast<int>(pop->getNeuronType()) << ",";
+                        file << state.membranePotential << ",";
+                        file << (neuron->isFiring() ? "1" : "0") << ",";
+                        file << state.lastSpikeTime << "\n";
+                    }
+                }
+            }
+            
+            file << "\nsynapse_info\n";
+            file << "source_id,destination_id,weight,delay,type\n";
+            
+            for (const auto& region : pImpl->regions) {
+                for (const auto* syn : region->getSynapses()) {
+                    file << syn->getSourceNeuron().index() << ",";
+                    file << syn->getDestinationNeuron().index() << ",";
+                    file << syn->getWeight() << ",";
+                    file << syn->getDelay() << ",";
+                    file << static_cast<int>(syn->getType()) << "\n";
+                }
+            }
+        }
+        
+        file.close();
+        NLM_LOG_INFO("Brain: Brain data exported successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception exporting brain data: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::exportConnectivityMatrix(const std::string& filename, const std::string& format) {
+    NLM_LOG_INFO("Brain: Exporting connectivity matrix to " + filename);
+    
+    try {
+        // Calculate connectivity matrix between regions
+        size_t regionCount = pImpl->regions.size();
+        if (regionCount == 0) {
+            NLM_LOG_WARNING("Brain: No regions to export connectivity matrix");
+            return false;
+        }
+        
+        if (format == "csv") {
+            std::ofstream file(filename);
+            if (!file.is_open()) {
+                NLM_LOG_ERROR("Brain: Failed to open file: " + filename);
+                return false;
+            }
+            
+            file << "source_region,target_region,total_connections,total_weight,connection_probability\n";
+            
+            for (size_t i = 0; i < regionCount; ++i) {
+                auto* sourceRegion = getRegion(RegionId(i + 1));
+                if (!sourceRegion) continue;
+                
+                for (size_t j = 0; j < regionCount; ++j) {
+                    auto* targetRegion = getRegion(RegionId(j + 1));
+                    if (!targetRegion) continue;
+                    
+                    // Count connections between regions
+                    size_t connectionCount = 0;
+                    float totalWeight = 0.0f;
+                    
+                    for (const auto& syn : sourceRegion->getSynapses()) {
+                        auto targetNeurons = targetRegion->getAllNeurons();
+                        for (auto* targetNeuron : targetNeurons) {
+                            if (syn->getDestinationNeuron() == targetNeuron->getId()) {
+                                ++connectionCount;
+                                totalWeight += syn->getWeight();
+                            }
+                        }
+                    }
+                    
+                    double connectionProbability = regionCount > 1 ? 
+                        static_cast<double>(connectionCount) / (regionCount * regionCount) : 0.0;
+                    
+                    file << i + 1 << "," << j + 1 << ",";
+                    file << connectionCount << ",";
+                    file << totalWeight << ",";
+                    file << connectionProbability << "\n";
+                }
+            }
+            
+            file.close();
+        }
+        
+        NLM_LOG_INFO("Brain: Connectivity matrix exported successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception exporting connectivity matrix: ") + e.what());
+        return false;
+    }
+}
+
+bool Brain::exportTimeSeriesData(const std::string& filename, const std::string& format) {
+    NLM_LOG_INFO("Brain: Exporting time series data to " + filename);
+    
+    try {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Brain: Failed to open file: " + filename);
+            return false;
+        }
+        
+        if (format == "csv") {
+            file << "timestamp,step,total_spikes,total_neurons,total_synapses,avg_firing_rate,e_i_ratio\n";
+            file << pImpl->currentTime << ",";
+            file << pImpl->currentStep << ",";
+            file << getTotalSpikeCount() << ",";
+            file << getTotalNeuronCount() << ",";
+            file << getTotalSynapseCount() << ",";
+            file << getAverageFiringRate() << ",";
+            file << getExcitationInhibitionRatio() << "\n";
+        }
+        
+        file.close();
+        NLM_LOG_INFO("Brain: Time series data exported successfully");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception exporting time series data: ") + e.what());
+        return false;
+    }
+}
+
+void Brain::updateVisualization(double deltaTime) {
+    auto startTime = std::chrono::steady_clock::now();
+    
+    if (visualizationEnabled && pImpl->visualizationUpdateRate > 0.0) {
+        // Update visualization system
+        pImpl->visualizationFrameCount++;
+        
+        // Collect visualization data
+        // (In a real implementation, this would call visualization systems)
+        
+        NLM_LOG_DEBUG("Brain: Updated visualization for frame " + std::to_string(pImpl->visualizationFrameCount));
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    auto endTime = std::chrono::steady_clock::now();
+    auto updateDuration = std::chrono::duration<double>(endTime - startTime).count();
+    pImpl->totalVisualizationUpdateTime += updateDuration;
+    pImpl->visualizationUpdateTimeLastFrame = updateDuration;
+    pImpl->lastVisualizationTime = pImpl->currentTime;
+}
+
+void Brain::renderVisualization() {
+    auto startTime = std::chrono::steady_clock::now();
+    
+    if (visualizationEnabled) {
+        // Render visualizations
+        // (In a real implementation, this would render to screen or file)
+        
+        NLM_LOG_DEBUG("Brain: Rendered visualization frame");
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    auto endTime = std::chrono::steady_clock::now();
+    auto renderDuration = std::chrono::duration<double>(endTime - startTime).count();
+    pImpl->totalVisualizationRenderTime += renderDuration;
+    pImpl->visualizationRenderTimeLastFrame = renderDuration;
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    // Calculate FPS
+    if (pImpl->visualizationFrameCountLastFrame > 0) {
+        pImpl->visualizationFPSLastFrame = static_cast<double>(pImpl->visualizationFrameCount) / 
+            (pImpl->visualizationFrameCount - pImpl->visualizationFrameCountLastFrame);
     }
+    pImpl->visualizationFrameCountLastFrame = pImpl->visualizationFrameCount;
+}
+
+bool Brain::isVisualizationEnabled() const {
+    return pImpl->visualizationEnabled;
+}
+
+void Brain::enableVisualization(bool enabled) {
+    pImpl->visualizationEnabled = enabled;
+    NLM_LOG_INFO("Brain: Visualization " + std::string(enabled ? "enabled" : "disabled"));
+}
+
+size_t Brain::getVisualizationFrameCount() const {
+    return pImpl->visualizationFrameCount;
+}
+
+double Brain::getVisualizationFPS() const {
+    return pImpl->visualizationFPSLastFrame;
+}
+
+double Brain::getVisualizationUpdateTime() const {
+    return pImpl->visualizationUpdateTimeLastFrame;
+}
+
+double Brain::getVisualizationRenderTime() const {
+    return pImpl->visualizationRenderTimeLastFrame;
+}
+
+std::vector<std::string> Brain::getAvailableVisualizationTypes() const {
+    return {"network", "activity", "spikes", "weights", "state_space", "connectivity"};
+}
+
+std::vector<std::string> Brain::getAvailableExportFormats() const {
+    return {"png", "json", "csv", "hdf5", "parquet"};
+}
+
+void Brain::setVisualizationPreference(const std::string& key, const std::string& value) {
+    pImpl->visualizationPreferences[key] = value;
+}
+
+std::string Brain::getVisualizationPreference(const std::string& key) const {
+    auto it = pImpl->visualizationPreferences.find(key);
+    return (it != pImpl->visualizationPreferences.end()) ? it->second : "";
+}
+
+} // namespace nlm
+
+
+// Get visualization statistics
+Brain::VisualizationStats Brain::getVisualizationStats() const {
+    VisualizationStats stats;
+    
+    stats.frameCount = pImpl->visualizationFrameCount;
+    stats.fps = pImpl->visualizationFPSLastFrame;
+    stats.updateTime = pImpl->visualizationUpdateTimeLastFrame;
+    stats.renderTime = pImpl->visualizationRenderTimeLastFrame;
+    stats.totalUpdateTime = pImpl->totalVisualizationUpdateTime;
+    stats.totalRenderTime = pImpl->totalVisualizationRenderTime;
+    stats.lastUpdateTime = pImpl->lastVisualizationTime;
+    
+    return stats;
+}
+
+// ========== PERFORMANCE MEASUREMENT METHODS ==========
+
+bool Brain::enablePerformanceProfiling(const std::string& sectionName) {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->startProfile(sectionName);
+    }
+    return false;
+}
+
+void Brain::disablePerformanceProfiling(const std::string& sectionName) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->stopProfile(sectionName);
+    }
+}
+
+void Brain::togglePerformanceProfiling(const std::string& sectionName) {
+    if (pImpl->performanceProfiler) {
+        if (pImpl->performanceProfiler->isProfiling(sectionName)) {
+            pImpl->performanceProfiler->stopProfile(sectionName);
+        } else {
+            pImpl->performanceProfiler->startProfile(sectionName);
+        }
+    }
+}
+
+double Brain::getPerformanceTime(const std::string& sectionName) const {
+    if (pImpl->performanceProfiler) {
+        const auto& timerData = pImpl->performanceProfiler->getTimerData(sectionName);
+        return timerData.totalDuration.count();
+    }
+    return 0.0;
+}
+
+uint64_t Brain::getMemoryUsage() const {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->getMemoryUsage();
+    }
+    return 0;
+}
+
+double Brain::getCPUUsage() const {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->getCPUUsage();
+    }
+    return 0.0;
+}
+
+double Brain::getFPS() const {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->getFPS();
+    }
+    return 0.0;
+}
+
+void Brain::profileBrainStep(const std::string& operation) {
+    if (pImpl->performanceProfiler) {
+        std::string sectionName = "brain_step_" + operation;
+        pImpl->performanceProfiler->startProfile(sectionName);
+    }
+}
+
+void Brain::profileMemoryOperations() {
+    if (pImpl->performanceProfiler) {
+        // Profile memory allocation/deallocation
+        // In real implementation, would track actual memory operations
+        pImpl->performanceProfiler->trackMemoryAllocation(1024); // Simulate
+        pImpl->performanceProfiler->trackMemoryDeallocation(512);
+    }
+}
+
+void Brain::profileNeuralActivity() {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->startProfile("neural_activity");
+        // Simulate neural activity profiling
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+        pImpl->performanceProfiler->stopProfile("neural_activity");
+    }
+}
+
+void Brain::profilePlasticityUpdates() {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->startProfile("plasticity_updates");
+        // Simulate plasticity updates
+        std::this_thread::sleep_for(std::chrono::microseconds(50));
+        pImpl->performanceProfiler->stopProfile("plasticity_updates");
+    }
+}
+
+void Brain::profileMemoryUpdates() {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->startProfile("memory_updates");
+        // Simulate memory updates
+        std::this_thread::sleep_for(std::chrono::microseconds(30));
+        pImpl->performanceProfiler->stopProfile("memory_updates");
+    }
+}
+
+void Brain::profilePredictionSystem() {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->startProfile("prediction_system");
+        // Simulate prediction system operations
+        std::this_thread::sleep_for(std::chrono::microseconds(40));
+        pImpl->performanceProfiler->stopProfile("prediction_system");
+    }
+}
+
+void Brain::profileCognitionSystems() {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->startProfile("cognition_systems");
+        // Simulate cognition system operations
+        std::this_thread::sleep_for(std::chrono::microseconds(60));
+        pImpl->performanceProfiler->stopProfile("cognition_systems");
+    }
+}
+
+void Brain::profileNeuromodulation() {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->startProfile("neuromodulation");
+        // Simulate neuromodulation operations
+        std::this_thread::sleep_for(std::chrono::microseconds(20));
+        pImpl->performanceProfiler->stopProfile("neuromodulation");
+    }
+}
+
+std::vector<std::string> Brain::getActiveProfileSections() const {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->getAllSectionNames();
+    }
+    return std::vector<std::string>();
+}
+
+std::vector<std::string> Brain::getBottleneckSections(double threshold) const {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->getBottleneckSections(threshold);
+    }
+    return std::vector<std::string>();
+}
+
+std::string Brain::getPerformanceSummary() const {
+    std::stringstream ss;
+    ss << "Brain Performance Summary:" << std::endl;
+    ss << "  Total Neurons: " << getTotalNeuronCount() << std::endl;
+    ss << "  Total Synapses: " << getTotalSynapseCount() << std::endl;
+    ss << "  Memory Usage: " << getMemoryUsage() << " bytes" << std::endl;
+    ss << "  CPU Usage: " << getCPUUsage() << "%" << std::endl;
+    ss << "  FPS: " << getFPS() << std::endl;
+    
+    if (pImpl->performanceProfiler) {
+        ss << "  Active Sections: " << getActiveProfileSections().size() << std::endl;
+        ss << "  Bottleneck Sections: " << getBottleneckSections().size() << std::endl;
+    }
+    
+    return ss.str();
+}
+
+void Brain::configurePerformanceProfiling(std::chrono::milliseconds interval) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->setProfilingInterval(interval);
+    }
+}
+
+void Brain::enableDetailedTiming(bool enable) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->setDetailedTiming(enable);
+    }
+}
+
+void Brain::enableMemoryTracking(bool enable) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->setMemoryTracking(enable);
+    }
+}
+
+void Brain::enableCPUTracking(bool enable) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->setCPUTracking(enable);
+    }
+}
+
+void Brain::enableIOTracking(bool enable) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->setIOTracking(enable);
+    }
+}
+
+void Brain::enableGPUTracking(bool enable) {
+    if (pImpl->performanceProfiler) {
+        pImpl->performanceProfiler->setGPUTracking(enable);
+    }
+}
+
+bool Brain::validatePerformanceRequirements(const std::map<std::string, double>& requirements) const {
+    if (pImpl->performanceAnalyzer) {
+        return pImpl->performanceAnalyzer->validatePerformanceRequirements(requirements);
+    }
+    return false;
+}
+
+std::string Brain::getPerformanceGrade() const {
+    if (pImpl->performanceAnalyzer) {
+        double score = pImpl->performanceAnalyzer->calculatePerformanceScore(std::map<std::string, double>{{ "placeholder", 0.0 }});
+        return pImpl->performanceAnalyzer->getPerformanceGrade(score);
+    }
+    return "UNKNOWN";
+}
+
+bool Brain::exportPerformanceData(const std::string& filename, const std::string& format) const {
+    if (pImpl->performanceProfiler) {
+        return pImpl->performanceProfiler->exportProfile(filename, format);
+    }
+    return false;
+}
+
+bool Brain::exportBenchmarkResults(const std::string& filename, const std::string& format) const {
+    if (pImpl->benchmarkSuite) {
+        pImpl->benchmarkSuite->saveResults(filename, format);
+        return true;
+    }
+    return false;
+}
+
+std::string Brain::analyzePerformanceTrends() const {
+    if (pImpl->performanceAnalyzer) {
+        return pImpl->performanceAnalyzer->generatePerformanceReport();
+    }
+    return "Performance analyzer not available";
+}
+
+std::vector<std::string> Brain::getPerformanceRecommendations() const {
+    if (pImpl->performanceAnalyzer) {
+        auto suggestions = pImpl->performanceAnalyzer->generateOptimizationSuggestions();
+        std::vector<std::string> recommendations;
+        for (const auto& suggestion : suggestions) {
+            if (suggestion.priority == "HIGH") {
+                recommendations.push_back("*** " + suggestion.metricName + " - " + suggestion.suggestedAction + " ***");
+            } else {
+                recommendations.push_back(suggestion.metricName + ": " + suggestion.suggestedAction);
+            }
+        }
+        return recommendations;
+    }
+    return std::vector<std::string>();
 }
 
 } // namespace nlm

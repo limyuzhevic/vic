@@ -7,6 +7,7 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , groupManager_(createDefaultNeuronGroupFactory())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -20,58 +21,26 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize with brain and neuron group manager
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+        groupManager_->initialize(brain_);
     }
 }
 
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
+    // Initialize development state
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    // Log group manager status
+    if (groupManager_) {
+        NLM_LOG_INFO("AgentBrain initialized with " +
+                     std::to_string(groupManager_->getTotalNeuronCount()) + " total neurons, " +
+                     std::to_string(groupManager_->getGroupCount()) + " neuron groups");
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -85,42 +54,62 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_ || !groupManager_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Process vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+    
+    NeuronGroup* visionGroup = groupManager_->getSensoryGroup(SensoryInputGroup::Vision);
+    if (visionGroup) {
+        const auto& visionNeurons = visionGroup->getNeurons();
+        for (size_t i = 0; i < visionNeurons.size() && i < vision.size(); ++i) {
+            if (visionNeurons[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                visionNeurons[i]->injectCurrent(current);
+            }
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
+    // Process touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+    
+    NeuronGroup* touchGroup = groupManager_->getSensoryGroup(SensoryInputGroup::Touch);
+    if (touchGroup) {
+        const auto& touchNeurons = touchGroup->getNeurons();
+        for (size_t i = 0; i < touchNeurons.size() && i < touch.size(); ++i) {
+            if (touchNeurons[i]) {
+                float current = touch[i] * 8.0f;  // Collision signal
+                touchNeurons[i]->injectCurrent(current);
+            }
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
+    // Process internal signals (4 values -> sensoryInternal_ neurons)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
+    
+    NeuronGroup* internalGroup = groupManager_->getSensoryGroup(SensoryInputGroup::Internal);
+    if (internalGroup) {
+        const auto& internalNeurons = internalGroup->getNeurons();
+        for (size_t i = 0; i < internalNeurons.size() && i < intern.size(); ++i) {
+            if (internalNeurons[i]) {
+                float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+                internalNeurons[i]->injectCurrent(current);
+            }
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    // Process proprioception (6 values -> sensoryProprioception_ neurons)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
+    
+    NeuronGroup* proprioceptionGroup = groupManager_->getSensoryGroup(SensoryInputGroup::Proprioception);
+    if (proprioceptionGroup) {
+        const auto& proprioceptionNeurons = proprioceptionGroup->getNeurons();
+        for (size_t i = 0; i < proprioceptionNeurons.size() && i < proprio.size(); ++i) {
+            if (proprioceptionNeurons[i]) {
+                float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+                proprioceptionNeurons[i]->injectCurrent(current);
+            }
         }
     }
     
@@ -147,10 +136,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    // Update all groups
+    if (groupManager_) {
+        groupManager_->update(0.01); // Assuming timestep for now
+    }
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_ || !groupManager_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -163,23 +157,42 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    if (!groupManager_) return MotorCommand::Wait;
+    
     // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
+    auto calcActivity = [](const NeuronGroup* group) -> float {
+        if (!group || group->empty()) return 0.0f;
         float sum = 0.0f;
-        for (Neuron* n : neurons) {
+        const auto& neurons = group->getNeurons();
+        for (Neuron* neuron : neurons) {
             // Use membrane potential deviation from rest as activity measure
-            sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            const auto& state = neuron->getState();
+            sum += std::abs(state.membranePotential - state.restingPotential);
         }
         return sum / neurons.size();
     };
     
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
+    float forwardAct = 0.0f, backwardAct = 0.0f, leftAct = 0.0f, rightAct = 0.0f, 
+         interactAct = 0.0f, waitAct = 0.0f;
+    
+    // Get activity levels for each motor group
+    NeuronGroup* forwardGroup = groupManager_->getMotorGroup(MotorActionGroup::Forward);
+    if (forwardGroup) forwardAct = calcActivity(forwardGroup);
+    
+    NeuronGroup* backwardGroup = groupManager_->getMotorGroup(MotorActionGroup::Backward);
+    if (backwardGroup) backwardAct = calcActivity(backwardGroup);
+    
+    NeuronGroup* leftGroup = groupManager_->getMotorGroup(MotorActionGroup::TurnLeft);
+    if (leftGroup) leftAct = calcActivity(leftGroup);
+    
+    NeuronGroup* rightGroup = groupManager_->getMotorGroup(MotorActionGroup::TurnRight);
+    if (rightGroup) rightAct = calcActivity(rightGroup);
+    
+    NeuronGroup* interactGroup = groupManager_->getMotorGroup(MotorActionGroup::Interact);
+    if (interactGroup) interactAct = calcActivity(interactGroup);
+    
+    NeuronGroup* waitGroup = groupManager_->getMotorGroup(MotorActionGroup::Wait);
+    if (waitGroup) waitAct = calcActivity(waitGroup);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
@@ -311,6 +324,11 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+    
+    // Update group manager
+    if (groupManager_) {
+        groupManager_->update(timestep);
+    }
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -345,6 +363,11 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Reset group manager
+    if (groupManager_) {
+        groupManager_->reset();
+    }
 }
 
 } // namespace nlm

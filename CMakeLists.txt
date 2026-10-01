@@ -19,6 +19,7 @@ else()
 endif()
 
 # Source directory
+
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # Core library
@@ -85,6 +86,14 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # World (NEW - SimpleWorld implementation)
+    src/world/SimpleWorld.cpp
+)
+
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/world>
+    $<INSTALL_INTERFACE:include>
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -100,32 +109,42 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+# Neuron group management (new Phase 3/4 component)
+add_library(nlm_neuron_groups STATIC
+    src/agent/NeuronGroup.cpp
+    src/agent/NeuronGroupManager.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_include_directories(nlm_neuron_groups PUBLIC src)
+target_link_libraries(nlm_neuron_groups PUBLIC nlm_core)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
+# Agent system with neuron group management
+add_library(nlm_agent_with_groups STATIC
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
 )
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_agent_with_groups PUBLIC src)
+target_link_libraries(nlm_agent_with_groups PUBLIC nlm_core nlm_neuron_groups)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
+# Update main executables to use the new architecture
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# NLM Command Line Interface executable
+add_executable(nlm_cli
+    src/main_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_cli_core)
+
+# Core CLI components
+add_library(nlm_cli_core STATIC
+    src/core/CommandLineParser.cpp
+    src/core/CLIFactory.cpp
+    src/core/CommandHandlers.cpp
+)
+target_include_directories(nlm_cli_core PUBLIC src)
+target_link_libraries(nlm_cli_core PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -144,7 +163,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_cli nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

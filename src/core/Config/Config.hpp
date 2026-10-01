@@ -5,11 +5,29 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Configuration error types
+class ConfigError : public std::runtime_error {
+public:
+    ConfigError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigFileError : public ConfigError {
+public:
+    ConfigFileError(const std::string& message) : ConfigError("Config file error: " + message) {}
+};
+
+class ConfigParseError : public ConfigError {
+public:
+    ConfigParseError(const std::string& message) : ConfigError("Config parse error: " + message) {}
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -77,6 +95,9 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set from nlohmann::json (convenience method)
+    void set(const std::string& key, const nlohmann::json& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;

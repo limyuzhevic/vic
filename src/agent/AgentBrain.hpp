@@ -4,13 +4,18 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "NeuronGroup.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
+// Forward declaration for neuron group manager
+class NeuronGroupManager;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
+// Refactored to use NeuronGroup abstraction
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,6 +74,10 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Neuron group manager access
+    NeuronGroupManager* getGroupManager() { return groupManager_.get(); }
+    const NeuronGroupManager* getGroupManager() const { return groupManager_.get(); }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,20 +86,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
-    
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    std::unique_ptr<NeuronGroupManager> groupManager_;
     
     // Neuromodulation state
     float dopamineLevel_;
