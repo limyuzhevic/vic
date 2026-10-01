@@ -488,6 +488,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store sensory state for prediction and concept formation
+            // Get sensory input from the last received observation
+            // For now, we'll use a simple approach - capture active sensory neurons
+            std::vector<float> sensoryState;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    // Convert neuron activation to sensory state value
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                              neuron->getState().restingPotential) / 20.0f;
+                    sensoryState.push_back(activation);
+                }
+            }
+            
+            // Also capture motor neuron state for action information
+            std::vector<float> motorState;
+            for (auto* neuron : pImpl->motorNeurons) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                              neuron->getState().restingPotential) / 20.0f;
+                    motorState.push_back(activation);
+                }
+            }
+            
+            // Store sensory state in episode
+            episode.sensoryState = sensoryState;
+            
+            // Store resulting sensory state (simple proxy for action effects)
+            episode.resultingSensoryState = motorState;  // Motor state as proxy for consequences
+            
             // Store active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
@@ -506,13 +537,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Update associative memory from this experience
+            if (pImpl->associativeMemory) {
+                pImpl->associativeMemory->associateFromExperience(episode);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // The prediction system makes predictions based on current sensory state
+        // and updates based on actual observations
+        
+        // Create a temporary sensory input from current sensory neuron activity
+        std::vector<float> currentSensoryData;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential) / 20.0f;
+            currentSensoryData.push_back(activation);
+        }
+        
+        // For now, we'll use a simple approach:
+        // 1. Store sensory pattern in prediction system for learning
+        // 2. Update prediction system based on current state
+        
+        // In a full implementation, this would use the PredictionSystem class
+        // to make actual predictions and compute prediction errors
+        // For Phase 6, we'll prepare the groundwork for prediction integration
+        
+        if (!currentSensoryData.empty()) {
+            // Store sensory pattern for prediction learning
+            // This would be passed to prediction system for training
+            // For now, just log the sensory pattern for prediction
+            
+            // Update prediction system confidence based on sensory activity
+            float totalActivity = 0.0f;
+            for (float activation : currentSensoryData) {
+                totalActivity += activation;
+            }
+            
+            if (pImpl->predictionError) {
+                // Compute prediction error from sensory activity
+                // In a real system, this would compare predicted vs actual sensory input
+                float predictionError = std::max(0.0f, totalActivity - 0.5f); // Simple proxy error
+                pImpl->predictionError->setLevel(predictionError);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +597,72 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 10: Use NeuralPlanner for action selection ==========
+    // NeuralPlanner generates action plans based on current state and goals
+    std::unique_ptr<Action> plannedAction;
+    if (pImpl->planner) {
+        // Generate action using NeuralPlanner
+        // Get current state for planning (sensory pattern)
+        std::vector<float> currentState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential) / 20.0f;
+            currentState.push_back(activation);
+        }
+        
+        // Get target reward (dopamine level as proxy)
+        float targetReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Plan action
+        ActionType plannedActionType = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Convert to Action object
+        plannedAction = std::make_unique<Action>(plannedActionType);
+        
+        // Store planned action for reference
+        if (!plannedAction) {
+            plannedAction = std::make_unique<Action>(ActionType::Wait);
+        }
+        
+        // Update planner with actual outcome (for learning)
+        // This would be updated later when we know the action outcome
+    }
+    
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes sensory patterns to discover categories
+        // and general patterns in the environment
+        
+        // Get current sensory pattern
+        std::vector<float> currentSensoryPattern;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential) / 20.0f;
+            currentSensoryPattern.push_back(activation);
+        }
+        
+        // Get current features from concept formation (e.g., spatial features)
+        // For now, we'll use sensory pattern as features
+        std::vector<float> features = currentSensoryPattern;
+        
+        // Current reward from dopamine system
+        float currentReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation system
+        // This allows it to form concepts from sensory input
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentSensoryPattern, 
+            features, 
+            currentReward, 
+            pImpl->currentStep
+        );
+        
+        // If concept was formed (conceptId > 0), we could use it for planning
+        // For now, just log concept formation
+        if (conceptId > 0) {
+            // Concept formation helps with generalization and prediction
+            // It can be used by NeuralPlanner and prediction systems
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -598,6 +731,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
+    // Extract sensory pattern for working memory and prediction systems
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(values.size());
+    
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
@@ -609,9 +746,24 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Store sensory pattern for memory and prediction systems
+        sensoryPattern.push_back(normalizedValue / 10.0f);
+        
+        // Working memory connection: store to working memory
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+    }
+    
+    // Prediction system integration: send sensory pattern to prediction system
+    if (pImpl->predictionSystem && !sensoryPattern.empty()) {
+        // For now, just store the sensory pattern for prediction
+        // In a full implementation, this would use the prediction system to predict next states
+        // We'll store it temporarily in prediction system if it has that capability
+        // or pass it to the concept formation system for processing
+        if (pImpl->conceptFormation) {
+            // Concept formation can process the sensory pattern to extract features
+            pImpl->conceptFormation->presentExperience(sensoryPattern, sensoryPattern, 0.0f, pImpl->currentStep);
         }
     }
 }
@@ -712,6 +864,27 @@ std::unique_ptr<class Action> Brain::produceAction() {
     }
     
     auto action = std::make_unique<Action>(type);
+    
+    // If NeuralPlanner is available, use it to override simple action
+    if (pImpl->planner) {
+        // Get current state for planning
+        std::vector<float> currentState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activation = std::abs(neuron->getState().membranePotential - 
+                                      neuron->getState().restingPotential) / 20.0f;
+            currentState.push_back(activation);
+        }
+        
+        // Get target reward (dopamine level as proxy)
+        float targetReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Let NeuralPlanner decide the action
+        ActionType plannedActionType = pImpl->planner->planAction(currentState, targetReward);
+        
+        // Override simple action with planned action
+        type = plannedActionType;
+        action = std::make_unique<Action>(type);
+    }
     
     return action;
 }
