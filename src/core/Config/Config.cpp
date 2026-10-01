@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,36 +21,52 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+    // Try to detect if it's JSON format (starts with { or [)
+    std::string firstChar;
+    file >> firstChar;
+    file.clear(); // Reset file state
+    file.seekg(0);
+    
+    bool isJSON = (firstChar == "{");
+    
+    if (isJSON) {
+        // Try to parse as JSON
+        return loadFromJSONFile(filepath);
+    } else {
+        // Parse as simple key=value format
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(file, line)) {
+            lineNum++;
+            line = trim(line);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                std::cerr << "WARNING: Invalid config line " << lineNum << ": " << line << std::endl;
+            }
         }
     }
     
@@ -78,18 +96,153 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    // Simple JSON object parsing (supports basic key-value pairs)
+    // For production, use a proper JSON library like nlohmann/json
+    if (content.empty() || content[0] != '{') {
+        std::cerr << "WARNING: File " << filepath << " is not a valid JSON object" << std::endl;
+        return false;
+    }
+    
+    size_t pos = 1;
+    while (pos < content.size() - 1) {
+        // Find next key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        pos = keyEnd + 2;  // Skip " and :
+        
+        // Find value
+        size_t valueEnd = content.find(',', pos);
+        if (valueEnd == std::string::npos) {
+            valueEnd = content.find('}', pos);
+        }
+        if (valueEnd == std::string::npos) break;
+        
+        std::string valueStr = content.substr(pos, valueEnd - pos);
+        valueStr = trim(valueStr);
+        
+        // Parse value based on type
+        ConfigValue configValue = jsonStringToConfigValue(valueStr);
+        set(key, configValue, ConfigSource::File);
+        
+        pos = valueEnd + 1;
+        if (content[pos] == ',') pos++; // Skip comma
     }
     
     return true;
+}
+
+ConfigValue Config::jsonStringToConfigValue(const std::string& jsonStr) {
+    std::string trimmed = trim(jsonStr);
+    
+    // Handle strings
+    if ((trimmed.front() == '"' && trimmed.back() == '"') ||
+        (trimmed.front() == '\'' && trimmed.back() == '\'')) {
+        return trimmed.substr(1, trimmed.size() - 2);
+    }
+    
+    // Handle numbers
+    if (trimmed.find('.') != std::string::npos || 
+        trimmed.find('e') != std::string::npos || 
+        trimmed.find('E') != std::string::npos) {
+        try {
+            size_t pos;
+            double val = std::stod(trimmed, pos);
+            if (pos == trimmed.size()) return val;
+        } catch (...) {}
+    } else {
+        try {
+            size_t pos;
+            int64_t val = std::stoll(trimmed, pos);
+            if (pos == trimmed.size()) return val;
+        } catch (...) {}
+    }
+    
+    // Handle booleans
+    if (trimmed == "true" || trimmed == "false") {
+        return trimmed == "true";
+    }
+    
+    // Handle arrays (simplified)
+    if (trimmed.front() == '[' && trimmed.back() == ']') {
+        std::string arrayContent = trimmed.substr(1, trimmed.size() - 2);
+        std::vector<std::string> elements;
+        
+        size_t start = 0;
+        size_t end = 0;
+        while ((end = arrayContent.find(',', start)) != std::string::npos) {
+            elements.push_back(trim(arrayContent.substr(start, end - start)));
+            start = end + 1;
+        }
+        elements.push_back(trim(arrayContent.substr(start)));
+        
+        // Try to determine array element type
+        bool allInts = true;
+        bool allDoubles = true;
+        bool allStrings = true;
+        
+        for (const auto& elem : elements) {
+            if (!isNumericInt(elem)) allInts = false;
+            if (!isNumericDouble(elem)) allDoubles = false;
+            allStrings = false; // Strings always valid
+        }
+        
+        if (allInts) {
+            std::vector<int> intArray;
+            for (const auto& elem : elements) {
+                intArray.push_back(std::stoi(elem));
+            }
+            return intArray;
+        } else if (allDoubles) {
+            std::vector<double> doubleArray;
+            for (const auto& elem : elements) {
+                doubleArray.push_back(std::stod(elem));
+            }
+            return doubleArray;
+        } else {
+            return elements;
+        }
+    }
+    
+    // Default to string
+    return trimmed;
+}
+
+bool Config::isNumericInt(const std::string& str) {
+    if (str.empty()) return false;
+    size_t pos;
+    int64_t val;
+    try {
+        val = std::stoll(str, pos);
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::isNumericDouble(const std::string& str) {
+    if (str.empty()) return false;
+    size_t pos;
+    double val;
+    try {
+        val = std::stod(str, pos);
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
 }
 
 template<typename T>
@@ -164,28 +317,6 @@ std::vector<std::string> Config::getKeys() const {
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
-}
-
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -199,7 +330,107 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
+// JSON processing implementation templates
+ConfigValue Config::jsonStringToConfigValue(const std::string& jsonStr) {
+    std::string trimmed = trim(jsonStr);
+    
+    // Handle strings
+    if ((trimmed.front() == '"' && trimmed.back() == '"') ||
+        (trimmed.front() == '\'' && trimmed.back() == '\'')) {
+        return trimmed.substr(1, trimmed.size() - 2);
+    }
+    
+    // Handle numbers
+    if (trimmed.find('.') != std::string::npos || 
+        trimmed.find('e') != std::string::npos || 
+        trimmed.find('E') != std::string::npos) {
+        try {
+            size_t pos;
+            double val = std::stod(trimmed, pos);
+            if (pos == trimmed.size()) return val;
+        } catch (...) {}
+    } else {
+        try {
+            size_t pos;
+            int64_t val = std::stoll(trimmed, pos);
+            if (pos == trimmed.size()) return val;
+        } catch (...) {}
+    }
+    
+    // Handle booleans
+    if (trimmed == "true" || trimmed == "false") {
+        return trimmed == "true";
+    }
+    
+    // Handle arrays (simplified)
+    if (trimmed.front() == '[' && trimmed.back() == ']') {
+        std
+::string arrayContent = trimmed.substr(1, trimmed.size() - 2);
+        std::vector<std::string> elements;
+        
+        size_t start = 0;
+        size_t end = 0;
+        while ((end = arrayContent.find(',', start)) != std::string::npos) {
+            elements.push_back(trim(arrayContent.substr(start, end - start)));
+            start = end + 1;
+        }
+        elements.push_back(trim(arrayContent.substr(start)));
+        
+        // Try to determine array element type
+        bool allInts = true;
+        bool allDoubles = true;
+        bool allStrings = true;
+        
+        for (const auto& elem : elements) {
+            if (!isNumericInt(elem)) allInts = false;
+            if (!isNumericDouble(elem)) allDoubles = false;
+            allStrings = false; // Strings always valid
+        }
+        
+        if (allInts) {
+            std::vector<int> intArray;
+            for (const auto& elem : elements) {
+                intArray.push_back(std::stoi(elem));
+            }
+            return intArray;
+        } else if (allDoubles) {
+            std::vector<double> doubleArray;
+            for (const auto& elem : elements) {
+                doubleArray.push_back(std::stod(elem));
+            }
+            return doubleArray;
+        } else {
+            return elements;
+        }
+    }
+    
+    // Default to string
+    return trimmed;
+}
+
+bool Config::isNumericInt(const std::string& str) {
+    if (str.empty()) return false;
+    size_t pos;
+    int64_t val;
+    try {
+        val = std::stoll(str, pos);
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::isNumericDouble(const std::string& str) {
+    if (str.empty()) return false;
+    size_t pos;
+    double val;
+    try {
+        val = std::stod(str, pos);
+        return pos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

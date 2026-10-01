@@ -61,6 +61,9 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from JSON file (helper function)
+    bool loadFromJSONFile(const std::string& filepath);
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
@@ -100,6 +103,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // JSON processing helpers
+    ConfigValue jsonStringToConfigValue(const std::string& jsonStr);
+    static bool isNumericInt(const std::string& str);
+    static bool isNumericDouble(const std::string& str);;
 
 } // namespace nlm

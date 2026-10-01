@@ -286,18 +286,30 @@ bool Brain::initialize() {
         }
     });
     
+    // Configure AttentionSystem
+    pImpl->attention->setInhibitionStrength(0.5f);
+    pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize development system
+    pImpl->developmentSystem->initialize(this);
+    
+    // Initialize neuromodulation systems
+    pImpl->novelty->initialize(this);
+    pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
-    return true;
-}
+    // Check for missing systems
+    if (!pImpl->attention) {
+        NLM_LOG_WARNING("AttentionalSelection not available - cognitive capabilities limited");
+    }
+    if (!pImpl->dopamine) {
+        NLM_LOG_WARNING("Dopamine not available - reward processing limited");
+    }
 
 void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
