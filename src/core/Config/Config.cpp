@@ -8,6 +8,12 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // Validation cache
+    mutable bool isValid;
+    mutable std::vector<std::string> validationErrors;
+    
+    Impl() : isValid(false) {}
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}

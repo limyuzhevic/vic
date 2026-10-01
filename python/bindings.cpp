@@ -16,6 +16,9 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Include Reward header
+#include "../src/neuromodulation/Reward.hpp"
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -373,32 +376,78 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("timestep"),
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
+              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
+              "Get current neuromodulation level")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
+              "Get curiosity level")
         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
+              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
+              "Get prediction error")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    py::class_<Reward>(m, "Reward", R"pbdoc(Reward signal for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue,
+             "Get current reward value")
+        .def("setValue", &Reward::setValue, py::arg("value"),
+             "Set current reward value")
+        .def("add", &Reward::add, py::arg("delta"),
+             "Accumulate reward")
+        .def("reset", &Reward::reset,
+             "Reset accumulated reward")
+        .def("computeReward", [](Reward& self, const Observation& observation, std::shared_ptr<Config> config) {
+             return self.computeReward(observation, config);
+         }, py::arg("observation"), py::arg("config"),
+             "Compute reward from environment observation")
+        .def("getHistory", &Reward::getHistory,
+             "Get reward history")
+        .def("clearHistory", &Reward::clearHistory,
+             "Clear reward history")
+        .def("getAccumulatedReward", &Reward::getAccumulatedReward,
+             "Get accumulated reward (lifetime total)")
+        .def("getHistorySize", &Reward::getHistorySize,
+             "Get number of reward samples")
+        .def("getAverageReward", &Reward::getAverageReward,
+             "Get average reward")
+        .def("getMaxReward", &Reward::getMaxReward,
+             "Get maximum reward in history")
+        .def("getMinReward", &Reward::getMinReward,
+             "Get minimum reward in history")
+        // Static reward computation methods
+        .def_static("computeSurvivalReward", &Reward::computeSurvivalReward,
+                   py::arg("observation"), py::arg("config"),
+                   "Compute survival-based reward from observation")
+        .def_static("computeEfficiencyReward", &Reward::computeEfficiencyReward,
+                   py::arg("observation"), py::arg("config"),
+                   "Compute efficiency-based reward from observation")
+        .def_static("computeLearningReward", &Reward::computeLearningReward,
+                   py::arg("observation"), py::arg("config"),
+                   "Compute learning-based reward from observation")
+        .def_static("computeExplorationReward", &Reward::computeExplorationReward,
+                   py::arg("observation"), py::arg("config"),
+                   "Compute exploration-based reward from observation")
+        .def("__repr__", [](const Reward& reward) {
+            return "<Reward: value=" + std::to_string(reward.getValue()) +
+                   ", accumulated=" + std::to_string(reward.getAccumulatedReward()) +
+                   ", history_size=" + std::to_string(reward.getHistorySize()) + ">";
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

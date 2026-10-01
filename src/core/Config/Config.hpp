@@ -93,6 +93,24 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Type-safe get methods with better error handling
+    template<typename T>
+    T getValue(const std::string& key, const T& defaultValue) const;
+    
+    // Configuration schema validation
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const std::string& key, const ConfigValue& value);
+    
+    // Configuration ranges and constraints
+    static float getMinFloat(const std::string& key);
+    static float getMaxFloat(const std::string& key);
+    static int64_t getMinInt(const std::string& key);
+    static int64_t getMaxInt(const std::string& key);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +118,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static bool isFloat(const ConfigValue& value);
+    static bool isInt(const ConfigValue& value);
+    static bool isString(const ConfigValue& value);
 };
 
 } // namespace nlm

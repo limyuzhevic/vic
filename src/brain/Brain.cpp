@@ -130,28 +130,168 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        // Connect neuromodulation systems to brain
+        dopamine->initialize(this);
+        curiosity->initialize(this);
+        predictionError->initialize(this);
+        novelty->initialize(this);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        // Configure neuromodulation parameters from config
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.5f);
+        float curiosityBaseline = config->getOr<float>("curiosity_baseline", 0.3f);
+        float noveltySensitivity = config->getOr<float>("novelty_sensitivity", 0.7f);
+        float predictionErrorWeight = config->getOr<float>("prediction_error_weight", 0.6f);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        // Set neuromodulation levels
+        if (dopamine) {
+            dopamine->setBaselineLevel(dopamineBaseline);
+        }
+        if (curiosity) {
+            curiosity->setNoveltyWeight(noveltySensitivity);
+            curiosity->setPredictionErrorWeight(predictionErrorWeight);
+            curiosity->setBaselineLevel(curiosityBaseline);
+        }
+        if (novelty) {
+            novelty->setSensitivity(noveltySensitivity);
+        }
+        if (predictionError) {
+            predictionError->setWeight(predictionErrorWeight);
+        }
         
-        // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        // Enhanced integration: Register neuromodulation handlers for plasticity
+        if (dopamine && curiosity && predictionError) {
+            // Register dopamine-based plasticity modulation
+            dopamine->registerPlasticityModulation([this](float level) {
+                // Dopamine modulates plasticity rates based on reward prediction errors
+                float plasticityMod = 1.0f + level * 0.5f;  // Enhance plasticity with reward
+                // Apply to STDP and Hebbian systems
+                if (stdp) {
+                    stdp->setLTPWeight(stdp->getLTPWeight() * plasticityMod);
+                }
+                if (hebbian) {
+                    hebbian->setLearningRate(hebbian->getLearningRate() * plasticityMod);
+                }
+            });
+            
+            // Register curiosity-based exploration drive
+            curiosity->registerExplorationDrive([this](float level) {
+                // Curiosity increases neural excitability for exploration
+                for (auto& region : regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            // Increase baseline excitability based on curiosity
+                            float currentExcitation = neuron->getMembranePotential();
+                            neuron->injectCurrent(level * 0.1f);
+                        }
+                    }
+                }
+            });
+            
+            // Register novelty detection for learning
+            novelty->registerNoveltyDetection([this](float noveltyLevel) {
+                // Novelty triggers synaptic strengthening
+                if (structuralPlasticity) {
+                    // Increase synaptogenesis rate based on novelty
+                    float baseRate = 0.0001f;
+                    float newRate = baseRate * (1.0f + noveltyLevel * 2.0f);
+                    structuralPlasticity->setSynaptogenesisRate(newRate);
+                }
+            });
+            
+            // Register prediction error for adaptive learning
+            predictionError->registerPredictionError([this](float error) {
+                // Prediction error adjusts learning rates
+                if (stdp) {
+                    // Error magnitude modulates STDP strength
+                    float errorFactor = std::min(1.0f, std::abs(error) * 2.0f);
+                    stdp->setLTPWeight(stdp->getLTPWeight() * (1.0f + errorFactor * 0.3f));
+                    stdp->setLTDWeight(stdp->getLTDWeight() * (1.0f + errorFactor * 0.2f));
+                }
+            });
+        }
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
+        // Configure enhanced neuromodulation interactions
+        if (dopamine && curiosity) {
+            // Setup cross-modulation between dopamine and curiosity
+            dopamine->registerCrossModulation([this](float dopamineLevel) {
+                if (curiosity) {
+                    // High dopamine reduces curiosity-driven exploration
+                    float curiosityMod = 1.0f - dopamineLevel * 0.5f;
+                    curiosity->setExplorationFactor(std::max(0.1f, curiosityMod));
+                }
+            });
+        }
+        
+        // Configure developmental neuromodulation
+        if (dopamine) {
+            dopamine->registerDevelopmentalModulation([this](DevelopmentalStage stage) {
+                // Neuromodulation changes with development
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        // High plasticity, moderate neuromodulation
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        // Enhanced neuromodulation effect
+                        if (curiosity) {
+                            curiosity->setExplorationFactor(1.5f);
+                        }
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        // Fine-tuned neuromodulation
+                        break;
+                    case DevelopmentalStage::Adult:
+                        // Stable neuromodulation
+                        break;
+                    case DevelopmentalStage::Aging:
+                        // Reduced neuromodulation effect
+                        break;
+                }
+            });
+        }
+        
+        // Configure checkpoint system to save neuromodulation state
+        if (checkpointManager) {
+            checkpointManager->addCheckpointData([this](CheckpointWriter& writer) {
+                // Save neuromodulation system states
+                if (dopamine) {
+                    writer.writeFloat("dopamine_level", dopamine->getLevel());
+                    writer.writeFloat("dopamine_plasticity_mod", dopamine->getPlasticityFactor());
+                }
+                if (curiosity) {
+                    writer.writeFloat("curiosity_level", curiosity->getLevel());
+                    writer.writeFloat("curiosity_exploration", curiosity->getExplorationDrive());
+                }
+                if (novelty) {
+                    writer.writeFloat("novelty_level", novelty->getLevel());
+                }
+                if (predictionError) {
+                    writer.writeFloat("prediction_error_level", predictionError->getError());
+                }
+            });
+            
+            checkpointManager->addRestoreCallback([this](CheckpointReader& reader) {
+                // Restore neuromodulation system states
+                if (dopamine) {
+                    float dopamineLevel = reader.readFloat("dopamine_level", 0.5f);
+                    float dopaminePlasticityMod = reader.readFloat("dopamine_plasticity_mod", 1.0f);
+                    dopamine->setValue(dopamineLevel);
+                    // Restore plasticity factor if available
+                }
+                if (curiosity) {
+                    float curiosityLevel = reader.readFloat("curiosity_level", 0.3f);
+                    float curiosityExploration = reader.readFloat("curiosity_exploration", 0.5f);
+                    // Note: Curiosity doesn't have direct setLevel method, would need implementation
+                }
+                if (novelty) {
+                    float noveltyLevel = reader.readFloat("novelty_level", 0.0f);
+                    // Note: Novelty doesn't have direct setLevel method, would need implementation
+                }
+                if (predictionError) {
+                    float predictionErrorLevel = reader.readFloat("prediction_error_level", 0.0f);
+                    // Note: PredictionError doesn't have direct setError method, would need implementation
+                }
+            });
+        }
     
     DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
@@ -258,37 +398,125 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
+    // Enhanced neuromodulation integration
+    // Register neuromodulation update handlers in the brain step loop
+    if (pImpl->dopamine && pImpl->curiosity && pImpl->predictionError && pImpl->novelty) {
+        // Register dopamine modulation for plasticity
+        pImpl->dopamine->registerPlasticityModulation([this](float level) {
+            // Dopamine modulates synaptic plasticity based on reward prediction errors
+            if (pImpl->stdp) {
+                pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * (1.0f + level * 0.3f));
+                pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * (1.0f - level * 0.1f));
+            }
+            if (pImpl->hebbian) {
+                pImpl->hebbian->setLearningRate(pImpl->hebbian->getLearningRate() * (1.0f + level * 0.2f));
+            }
+        });
+        
+        // Register curiosity-driven exploration
+        pImpl->curiosity->registerExplorationDrive([this](float level) {
+            // Curiosity increases neural excitability and promotes exploration
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Increase membrane potential for exploration
+                        neuron->injectCurrent(level * 0.05f);
+                        // Enhance firing threshold for curiosity-driven behavior
+                        float currentThreshold = neuron->getThreshold();
+                        neuron->setThreshold(currentThreshold * (1.0f - level * 0.1f));
                     }
-                    return;
                 }
             }
-        }
-    });
+        });
+        
+        // Register novelty detection for synaptic strengthening
+        pImpl->novelty->registerNoveltyDetection([this](float noveltyLevel) {
+            // Novelty triggers enhanced synaptic consolidation
+            if (pImpl->structuralPlasticity) {
+                // Increase synaptogenesis rate based on novelty
+                float baseRate = 0.0001f;
+                float noveltyRate = baseRate * (1.0f + noveltyLevel * 3.0f);
+                pImpl->structuralPlasticity->setSynaptogenesisRate(std::min(noveltyRate, 0.001f));
+            }
+        });
+        
+        // Register prediction error for adaptive learning
+        pImpl->predictionError->registerPredictionError([this](float error) {
+            // Prediction error adjusts learning rates dynamically
+            if (pImpl->stdp) {
+                // Error magnitude modulates STDP strength
+                float errorFactor = std::min(1.0f, std::abs(error) * 2.0f);
+                pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * (1.0f + errorFactor * 0.4f));
+                pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * (1.0f + errorFactor * 0.2f));
+            }
+        });
+        
+        // Register neuromodulation updates in the step loop
+        // This will be handled by the main step function
+    }
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Configure neuromodulation with config parameters
+    if (pImpl->config) {
+        // Configure dopamine baseline level
+        float dopamineBaseline = pImpl->config->getOr<float>("dopamine_baseline", 0.5f);
+        float curiosityBaseline = pImpl->config->getOr<float>("curiosity_baseline", 0.3f);
+        float noveltySensitivity = pImpl->config->getOr<float>("novelty_sensitivity", 0.7f);
+        float predictionErrorWeight = pImpl->config->getOr<float>("prediction_error_weight", 0.6f);
+        
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setBaselineLevel(dopamineBaseline);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->setNoveltyWeight(noveltySensitivity);
+            pImpl->curiosity->setPredictionErrorWeight(predictionErrorWeight);
+            pImpl->curiosity->setBaselineLevel(curiosityBaseline);
+        }
+        if (pImpl->novelty) {
+            pImpl->novelty->setSensitivity(noveltySensitivity);
+        }
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setWeight(predictionErrorWeight);
+        }
+    }
+    
+    // Register development system callback for neuromodulation adaptation
+    if (pImpl->developmentSystem && pImpl->dopamine) {
+        pImpl->developmentSystem->registerNeuromodulationCallback([this](DevelopmentalStage stage, float level) {
+            // Development stage affects neuromodulation strength
+            switch (stage) {
+                case DevelopmentalStage::Initial:
+                    // High plasticity, moderate neuromodulation
+                    if (pImpl->dopamine) {
+                        pImpl->dopamine->setValue(0.6f);
+                    }
+                    break;
+                case DevelopmentalStage::CriticalPeriod:
+                    // Enhanced neuromodulation for learning
+                    if (pImpl->curiosity) {
+                        pImpl->curiosity->setExplorationFactor(1.5f);
+                    }
+                    break;
+                case DevelopmentalStage::Maturation:
+                    // Fine-tuned neuromodulation
+                    break;
+                case DevelopmentalStage::Adult:
+                    // Stable neuromodulation
+                    if (pImpl->dopamine) {
+                        pImpl->dopamine->setValue(0.5f);
+                    }
+                    break;
+                case DevelopmentalStage::Aging:
+                    // Reduced neuromodulation effect
+                    if (pImpl->dopamine) {
+                        pImpl->dopamine->setValue(0.3f);
+                    }
+                    break;
+            }
+        });
+    }
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
