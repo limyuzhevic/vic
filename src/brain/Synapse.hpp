@@ -70,16 +70,15 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+// Update synapse for one simulation step
     void step(Timestamp currentTime);
-    
+
     // Reset to initial state
     void reset();
-    
+
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
-    
+
 private:
     struct Impl;
     Impl* pImpl;
