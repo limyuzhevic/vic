@@ -130,6 +130,28 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
+        // Initialize memory systems
+        workingMemory = std::make_unique<NeuralWorkingMemory>();
+        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Initialize prediction system
+        predictionSystem = std::make_unique<PredictionSystem>();
+        
+        // Initialize cognition systems
+        planner = std::make_unique<NeuralPlanner>();
+        conceptFormation = std::make_unique<ConceptFormation>();
+        attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize development system
+        developmentSystem = std::make_unique<DevelopmentSystem>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
+        
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
