@@ -64,15 +64,11 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
 
 Synapse::~Synapse() = default;
 
-Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Synapse::Synapse(Synapse&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -104,6 +100,7 @@ void Synapse::addToWeight(SynapticWeight delta) {
 }
 
 Delay Synapse::getDelay() const {
+    if (!pImpl) return 0;
     return pImpl->delay;
 }
 
@@ -112,6 +109,7 @@ void Synapse::setDelay(Delay delay) {
 }
 
 SynapseType Synapse::getType() const {
+    if (!pImpl) return SynapseType::Excitatory;
     return pImpl->type;
 }
 
@@ -120,32 +118,48 @@ void Synapse::setType(SynapseType type) {
 }
 
 bool Synapse::isExcitatory() const {
+    if (!pImpl) return false;
     return pImpl->type == SynapseType::Excitatory;
 }
 
 bool Synapse::isInhibitory() const {
+    if (!pImpl) return false;
     return pImpl->type == SynapseType::Inhibitory;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (!pImpl) return;
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+        auto excess = pImpl->preSpikeHistory.size() - Impl::MAX_SPIKE_HISTORY;
+        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin(),
+                                     pImpl->preSpikeHistory.begin() + excess);
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (!pImpl) return;
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+        auto excess = pImpl->postSpikeHistory.size() - Impl::MAX_SPIKE_HISTORY;
+        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin(),
+                                      pImpl->postSpikeHistory.begin() + excess);
     }
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+    if (!pImpl) {
+        static const std::vector<Timestamp> empty;
+        return empty;
+    }
     return pImpl->preSpikeHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+    if (!pImpl) {
+        static const std::vector<Timestamp> empty;
+        return empty;
+    }
     return pImpl->postSpikeHistory;
 }
 
