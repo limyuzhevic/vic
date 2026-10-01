@@ -1,11 +1,16 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
 
+// Forward declaration
+class Brain;
+
 // Prediction error signal for curiosity and learning
 // Computes difference between predicted and actual values
+// Implements temporal difference learning prediction error
 
 class PredictionError {
 public:
@@ -13,7 +18,7 @@ public:
     ~PredictionError();
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(std::shared_ptr<Brain> brain);
     
     // Get error value
     float getError() const;
@@ -31,9 +36,12 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Check if system is properly initialized
+    bool isInitialized() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

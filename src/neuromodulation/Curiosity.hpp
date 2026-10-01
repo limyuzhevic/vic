@@ -1,22 +1,27 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include <memory>
 
 namespace nlm {
 
+// Forward declaration
+class Brain;
+
 // Curiosity drive: exploration motivation based on novelty and prediction error
 // Computed as weighted combination of novelty and prediction error
+// Implements curiosity as a homeostatic system that increases exploration
 
-class Curiosity {
+class Curiosity : public Neuromodulator {
 public:
     Curiosity();
-    ~Curiosity();
+    ~Curiosity() override;
     
     // Initialize with brain reference
-    void initialize(class Brain* brain);
+    void initialize(Brain* brain) override;
     
     // Get curiosity level
-    float getLevel() const;
+    float getLevel() const override;
     
     // Update curiosity based on novelty and prediction error
     void update(float novelty, float predictionError, TimestepDuration dt);
@@ -33,7 +38,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

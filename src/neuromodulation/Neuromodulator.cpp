@@ -4,18 +4,23 @@
 namespace nlm {
 
 struct Dopamine::Impl {
+    std::weak_ptr<class Brain> brain;
     float level;
     float baseline;
     float peak;
     float decayRate;
     float releaseRate;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : brain(nullptr), level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Dopamine::Dopamine() : pImpl(std::make_unique<Impl>()) {}
 
 Dopamine::~Dopamine() = default;
+
+void Dopamine::initialize(Brain* brain) {
+    pImpl->brain = brain;
+}
 
 const char* Dopamine::getName() const {
     return "DA";

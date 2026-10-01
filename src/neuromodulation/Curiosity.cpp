@@ -4,7 +4,7 @@
 namespace nlm {
 
 struct Curiosity::Impl {
-    class Brain* brain;
+    std::weak_ptr<class Brain> brain;
     float level;
     float noveltyWeight;
     float predictionErrorWeight;
@@ -18,11 +18,17 @@ struct Curiosity::Impl {
         , decayRate(0.05f) {}
 };
 
-Curiosity::Curiosity() : pImpl(new Impl) {}
+Curiosity::Curiosity() : pImpl(std::make_unique<Impl>()) {}
 
 Curiosity::~Curiosity() = default;
 
 void Curiosity::initialize(Brain* brain) {
+    // Check if the brain is still valid
+    if (!brain) {
+        return;
+    }
+    
+    // Convert to shared_ptr for weak_ptr
     pImpl->brain = brain;
     NLM_LOG_INFO("Curiosity system initialized");
 }

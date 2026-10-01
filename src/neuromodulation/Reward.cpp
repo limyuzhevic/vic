@@ -3,16 +3,27 @@
 namespace nlm {
 
 struct Reward::Impl {
+    std::weak_ptr<class Brain> brain;
     float currentValue;
     float accumulatedReward;
     std::vector<float> history;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    Impl() : brain(nullptr), currentValue(0.0f), accumulatedReward(0.0f) {}
 };
 
-Reward::Reward() : pImpl(new Impl) {}
+Reward::Reward() : pImpl(std::make_unique<Impl>()) {}
 
 Reward::~Reward() = default;
+
+void Reward::initialize(Brain* brain) {
+    // Check if the brain is still valid
+    if (!brain) {
+        return;
+    }
+    
+    // Convert to shared_ptr for weak_ptr
+    pImpl->brain = brain;
+}
 
 float Reward::getValue() const {
     return pImpl->currentValue;
@@ -25,6 +36,7 @@ void Reward::setValue(float value) {
 void Reward::add(float delta) {
     pImpl->accumulatedReward += delta;
     pImpl->currentValue += delta;
+    pImpl->history.push_back(pImpl->currentValue);
 }
 
 void Reward::reset() {

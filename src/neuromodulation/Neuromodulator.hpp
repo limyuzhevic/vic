@@ -6,12 +6,19 @@
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+
 // Neuromodulator: Abstract base for neuromodulatory signals
 // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
 
 class Neuromodulator {
 public:
     virtual ~Neuromodulator() = default;
+    
+    // Initialize neuromodulator with brain reference
+    // This allows neuromodulators to access brain state and resources
+    virtual void initialize(Brain* brain) {}
     
     // Get modulator name
     virtual const char* getName() const = 0;
@@ -50,7 +57,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation

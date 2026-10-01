@@ -6,7 +6,7 @@
 namespace nlm {
 
 struct Novelty::Impl {
-    class Brain* brain;
+    std::weak_ptr<class Brain> brain;
     float level;
     float decayRate;
     std::vector<float> history;
@@ -16,11 +16,17 @@ struct Novelty::Impl {
     Impl() : brain(nullptr), level(0.0f), decayRate(0.1f), noveltyThreshold(0.3f) {}
 };
 
-Novelty::Novelty() : pImpl(new Impl) {}
+Novelty::Novelty() : pImpl(std::make_unique<Impl>()) {}
 
 Novelty::~Novelty() = default;
 
 void Novelty::initialize(Brain* brain) {
+    // Check if the brain is still valid
+    if (!brain) {
+        return;
+    }
+    
+    // Convert to shared_ptr for weak_ptr
     pImpl->brain = brain;
     NLM_LOG_INFO("Novelty detection initialized");
 }

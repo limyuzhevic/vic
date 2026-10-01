@@ -1,13 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
-#include <string>
 
 namespace nlm {
 
@@ -24,10 +19,6 @@ class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -81,13 +72,13 @@ public:
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
+    class SpikeSystem* getSpikeSystem();
+    const class SpikeSystem* getSpikeSystem() const;
     
     // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    class STDP* getSTDP();
+    class Hebbian* getHebbian();
+    class StructuralPlasticity* getStructuralPlasticity();
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -98,7 +89,7 @@ public:
     std::unique_ptr<class Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -117,13 +108,13 @@ public:
     
     // Region management
     RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
+    class NeuralRegion* getRegion(RegionId id);
+    const class NeuralRegion* getRegion(RegionId id) const;
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     
     // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    const std::vector<std::unique_ptr<class NeuralRegion>>& getRegions() const;
     
     // Inter-region connection management
     void addInterRegionConnection(RegionId source, RegionId target, 
@@ -140,29 +131,29 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    class NeuralWorkingMemory* getWorkingMemory();
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    class NeuralEpisodicMemory* getEpisodicMemory();
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    class NeuralAssociativeMemory* getAssociativeMemory();
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    class PredictionSystem* getPredictionSystem();
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    class NeuralPlanner* getPlanner();
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    class ConceptFormation* getConceptFormation();
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    class AttentionalSelection* getAttention();
     
     // ========== DEVELOPMENT SYSTEM ==========
     
@@ -173,16 +164,16 @@ public:
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    Neuromodulator* getDopamine();
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    Neuromodulator* getCuriosity();
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    Neuromodulator* getNovelty();
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    Neuromodulator* getPredictionErrorSignal();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
@@ -195,7 +186,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
