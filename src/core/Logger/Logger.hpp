@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <limits>
 
 namespace nlm {
 
@@ -95,6 +96,23 @@ public:
     void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
+    // Enhanced logging with context
+    void debugWithContext(const std::string& context, const std::string& message,
+                         const std::string& file = "", int line = 0, const std::string& function = "");
+    void infoWithContext(const std::string& context, const std::string& message,
+                        const std::string& file = "", int line = 0, const std::string& function = "");
+    void warningWithContext(const std::string& context, const std::string& message,
+                           const std::string& file = "", int line = 0, const std::string& function = "");
+    void errorWithContext(const std::string& context, const std::string& message,
+                         const std::string& file = "", int line = 0, const std::string& function = "");
+    void criticalWithContext(const std::string& context, const std::string& message,
+                            const std::string& file = "", int line = 0, const std::string& function = "");
+    
+    // Logging with performance monitoring
+    void logWithPerformance(const std::string& operation, LogLevel level,
+                           const std::string& message, const std::string& file = "",
+                           int line = 0, const std::string& function = "");
+    
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
@@ -103,7 +121,7 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -115,6 +133,16 @@ private:
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Enhanced convenience macros with context
+#define NLM_LOG_DEBUG_CTX(ctx, msg) nlm::Logger::getGlobal().debugWithContext(ctx, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_INFO_CTX(ctx, msg) nlm::Logger::getGlobal().infoWithContext(ctx, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_WARNING_CTX(ctx, msg) nlm::Logger::getGlobal().warningWithContext(ctx, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_ERROR_CTX(ctx, msg) nlm::Logger::getGlobal().errorWithContext(ctx, msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_CRITICAL_CTX(ctx, msg) nlm::Logger::getGlobal().criticalWithContext(ctx, msg, __FILE__, __LINE__, __func__)
+
+// Performance timing macro
+#define NLM_PERF_OPERATION(op) nlm::PerformanceTimer timer_##__LINE__(op)
 
 // Stream-style logging helper
 class LogStream {
@@ -137,5 +165,16 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Performance timer for measuring expensive operations
+class PerformanceTimer {
+public:
+    PerformanceTimer(const std::string& operation);
+    ~PerformanceTimer();
+    
+private:
+    std::string operation_;
+    std::chrono::high_resolution_clock::time_point start_;
+};
 
 } // namespace nlm

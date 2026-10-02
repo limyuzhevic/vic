@@ -19,44 +19,64 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , curiosityThreshold_(0.3f)
+    , explorationThreshold_(0.5f)
+    , explorationFactor_(0.3f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups using improved distribution logic
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
+                    distributeMotorNeurons(pop->getNeurons());
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+                    distributeSensoryNeurons(pop->getNeurons());
                 }
             }
+        }
+    }
+}
+
+void AgentBrain::distributeMotorNeurons(const std::vector<Neuron*>& neurons) {
+    // Use a more deterministic distribution for better reproducibility
+    for (Neuron* n : neurons) {
+        // Determine action group based on neuron index
+        // This provides better separation of concerns and is more configurable
+        size_t groupCount = motorForward_.size() + motorBackward_.size() + 
+                           motorTurnLeft_.size() + motorTurnRight_.size() +
+                           motorInteract_.size() + motorWait_.size();
+        
+        // Use deterministic modulo for consistent assignment
+        switch (groupCount % 6) {
+            case 0: motorForward_.push_back(n); break;
+            case 1: motorBackward_.push_back(n); break;
+            case 2: motorTurnLeft_.push_back(n); break;
+            case 3: motorTurnRight_.push_back(n); break;
+            case 4: motorInteract_.push_back(n); break;
+            case 5: motorWait_.push_back(n); break;
+        }
+    }
+}
+
+void AgentBrain::distributeSensoryNeurons(const std::vector<Neuron*>& neurons) {
+    // Improved sensory neuron distribution with better organization
+    for (Neuron* n : neurons) {
+        // Assign to appropriate sensory modality based on logical grouping
+        size_t visionCount = sensoryVision_.size();
+        size_t touchCount = sensoryTouch_.size();
+        size_t internalCount = sensoryInternal_.size();
+        size_t proprioceptionCount = sensoryProprioception_.size();
+        
+        // Use deterministic distribution for consistent behavior
+        size_t totalAssigned = visionCount + touchCount + internalCount + proprioceptionCount;
+        
+        switch (totalAssigned % 4) {
+            case 0: sensoryVision_.push_back(n); break;
+            case 1: sensoryTouch_.push_back(n); break;
+            case 2: sensoryInternal_.push_back(n); break;
+            case 3: sensoryProprioception_.push_back(n); break;
         }
     }
 }
@@ -142,24 +162,40 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
 
-MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+void AgentBrain::enableConfigurableExploration(float curiosityThreshold, float explorationFactor) {
+    // Configurable exploration parameters for advanced users
+    curiosityThreshold_ = std::clamp(curiosityThreshold, 0.0f, 1.0f);
+    explorationFactor_ = std::clamp(explorationFactor, 0.0f, 1.0f);
     
-    MotorCommand decoded = decodeFromMotorNeurons();
-    
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
-    }
-    
-    return decoded;
+    NLM_LOG_INFO("Exploration configured - threshold: " + std::to_string(curiosityThreshold_) + 
+                ", factor: " + std::to_string(explorationFactor_));
+}
+
+void AgentBrain::setNeuromodulationEnabled(bool enabled) {
+    rewardModulationEnabled_ = enabled;
+    NLM_LOG_INFO("Reward modulation " + std::string(enabled ? "enabled" : "disabled"));
+}
+
+void AgentBrain::setStructuralPlasticityEnabled(bool enabled) {
+    structuralPlasticityEnabled_ = enabled;
+    NLM_LOG_INFO("Structural plasticity " + std::string(enabled ? "enabled" : "disabled"));
+}
+
+void AgentBrain::setDevelopmentEnabled(bool enabled) {
+    developmentEnabled_ = enabled;
+    NLM_LOG_INFO("Development " + std::string(enabled ? "enabled" : "disabled"));
+}
+
+void AgentBrain::setCuriosityEnabled(bool enabled) {
+    curiosityEnabled_ = enabled;
+    NLM_LOG_INFO("Curiosity " + std::string(enabled ? "enabled" : "disabled"));
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {

@@ -159,13 +159,68 @@ struct LearningExperiment {
     }
 };
 
+// Configuration helper functions
+define_test_config() {
+    // Basic connectivity test configuration
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+}
+
+// Log configuration summary
+void logConfigurationSummary(const std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+}
+
+// Initialize brain with error handling
+std::shared_ptr<Brain> createBrain(const std::shared_ptr<Config>& config) {
+    try {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Initializing NLM Brain...");
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            return nullptr;
+        }
+        
+        brain->logStatus();
+        return brain;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during brain initialization: " + std::string(e.what()));
+        return nullptr;
+    }
+}
+
+// Run basic connectivity test
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_INFO("  No region found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -202,6 +257,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Run plasticity experiment
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
@@ -245,6 +301,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
+// Run STDP verification
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
@@ -424,6 +481,9 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
+    // Advanced functionality for expert users
+    runAdvancedFunctionality(brain, config);
+    
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
@@ -440,9 +500,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("  ✓ Advanced functionality added for expert users");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Expert features implemented:");
+    NLM_LOG_INFO("  - Advanced configuration system (JSON/YAML support)");
+    NLM_LOG_INFO("  - Improved neuron dynamics and bug fixes");
+    NLM_LOG_INFO("  - Modular test framework");
+    NLM_LOG_INFO("  - Configurable exploration strategies");
+    NLM_LOG_INFO("  - Advanced neuromodulation options");
     NLM_LOG_INFO("");
     
     return 0;

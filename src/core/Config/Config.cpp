@@ -19,40 +19,142 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        // Try to parse as JSON first (with simple implementation)
+        std::string content((std::istreambuf_iterator<char>(file)), 
+                           std::istreambuf_iterator<char>());
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Simple JSON-like parsing for basic key-value pairs
+        // In a real implementation, we would use a proper JSON parser like nlohmann::json
+        size_t pos = 0;
+        while ((pos = content.find("\"", pos)) != std::string::npos) {
+            size_t keyStart = pos + 1;
+            size_t keyEnd = content.find("\"", keyStart);
+            if (keyEnd == std::string::npos) break;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            std::string key = content.substr(keyStart, keyEnd - keyStart);
+            
+            // Find the colon after the key
+            size_t colonPos = content.find(":", keyEnd);
+            if (colonPos == std::string::npos) break;
+            
+            // Find the value
+            size_t valueStart = content.find_first_not_of("\t\n\r ", colonPos + 1);
+            if (valueStart == std::string::npos) continue;
+            
+            // Handle different value types
+            if (content[valueStart] == '"') {
+                // String value
+                size_t valueEnd = content.find('"', valueStart + 1);
+                if (valueEnd == std::string::npos) break;
+                std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+                set(key, value, ConfigSource::File);
+            } else if (content[valueStart] == 't' || content[valueStart] == 'f') {
+                // Boolean value
+                size_t endPos = content.find_first_of(",}\n", valueStart);
+                std::string boolStr = content.substr(valueStart, endPos - valueStart);
+                bool boolValue = (boolStr == "true" || boolStr == "True" || boolStr == "TRUE");
+                set(key, boolValue, ConfigSource::File);
+            } else {
+                // Numeric value (int or double)
+                size_t endPos = content.find_first_of(",}\n", valueStart);
+                std::string numStr = content.substr(valueStart, endPos - valueStart);
+                
+                // Try to parse as int first
+                try {
+                    size_t intEnd = 0;
+                    int intVal = std::stoi(numStr, &intEnd);
+                    if (intEnd == numStr.size()) {
+                        set(key, intVal, ConfigSource::File);
+                    } else {
+                        // Try double
+                        double doubleVal = std::stod(numStr);
+                        set(key, doubleVal, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // If parsing fails, try as string
+                    set(key, numStr, ConfigSource::File);
+                }
             }
             
-            set(key, value, ConfigSource::File);
+            pos = keyEnd + 1;
         }
+        
+        // Also support simple key=value format for backward compatibility
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to convert to appropriate type
+                try {
+                    // Try integer
+                    size_t intEnd = 0;
+                    int intVal = std::stoi(value, &intEnd);
+                    if (intEnd == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    // Try double
+                    size_t doubleEnd = 0;
+                    double doubleVal = std::stod(value, &doubleEnd);
+                    if (doubleEnd == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    // Try boolean
+                    if (value == "true" || value == "True" || value == "TRUE") {
+                        set(key, true, ConfigSource::File);
+                        continue;
+                    } else if (value == "false" || value == "False" || value == "FALSE") {
+                        set(key, false, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                // Fall back to string
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from: " + filepath + " (" + 
+                    std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error loading config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

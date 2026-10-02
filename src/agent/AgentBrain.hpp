@@ -58,7 +58,7 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
+// Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
@@ -69,15 +69,20 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced exploration configuration
+    void enableConfigurableExploration(float curiosityThreshold, float explorationFactor);
+    
+    // System enable/disable
+    void setNeuromodulationEnabled(bool enable);
+    void setStructuralPlasticityEnabled(bool enable);
+    void setDevelopmentEnabled(bool enable);
+    void setCuriosityEnabled(bool enable);
+    
+    // Configuration access
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExplorationFactor() const { return explorationFactor_; }
+    
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
-    std::shared_ptr<Brain> brain_;
-    
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
@@ -109,9 +114,17 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Advanced configuration parameters
+    float curiosityThreshold_;    // Threshold for curiosity-based exploration
+    float explorationFactor_;     // Factor for exploration behavior
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Private helper functions
+    void distributeMotorNeurons(const std::vector<Neuron*>& neurons);
+    void distributeSensoryNeurons(const std::vector<Neuron*>& neurons);
 };
 
 } // namespace nlm

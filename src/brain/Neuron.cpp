@@ -195,9 +195,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
+        // Store current synaptic input for post-refractory processing
+        float currentSynapticInput = pImpl->synapticInput;
         pImpl->synapticInput = 0.0f;
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
+            // Restore synaptic input that was accumulated during refractory
+            pImpl->synapticInput = currentSynapticInput;
         }
         return false;
     }
@@ -250,7 +254,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // No spike occurred - set appropriate firing state
+        if (pImpl->state.refractoryRemaining > 0) {
+            pImpl->state.firingState = FiringState::Refractory;
+        } else {
+            pImpl->state.firingState = FiringState::Resting;
+        }
     }
     
     // Clear synaptic input for next step

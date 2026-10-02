@@ -102,93 +102,100 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
-struct Logger::Impl {
-    std::vector<std::shared_ptr<ILogger>> loggers;
-    std::mutex mutex;
+// Performance monitoring and timing utilities
+namespace {
+    class PerformanceTimer {
+    public:
+        PerformanceTimer(const std::string& operation) : operation_(operation) {
+            start_ = std::chrono::high_resolution_clock::now();
+        }
+        
+        ~PerformanceTimer() {
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start_).count();
+            NLM_LOG_DEBUG("Performance: " + operation_ + " took " + std::to_string(duration) + "μs");
+        }
+        
+    private:
+        std::string operation_;
+        std::chrono::high_resolution_clock::time_point start_;
+    };
+}
+
+// Enhanced logging with performance monitoring
+void Logger::logWithPerformance(const std::string& operation, LogLevel level, 
+                               const std::string& message, const std::string& file, 
+                               int line, const std::string& function) {
+    // Log performance timing for expensive operations
+    PerformanceTimer timer("logWithPerformance");
+    
+    // Enhanced log entry with additional context
+    log(level, "[" + operation + "] " + message, file, line, function);
+}
+
+void Logger::debugWithContext(const std::string& context, const std::string& message,
+                             const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Debug, "[" + context + "] " + message, file, line, function);
+}
+
+void Logger::infoWithContext(const std::string& context, const std::string& message,
+                            const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Info, "[" + context + "] " + message, file, line, function);
+}
+
+void Logger::warningWithContext(const std::string& context, const std::string& message,
+                               const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Warning, "[" + context + "] " + message, file, line, function);
+}
+
+void Logger::errorWithContext(const std::string& context, const std::string& message,
+                             const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Error, "[" + context + "] " + message, file, line, function);
+}
+
+void Logger::criticalWithContext(const std::string& context, const std::string& message,
+                                const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Critical, "[" + context + "] " + message, file, line, function);
+}
+
+// Performance statistics
+struct Logger::PerfStats {
+    int64_t totalTime_ = 0;     // Total time in microseconds
+    int calls_ = 0;            // Number of calls
+    int64_t minTime_ = LLONG_MAX; // Minimum time
+    int64_t maxTime_ = 0;      // Maximum time
+    
+    void addSample(int64_t time) {
+        totalTime_ += time;
+        ++calls_;
+        if (time < minTime_) minTime_ = time;
+        if (time > maxTime_) maxTime_ = time;
+    }
+    
+    double getAverageTime() const {
+        return calls_ > 0 ? static_cast<double>(totalTime_) / calls_ : 0.0;
+    }
+    
+    std::string getSummary() const {
+        std::ostringstream oss;
+        oss << "Average: " << getAverageTime() << "μs, "
+            << "Min: " << minTime_ << "μs, "
+            << "Max: " << maxTime_ << "μs, "
+            << "Calls: " << calls_;
+        return oss.str();
+    }
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
-
-Logger::~Logger() = default;
-
-void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
-}
-
-void Logger::clearLoggers() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
-}
-
-void Logger::setLevel(LogLevel level) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
-    }
-}
-
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
-    }
-}
-
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
-}
-
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
-}
-
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
-}
-
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
-}
-
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
-}
-
-bool Logger::isEnabled(LogLevel level) const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
-        }
-    }
-    return false;
-}
-
-Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
-}
-
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
-}
-
-// LogStream implementation
+// LogStream implementation with enhanced debugging
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+    : level_(level), file_(file), line_(line), function_(function) {
+    oss_ << "[" << std::filesystem::path(file).filename() << ":" << line << "] ";
+    
+    // Add function name if available
+    if (!function.empty()) {
+        oss_ << function << "(); ";
+    }
+}
 
 LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
