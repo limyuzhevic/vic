@@ -64,6 +64,12 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Validate current configuration
+    std::vector<std::string> validate() const;
+    
+    // Get file path for loading
+    std::string getFilePath() const;
+    
     // Get values
     template<typename T>
     std::optional<T> get(const std::string& key) const;
@@ -100,6 +106,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File path storage for loading
+    std::string currentFilePath;
 };
 
 } // namespace nlm

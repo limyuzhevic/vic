@@ -152,6 +152,10 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("validate", &Config::validate,
+             "Validate configuration and return list of errors")
+        .def("getFilePath", &Config::getFilePath,
+             "Get the file path used for loading configuration")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -186,9 +190,8 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
-        .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
-        }, py::arg("data"))
+        .def("setData", py::overload_cast<const std::vector<float>&>(&Audio::setData),
+             py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);
@@ -207,7 +210,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("getId", &Action::getId);
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())

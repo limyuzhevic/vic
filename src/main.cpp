@@ -28,24 +28,15 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printConfigValidationResults(const std::vector<std::string>& errors) {
+    if (errors.empty()) {
+        NLM_LOG_INFO("Configuration validation passed with no errors.");
+    } else {
+        NLM_LOG_WARNING("Configuration validation found the following issues:");
+        for (const auto& error : errors) {
+            NLM_LOG_WARNING("  - " + error);
+        }
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -53,8 +44,8 @@ struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
     size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
+    std::vector<std::pair<SynapseId, float>> initialWeights;  // Track synapse ID with weight
+    std::vector<std::pair<SynapseId, float>> finalWeights;     // Track synapse ID with weight
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
@@ -67,16 +58,20 @@ struct LearningExperiment {
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                if (syn->getId() != INVALID_SYNAPSE_ID) {
+                    initialWeights.push_back({syn->getId(), syn->getWeight()});
+                }
             }
         }
         
         NLM_LOG_INFO("Initial state recorded:");
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
         if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
+            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f,
+                [](float acc, const auto& p) { return acc + p.second; });
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Synapses tracked: " + std::to_string(initialWeights.size()));
         }
     }
     
@@ -86,18 +81,36 @@ struct LearningExperiment {
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                if (syn->getId() != INVALID_SYNAPSE_ID) {
+                    finalWeights.push_back({syn->getId(), syn->getWeight()});
+                }
             }
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Get most active neurons - use brain's neurons if SpikeSystem is not available
+        mostActiveNeurons.clear();
+        auto neurons = brain->getAllNeurons();
+        if (!neurons.empty()) {
+            std::vector<std::pair<NeuronId, size_t>> neuronSpikeCounts;
+            for (const auto& neuron : neurons) {
+                size_t spikeCount = neuron->getSpikeCount();
+                neuronSpikeCounts.push_back({neuron->getId(), spikeCount});
+            }
+            std::sort(neuronSpikeCounts.begin(), neuronSpikeCounts.end(),
+                [](const auto& a, const auto& b) { return a.second > b.second; });
+            for (size_t i = 0; i < std::min(size_t(10), neuronSpikeCounts.size()); ++i) {
+                mostActiveNeurons.push_back(neuronSpikeCounts[i].first);
+            }
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
+            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f,
+                [](float acc, const auto& p) { return acc + p.second; });
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Synapses tracked: " + std::to_string(finalWeights.size()));
         }
     }
     
@@ -112,8 +125,10 @@ struct LearningExperiment {
         }
         
         // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
+        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f,
+            [](float acc, const auto& p) { return acc + p.second; });
+        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f,
+            [](float acc, const auto& p) { return acc + p.second; });
         float initialMean = initialSum / initialWeights.size();
         float finalMean = finalSum / finalWeights.size();
         
@@ -127,12 +142,24 @@ struct LearningExperiment {
         size_t weakened = 0;
         size_t unchanged = 0;
         
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+        // Match synapses by ID for accurate comparison
+        std::unordered_map<SynapseId, size_t> initialWeightMap;
+        for (const auto& p : initialWeights) {
+            initialWeightMap[p.first] = p.second;
+        }
+        
+        for (const auto& p : finalWeights) {
+            auto it = initialWeightMap.find(p.first);
+            if (it != initialWeightMap.end()) {
+                float delta = p.second - it->second;
+                if (delta > 0.01f) {
+                    strengthened++;
+                } else if (delta < -0.01f) {
+                    weakened++;
+                } else {
+                    unchanged++;
+                }
+            }
         }
         
         NLM_LOG_INFO("");
@@ -165,7 +192,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -250,7 +280,16 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found!");
+        return;
+    }
+    
+    // Get the current spike system for neurons
+    if (!brain->getSpikeSystem()) {
+        NLM_LOG_ERROR("Brain does not have a spike system!");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -263,11 +302,14 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record initial weights
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
+    std::vector<SynapseId> synapseIds;
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
+        synapseIds.push_back(synapses[i]->getId());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " ID:" + std::to_string(synapseIds[i].value) +
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -298,17 +340,14 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
+    float totalDelta = 0.0f;
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
-    float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+                        " ID:" + std::to_string(synapseIds[i].value) +
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
+        totalDelta += delta;
     }
     
     NLM_LOG_INFO("");
@@ -363,8 +402,11 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Validate configuration
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Validating configuration...");
+    auto validationErrors = config->validate();
+    printConfigValidationResults(validationErrors);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
