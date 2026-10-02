@@ -27,32 +27,17 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
+    // Enhanced file format detection
+    std::string extension = getFileExtension(filepath);
     
-    return true;
+    if (extension == "json" || extension == "YAML" || extension == "yml") {
+        return loadFromJSON(filepath);
+    } else if (extension == "xml") {
+        return loadFromXML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +69,28 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Auto-detect file format and use appropriate saving method
+    std::string extension = getFileExtension(filepath);
+    
+    if (extension == "json") {
+        return saveToJSON(filepath);
+    } else {
+        // Default to simple format for backward compatibility
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            // Format value based on type
+            std::visit([&file](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << arg << "\"";
+                } else {
+                    file << arg;
+                }
+            }, entry.value);
+            file << "\n";
+        }
     }
     
     return true;
@@ -186,20 +190,80 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+std::string Config::getFileExtension(const std::string& filename) {
+    size_t pos = filename.find_last_of(".");
+    if (pos == std::string::npos) return "";
+    std::string ext = filename.substr(pos + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext;
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
 }
 
-// Explicit template instantiations
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO: Implement full JSON parser
+    // For now, provide a basic implementation
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Very basic JSON parsing (for demonstration)
+    // In a real implementation, use a proper JSON library like nlohmann/json
+    size_t bracePos = content.find('{');
+    if (bracePos == std::string::npos) {
+        return false;
+    }
+    
+    // Simple parsing for key-value pairs in JSON format
+    // This is a placeholder - real implementation would use a proper JSON parser
+    return loadFromSimpleFormat(filepath);  // Fall back to simple format for now
+}
+
+bool Config::saveToJSON(const std::string& filepath) const {
+    // TODO: Implement proper JSON output
+    // For now, use simple format as a placeholder
+    return saveToFile(filepath);
+}
+
+bool Config::loadFromXML(const std::string& filepath) {
+    // TODO: Implement XML parser
+    // For now, fall back to simple format
+    return loadFromSimpleFormat(filepath);
+}
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
