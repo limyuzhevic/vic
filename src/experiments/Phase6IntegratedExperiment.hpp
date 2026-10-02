@@ -15,6 +15,7 @@
  * that all systems interact properly.
  */
 
+#include "Phase6Config.hpp"
 #include "../experiments/Experiment.hpp"
 #include "../experiments/Metrics.hpp"
 #include <vector>
@@ -73,31 +74,11 @@ struct Phase6IntegrationResult {
 };
 
 /**
- * Configuration for Phase 6 integration experiment
- */
-struct Phase6Config {
-    uint64_t maxSteps;
-    size_t neuronCount;
-    size_t regionCount;
-    float connectionProbability;
-    bool enableCheckpointing;
-    bool enableReplay;
-    bool enableDevelopment;
-    std::string checkpointPath;
-    
-    Phase6Config()
-        : maxSteps(10000)
-        , neuronCount(1000)
-        , regionCount(1)
-        , connectionProbability(0.1f)
-        , enableCheckpointing(true)
-        , enableReplay(true)
-        , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
-};
-
-/**
  * Phase 6 integrated experiment runner
+ * 
+ * This class runs the Phase 6 integration experiment using the unified
+ * Phase6Config configuration system. It demonstrates that all brain
+ * systems are properly connected and functional.
  */
 class Phase6IntegratedExperiment {
 public:
@@ -106,33 +87,65 @@ public:
     
     /**
      * Run the complete integration test
+     * 
+     * @param config Configuration for the Phase 6 integration experiment
+     * @return Integration test results
      */
     Phase6IntegrationResult run(const Phase6Config& config);
     
     /**
      * Run a simple integration verification
+     * 
+     * @return true if integration is successful, false otherwise
      */
     bool verifyIntegration();
     
     /**
      * Test memory integration
+     * 
+     * @return true if memory integration is successful, false otherwise
      */
     bool testMemoryIntegration();
     
     /**
      * Test neuromodulation integration
+     * 
+     * @return true if neuromodulation integration is successful, false otherwise
      */
     bool testNeuromodulationIntegration();
     
     /**
      * Test checkpoint save/load
+     * 
+     * @return true if checkpointing is successful, false otherwise
      */
     bool testCheckpointing();
     
     /**
      * Test replay system
+     * 
+     * @return true if replay system is functional, false otherwise
      */
     bool testReplay();
+    
+    /**
+     * Print configuration summary
+     * 
+     * @param config Configuration to print
+     */
+    static void printConfiguration(const Phase6Config& config);
+    
+    /**
+     * Create standard configuration presets
+     * 
+     * @param presetType Type of preset configuration
+     */
+    static Phase6Config createPreset(const std::string& presetType);
+    
+private:
+    // Internal implementation details
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

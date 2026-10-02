@@ -5,7 +5,8 @@
  * that all brain systems are properly connected.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "Phase6IntegratedExperiment.hpp"
+#include "Phase6Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
@@ -53,12 +54,22 @@ int main(int argc, char* argv[]) {
     
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    
+    // Use the new unified Phase6Config system
+    Phase6Config config = Phase6IntegratedExperiment::createPreset("quick_test");
+    
+    // Optionally override with command line arguments
+    if (argc > 1) {
+        std::string arg = argv[1];
+        if (arg == "--full") {
+            config = Phase6IntegratedExperiment::createPreset("full_integration");
+        } else if (arg == "--real") {
+            config = Phase6IntegratedExperiment::createPreset("real_time");
+        }
+    }
+    
+    // Print configuration
+    Phase6IntegratedExperiment::printConfiguration(config);
     
     auto result = experiment.run(config);
     
