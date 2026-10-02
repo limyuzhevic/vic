@@ -43,25 +43,22 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Configuration class
 class Config {
 public:
     Config();
     ~Config();
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    // Initialize with default values
+    void setDefaultValues();
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, falls back to key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (exports to JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values

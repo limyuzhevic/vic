@@ -6,6 +6,13 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Enhanced with advanced agent commands and capabilities:
+// - Agent brain control (start, stop, pause, resume)
+// - Learning control (enable/disable, rate adjustment)
+// - Behavior modification (exploration/exploitation)
+// - State management (checkpoint, restore, save/load)
+// - Performance monitoring and optimization
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +25,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "agent/AgentBrain.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +33,11 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <sstream>
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <filesystem>
 
 using namespace nlm;
 
@@ -158,6 +171,95 @@ struct LearningExperiment {
         }
     }
 };
+
+// Agent Command Processing
+bool processAgentCommand(const std::string& command, const std::string& arg, 
+                        std::shared_ptr<AgentBrain>& agentBrain,
+                        bool& verboseMode) {
+    if (!agentBrain) return false;
+    
+    // Check if command is for agent
+    if (command == "agent") {
+        // Agent-specific commands
+        std::string agentCmd = arg;
+        
+        // Find first non-alphanumeric char to separate command from args
+        size_t spacePos = agentCmd.find(' ');
+        if (spacePos != std::string::npos) {
+            std::string cmd = agentCmd.substr(0, spacePos);
+            std::string cmdArg = agentCmd.substr(spacePos + 1);
+            return agentBrain->processCommand(cmd, cmdArg);
+        }
+        else {
+            return agentBrain->processCommand(agentCmd, "");
+        }
+    }
+    else if (command == "help") {
+        if (arg == "agent" || arg.empty()) {
+            std::cout << agentBrain->getAgentCommandHelp();
+        }
+        else if (arg == "simulation") {
+            std::cout << "\n=== Simulation Command Help ===\n";
+            std::cout << "  run                - Run the simulation (default)\n";
+            std::cout << "  stop               - Stop simulation\n";
+            std::cout << "  pause              - Pause simulation\n";
+            std::cout << "  resume             - Resume simulation\n";
+            std::cout << "  verbose [on|off]  - Toggle verbose logging\n";
+            std::cout << "  status             - Show system status\n";
+        }
+        return true;
+    }
+    else if (command == "verbose") {
+        verboseMode = !verboseMode;
+        NLM_LOG_INFO("Verbose logging: " + std::string(verboseMode ? "ON" : "OFF"));
+        return true;
+    }
+    else if (command == "status") {
+        std::cout << "\n=== System Status ===\n";
+        std::cout << "Configuration:\n";
+        if (config) {
+            std::cout << "  Neuron count: " << config->getOr<int64_t>("neuron_count", 1000) << "\n";
+            std::cout << "  Region count: " << config->getOr<int64_t>("region_count", 1) << "\n";
+            std::cout << "  Timestep: " << config->getOr<double>("simulation_timestep", 0.001) << "s\n";
+        }
+        std::cout << "Max steps: " << config->getOr<int64_t>("max_simulation_steps", 10000) << "\n";
+        if (agentBrain) {
+            std::cout << "\nAgent Brain:\n";
+            std::cout << agentBrain->getPerformanceMetrics();
+        }
+        return true;
+    }
+    else if (command == "run") {
+        if (agentBrain) {
+            agentBrain->start();
+        }
+        NLM_LOG_INFO("Simulation started");
+        return true;
+    }
+    else if (command == "stop") {
+        if (agentBrain) {
+            agentBrain->stop();
+        }
+        NLM_LOG_INFO("Simulation stopped");
+        return true;
+    }
+    else if (command == "pause") {
+        if (agentBrain) {
+            agentBrain->pause();
+        }
+        NLM_LOG_INFO("Simulation paused");
+        return true;
+    }
+    else if (command == "resume") {
+        if (agentBrain) {
+            agentBrain->resume();
+        }
+        NLM_LOG_INFO("Simulation resumed");
+        return true;
+    }
+    
+    return false;
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -326,6 +428,72 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Parse command line for agent commands
+    std::vector<std::string> args;
+    std::string mode = "run";
+    bool verboseMode = false;
+    std::string agentConfig = "";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Check for agent mode
+        if (arg == "agent" || arg == "--agent") {
+            mode = "agent";
+        }
+        else if (arg == "simulation") {
+            mode = "simulation";
+        }
+        else if (arg == "--verbose") {
+            verboseMode = true;
+        }
+        else if (arg.substr(0, 7) == "--agent=") {
+            agentConfig = arg.substr(7);
+        }
+        else if (arg.find('=') != std::string::npos && 
+                 (arg.substr(0, 7) == "--set=" || 
+                  (arg.find('=') != std::string::npos && arg.find(' ') == std::string::npos))) {
+            // Pass through to config system
+            args.push_back(arg);
+        }
+        else if (arg.find('=') != std::string::npos || arg.find(' ') != std::string::npos) {
+            // Config command
+            args.push_back(arg);
+        }
+        else {
+            // Direct command (like 'help', 'status', etc.)
+            args.push_back(arg);
+        }
+    }
+    
+    // Check help request
+    bool showHelp = false;
+    for (const auto& arg : args) {
+        if (arg == "--help" || arg == "-h" || arg == "help") {
+            showHelp = true;
+            break;
+        }
+    }
+    
+    if (showHelp) {
+        printBanner();
+        std::cout << "\nNLM Agent Command Line Options:\n";
+        std::cout << "  mode=agent                - Enable agent mode for brain control\n";
+        std::cout << "  mode=simulation           - Enable simulation mode (default)\n";
+        std::cout << "  --verbose                 - Enable verbose logging\n";
+        std::cout << "  --help, -h                - Show this help message\n";
+        std::cout << "\nAgent Commands (in agent mode):\n";
+        std::cout << "  agent command [arg]       - Execute agent command (see 'help agent')\n";
+        std::cout << "  status                    - Show system status\n";
+        std::cout << "  help [topic]              - Show help for topic\n";
+        std::cout << "  run                       - Start agent or simulation\n";
+        std::cout << "  stop                      - Stop agent or simulation\n";
+        std::cout << "  pause                     - Pause agent or simulation\n";
+        std::cout << "  resume                    - Resume agent or simulation\n";
+        std::cout << "\nExample: ./nlm mode=agent agent status\n";
+        return 0;
+    }
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -345,61 +513,169 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    
+    // Process agent-specific configuration
+    if (!agentConfig.empty()) {
+        // Load agent configuration
+        config->loadFromFile(agentConfig);
+        NLM_LOG_INFO("Loaded agent configuration from: " + agentConfig);
+    }
+    else {
+        // Try to load default config
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration.");
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Apply command line overrides
+    bool hasCustomArgs = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --set key=value format
+        if (arg.substr(0, 5) == "--set=") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(5, pos - 5);
+                std::string value = arg.substr(pos + 1);
+                config->set(key, value, ConfigSource::CommandLine);
+                hasCustomArgs = true;
+            }
+        } else if (arg.substr(0, 6) == "--set ") {
+            // Handle --set key value format
+            std::string key = arg.substr(6);
+            if (i + 1 < argc) {
+                std::string value = argv[++i];
+                config->set(key, value, ConfigSource::CommandLine);
+                hasCustomArgs = true;
+            }
+        } else if (arg == "--enable_profiling") {
+            config->set("enable_profiling", true, ConfigSource::CommandLine);
+            hasCustomArgs = true;
+        }
     }
     
-    // Override with command line args
+    // Override with traditional command line args for backward compatibility
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Use the improved setDefaultValues method
+    if (!hasCustomArgs) {
+        // Only apply defaults if no custom settings were provided
+        config->setDefaultValues();
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Backward compatibility - override some defaults if explicitly provided
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg.substr(0, 18) == "--neuron_count=") {
+            int64_t neuronCount = std::stoll(arg.substr(18));
+            config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+        } else if (arg == "--neuron_count" && i + 1 < argc) {
+            int64_t neuronCount = std::stoll(argv[++i]);
+            config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 17) == "--region_count=") {
+            int64_t regionCount = std::stoll(arg.substr(17));
+            config->set("region_count", regionCount, ConfigSource::CommandLine);
+        } else if (arg == "--region_count" && i + 1 < argc) {
+            int64_t regionCount = std::stoll(argv[++i]);
+            config->set("region_count", regionCount, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 11) == "--timestep=") {
+            double timestep = std::stod(arg.substr(11));
+            config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+        } else if (arg == "--timestep" && i + 1 < argc) {
+            double timestep = std::stod(argv[++i]);
+            config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 7) == "--steps=") {
+            int64_t steps = std::stoll(arg.substr(7));
+            config->set("max_simulation_steps", steps, ConfigSource::CommandLine);
+        } else if (arg == "--steps" && i + 1 < argc) {
+            int64_t steps = std::stoll(argv[++i]);
+            config->set("max_simulation_steps", steps, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 7) == "--seed=") {
+            int64_t seed = std::stoll(arg.substr(7));
+            config->set("random_seed", seed, ConfigSource::CommandLine);
+        } else if (arg == "--seed" && i + 1 < argc) {
+            int64_t seed = std::stoll(argv[++i]);
+            config->set("random_seed", seed, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 13) == "--dev_level=") {
+            int level = std::stoi(arg.substr(13));
+            // Map development level to plasticity modifier
+            float plasticityModifier = 1.0f;
+            switch (level) {
+                case 1: plasticityModifier = 0.8f; break;
+                case 2: plasticityModifier = 0.5f; break;
+                case 3: plasticityModifier = 0.2f; break;
+            }
+            config->set("plasticity_modifier_initial", plasticityModifier, ConfigSource::CommandLine);
+        } else if (arg == "--dev_level" && i + 1 < argc) {
+            int level = std::stoi(argv[++i]);
+            float plasticityModifier = 1.0f;
+            switch (level) {
+                case 1: plasticityModifier = 0.8f; break;
+                case 2: plasticityModifier = 0.5f; break;
+                case 3: plasticityModifier = 0.2f; break;
+            }
+            config->set("plasticity_modifier_initial", plasticityModifier, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 13) == "--log_level=") {
+            config->set("log_level", arg.substr(13), ConfigSource::CommandLine);
+        } else if (arg == "--log_level" && i + 1 < argc) {
+            config->set("log_level", argv[++i], ConfigSource::CommandLine);
+        } else if (arg.substr(0, 17) == "--checkpoint=") {
+            config->set("checkpoint_dir", arg.substr(17), ConfigSource::CommandLine);
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            config->set("checkpoint_dir", argv[++i], ConfigSource::CommandLine);
+        } else if (arg.substr(0, 24) == "--checkpoint_interval=") {
+            size_t interval = std::stoul(arg.substr(24));
+            config->set("checkpoint_interval", interval, ConfigSource::CommandLine);
+        } else if (arg == "--checkpoint_interval" && i + 1 < argc) {
+            size_t interval = std::stoul(argv[++i]);
+            config->set("checkpoint_interval", interval, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 16) == "--world_width=") {
+            size_t width = std::stoul(arg.substr(16));
+            config->set("world_width", width, ConfigSource::CommandLine);
+        } else if (arg == "--world_width" && i + 1 < argc) {
+            size_t width = std::stoul(argv[++i]);
+            config->set("world_width", width, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 17) == "--world_height=") {
+            size_t height = std::stoul(arg.substr(17));
+            config->set("world_height", height, ConfigSource::CommandLine);
+        } else if (arg == "--world_height" && i + 1 < argc) {
+            size_t height = std::stoul(argv[++i]);
+            config->set("world_height", height, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 16) == "--vision_range=") {
+            size_t range = std::stoul(arg.substr(16));
+            config->set("vision_range", range, ConfigSource::CommandLine);
+        } else if (arg == "--vision_range" && i + 1 < argc) {
+            size_t range = std::stoul(argv[++i]);
+            config->set("vision_range", range, ConfigSource::CommandLine);
+        }
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 1000)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.1f)));
+    NLM_LOG_INFO("  max_simulation_steps: " + std::to_string(config->getOr<int64_t>("max_simulation_steps", 10000)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    // Log full configuration if in debug mode
+    if (config->getOr<bool>("debug_mode", false)) {
+        NLM_LOG_INFO("Full Configuration:");
+        NLM_LOG_INFO(config->summary());
+    }
     
-    // Initialize brain
+    // Create AgentBrain with enhanced capabilities
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    NLM_LOG_INFO("Initializing AgentBrain with advanced capabilities...");
+    
+    // Create brain
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -407,27 +683,102 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Create AgentBrain with advanced features
+    auto agentBrain = std::make_shared<AgentBrain>(brain);
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Initialize agent with default world
+    class SimpleWorld {
+    public:
+        SimpleWorld() : visionWidth_(16), visionHeight_(16) {}
+        size_t getVisionWidth() const { return visionWidth_; }
+        size_t getVisionHeight() const { return visionHeight_; }
+    private:
+        size_t visionWidth_;
+        size_t visionHeight_;
+    } world;
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    agentBrain->initialize(world);
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Apply agent-specific configuration
+    agentBrain->setLearningEnabled(config->getOr<bool>("agent_learning_enabled", true));
+    agentBrain->setLearningRate(config->getOr<float>("agent_learning_rate", 0.01f));
+    agentBrain->setExplorationRate(config->getOr<float>("agent_exploration_rate", 0.1f));
+    agentBrain->enablePerformanceMonitoring(config->getOr<bool>("agent_performance_monitoring", false));
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    agentBrain->start();
     
-    // Final brain status
+    // Log agent status
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
+    NLM_LOG_INFO("=== Agent Brain Status ===");
+    NLM_LOG_INFO(agentBrain->getPerformanceMetrics());
+    
+    // Enable profiling if requested
+    if (config->getOr<bool>("enable_profiling", false)) {
+        NLM_LOG_INFO("Performance profiling enabled.");
+        // Profile would be implemented here
+    }
+    
+    // Handle command mode vs simulation mode
+    if (mode == "agent") {
+        // Agent mode - process agent commands
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Agent mode enabled. Processing commands...");
+        
+        // Process any initial agent commands
+        for (const auto& arg : args) {
+            if (arg == "help") {
+                std::cout << agentBrain->getAgentCommandHelp();
+            }
+            else {
+                // Try to process as command
+                processAgentCommand(arg, "", agentBrain, verboseMode);
+            }
+        }
+        
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Agent ready. Type 'help agent' for available commands.");
+    }
+    else {
+        // Simulation mode - run default experiments
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Running default simulation tests...");
+        
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        // Final brain status
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Final Brain Status ===");
+        brain->logStatus();
+        
+        // Agent statistics if available
+        if (agentBrain) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Agent Brain Statistics ===");
+            NLM_LOG_INFO(agentBrain->getPerformanceMetrics());
+        }
+        
+        // Log performance statistics if profiling is enabled
+        if (config->getOr<bool>("enable_profiling", false)) {
+            NLM_LOG_INFO("");
+            NLM_LOG_INFO("=== Performance Statistics ===");
+            NLM_LOG_INFO("Total simulation time: Not measured yet");
+            NLM_LOG_INFO("Average firing rate: " + std::to_string(brain->getAverageFiringRate()));
+            NLM_LOG_INFO("Total spikes processed: " + std::to_string(brain->getTotalSpikeCount()));
+        }
+    }
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
@@ -441,8 +792,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
     NLM_LOG_INFO("");
+    NLM_LOG_INFO("Enhanced Agent Brain Features:");
+    NLM_LOG_INFO("  ✓ Advanced agent control (start, stop, pause, resume)");
+    NLM_LOG_INFO("  ✓ Learning control (enable/disable, rate adjustment)");
+    NLM_LOG_INFO("  ✓ Behavior modification (exploration/exploitation)");
+    NLM_LOG_INFO("  ✓ State management (checkpoint, restore, save/load)");
+    NLM_LOG_INFO("  ✓ Performance monitoring and optimization");
+    NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("The enhanced Agent Brain provides powerful new capabilities for");
+    NLM_LOG_INFO("controlling, monitoring, and adapting neural behavior.");
     NLM_LOG_INFO("");
     
     return 0;

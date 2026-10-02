@@ -74,6 +74,114 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Enhanced memory capabilities for integration
+
+    // Memory indexing and caching for O(log n) access
+    void indexMemory(const std::vector<float>& pattern, SimulationStep timestamp,
+                    float importance, float novelty = 0.0f);
+    std::vector<size_t> searchSimilar(const std::vector<float>& pattern, 
+                                     size_t maxResults = 10) const;
+
+    // Memory compression and storage efficiency
+    std::vector<float> compressMemory(const std::vector<float>& pattern) const;
+    bool cacheMemory(size_t index, bool highPriority = false);
+
+    // Memory lifecycle management
+    void createMemoryTrace(const std::vector<float>& pattern, float initialImportance = 1.0f);
+    void consolidate(float relevanceThreshold);
+    void decay(float decayRate, float minImportance);
+
+    // Memory interaction with neural plasticity
+    void enhanceWithPlasticity(float plasticityFactor);
+    void adaptToEnvironment(const std::vector<float>& environmentalFactors);
+
+    // Memory coordination and arbitration
+    void coordinateAccess(MemorySystemType type, const std::vector<float>& pattern,
+                         AccessType accessType = AccessType::Read);
+    void adjustPriority(const std::vector<float>& pattern, float priorityDelta);
+
+    // Enhanced capabilities for learning
+    void replay(const std::vector<float>& pattern, size_t repetitions = 5);
+    void strengthenAssociations(const std::vector<float>& patternA,
+                               const std::vector<float>& patternB, 
+                               float strengthFactor = 1.0f);
+    void detectInterference(const std::vector<float>& pattern);
+    void resolveInterference(const std::vector<float>& pattern);
+
+    // Performance and efficiency
+    void optimizeAccessPatterns();
+    void optimizeMemoryLayout();
+    size_t getTotalMemoryUsage() const;
+    double getAverageAccessTime() const;
+
+    // Statistics and monitoring
+    struct MemoryStats {
+        size_t activeTraces;
+        size_t cachedMemories;
+        float averageImportance;
+        size_t compressionRatio;
+        float interferenceLevel;
+        float plasticityInfluence;
+    };
+    
+    MemoryStats getStats() const;
+
+    // Configuration and control
+    void setMemoryConfig(const MemoryConfig& config);
+    MemoryConfig getMemoryConfig() const { return config_; }
+    void enableCompression(bool enable) { config_.enableCompression = enable; }
+    void enableCaching(bool enable) { config_.enableCaching = enable; }
+    void enableReconstruction(bool enable) { config_.enableReconstruction = enable; }
+
+    // Memory system coordination
+    void registerCoordinator(MemoryCoordinator* coordinator) { coordinator_ = coordinator; }
+    void setMemoryPool(MemoryPool<NeuronState>* pool) { memoryPool_ = pool; }
+
+    // Auto-tuning
+    void autoTune(float performanceThreshold);
+    void analyzePerformance();
+    float getPerformanceScore() const;
+
+private:
+    // Internal implementation details
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+
+    Brain* brain_;
+    size_t capacity_;
+    float decayRate_;
+    
+    // Memory content
+    std::vector<NeuronId> memoryNeurons_;
+    std::vector<float> memoryActivations_;
+    std::vector<SimulationStep> memoryTimestamps_;
+    
+    // Active memory traces
+    std::vector<size_t> activeTraces_;
+    
+    // Recurrent connections for maintenance
+    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    
+    // Winner neurons (for competition)
+    std::vector<NeuronId> winners_;
+    
+    // Enhanced memory system components
+    MemoryCoordinator* coordinator_;
+    MemoryPool<NeuronState>* memoryPool_;
+    std::vector<std::vector<float>> indexedPatterns_;
+    std::vector<MemoryIndexEntry> index_;
+    std::unordered_map<size_t, std::vector<float>> cache_;
+    std::unordered_set<size_t> highPriorityCache_;
+    
+    // Performance metrics
+    mutable std::atomic<size_t> accessCount_;
+    mutable std::atomic<double> totalAccessTime_;
+    mutable std::atomic<size_t> compressionCount_;
+    mutable std::atomic<float> averageImportance_;
+    
+    // Configuration
+    MemoryConfig config_;
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
