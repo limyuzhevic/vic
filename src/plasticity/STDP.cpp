@@ -59,22 +59,68 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+    if (preSpikes.size() <= postSpikes.size()) {
+        // For each pre spike, find all post spikes that occur after it
+        for (Timestamp preTime : preSpikes) {
+            // Find first post spike that occurs after this pre spike
+            auto postIt = std::upper_bound(postSpikes.begin(), postSpikes.end(), preTime);
+            // Process all subsequent post spikes
+            for (; postIt != postSpikes.end(); ++postIt) {
+                float dt = static_cast<float>(*postIt - preTime);  // Δt in ms
+                if (dt > 0) {
+                    // Pre before post: POTENTIATION
+                    // "Cells that fire together, wire together" - but only if pre fires before post
+                    float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                    totalDelta += delta;
+                }
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+        }
+        
+        // For post-before-pre depression (post fires before pre)
+        for (Timestamp postTime : postSpikes) {
+            // Find last pre spike that occurs before this post spike
+            auto preIt = std::lower_bound(preSpikes.begin(), preSpikes.end(), postTime);
+            // If there was a pre spike, check if any occurred before this post spike
+            if (preIt != preSpikes.begin()) {
+                --preIt;  // Go to the last pre spike before this post spike
+                float dt = static_cast<float>(postTime - *preIt);  // Δt = postTime - preTime (positive since preIt < postTime)
+                if (dt > 0) {
+                    // Post before pre: DEPRESSION
+                    // "Anti-Hebbian" - connection weakens if post fires without pre
+                    float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is positive, so this subtracts
+                    totalDelta += delta;
+                }
+            }
+        }
+    } else {
+        // PreSpikes is larger, use symmetric approach
+        for (Timestamp postTime : postSpikes) {
+            // Find first pre spike that occurs after this post spike
+            auto preIt = std::upper_bound(preSpikes.begin(), preSpikes.end(), postTime);
+            // Process all subsequent pre spikes
+            for (; preIt != preSpikes.end(); ++preIt) {
+                float dt = static_cast<float>(*preIt - postTime);  // Δt in ms (pre after post)
+                if (dt > 0) {
+                    // Post before pre: DEPRESSION
+                    float delta = -pImpl->ltdWeight * std::exp(dt / tau);
+                    totalDelta += delta;
+                }
+            }
+        }
+        
+        // For pre-before-post potentiation (pre fires before post)
+        for (Timestamp preTime : preSpikes) {
+            // Find last post spike that occurs before this pre spike
+            auto postIt = std::lower_bound(postSpikes.begin(), postSpikes.end(), preTime);
+            if (postIt != postSpikes.begin()) {
+                --postIt;  // Go to the last post spike before this pre spike
+                float dt = static_cast<float>(preTime - *postIt);  // Δt = preTime - postTime (positive since postIt < preTime)
+                if (dt > 0) {
+                    // Pre before post: POTENTIATION
+                    float delta = pImpl->ltpWeight * std::exp(-dt / tau);
+                    totalDelta += delta;
+                }
+            }
         }
     }
     

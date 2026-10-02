@@ -1,151 +1,171 @@
-cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
+# NLM Project CMake Configuration
+# Build system for Neural Learning Machine (NLM) Project
 
-# C++20 standard
-set(CMAKE_CXX_STANDARD 20)
+cmake_minimum_required(VERSION 3.10)
+project(NLM VERSION 2.0.0 LANGUAGES CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# Project configuration
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+# Compiler optimizations
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+    add_compile_options(-O3 -march=native -fomit-frame-pointer -flto)
+    add_link_options(-flto -Wl,--gc-sections)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+# Include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
+# Source files
+file(GLOB_RECURSE SRC_FILES
+    "src/**/*.cpp"
+    "src/**/*.cc"
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Header files
+file(GLOB_RECURSE HDR_FILES
+    "src/**/*.hpp"
+    "src/**/*.h"
 )
-target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
-)
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+# Create executable
+add_executable(nlm ${SRC_FILES} ${HDR_FILES})
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+# Target properties
+target_compile_definitions(nlm PRIVATE _USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(nlm PUBLIC stdc++)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Testing
-enable_testing()
-add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# Installation
+install(TARGETS nlm
     RUNTIME DESTINATION bin
+    BUNDLE DESTINATION bin
+)
+
+# Documentation
+install(DIRECTORY docs/ DESTINATION share/doc/nlm)
+
+# Configuration files
+install(DIRECTORY configs/ DESTINATION etc/nlm)
+
+# Add tests
+enable_testing()
+
+# Add example targets
+add_executable(nlm_demo examples/nlm_demo.cpp)
+target_link_libraries(nlm_demo nlm)
+
+# Add benchmark target
+add_executable(nlm_benchmark src/benchmark.cpp)
+target_link_libraries(nlm_benchmark nlm)
+
+# Add experiment targets
+add_executable(phase2_experiment src/experiments/Phase2Experiment.cpp)
+target_link_libraries(phase2_experiment nlm)
+
+# Add installation rules for examples
+install(TARGETS nlm_demo nlm_benchmark phase2_experiment
+    RUNTIME DESTINATION bin/examples
+)
+
+# Installation for headers
+install(DIRECTORY include/nlm DESTINATION include/nlm)
+
+# Build options
+option(BUILD_EXAMPLES "Build example programs" ON)
+option(BUILD_BENCHMARKS "Build benchmarks" ON)
+option(BUILD_TESTS "Build tests" ON)
+option(ENABLE_PERFORMANCE_MONITORING "Enable performance monitoring" ON)
+option(ENABLE_VECTORIZATION "Enable compiler vectorization" ON)
+option(ENABLE_MEMORY_POOLING "Enable memory pooling optimizations" ON)
+
+# Performance optimizations
+if(ENABLE_VECTORIZATION)
+    target_compile_options(nlm PRIVATE -march=native -O3)
+endif()
+
+if(ENABLE_MEMORY_POOLING)
+    target_compile_definitions(nlm PRIVATE NLM_ENABLE_MEMORY_POOLING)
+endif()
+
+if(ENABLE_PERFORMANCE_MONITORING)
+    target_compile_definitions(nlm PRIVATE NLM_PERFORMANCE_MONITORING)
+endif()
+
+# Target-specific optimizations
+add_custom_target(performance_optimize
+    COMMAND ${CMAKE_COMMAND} -E echo "Optimizing build for performance..."
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+# Test target
+add_test(NAME nlm_basic
+    COMMAND nlm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Custom targets for different build types
+add_custom_target(debug
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Building in Debug mode"
+)
+
+add_custom_target(release
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Building in Release mode"
+)
+
+add_custom_target(optimize
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release -DENABLE_VECTORIZATION=ON -DENABLE_MEMORY_POOLING=ON ..
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Building with maximum optimizations"
+)
+
+# Summary message
+message(STATUS "NLM Project Configuration:")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Examples: ${BUILD_EXAMPLES}")
+message(STATUS "  Benchmarks: ${BUILD_BENCHMARKS}")
+message(STATUS "  Tests: ${BUILD_TESTS}")
+message(STATUS "  Performance Monitoring: ${ENABLE_PERFORMANCE_MONITORING}")
+message(STATUS "  Vectorization: ${ENABLE_VECTORIZATION}")
+message(STATUS "  Memory Pooling: ${ENABLE_MEMORY_POOLING}")
+
+# Export configuration
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm_config.cmake
+    @ONLY
+)
+
+# Package configuration
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/nlmConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(EXPORT nlmTargets
+    FILE nlmConfig.cmake
+    NAMESPACE nlm::
+    DESTINATION lib/cmake/nlm
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/nlmConfigVersion.cmake
+    DESTINATION lib/cmake/nlm
 )

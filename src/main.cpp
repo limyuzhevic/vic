@@ -28,7 +28,10 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printBanner();
+void printHelp();
+
+int main(int argc, char** argv);
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -326,10 +329,15 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with error handling
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
+    
+    if (!logger) {
+        std::cerr << "FATAL: Failed to initialize logger!" << std::endl;
+        return 1;
+    }
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
@@ -340,8 +348,13 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with error handling
     auto config = std::make_shared<Config>();
+    
+    if (!config) {
+        NLM_LOG_ERROR("FATAL: Failed to allocate configuration!");
+        return 1;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -363,33 +376,151 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Parse command line arguments for enhanced configuration
+    std::map<std::string, std::string> cliArgs;
+    std::vector<std::string> unknownArgs;
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 2) == "--") {
+            // Argument with optional value (format: --key or --key=value)
+            size_t equalsPos = arg.find('=');
+            if (equalsPos != std::string::npos) {
+                std::string key = arg.substr(2, equalsPos - 2);
+                std::string value = arg.substr(equalsPos + 1);
+                cliArgs[key] = value;
+            } else {
+                cliArgs[arg.substr(2)] = "true";  // Flag argument
+            }
+        } else {
+            unknownArgs.push_back(arg);
+        }
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Display help if requested
+    if (cliArgs.find("help") != cliArgs.end() || cliArgs.find("h") != cliArgs.end()) {
+        printHelp();
+        return 0;
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Apply command-line overrides
+    for (const auto& pair : cliArgs) {
+        const std::string& key = pair.first;
+        const std::string& value = pair.second;
+        
+        try {
+            if (key == "neuron_count") {
+                config->set(key, std::stoll(value), ConfigSource::CommandLine);
+            } else if (key == "region_count") {
+                config->set(key, std::stoll(value), ConfigSource::CommandLine);
+            } else if (key == "connection_probability") {
+                config->set(key, std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "random_seed") {
+                config->set(key, std::stoll(value), ConfigSource::CommandLine);
+            } else if (key == "simulation_timestep") {
+                config->set(key, std::stod(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_ltp_weight") {
+                config->set(key, std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_ltd_weight") {
+                config->set(key, std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_tau") {
+                config->set(key, std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "synaptogenesis_rate") {
+                config->set(key, std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "pruning_rate") {
+                config->set(key, std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "log_level") {
+                // Parse log level
+                std::string level = value;
+                std::transform(level.begin(), level.end(), level.begin(), ::tolower);
+                if (level == "debug") config->set(key, LogLevel::Debug, ConfigSource::CommandLine);
+                else if (level == "info") config->set(key, LogLevel::Info, ConfigSource::CommandLine);
+                else if (level == "warning") config->set(key, LogLevel::Warning, ConfigSource::CommandLine);
+                else if (level == "error") config->set(key, LogLevel::Error, ConfigSource::CommandLine);
+                else if (level == "critical") config->set(key, LogLevel::Critical, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Unknown command-line argument: " + key);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to parse argument " + key + ": " + std::string(e.what()));
+        }
+    }
+    
+void printHelp() {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                               NLM Help                                     ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+Usage: ./nlm [options]
+
+Options:
+  --help, -h                    Show this help message
+  --config=file                Load configuration from file
+  --neuron_count=N             Set number of neurons (default: 1000)
+  --region_count=N              Set number of brain regions (default: 1)
+  --connection_probability=N    Set synaptic connection probability (default: 0.1)
+  --random_seed=N               Set random seed for reproducibility (default: 42)
+  --simulation_timestep=N       Set simulation timestep in seconds (default: 0.001)
+  --stdp_ltp_weight=N           Set STDP LTP weight (default: 0.01)
+  --stdp_ltd_weight=N            Set STDP LTD weight (default: 0.012)
+  --stdp_tau=N                  Set STDP time constant (default: 20.0)
+  --synaptogenesis_rate=N       Set synaptic creation rate (default: 0.0001)
+  --pruning_rate=N              Set synaptic pruning rate (default: 0.00001)
+  --log_level=LEVEL             Set log level: debug, info, warning, error, critical
+
+Examples:
+  ./nlm --neuron_count=5000 --region_count=3 --connection_probability=0.2
+  ./nlm --stdp_ltp_weight=0.015 --stdp_tau=30.0 --config=my_config.cfg
+  ./nlm --log_level=debug --random_seed=12345
+
+Configuration files:
+  configs/default.cfg              Default configuration
+  configs/performance.cfg          Performance-optimized settings
+  configs/learning.cfg             Learning-focused settings
+
+For more information, visit: https://github.com/nlmlab/nlm
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+
+Phase 2: Real Neural Computation with:
+  • Leaky Integrate-and-Fire (LIF) neurons
+  • Event-driven spike propagation with delays
+  • STDP and Hebbian plasticity rules
+  • Structural plasticity (synaptogenesis/pruning)
+  • Neuromodulation (dopamine, curiosity, novelty)
+═══════════════════════════════════════════════════════════════════════════════════════════════
+
+Enter simulation parameters above, or press Ctrl+C to exit.
+  )" << std::endl;
+}
+    
+    // Configure performance monitoring
+    config->set("performance_monitor", true, ConfigSource::Default);
+    config->set("performance_log_interval", 100, ConfigSource::Default);  // Log every 100 steps
+    config->set("memory_usage_report", true, ConfigSource::Default);
+    config->set("cpu_usage_report", true, ConfigSource::Default);
+    
+    // Performance optimization settings
+    config->set("use_optimized_stdp", true, ConfigSource::Default);
+    config->set("enable_vectorization", true, ConfigSource::Default);
+    config->set("use_memory_pooling", true, ConfigSource::Default);
+    config->set("enable_async_processing", false, ConfigSource::Default);  // Start with false for stability
+    
+    // Advanced performance tuning
+    config->set("max_memory_usage_mb", 1024.0f, ConfigSource::Default);
+    config->set("max_cpu_usage_percent", 50.0f, ConfigSource::Default);
+    config->set("target_fps", 60.0f, ConfigSource::Default);
+    config->set("enable_performance_profiling", true, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", nlm::DefaultConfig::RANDOM_SEED)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", nlm::DefaultConfig::SIMULATION_TIMESTEP)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", nlm::DefaultConfig::NEURON_COUNT)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", nlm::DefaultConfig::REGION_COUNT)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", nlm::DefaultConfig::CONNECTION_PROBABILITY)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -401,6 +532,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain) {
+        NLM_LOG_ERROR("FATAL: Failed to allocate brain!");
+        return 1;
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
@@ -446,4 +582,54 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Help function
+void printHelp() {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                               NLM Help                                     ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+Usage: ./nlm [options]
+
+Options:
+  --help, -h                    Show this help message
+  --config=file                Load configuration from file
+  --neuron_count=N             Set number of neurons (default: 1000)
+  --region_count=N              Set number of brain regions (default: 1)
+  --connection_probability=N    Set synaptic connection probability (default: 0.1)
+  --random_seed=N               Set random seed for reproducibility (default: 42)
+  --simulation_timestep=N       Set simulation timestep in seconds (default: 0.001)
+  --stdp_ltp_weight=N           Set STDP LTP weight (default: 0.01)
+  --stdp_ltd_weight=N            Set STDP LTD weight (default: 0.012)
+  --stdp_tau=N                  Set STDP time constant (default: 20.0)
+  --synaptogenesis_rate=N       Set synaptic creation rate (default: 0.0001)
+  --pruning_rate=N              Set synaptic pruning rate (default: 0.00001)
+  --log_level=LEVEL             Set log level: debug, info, warning, error, critical
+
+Examples:
+  ./nlm --neuron_count=5000 --region_count=3 --connection_probability=0.2
+  ./nlm --stdp_ltp_weight=0.015 --stdp_tau=30.0 --config=my_config.cfg
+  ./nlm --log_level=debug --random_seed=12345
+
+Configuration files:
+  configs/default.cfg              Default configuration
+  configs/performance.cfg          Performance-optimized settings
+  configs/learning.cfg             Learning-focused settings
+
+For more information, visit: https://github.com/nlmlab/nlm
+
+═══════════════════════════════════════════════════════════════════════════════════════════════
+
+Phase 2: Real Neural Computation with:
+  • Leaky Integrate-and-Fire (LIF) neurons
+  • Event-driven spike propagation with delays
+  • STDP and Hebbian plasticity rules
+  • Structural plasticity (synaptogenesis/pruning)
+  • Neuromodulation (dopamine, curiosity, novelty)
+═══════════════════════════════════════════════════════════════════════════════════════════════
+
+Enter simulation parameters above, or press Ctrl+C to exit.
+  )" << std::endl;
 }

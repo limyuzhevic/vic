@@ -207,11 +207,11 @@ private:
         config->set("connection_probability", 0.1f);
         config->set("random_seed", 42u);
         config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+        config->set("stdp_ltp_weight", nlm::DefaultConfig::STDP_LTP_WEIGHT);
+        config->set("stdp_ltd_weight", nlm::DefaultConfig::STDP_LTD_WEIGHT);
+        config->set("stdp_tau", nlm::DefaultConfig::STDP_TIME_CONSTANT);
+        config->set("synaptogenesis_rate", nlm::DefaultConfig::SYNAPTOGENESIS_RATE);
+        config->set("pruning_rate", nlm::DefaultConfig::PRUNING_RATE);
     }
     
     const char* motorCommandToString(MotorCommand cmd) {

@@ -22,11 +22,140 @@
 
 namespace nlm {
 
+// Performance monitoring system
+struct PerformanceMonitor {
+    PerformanceMonitor() : startTime(std::chrono::high_resolution_clock::now()), 
+                          stepsCompleted(0), totalSpikeCount(0), 
+                          lastSpikeCount(0), maxFiringRate(0.0f), 
+                          averageFiringRate(0.0f), neuronsActive(0), 
+                          totalMemoryUsage(0.0f), cpuUsage(0.0f) {}
+    
+    void update() {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime);
+        double seconds = duration.count() / 1000.0;
+        
+        if (seconds > 0) {
+            stepsCompleted = getTotalStepCount();
+            totalSpikeCount = getTotalSpikeCount();
+            
+            // Calculate firing rate (spikes per second)
+            float firingRate = static_cast<float>(totalSpikeCount) / seconds;
+            averageFiringRate = (averageFiringRate * 0.9f) + (firingRate * 0.1f);  // Smooth average
+            maxFiringRate = std::max(maxFiringRate, firingRate);
+            
+            neuronsActive = getActiveNeuronCount();
+            
+            // Estimate memory usage (approximate)
+            totalMemoryUsage = estimateMemoryUsage();
+            
+            // Estimate CPU usage (approximate)
+            cpuUsage = estimateCpuUsage(seconds);
+        }
+    }
+    
+    double getUptimeSeconds() const {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime);
+        return duration.count() / 1000.0;
+    }
+    
+    double getStepsPerSecond() const {
+        double uptime = getUptimeSeconds();
+        return uptime > 0 ? stepsCompleted / uptime : 0.0;
+    }
+    
+    double getSpikesPerSecond() const {
+        double uptime = getUptimeSeconds();
+        return uptime > 0 ? totalSpikeCount / uptime : 0.0;
+    }
+    
+    double getMemoryUsageMB() const {
+        return totalMemoryUsage / (1024.0 * 1024.0);  // Convert to MB
+    }
+    
+    void logPerformance(const std::string& label) const {
+        double uptime = getUptimeSeconds();
+        double stepsPerSec = getStepsPerSecond();
+        double spikesPerSec = getSpikesPerSecond();
+        
+        NLM_LOG_INFO("[" + label + "] Performance:");
+        NLM_LOG_INFO("  Uptime: " + std::to_string(uptime) + "s");
+        NLM_LOG_INFO("  Steps/sec: " + std::to_string(stepsPerSec));
+        NLM_LOG_INFO("  Spikes/sec: " + std::to_string(spikesPerSec));
+        NLM_LOG_INFO("  Average firing rate: " + std::to_string(averageFiringRate) + " Hz");
+        NLM_LOG_INFO("  Max firing rate: " + std::to_string(maxFiringRate) + " Hz");
+        NLM_LOG_INFO("  Active neurons: " + std::to_string(neuronsActive));
+        NLM_LOG_INFO("  Memory usage: " + std::to_string(getMemoryUsageMB()) + " MB");
+        NLM_LOG_INFO("  CPU usage: " + std::to_string(cpuUsage * 100.0f) + "%");
+    }
+    
+private:
+    double estimateMemoryUsage() const {
+        // Estimate memory usage based on brain components
+        double memory = 0.0;
+        memory += sizeof(std::vector<std::unique_ptr<NeuralRegion>>) * pImpl->regions.capacity();
+        memory += sizeof(std::vector<InterRegionConnection>) * pImpl->interRegionConnections.capacity();
+        
+        for (const auto& region : pImpl->regions) {
+            memory += region->getMemoryUsage();
+        }
+        
+        return memory;
+    }
+    
+    double estimateCpuUsage(double uptime) const {
+        // Simplified CPU usage estimation
+        // In a real implementation, this would use system CPU metrics
+        static double lastCpuUsage = 0.0;
+        static double lastUptime = 0.0;
+        
+        if (uptime > 0) {
+            double cpuUsageDelta = (totalSpikeCount - lastSpikeCount) * 0.001f / (uptime - lastUptime);
+            cpuUsage = 0.7 * cpuUsage + 0.3 * cpuUsageDelta;
+            lastCpuUsage = cpuUsage;
+            lastUptime = uptime;
+        }
+        
+        return std::min(cpuUsage, 1.0f);  // Cap at 100%
+    }
+    
+    size_t getTotalStepCount() const {
+        return pImpl->currentStep;
+    }
+    
+    size_t getTotalSpikeCount() const {
+        return pImpl->totalSpikesTotal;
+    }
+    
+    size_t getActiveNeuronCount() const {
+        size_t active = 0;
+        for (const auto& region : pImpl->regions) {
+            active += region->getActiveNeuronCount();
+        }
+        return active;
+    }
+    
+    std::chrono::high_resolution_clock::time_point startTime;
+    size_t stepsCompleted;
+    size_t totalSpikeCount;
+    size_t lastSpikeCount;
+    float maxFiringRate;
+    float averageFiringRate;
+    size_t neuronsActive;
+    float totalMemoryUsage;
+    float cpuUsage;
+};
+
+// Add performance monitoring to Brain Impl
 struct Brain::Impl {
     std::shared_ptr<Config> config;
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Performance monitoring
+    PerformanceMonitor performanceMonitor;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -91,7 +220,8 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps)
+    {
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -131,14 +261,14 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", nlm::DefaultConfig::STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", nlm::DefaultConfig::STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", nlm::DefaultConfig::STDP_TIME_CONSTANT);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", nlm::DefaultConfig::SYNAPTOGENESIS_RATE);
+        float pruningRate = config->getOr<float>("pruning_rate", nlm::DefaultConfig::PRUNING_RATE);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
@@ -1077,41 +1207,9 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
-    }
-    
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
-    }
-    
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
-    }
+    // Performance monitoring
+    pImpl->performanceMonitor.update();
+    pImpl->performanceMonitor.logPerformance("brain_status");
 }
 
 } // namespace nlm

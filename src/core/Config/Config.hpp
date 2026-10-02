@@ -43,6 +43,33 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Default configuration constants
+namespace DefaultConfig {
+    constexpr float STDP_LTP_WEIGHT = 0.01f;
+    constexpr float STDP_LTD_WEIGHT = 0.012f;
+    constexpr float STDP_TIME_CONSTANT = 20.0f;
+    constexpr float SYNAPTOGENESIS_RATE = 0.0001f;
+    constexpr float PRUNING_RATE = 0.00001f;
+    constexpr float SIMULATION_TIMESTEP = 0.001f;
+    constexpr float NEURON_COUNT = 1000.0f;
+    constexpr float REGION_COUNT = 1.0f;
+    constexpr float CONNECTION_PROBABILITY = 0.1f;
+    constexpr uint64_t RANDOM_SEED = 42;
+    constexpr size_t VISUALIZATION_WIDTH = 256;
+    constexpr size_t VISUALIZATION_HEIGHT = 256;
+    constexpr float NEURON_RESTING_POTENTIAL = -70.0f;
+    constexpr float NEURON_THRESHOLD = -55.0f;
+    constexpr float MAX_SPIKE_HISTORY = 100;
+    constexpr float TIME_CONSTANT = 20.0f;
+    constexpr float MEMBRANE_CAPACITANCE = 1.0f;
+    constexpr float ADAPTATION_DECAY = 0.95f;
+    constexpr float ADAPTATION_INCREMENT = 1.0f;
+    constexpr float REFRACTORY_PERIOD_MIN = 2;
+    constexpr float REFRACTORY_PERIOD_MAX = 10;
+    constexpr float ADAPTATION_STRENGTH = 0.01f;
+    constexpr float ADAPTATION_RATE = 0.95f;
+}
+
 // Main configuration class
 class Config {
 public:

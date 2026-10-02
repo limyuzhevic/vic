@@ -28,10 +28,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("stdp_ltp_weight", nlm::DefaultConfig::STDP_LTP_WEIGHT);
+    cfg->set("stdp_ltd_weight", nlm::DefaultConfig::STDP_LTD_WEIGHT);
+    cfg->set("synaptogenesis_rate", nlm::DefaultConfig::SYNAPTOGENESIS_RATE);
+    cfg->set("pruning_rate", nlm::DefaultConfig::PRUNING_RATE);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);

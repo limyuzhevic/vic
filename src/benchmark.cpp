@@ -37,8 +37,8 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.1f, ConfigSource::Default);
-    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", nlm::DefaultConfig::STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set("stdp_ltd_weight", nlm::DefaultConfig::STDP_LTD_WEIGHT, ConfigSource::Default);
     
     // Create brain
     auto brain = std::make_shared<Brain>(config);
