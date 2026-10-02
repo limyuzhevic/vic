@@ -400,22 +400,47 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    // Enhanced createBrain with better error checking
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+        if (!config) {
+            throw std::runtime_error("Configuration cannot be null");
+        }
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, py::arg("config"), "Create and initialize a new brain with configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Enhanced createSimpleWorld with configuration
+    m.def("createSimpleWorld", [](size_t width, size_t height, 
+                                 size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        if (width > 0 && height > 0) {
+            world->configure(width, height, visionWidth, visionHeight);
+        }
+        return world;
+    }, py::arg("width") = 0, py::arg("height") = 0,
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create a new simple world with optional dimensions");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Enhanced createAgentBrain with validation
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::runtime_error("Brain cannot be null");
+        }
+        auto agent = std::make_shared<AgentBrain>(brain);
+        if (world) {
+            agent->initialize(world);
+        }
+        return agent;
+    }, py::arg("brain"), py::arg("world") = nullptr,
+       "Create an agent brain interface with optional world initialization");
 
+    // Version attribute (defined below)
+    m.attr("__version__") = "0.1.0";
+
+    // Invalid constants (defined below)
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
