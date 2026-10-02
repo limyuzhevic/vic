@@ -1,11 +1,12 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Enhanced Multi-Phase Neural Computation System
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase provides comprehensive neural simulation with:
+// - Multi-phase support (Phase 2-6)
+// - Enhanced command-line interface
+// - Advanced debugging and monitoring
+// - Improved configuration management
+// - Better error handling and validation
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -25,27 +26,107 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <unordered_map>
+#include <functional>
 
 using namespace nlm;
 
-void printBanner() {
+// Command-line argument parser
+class CommandLineParser {
+public:
+    struct Options {
+        std::string configFile;
+        std::string phase = "auto"; // "2", "3", "4", "6", or "auto"
+        std::string outputFile;
+        bool verbose = false;
+        bool debug = false;
+        bool help = false;
+        bool version = false;
+        bool listPhases = false;
+        int maxSteps = 0;
+        double timestep = 0.001;
+    };
+
+    static Options parse(int argc, char** argv) {
+        Options options;
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            
+            if (arg == "--help" || arg == "-h") {
+                options.help = true;
+            } else if (arg == "--version") {
+                options.version = true;
+            } else if (arg == "--list-phases") {
+                options.listPhases = true;
+            } else if (arg == "--phase") {
+                if (i + 1 < argc) options.phase = argv[++i];
+            } else if (arg == "--config") {
+                if (i + 1 < argc) options.configFile = argv[++i];
+            } else if (arg == "--output") {
+                if (i + 1 < argc) options.outputFile = argv[++i];
+            } else if (arg == "--verbose") {
+                options.verbose = true;
+            } else if (arg == "--debug") {
+                options.debug = true;
+            } else if (arg == "--max-steps") {
+                if (i + 1 < argc) options.maxSteps = std::stoi(argv[++i]);
+            } else if (arg == "--timestep") {
+                if (i + 1 < argc) options.timestep = std::stod(argv[++i]);
+            } else if (arg.starts_with("--")) {
+                std::cerr << "Unknown option: " << arg << std::endl;
+            }
+        }
+        
+        return options;
+    }
+};
+
+void printBanner(const std::string& phase = "2") {
+    std::string phaseName;
+    if (phase == "2") phaseName = "Phase 2: Real Neural Computation";
+    else if (phase == "3") phaseName = "Phase 3: World Interaction";
+    else if (phase == "4") phaseName = "Phase 4: Advanced Cognition";
+    else if (phase == "6") phaseName = "Phase 6: Final Integration";
+    else phaseName = "Multi-Phase Neural Computation";
+    
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     " << phaseName << "                     ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help              Show this help message" << std::endl;
+    std::cout << "  --version               Show version information" << std::endl;
+    std::cout << "  --list-phases           List available phases" << std::endl;
+    std::cout << "  --phase <phase>         Run specific phase (2, 3, 4, 6)" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file" << std::endl;
+    std::cout << "  --output <file>         Save results to file" << std::endl;
+    std::cout << "  --verbose               Enable verbose logging" << std::endl;
+    std::cout << "  --debug                 Enable debug mode" << std::endl;
+    std::cout << "  --max-steps <n>         Maximum simulation steps (0 = auto)" << std::endl;
+    std::cout << "  --timestep <t>          Simulation timestep (default: 0.001)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Available phases:" << std::endl;
+    std::cout << "  Phase 2: Real neural computation with LIF neurons and plasticity" << std::endl;
+    std::cout << "  Phase 3: World interaction and agent-environment dynamics" << std::endl;
+    std::cout << "  Phase 4: Advanced cognition and decision making" << std::endl;
+    std::cout << "  Phase 6: Final integration of all brain systems" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
