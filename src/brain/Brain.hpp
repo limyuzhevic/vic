@@ -8,10 +8,11 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <optional>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for external dependencies
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -28,6 +29,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SensoryInput;
+class Action;
+class Neuromodulator;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -72,7 +76,7 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -80,14 +84,11 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
-    // Spike system access
-    SpikeSystem* getSpikeSystem();
-    const SpikeSystem* getSpikeSystem() const;
-    
-    // Plasticity system access
-    STDP* getSTDP();
-    Hebbian* getHebbian();
-    StructuralPlasticity* getStructuralPlasticity();
+    // Spike system access (returns shared_ptr for better memory management)
+    std::shared_ptr<SpikeSystem> getSpikeSystem() const;
+    std::shared_ptr<STDP> getSTDP() const;
+    std::shared_ptr<Hebbian> getHebbian() const;
+    std::shared_ptr<StructuralPlasticity> getStructuralPlasticity() const;
     
     // Statistics
     float getExcitationInhibitionRatio() const;
@@ -95,10 +96,10 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -115,10 +116,9 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
+    // Region management with validation
     RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
+    std::shared_ptr<NeuralRegion> getRegion(RegionId id) const;
     size_t getRegionCount() const;
     std::vector<RegionId> getRegionIds() const;
     
@@ -140,62 +140,67 @@ public:
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    std::shared_ptr<NeuralWorkingMemory> getWorkingMemory() const;
     
     // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    std::shared_ptr<NeuralEpisodicMemory> getEpisodicMemory() const;
     
     // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    std::shared_ptr<NeuralAssociativeMemory> getAssociativeMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    std::shared_ptr<PredictionSystem> getPredictionSystem() const;
     
     // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    std::shared_ptr<NeuralPlanner> getPlanner() const;
     
     // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    std::shared_ptr<ConceptFormation> getConceptFormation() const;
     
     // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    std::shared_ptr<AttentionalSelection> getAttention() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     
-    DevelopmentSystem* getDevelopmentSystem();
+    // Development system for structural changes
+    std::shared_ptr<DevelopmentSystem> getDevelopmentSystem() const;
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    std::shared_ptr<Dopamine> getDopamine() const;
     
     // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    std::shared_ptr<Curiosity> getCuriosity() const;
     
     // Novelty - novelty detection
-    Novelty* getNovelty();
+    std::shared_ptr<Novelty> getNovelty() const;
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    std::shared_ptr<PredictionError> getPredictionErrorSignal() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator
-    RandomGenerator* getRandomGenerator();
+    std::shared_ptr<RandomGenerator> getRandomGenerator() const;
     
     // Logging
     void logStatus() const;
     
+    // Validation and utility methods
+    bool isRegionValid(RegionId id) const;
+    std::optional<float> getRegionExcitationInhibitionRatio(RegionId id) const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

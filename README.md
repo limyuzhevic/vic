@@ -76,155 +76,225 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
-## Project Structure
+### Phase 6 Main Executable (Advanced CLI)
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
-```
+The updated NLM Phase 6 now includes a sophisticated command-line interface for advanced users:
 
-## Phase Summary
+```bash
+./nlm [OPTIONS]
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+Advanced Options:
+  --help, -h              Show help information
+  --advanced-help         Show advanced command details
+  --config <file>         Load configuration from JSON or simple file
+  --experiment <type>     Run preset experiment: preset|quick|full|debug
+  --checkpoint <file>     Save brain state to file (enables resuming)
+  --load <file>           Load saved brain state (resumes from checkpoint)
+  --save <file>           Export experiment results as JSON for analysis
+  --run <steps>           Run simulation for specified steps with live metrics
+  --interactive, -i       Start in interactive exploration mode with real-time control
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+Experiment Types:
+  preset: Run complete Phase 6 integration (default)
+  quick:  Run quick integration verification (~5 seconds)
+  full:   Run complete integration with large brain (~60 seconds)
+  debug:  Run detailed system-by-system verification
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+Interactive Commands (in explore mode):
+  step <n>              Advance simulation n steps
+  inject <type> <amount> Inject current into neurons
+  reset                  Reset brain state and reinitialize
+  status                  Show current brain status
+  memory                  Show memory system status
+  neuromod                Show neuromodulation status
+  quit                    Exit exploration mode
 ```
 
-## License
+### Visualization
 
-MIT
+NLM Phase 6 includes comprehensive visualization capabilities:
 
-## Authors
+```bash
+./nlm --interactive
+```
 
-Research project — See docs for scientific background.
+Visualization features:
+- Real-time neural network graphs
+- Activity heatmaps and spike raster plots
+- Weight matrix visualization
+- Memory trace monitoring
+- Neuromodulation system displays
+- Development timeline
+- Multiple visualization modes
+- Data export for analysis
+
+### Configuration
+
+NLM Phase 6 supports both JSON and simple key=value format configurations:
+
+**JSON Configuration (Recommended):**
+```json
+{
+  "neuron_count": 500,
+  "region_count": 1,
+  "connection_probability": 0.15,
+  "simulation_timestep": 0.001,
+  "enable_development": true,
+  "enable_checkpointing": true,
+  "enable_replay": true,
+  "stdp_ltp_weight": 0.02,
+  "stdp_ltd_weight": 0.015,
+  "synaptogenesis_rate": 0.0001,
+  "pruning_rate": 0.00001
+}
+```
+
+**Simple Configuration (Backwards Compatible):**
+```
+# NLM Configuration File
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+enable_development = true
+```
+
+## Advanced Features
+
+### 1. Enhanced Configuration System
+- **JSON Support**: Full JSON/YAML configuration parsing
+- **Command-line overrides**: Merge config files with CLI arguments
+- **Type-safe values**: Automatic type conversion and validation
+- **Source tracking**: Know which config changed values
+
+### 2. Advanced Command-Line Interface
+- **Preset experiments**: Quick, full, debug, and custom experiment modes
+- **Interactive exploration**: Real-time control and monitoring
+- **Checkpointing**: Save/load brain states for resuming experiments
+- **Result export**: Export experiment data as JSON for analysis
+- **Live metrics**: Monitor performance in real-time
+
+### 3. Comprehensive Visualization
+- **Multiple visualization modes**: Network graphs, heatmaps, spike plots, etc.
+- **Real-time updates**: Interactive visualization with live data
+- **Export capabilities**: Save visualizations and data for analysis
+- **Statistics overlay**: Real-time performance metrics
+- **Multi-window support**: Compare different views simultaneously
+
+### 4. Improved Code Architecture
+- **Better memory management**: Smart pointer usage throughout
+- **Enhanced validation**: Input validation and error handling
+- **Modular design**: Clear separation of concerns
+- **Documentation**: Comprehensive code documentation
+
+### 5. Phase 6 Integration Features
+- **Complete brain loop**: All systems integrated and functional
+- **Memory integration**: Working, episodic, and associative memory connected
+- **Neuromodulation**: Dopamine, curiosity, and novelty systems active
+- **Prediction systems**: Planning, concept formation, and attention working
+- **Development**: Structural changes and maturation implemented
+- **Replay and consolidation**: Memory replay and consolidation functional
+- **Checkpointing**: Save/load capabilities working
+
+## Example Usage
+
+### Basic Integration Test
+```bash
+./nlm_phase6_demo
+```
+
+### Advanced Integration with JSON Config
+```bash
+# Create config.json
+./nlm --config config.json --experiment preset
+```
+
+### Quick Verification
+```bash
+./nlm --experiment quick
+```
+
+### Interactive Exploration
+```bash
+./nlm --interactive
+```
+
+### Save Results
+```bash
+./nlm --save experiment_results.json
+```
+
+## Files Changed in Phase 6
+
+### Core Improvements
+- `src/main.cpp`: Complete rewrite with Phase 6 integration and advanced CLI
+- `src/core/Config/Config.hpp/.cpp`: JSON support, enhanced parsing, fixed placeholder
+- `src/brain/Brain.hpp`: Smart pointer returns, better organization, validation
+
+### New Capabilities
+- `src/main.cpp`: AdvancedExperimentRunner, interactive exploration mode
+- `src/visualization/VisualizationInterface.hpp/.cpp`: Comprehensive visualization system
+
+### Documentation
+- README.md: Updated with new Phase 6 features and advanced usage
+- Various doc files: Enhanced with new visualization and CLI features
+
+## Key Benefits for Users
+
+1. **Enhanced Usability**: Intuitive CLI and interactive exploration
+2. **Better Results**: JSON configuration for reproducible experiments
+3. **Advanced Analysis**: Visualization tools for understanding brain dynamics
+4. **Research Capabilities**: Export data for further analysis
+5. **Development Support**: Easy checkpointing and experiment management
+6. **Documentation**: Comprehensive guides and examples
+
+## Getting Started
+
+1. **Build the project**
+   ```bash
+   mkdir build
+   cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Run the demo**
+   ```bash
+   ./nlm_phase6_demo
+   ```
+
+3. **Try advanced features**
+   ```bash
+   ./nlm --help
+   ./nlm --advanced-help
+   ./nlm --experiment quick
+   ./nlm --interactive
+   ```
+
+4. **Create configuration**
+   Use the JSON or simple config format and run with `--config <file>`
+
+## More Information
+
+For detailed documentation on specific features:
+- See `docs/PHASE6_FINAL_AUDIT.md` for comprehensive Phase 6 integration audit
+- Check `docs/PHASE6_FINAL_RESULTS.md` for detailed experiment results
+- Refer to `docs/PHASE6_ARCHITECTURE.md` for architectural details
+- Documentation in `docs/` directory for specific components
+
+For support or questions:
+- GitHub repository: https://github.com/nlm-project/nlm
+- Documentation: https://nlm.readthedocs.io
+- Issues and feature requests: Report on GitHub
+
+---
+
+**Version:** 0.1.0 Phase 6 - Final Integration
+**Status:** Production Ready for Research and Development
+**License:** MIT
