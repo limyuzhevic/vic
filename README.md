@@ -75,12 +75,37 @@ make -j4
 
 ## Running
 
+### Phase 2 Demo (Basic Neural Computation)
+```bash
+./nlm
+```
+
+### Phase 3 Demo (World Interaction)
+```bash
+./nlm_phase3_demo
+```
+
+### Phase 4 Demo (Emerging Cognition)
+```bash
+./nlm_phase4_demo
+```
+
+### Phase 5 Demo (Lifetime Learning)
+```bash
+./nlm_phase5_demo
+```
+
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Performance Benchmark
+```bash
+./nlm_benchmark
+```
+
+The Phase 6 demo runs a comprehensive integration test verifying that all brain systems are connected and working together. The benchmark measures simulation performance for different network sizes.
 
 ## Project Structure
 
