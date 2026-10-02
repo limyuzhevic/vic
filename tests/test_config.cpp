@@ -2,8 +2,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
-
-namespace test_config {
+#include <functional>
 
 void testConfigCreation() {
     nlm::Config config;
@@ -78,12 +77,115 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Test valid values
+    assert(config.setValidated("neuron_count", 100));
+    assert(config.setValidated("region_count", 1));
+    assert(config.setValidated("connection_probability", 0.5f));
+    assert(config.setValidated("stdp_ltp_weight", 0.02f));
+    assert(config.setValidated("stdp_ltd_weight", -0.015f));
+    assert(config.setValidated("simulation_timestep", 0.001));
+    assert(config.setValidated("random_seed", 42));
+    
+    // Test invalid values
+    assert(!config.setValidated("neuron_count", 0));  // Too small
+    assert(!config.setValidated("neuron_count", 1000001));  // Too large
+    assert(!config.setValidated("region_count", 0));  // Too small
+    assert(!config.setValidated("connection_probability", -0.1f));  // Too small
+    assert(!config.setValidated("connection_probability", 1.1f));  // Too large
+    assert(!config.setValidated("simulation_timestep", 0.0));  // Not positive
+    assert(!config.setValidated("simulation_timestep", -0.001));  // Negative
+    assert(!config.setValidated("random_seed", -1));  // Negative
+    
+    // Test custom validator
+    auto positive_validator = [](int value) { return value > 0; };
+    assert(config.setValidated("test_positive", 10, nlm::ConfigSource::Runtime, positive_validator));
+    assert(!config.setValidated("test_positive", -5, nlm::ConfigSource::Runtime, positive_validator));
+    assert(!config.setValidated("test_positive", 0, nlm::ConfigSource::Runtime, positive_validator));
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
+void testConfigValidationErrors() {
+    nlm::Config config;
+    
+    // Add some invalid values
+    config.set("neuron_count", 0);  // Invalid
+    config.set("connection_probability", 1.5f);  // Invalid
+    config.set("simulation_timestep", -0.001);  // Invalid
+    
+    // Check validation errors
+    auto errors = config.getValidationErrors();
+    assert(errors.size() > 0);  // Should have errors
+    
+    // Check that validate() returns false
+    assert(!config.validate());
+    
+    std::cout << "    testConfigValidationErrors passed" << std::endl;
+}
+
+void testConfigSummary() {
+    nlm::Config config;
+    
+    // Add test values
+    config.set("test_int", 42);
+    config.set("test_string", "test_value");
+    config.set("test_bool", false);
+    
+    // Generate summary
+    std::string summary = config.summary();
+    assert(!summary.empty());
+    assert(summary.find("test_int") != std::string::npos);
+    assert(summary.find("test_string") != std::string::npos);
+    assert(summary.find("test_bool") != std::string::npos);
+    
+    std::cout << "    testConfigSummary passed" << std::endl;
+}
+
+void testConfigValidatorHelpers() {
+    // Test createRangeValidator
+    auto int_validator = nlm::Config::createRangeValidator<int>(1, 10);
+    assert(int_validator(5));
+    assert(int_validator(1));
+    assert(int_validator(10));
+    assert(!int_validator(0));
+    assert(!int_validator(11));
+    
+    auto double_validator = nlm::Config::createRangeValidator<double>(0.0, 1.0);
+    assert(double_validator(0.5));
+    assert(double_validator(0.0));
+    assert(double_validator(1.0));
+    assert(!double_validator(-0.1));
+    assert(!double_validator(1.1));
+    
+    // Test createPositiveValidator
+    auto positive_int_validator = nlm::Config::createPositiveValidator<int>();
+    assert(positive_int_validator(1));
+    assert(positive_int_validator(100));
+    assert(!positive_int_validator(0));
+    assert(!positive_int_validator(-1));
+    
+    auto positive_double_validator = nlm::Config::createPositiveValidator<double>();
+    assert(positive_double_validator(0.001));
+    assert(positive_double_validator(100.0));
+    assert(!positive_double_validator(0.0));
+    assert(!positive_double_validator(-0.001));
+    
+    std::cout << "    testConfigValidatorHelpers passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigValidationErrors();
+    testConfigSummary();
+    testConfigValidatorHelpers();
 }
 
 } // namespace test_config

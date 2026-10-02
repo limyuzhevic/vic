@@ -78,6 +78,12 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Set with validation (returns false if validation fails)
+    template<typename T>
+    bool setValidated(const std::string& key, const T& value, 
+                     ConfigSource source = ConfigSource::Runtime,
+                     const std::function<bool(const T&)>& validator = nullptr);
+    
     // Check existence
     bool has(const std::string& key) const;
     
@@ -92,6 +98,10 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
     
 private:
     struct Impl;

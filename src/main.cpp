@@ -321,14 +321,13 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
+    // Initialize logger with error handling
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    if (!consoleLogger) {
+        std::cerr << "ERROR: Failed to create console logger!" << std::endl;
+        return 1;
+    }
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -340,8 +339,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with better error handling
     auto config = std::make_shared<Config>();
+    if (!config) {
+        NLM_LOG_ERROR("Failed to create configuration object!");
+        return 1;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -359,6 +362,14 @@ int main(int argc, char** argv) {
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        // Validate loaded configuration
+        auto validationErrors = config->getValidationErrors();
+        if (!validationErrors.empty()) {
+            NLM_LOG_WARNING("Configuration validation warnings:");
+            for (const auto& error : validationErrors) {
+                NLM_LOG_WARNING("  - " + error);
+            }
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -392,15 +403,61 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Set default values for Phase 2
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Final configuration validation
+    if (!config->validate()) {
+        auto validationErrors = config->getValidationErrors();
+        NLM_LOG_ERROR("Configuration validation failed:");
+        for (const auto& error : validationErrors) {
+            NLM_LOG_ERROR("  - " + error);
+        }
+        NLM_LOG_ERROR("Exiting due to invalid configuration.");
+        return 1;
+    }
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+    
+    // Initialize simulation clock with error checking
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep));
+        return 1;
+    }
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with comprehensive error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to create brain object!");
+        return 1;
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
@@ -409,19 +466,31 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
+    brain->logStatus();
+    
+    // Run Test 1: Basic connectivity with error handling
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
+    // Reset brain for plasticity experiment with comprehensive error checking
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Resetting brain for plasticity experiment...");
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to reinitialize brain after reset!");
+        return 1;
+    }
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
+    // Reset and run Test 3: STDP verification with error checking
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Resetting brain for STDP verification...");
     brain->reset();
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to reinitialize brain for STDP test!");
+        return 1;
+    }
     runStdpVerification(brain);
     
     // Final brain status
@@ -429,6 +498,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     
+    // Memory cleanup and final logging
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");

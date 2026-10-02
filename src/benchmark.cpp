@@ -110,9 +110,19 @@ int main() {
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with error handling
     auto logger = std::make_shared<Logger>();
+    if (!logger) {
+        std::cerr << "ERROR: Failed to create logger!" << std::endl;
+        return 1;
+    }
+    
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
+    if (!consoleLogger) {
+        std::cerr << "ERROR: Failed to create console logger!" << std::endl;
+        return 1;
+    }
+    
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -129,16 +139,48 @@ int main() {
         {2000, 200},      // 2000 neurons, 200 steps
     };
     
+    size_t successfulBenchmarks = 0;
+    
     for (const auto& [neurons, steps] : benchmarks) {
-        auto result = runBenchmark(neurons, steps);
-        results.push_back(result);
-        std::cout << std::endl;
+        // Validate benchmark parameters
+        if (neurons == 0) {
+            std::cerr << "WARNING: Skipping benchmark with 0 neurons" << std::endl;
+            continue;
+        }
+        
+        if (steps == 0) {
+            std::cerr << "WARNING: Skipping benchmark with 0 steps" << std::endl;
+            continue;
+        }
+        
+        // Run benchmark with error handling
+        try {
+            auto result = runBenchmark(neurons, steps);
+            results.push_back(result);
+            successfulBenchmarks++;
+            std::cout << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Benchmark failed for " << neurons << " neurons, " 
+                      << steps << " steps: " << e.what() << std::endl;
+            // Continue with other benchmarks
+        } catch (...) {
+            std::cerr << "ERROR: Benchmark failed unexpectedly for " << neurons 
+                      << " neurons, " << steps << " steps" << std::endl;
+            // Continue with other benchmarks
+        }
+    }
+    
+    if (results.empty()) {
+        std::cerr << "ERROR: All benchmarks failed!" << std::endl;
+        return 1;
     }
     
     // Print summary
     printBenchmarkResults(results);
     
-    std::cout << "Benchmark complete." << std::endl;
+    std::cout << std::endl;
+    std::cout << "Benchmark complete. Successful benchmarks: " << successfulBenchmarks 
+              << " out of " << benchmarks.size() << std::endl;
     
     return 0;
 }

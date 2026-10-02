@@ -1,4 +1,3 @@
-#include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -186,30 +185,163 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Get configuration summary
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\\\"" << arg << "\\\"";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Configuration validation
+bool Config::validate() const {
+    // Define validation rules for key configuration values
+    std::vector<std::string> errors = getValidationErrors();
+    return errors.empty();
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Validate simulation parameters
+    if (has("neuron_count")) {
+        auto val = get<int64_t>("neuron_count");
+        if (val.has_value()) {
+            if (val.value() < 1) {
+                errors.push_back("neuron_count must be at least 1, got " + std::to_string(val.value()));
+            } else if (val.value() > 1000000) {
+                errors.push_back("neuron_count too large (max 1,000,000), got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+    if (has("region_count")) {
+        auto val = get<int64_t>("region_count");
+        if (val.has_value()) {
+            if (val.value() < 1) {
+                errors.push_back("region_count must be at least 1, got " + std::to_string(val.value()));
+            } else if (val.value() > 1000) {
+                errors.push_back("region_count too large (max 1000), got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto val = get<float>("connection_probability");
+        if (val.has_value()) {
+            if (val.value() < 0.0f) {
+                errors.push_back("connection_probability must be >= 0.0, got " + std::to_string(val.value()));
+            } else if (val.value() > 1.0f) {
+                errors.push_back("connection_probability must be <= 1.0, got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+    // Validate plasticity parameters
+    if (has("stdp_ltp_weight")) {
+        auto val = get<float>("stdp_ltp_weight");
+        if (val.has_value()) {
+            if (std::abs(val.value()) > 1.0f) {
+                errors.push_back("stdp_ltp_weight must be in [-1.0, 1.0], got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+    if (has("stdp_ltd_weight")) {
+        auto val = get<float>("stdp_ltd_weight");
+        if (val.has_value()) {
+            if (std::abs(val.value()) > 1.0f) {
+                errors.push_back("stdp_ltd_weight must be in [-1.0, 1.0], got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+    // Validate simulation parameters
+    if (has("simulation_timestep")) {
+        auto val = get<double>("simulation_timestep");
+        if (val.has_value()) {
+            if (val.value() <= 0.0) {
+                errors.push_back("simulation_timestep must be positive, got " + std::to_string(val.value()));
+            } else if (val.value() > 0.1) {
+                errors.push_back("simulation_timestep too large (max 0.1s), got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+    if (has("random_seed")) {
+        auto val = get<int64_t>("random_seed");
+        if (val.has_value()) {
+            if (val.value() < 0) {
+                errors.push_back("random_seed must be non-negative, got " + std::to_string(val.value()));
+            }
+        }
+    }
+    
+// Set with validation (returns false if validation fails)
+template<typename T>
+bool Config::setValidated(const std::string& key, const T& value,
+                         ConfigSource source,
+                         const std::function<bool(const T&)>& validator) {
+    // Check if validation function is provided
+    if (validator && !validator(value)) {
+        return false;
+    }
+    
+    // Check for known validation errors
+    set(key, ConfigValue(value), source);
+    
+    // Quick validation for common parameters
+    if (key == "neuron_count") {
+        auto val = get<int64_t>(key);
+        if (val.has_value() && (val.value() < 1 || val.value() > 1000000)) {
+            return false;
+        }
+    } else if (key == "connection_probability") {
+        auto val = get<float>(key);
+        if (val.has_value() && (val.value() < 0.0f || val.value() > 1.0f)) {
+            return false;
+        }
+    }
+    
+    return validate();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Helper function to create validator for integer ranges
+template<typename T>
+std::function<bool(const T&)> createRangeValidator(T min, T max) {
+    return [min, max](const T& value) {
+        return value >= min && value <= max;
+    };
+}
+
+// Helper function to create validator for positive values
+template<typename T>
+std::function<bool(const T&)> createPositiveValidator() {
+    return [](const T& value) {
+        return value > 0;
+    };
+}
+
+// Template instantiations for validator helpers
+template std::function<bool(const int&)> createRangeValidator<int>(int, int);
+template std::function<bool(const int64_t&)> createRangeValidator<int64_t>(int64_t, int64_t);
+template std::function<bool(const double&)> createRangeValidator<double>(double, double);
+template std::function<bool(const float&)> createRangeValidator<float>(float, float);
+
+template std::function<bool(const int&)> createPositiveValidator<int>();
+template std::function<bool(const int64_t&)> createPositiveValidator<int64_t>();
+template std::function<bool(const double&)> createPositiveValidator<double>();
+template std::function<bool(const float&)> createPositiveValidator<float>();
 
 } // namespace nlm
