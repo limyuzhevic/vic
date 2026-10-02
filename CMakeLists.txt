@@ -139,6 +139,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Enhanced Python bindings
+add_library(pynlm_enhanced MODULE
+    python/bindings_enhanced.cpp
+)
+target_include_directories(pynlm_enhanced PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(pynlm_enhanced PRIVATE nlm_core)
+set_target_properties(pynlm_enhanced PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "pynlm_enhanced"
+    SUFFIX ".so"
+)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
@@ -148,4 +160,9 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install enhanced Python module
+install(TARGETS pynlm_enhanced
+    LIBRARY DESTINATION python
 )
