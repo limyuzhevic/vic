@@ -85,6 +85,16 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance optimizations (Phase 5)
+    src/performance/OptimizedBrain.cpp
+    src/performance/EventQueue.cpp
+    src/performance/CheckpointSystem.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/SparseConnectivity.cpp
+    # Performance monitoring
+    src/performance/Performance.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -94,6 +104,7 @@ target_include_directories(nlm_core PUBLIC
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
+    src/agent/AgentBody.cpp
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
@@ -103,6 +114,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
+    # Note: src/world/Observation.cpp removed to eliminate duplicate - environment version is used
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
@@ -133,19 +145,78 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 5 experiments (future)
+# add_library(nlm_phase5 STATIC ...)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Visualization library
+add_library(nlm_visualization STATIC
+    src/visualization/VisualizationInterface.cpp
+)
+target_include_directories(nlm_visualization PUBLIC src)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
+
+# Performance libraries (Phase 5 optimizations)
+add_library(nlm_performance STATIC
+    src/performance/OptimizedBrain.cpp
+    src/performance/EventQueue.cpp
+    src/performance/CheckpointSystem.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/SparseConnectivity.cpp
+    src/performance/Performance.cpp
+)
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Install targets (improved)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_visualization nlm_performance nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install headers
+install(DIRECTORY src/
+    DESTINATION include/nlm
+    FILES_MATCHING PATTERN "*.hpp"
+    PATTERN "*.h"
+)
+
+# Install Python bindings
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python/CMakeLists.txt")
+    add_subdirectory(python)
+    install(TARGETS pynlm
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+endif()
+
+# Install configuration files
+install(DIRECTORY configs/
+    DESTINATION etc/nlm
+    FILES_MATCHING PATTERN "*.cfg"
+    PATTERN "*.json"
+)
+
+# Install documentation
+install(DIRECTORY docs/
+    DESTINATION share/doc/nlm
 )
