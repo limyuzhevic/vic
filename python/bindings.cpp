@@ -145,7 +145,7 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML or key=value file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
@@ -154,15 +154,35 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a string configuration value with default fallback")
+        .def("getOr", &Config::getOr<int64_t>, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer configuration value with default fallback")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get a double configuration value with default fallback")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean configuration value with default fallback")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = 0,
+             "Set a configuration value")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
+        .def("validateConfiguration", &Config::validateConfiguration,
+             "Validate the entire configuration")
+        .def("getLastError", &Config::getLastError,
+             "Get the last error message from validation or operations")
+        .def("printHelp", &Config::printHelp,
+             "Print help information for configuration options")
+        .def("printVersion", &Config::printVersion,
+             "Print version information")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        }, "String representation of configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

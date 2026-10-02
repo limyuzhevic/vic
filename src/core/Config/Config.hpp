@@ -93,6 +93,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateKey(const std::string& key) const;
+    std::string getLastError() const;
+    
+    // Configuration validation
+    bool validateConfiguration() const;
+    
+    // Help and version information
+    void printHelp() const;
+    void printVersion() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +111,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File parsing helpers
+    bool parseFromKeyValue(std::ifstream& file);
+    bool parseFromJSON(std::ifstream& file);
+    
+    // Error handling
+    void setError(const std::string& error);
+    void clearError();
+    
+    // Configuration validation
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
 };
 
 } // namespace nlm

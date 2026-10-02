@@ -65,18 +65,113 @@ void testConfigRemove() {
     std::cout << "    testConfigRemove passed" << std::endl;
 }
 
-void testConfigKeys() {
+void testConfigValidation() {
     nlm::Config config;
     
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
+    // Test valid configuration
+    config.set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Runtime);
+    config.set("connection_probability", 0.5, nlm::ConfigSource::Runtime);
+    config.set("log_level", std::string("info"), nlm::ConfigSource::Runtime);
+    config.set("log_to_file", true, nlm::ConfigSource::Runtime);
     
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
+    assert(config.validateConfiguration());
+    assert(config.getLastError().empty());
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    std::cout << "    testConfigValidation passed" << std::endl;
 }
+
+void testConfigKeyValidation() {
+    nlm::Config config;
+    
+    // Test empty key
+    config.set("", "value", nlm::ConfigSource::Runtime);
+    assert(!config.validateKey(""));
+    assert(!config.getLastError().empty());
+    
+    // Test too long key
+    std::string longKey = "very_long_key_name_that_exceeds_maximum_length_limit_for_testing";
+    assert(!config.validateKey(longKey));
+    assert(!config.getLastError().empty());
+    
+    // Test key with invalid characters
+    assert(!config.validateKey("invalid@key"));
+    assert(!config.getLastError().empty());
+    
+    // Test valid key
+    assert(config.validateKey("valid_key"));
+    assert(config.getLastError().empty());
+    
+    std::cout << "    testConfigKeyValidation passed" << std::endl;
+}
+
+void testConfigValueValidation() {
+    nlm::Config config;
+    
+    // Test neuron_count validation
+    config.set("neuron_count", -10, nlm::ConfigSource::Runtime);
+    assert(!config.validateConfiguration());
+    assert(!config.getLastError().empty());
+    
+    config.remove("neuron_count");
+    config.set("neuron_count", 100, nlm::ConfigSource::Runtime);
+    assert(config.validateConfiguration());
+    
+    // Test connection_probability validation
+    config.set("connection_probability", 1.5, nlm::ConfigSource::Runtime);
+    assert(!config.validateConfiguration());
+    assert(!config.getLastError().empty());
+    
+    config.remove("connection_probability");
+    config.set("connection_probability", 0.3, nlm::ConfigSource::Runtime);
+    assert(config.validateConfiguration());
+    
+    // Test log_level validation
+    config.set("log_level", "invalid_level", nlm::ConfigSource::Runtime);
+    assert(!config.validateConfiguration());
+    assert(!config.getLastError().empty());
+    
+    config.remove("log_level");
+    config.set("log_level", "debug", nlm::ConfigSource::Runtime);
+    assert(config.validateConfiguration());
+    
+    std::cout << "    testConfigValueValidation passed" << std::endl;
+}
+
+void testAdvancedConfigOptions() {
+    nlm::Config config;
+    
+    // Test advanced boolean options
+    config.set("advanced.enable_structural_plasticity", true, nlm::ConfigSource::Runtime);
+    config.set("advanced.enable_reward_modulation", true, nlm::ConfigSource::Runtime);
+    config.set("advanced.enable_development", true, nlm::ConfigSource::Runtime);
+    
+    assert(config.validateConfiguration());
+    
+    // Test optimization level
+    config.set("advanced.optimization_level", 2, nlm::ConfigSource::Runtime);
+    assert(config.validateConfiguration());
+    
+    // Test parallel processing
+    config.set("advanced.parallel_processing", true, nlm::ConfigSource::Runtime);
+    assert(config.validateConfiguration());
+    
+    // Test invalid advanced option
+    config.set("advanced.invalid_option", 123, nlm::ConfigSource::Runtime);
+    assert(!config.validateConfiguration());
+    assert(!config.getLastError().empty());
+    
+    std::cout << "    testAdvancedConfigOptions passed" << std::endl;
+}
+
+void testConfigHelpAndVersion() {
+    nlm::Config config;
+    
+    // Test that help and version methods exist and can be called
+    // (These methods don't return error codes, so we just call them)
+    config.printHelp();
+    config.printVersion();
+    
+    } // namespace test_config
 
 void runAll() {
     testConfigCreation();
@@ -84,6 +179,9 @@ void runAll() {
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigKeyValidation();
+    testConfigValueValidation();
+    testAdvancedConfigOptions();
+    testConfigHelpAndVersion();
 }
-
-} // namespace test_config
