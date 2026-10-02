@@ -28,7 +28,9 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +43,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key format
+            if (key.empty() || !isValidKey(key)) {
+                NLM_LOG_WARNING("Invalid configuration key at line " + std::to_string(lineNumber) + ": '" + key + "'");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,10 +57,134 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid configuration format at line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
     return true;
+}
+
+bool Config::validate() const {
+    bool allValid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        bool valid = validateValue(entry.key, entry.value);
+        if (!valid) {
+            NLM_LOG_ERROR("Invalid configuration value: " + entry.key + " = " + getStringValue(entry.value));
+            allValid = false;
+        }
+    }
+    
+    return allValid;
+}
+
+bool Config::isValidKey(const std::string& key) const {
+    // Valid keys should be alphanumeric with underscores or hyphens
+    return !key.empty() && std::all_of(key.begin(), key.end(),
+        [](char c) { return std::isalnum(c) || c == '_' || c == '-'; });
+}
+
+bool Config::validateValue(const std::string& key, const ConfigValue& value) const {
+    // Type-specific validation
+    bool valid = true;
+    
+    // Check for known configuration keys and validate them
+    if (key == "neuron_count") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t neurons = std::get<int64_t>(value);
+            if (neurons < 10 || neurons > 1000000) {
+                NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neurons) +
+                             ". Must be between 10 and 1000000.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "simulation_steps") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t steps = std::get<int64_t>(value);
+            if (steps < 1 || steps > 10000000) {
+                NLM_LOG_ERROR("Invalid simulation steps: " + std::to_string(steps) +
+                             ". Must be between 1 and 10000000.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "simulation_timestep") {
+        if (std::holds_alternative<double>(value)) {
+            double timestep = std::get<double>(value);
+            if (timestep <= 0.0 || timestep > 1.0) {
+                NLM_LOG_ERROR("Invalid timestep: " + std::to_string(timestep) +
+                             ". Must be between 0.0001 and 1.0 seconds.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "region_count") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t regions = std::get<int64_t>(value);
+            if (regions < 1 || regions > 100) {
+                NLM_LOG_ERROR("Invalid region count: " + std::to_string(regions) +
+                             ". Must be between 1 and 100.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "connection_probability") {
+        if (std::holds_alternative<float>(value)) {
+            float prob = std::get<float>(value);
+            if (prob < 0.0f || prob > 1.0f) {
+                NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(prob) +
+                             ". Must be between 0.0 and 1.0.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "random_seed") {
+        if (std::holds_alternative<int64_t>(value)) {
+            int64_t seed = std::get<int64_t>(value);
+            if (seed < 0 || seed > UINT32_MAX) {
+                NLM_LOG_ERROR("Invalid random seed: " + std::to_string(seed) +
+                             ". Must be between 0 and 4294967295.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "stdp_ltp_weight" || key == "stdp_ltd_weight") {
+        if (std::holds_alternative<float>(value)) {
+            float weight = std::get<float>(value);
+            if (weight < 0.0f || weight > 1.0f) {
+                NLM_LOG_ERROR("Invalid STDP weight for " + key + ": " + std::to_string(weight) +
+                             ". Must be between 0.0 and 1.0.");
+                valid = false;
+            }
+        }
+    }
+    else if (key == "synaptogenesis_rate" || key == "pruning_rate") {
+        if (std::holds_alternative<float>(value)) {
+            float rate = std::get<float>(value);
+            if (rate < 0.0f || rate > 0.1f) {
+                NLM_LOG_ERROR("Invalid plasticity rate for " + key + ": " + std::to_string(rate) +
+                             ". Must be between 0.0 and 0.1.");
+                valid = false;
+            }
+        }
+    }
+    
+    return valid;
+}
+
+std::string Config::getStringValue(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

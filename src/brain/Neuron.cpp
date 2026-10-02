@@ -35,7 +35,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -43,7 +45,9 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {  // Safety check for null pointer
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
