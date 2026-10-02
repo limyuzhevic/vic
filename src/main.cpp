@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <filesystem>
 
 using namespace nlm;
 
@@ -194,11 +195,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        std::ostringstream neuronInfo;
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (i > 0) neuronInfo << " | ";
+            neuronInfo << "Neuron " << i << 
+                       " V=" << neurons[i]->getMembranePotential() << 
+                       " thresh=" << neurons[i]->getThreshold();
         }
+        NLM_LOG_INFO("    " + neuronInfo.str());
     }
 }
 
@@ -232,9 +236,11 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            std::ostringstream logMsg;
+            logMsg << "  Step " << step << 
+                      " | Spikes: " << brain->getTotalSpikeCount() << 
+                      " | Firing: " << brain->getFiringNeuronCount();
+            NLM_LOG_INFO(logMsg.str());
         }
     }
     
@@ -356,18 +362,22 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load config from file with proper error handling
+    NLM_LOG_INFO("Attempting to load configuration from: " + configFile);
+    bool configLoaded = config->loadFromFile(configFile);
+    if (configLoaded) {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_ERROR("Failed to load configuration from: " + configFile);
+        NLM_LOG_WARN("Using default configuration. Please ensure the config file exists and is readable.");
+        NLM_LOG_WARN("Default config path: " + std::filesystem::absolute(configFile).string());
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(123456789), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);

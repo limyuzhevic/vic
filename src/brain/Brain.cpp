@@ -94,10 +94,14 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
-            seed = *seedOpt;
+    uint64_t seed = 123456789;  // Default seed (time-based for variety)
+    if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        seed = *seedOpt;
+        if (seed == 0) {
+            NLM_LOG_WARN("Random seed is 0, which may cause issues. Using time-based seed instead.");
+            seed = std::chrono::system_clock::now().time_since_epoch().count();
         }
+    }
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems

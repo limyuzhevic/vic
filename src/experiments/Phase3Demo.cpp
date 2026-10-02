@@ -205,7 +205,7 @@ private:
         config->set("neuron_count", 500);
         config->set("region_count", 2);
         config->set("connection_probability", 0.1f);
-        config->set("random_seed", 42u);
+        config->set("random_seed", 123456789u);
         config->set("simulation_timestep", 0.001);
         config->set("stdp_ltp_weight", 0.01f);
         config->set("stdp_ltd_weight", 0.012f);
