@@ -5,6 +5,10 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
+#include <stdexcept>
+#include <sstream>
 
 namespace nlm {
 
@@ -28,7 +32,74 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
+    Environment,
     Runtime
+};
+
+// Configuration validation result
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
+    
+    static ValidationResult success() { return {true, ""}; }
+    static ValidationResult error(const std::string& msg) { return {false, msg}; }
+};
+
+// Type conversion utilities
+class ConfigConverter {
+public:
+    // String to specific type conversion
+    static bool toBool(const std::string& str, bool& value);
+    static bool toInt(const std::string& str, int& value);
+    static bool toInt64(const std::string& str, int64_t& value);
+    static bool toDouble(const std::string& str, double& value);
+    static bool toString(const std::string& str, std::string& value);
+    
+    // Type checking
+    static bool isBool(const std::string& str);
+    static bool isInt(const std::string& str);
+    static bool isInt64(const std::string& str);
+    static bool isDouble(const std::string& str);
+    static bool isFloat(const std::string& str);
+    
+    // Vector conversions
+    static bool toIntVector(const std::string& str, std::vector<int>& value);
+    static bool toDoubleVector(const std::string& str, std::vector<double>& value);
+    static bool toStringVector(const std::string& str, std::vector<std::string>& value);
+    
+    // Range validation
+    static bool inRange(double value, double min, double max, bool inclusive = true);
+    
+    // Common string values
+    static const std::string& TRUE_STR();
+    static const std::string& FALSE_STR();
+    static const std::string& YES_STR();
+    static const std::string& NO_STR();
+    static const std::string& ON_STR();
+    static const std::string& OFF_STR();
+};
+
+// Configuration validation rule
+struct ValidationRule {
+    std::string key;
+    std::function<ValidationResult(const ConfigValue&)> validator;
+    std::string errorMessage;
+};
+
+// Configuration entry
+struct ConfigEntry {
+    std::string key;
+    ConfigValue value;
+    ConfigSource source;
+    std::string description;
+    std::vector<std::string> tags;
+    
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), tags() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
+        : key(k), value(v), source(s), description(desc), tags() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc,
+                const std::vector<std::string>& t)
+        : key(k), value(v), source(s), description(desc), tags(t) {}
 };
 
 // Configuration entry
