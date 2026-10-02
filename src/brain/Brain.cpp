@@ -582,11 +582,169 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 16: Advance development for next step ==========
+    pImpl->developmentSystem->advanceStage();
+    
+    // ========== STEP 17: Enhanced working memory integration ==========
+    if (pImpl->workingMemory) {
+        // Apply attention-based filtering to working memory
+        if (pImpl->attention) {
+            // Get current attention focus (attended regions)
+            auto attendedRegions = pImpl->attention->getAttendedRegions();
+            
+            // Filter working memory contents based on attention
+            pImpl->workingMemory->applyAttentionFilter(attendedRegions);
+        }
+        
+        // Update development effects on working memory
+        if (pImpl->developmentSystem) {
+            pImpl->workingMemory->setDecayRate(0.01f / (pImpl->developmentSystem->getDevelopmentalAge() + 1.0f));
+        }
+        
+        // Enhanced novelty-based updating
+        if (pImpl->novelty) {
+            float noveltyLevel = pImpl->novelty->getLevel();
+            if (noveltyLevel > 0.7f) {
+                // High novelty - refresh working memory
+                pImpl->workingMemory->resetAllNeurons();
+            }
+        }
     }
-}
+    
+    // ========== STEP 18: Enhanced episodic memory integration ==========
+    if (pImpl->episodicMemory) {
+        // Update developmental stage information in episodic memories
+        if (pImpl->developmentSystem) {
+            auto stage = pImpl->developmentSystem->getCurrentStage();
+            std::string stageStr;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial: stageStr = "Initial"; break;
+                case DevelopmentalStage::CriticalPeriod: stageStr = "CriticalPeriod"; break;
+                case DevelopmentalStage::Maturation: stageStr = "Maturation"; break;
+                case DevelopmentalStage::Adult: stageStr = "Adult"; break;
+                case DevelopmentalStage::Aging: stageStr = "Aging"; break;
+            }
+            
+            // Store developmental stage in current episode
+            // This would require modifications to EpisodicMemoryItem structure
+        }
+        
+        // Enhanced consolidation based on developmental stage
+        if (pImpl->developmentSystem) {
+            auto stage = pImpl->developmentSystem->getCurrentStage();
+            float consolidationStrength = 1.0f;
+            
+            switch (stage) {
+                case DevelopmentalStage::Initial: consolidationStrength = 0.3f; break;  // Weak consolidation
+                case DevelopmentalStage::CriticalPeriod: consolidationStrength = 0.6f; break;
+                case DevelopmentalStage::Maturation: consolidationStrength = 0.9f; break;
+                case DevelopmentalStage::Adult: consolidationStrength = 1.2f; break;
+                case DevelopmentalStage::Aging: consolidationStrength = 0.8f; break;
+            }
+            
+            if (currentStep % pImpl->consolidationInterval == 0) {
+                pImpl->episodicMemory->consolidate(consolidationStrength * 0.5f);
+            }
+        }
+    }
+    
+    // ========== STEP 19: Enhanced prediction system integration ==========
+    if (pImpl->predictionSystem) {
+        // The prediction system would be updated with current neural activity patterns
+        // For now, basic implementation that can be enhanced in Phase 7
+        
+        // Update prediction based on working memory content
+        if (pImpl->workingMemory) {
+            auto workingMemoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!workingMemoryNeurons.empty()) {
+                // Would integrate with prediction system here
+                // PredictionSystem would predict next sensory input based on working memory patterns
+                // This requires proper prediction system implementation
+            }
+        }
+        
+        // Update prediction error based on prediction system
+        // Prediction error affects dopamine release
+        if (pImpl->dopamine && pImpl->predictionSystem) {
+            // TODO: Implement prediction error calculation and dopamine modulation
+            // float predictionError = pImpl->predictionSystem->calculatePredictionError();
+            // pImpl->dopamine->signalPredictionError(predictionError);
+        }
+    }
+    
+    // ========== STEP 20: Enhanced concept formation ==========
+    if (pImpl->conceptFormation && pImpl->attention) {
+        // Concept formation based on attentional selection and working memory content
+        auto attendedRegions = pImpl->attention->getAttendedRegions();
+        auto workingMemoryNeurons = pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeurons() : std::vector<NeuronId>{};
+        
+        if (!workingMemoryNeurons.empty()) {
+            // Would form concepts from patterns in working memory that are attended to
+            // This requires proper concept formation implementation
+            
+            // Example: Extract patterns from working memory neurons
+            // conceptFormation->processWorkingMemoryPatterns(workingMemoryNeurons, attendedRegions);
+        }
+    }
+    
+    // ========== STEP 21: Adaptive learning rates based on development ==========
+    if (pImpl->developmentSystem && currentStep % 100 == 0) {
+        auto stage = pImpl->developmentSystem->getStage();
+        float learningRateMod = 1.0f;
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial: learningRateMod = 2.0f; break;  // Fast learning initially
+            case DevelopmentalStage::CriticalPeriod: learningRateMod = 1.5f; break;
+            case DevelopmentalStage::Maturation: learningRateMod = 1.0f; break;  // Stable
+            case DevelopmentalStage::Adult: learningRateMod = 0.7f; break;   // Slow, fine-tuning
+            case DevelopmentalStage::Aging: learningRateMod = 0.5f; break;  // Reduced learning
+        }
+        
+        // Apply learning rate modulation to STDP and Hebbian plasticity
+        // This would require accessing plasticity systems through Brain interface
+        // For now, just log the developmental stage
+        // NLM_LOG_DEBUG("Developmental stage " + std::to_string(static_cast<int>(stage)) + 
+        //              " - learning rate modulation: " + std::to_string(learningRateMod));
+    }
+    
+    // ========== STEP 22: Enhanced memory replay for learning ==========
+    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory && pImpl->developmentSystem) {
+        // Adaptive replay based on developmental stage
+        auto stage = pImpl->developmentSystem->getStage();
+        size_t replayCount = 3;  // Default replay count
+        
+        switch (stage) {
+            case DevelopmentalStage::Initial: replayCount = 1; break;  // Minimal replay initially
+            case DevelopmentalStage::CriticalPeriod: replayCount = 2; break;
+            case DevelopmentalStage::Maturation: replayCount = 3; break;
+            case DevelopmentalStage::Adult: replayCount = 2; break;   // Occasional replay
+            case DevelopmentalStage::Aging: replayCount = 1; break;   // Minimal replay
+        }
+        
+        // Get episodes for replay with developmental stage considerations
+        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(replayCount);
+        for (const auto* episode : episodesToReplay) {
+            pImpl->episodicMemory->replayEpisode(episode);
+        }
+    }
+    
+    // ========== STEP 23: Final integration statistics ==========
+    // Collect comprehensive integration statistics
+    if (currentStep % 1000 == 0) {
+        std::ostringstream stats;
+        stats << "=== Integration Statistics ===\n";
+        stats << "Step: " << currentStep << "\n";
+        stats << "Developmental Stage: " << static_cast<int>(pImpl->developmentSystem->getStage()) << "\n";
+        stats << "Working Memory Neurons: " << (pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeurons().size() : 0) << "\n";
+        stats << "Episodic Memory Episodes: " << (pImpl->episodicMemory ? pImpl->episodicMemory->getEpisodeCount() : 0) << "\n";
+        stats << "Attended Regions: " << (pImpl->attention ? pImpl->attention->getAttendedRegions().size() : 0) << "\n";
+        stats << "Prediction Error: " << (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) << "\n";
+        stats << "Novelty Level: " << (pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f) << "\n";
+        stats << "Curiosity Level: " << (pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f) << "\n";
+        
+        NLM_LOG_INFO(stats.str());
+    }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input

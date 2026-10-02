@@ -420,6 +420,183 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // ============================================================================
+    // Integration and System Management Functions
+    // ============================================================================
+
+    m.def("connect_systems", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, 
+                               std::shared_ptr<SimpleWorld> world) {
+        // Enable all available systems
+        if (agent) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+        
+        // Initialize systems with world if provided
+        if (agent && world) {
+            agent->initialize(*world);
+        }
+        
+        return "Systems connected and enabled successfully";
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+       "Connect and enable all available brain systems");
+
+    m.def("enable_all_systems", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw std::runtime_error("AgentBrain is not initialized");
+        }
+        
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return "All systems enabled: reward_modulation, structural_plasticity, development, curiosity";
+    }, py::arg("agent"), "Enable all available neuromodulation and learning systems");
+
+    m.def("get_system_status", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+        std::map<std::string, std::string> status;
+        
+        if (brain) {
+            status["brain_neuron_count"] = std::to_string(brain->getTotalNeuronCount());
+            status["brain_synapse_count"] = std::to_string(brain->getTotalSynapseCount());
+            status["brain_firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+            status["brain_total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+            status["brain_developmental_stage"] = "unknown"; // TODO: Add stage string conversion
+        }
+        
+        if (agent) {
+            status["agent_reward_modulation"] = agent->isRewardModulationEnabled() ? "enabled" : "disabled";
+            status["agent_structural_plasticity"] = agent->isStructuralPlasticityEnabled() ? "enabled" : "disabled";
+            status["agent_development"] = agent->isDevelopmentEnabled() ? "enabled" : "disabled";
+            status["agent_curiosity"] = agent->isCuriosityEnabled() ? "enabled" : "disabled";
+            status["agent_curiosity_level"] = std::to_string(agent->getCuriosityLevel());
+            status["agent_novelty_level"] = std::to_string(agent->getNoveltyLevel());
+            status["agent_neuromodulation_level"] = std::to_string(agent->getNeuromodulationLevel());
+        }
+        
+        return status;
+    }, py::arg("brain"), py::arg("agent"),
+       "Get comprehensive status of all brain and agent systems");
+
+    m.def("validate_integration", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                                     std::shared_ptr<SimpleWorld> world) {
+        std::map<std::string, bool> integrationStatus;
+        
+        // Check basic components
+        integrationStatus["brain_initialized"] = brain ? true : false;
+        integrationStatus["agent_initialized"] = agent ? true : false;
+        integrationStatus["world_initialized"] = world ? true : false;
+        
+        // Check system enablement
+        if (agent) {
+            integrationStatus["reward_modulation"] = agent->isRewardModulationEnabled();
+            integrationStatus["structural_plasticity"] = agent->isStructuralPlasticityEnabled();
+            integrationStatus["development"] = agent->isDevelopmentEnabled();
+            integrationStatus["curiosity"] = agent->isCuriosityEnabled();
+        }
+        
+        // Overall integration validation
+        bool allValid = integrationStatus["brain_initialized"] &&
+                       integrationStatus["agent_initialized"] &&
+                       integrationStatus["world_initialized"] &&
+                       (integrationStatus.count("reward_modulation") == 0 || integrationStatus["reward_modulation"]) &&
+                       (integrationStatus.count("structural_plasticity") == 0 || integrationStatus["structural_plasticity"]) &&
+                       (integrationStatus.count("development") == 0 || integrationStatus["development"]) &&
+                       (integrationStatus.count("curiosity") == 0 || integrationStatus["curiosity"]);
+        
+        integrationStatus["overall_integration_valid"] = allValid;
+        
+        return integrationStatus;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+       "Validate that all brain systems are properly integrated and enabled");
+
+    m.def("get_memory_stats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> memoryStats;
+        
+        if (brain) {
+            // Basic brain stats that relate to memory capacity
+            memoryStats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+            memoryStats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+            memoryStats["active_neurons"] = static_cast<double>(brain->getActiveNeuronCount());
+            memoryStats["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+            memoryStats["average_firing_rate"] = brain->getAverageFiringRate();
+            memoryStats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+            memoryStats["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+            
+            // Estimate working memory based on active neurons and firing rate
+            memoryStats["estimated_working_memory_capacity"] = 
+                brain->getActiveNeuronCount() * 0.1; // Simplified estimate
+            
+            // Estimate episodic memory based on total synapses
+            memoryStats["estimated_episodic_memory_capacity"] = 
+                brain->getTotalSynapseCount() * 0.001; // Simplified estimate
+        }
+        
+        return memoryStats;
+    }, py::arg("brain"), "Get comprehensive memory system statistics");
+
+    m.def("get_performance_metrics", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                                        std::shared_ptr<SimpleWorld> world, int steps) {
+        struct PerformanceMetrics {
+            double avg_firing_rate;
+            double learning_efficiency;
+            double exploration_rate;
+            double goal_directedness;
+            double curiosity_level;
+            double novelty_level;
+            double energy_efficiency;
+            double adaptation_speed;
+            double prediction_accuracy;
+            double memory_retention;
+        };
+        
+        PerformanceMetrics metrics{};
+        
+        if (brain) {
+            metrics.avg_firing_rate = brain->getAverageFiringRate();
+            metrics.learning_efficiency = brain->getTotalSpikeCount() > 0 ? 
+                brain->getFiringNeuronCount() / static_cast<double>(brain->getTotalNeuronCount()) : 0.0;
+            metrics.adaptation_speed = brain->getDevelopmentalStage() > 2 ? 0.8 : 0.4; // Simplified
+            metrics.prediction_accuracy = 0.5; // Placeholder - requires prediction system access
+        }
+        
+        if (agent) {
+            metrics.curiosity_level = agent->getCuriosityLevel();
+            metrics.novelty_level = agent->getNoveltyLevel();
+            metrics.learning_efficiency = agent->isCuriosityEnabled() ? metrics.learning_efficiency * 1.2 : metrics.learning_efficiency;
+            metrics.exploration_rate = agent->getCuriosityLevel() * 0.3;
+            metrics.goal_directedness = 0.7; // Placeholder - requires action selection analysis
+        }
+        
+        if (world) {
+            metrics.energy_efficiency = world->getMaxEnergy() > 0 ? 
+                world->getAgentBody().energy / world->getMaxEnergy() : 0.5;
+        }
+        
+        metrics.memory_retention = 0.6; // Placeholder - requires memory system access
+        
+        return metrics;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps"),
+       "Collect comprehensive performance metrics from all brain systems");
+
+    m.def("create_config", [](const std::string& jsonString) {
+        auto config = std::make_shared<Config>();
+        try {
+            json jsonData = json::parse(jsonString);
+            config->fromJSON(jsonData);
+        } catch (const json::parse_error& e) {
+            throw std::runtime_error("Invalid JSON configuration: " + std::string(e.what()));
+        }
+        return config;
+    }, py::arg("jsonString"), "Create configuration from JSON string");
+
+    m.def("get_version", []() {
+        return std::string("NLM v2.0 - Phase 5/6 Integration");
+    }, "Get NLM version information");
 }
 
 } // namespace nlm

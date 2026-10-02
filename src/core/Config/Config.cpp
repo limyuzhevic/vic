@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,9 +22,25 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parser first (Phase 4 advanced)
+    std::ifstream jsonFile(filepath);
+    if (jsonFile.is_open()) {
+        try {
+            json jsonData = json::parse(jsonFile);
+            // Convert JSON to config entries
+            fromJSON(jsonData);
+            return true;
+        } catch (const json::parse_error& e) {
+            // JSON parsing failed, try legacy format
+            return loadFromLegacyFormat(filepath);
+        }
+    }
     
+    // If JSON file doesn't exist or failed, try legacy format
+    return loadFromLegacyFormat(filepath);
+}
+
+bool Config::loadFromLegacyFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -35,7 +54,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs (legacy format)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -43,7 +62,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -53,6 +72,59 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+void Config::fromJSON(const json& data) {
+    clear();
+    
+    // Process all possible config sections
+    auto processSection = [this](const json& section, const std::string& prefix) {
+        if (!section.is_object()) return;
+        
+        for (auto it = section.begin(); it != section.end(); ++it) {
+            std::string key = prefix + it->first;
+            
+            if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File);
+            } else if (it->is_number_unsigned()) {
+                set(key, static_cast<int64_t>(it->get<size_t>()), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // Handle arrays (currently only for int arrays)
+                if (!it->empty() && it->front().is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : *it) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    set(key, intArray, ConfigSource::File);
+                } else if (!it->empty() && it->front().is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : *it) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    set(key, doubleArray, ConfigSource::File);
+                }
+            }
+        }
+    };
+    
+    // Process different sections with appropriate prefixes
+    processSection(data, "");
+    processSection(data["brain"], "brain.");
+    processSection(data["plasticity"], "plasticity.");
+    processSection(data["plasticity"]["stdp"], "plasticity.stdp.");
+    processSection(data["plasticity"]["hebbian"], "plasticity.hebbian.");
+    processSection(data["plasticity"]["structural"], "plasticity.structural.");
+    processSection(data["neuromodulation"], "neuromod.");
+    processSection(data["neuromodulation"]["dopamine"], "neuromod.dopamine.");
+    processSection(data["memory"], "memory.");
+    processSection(data["environment"], "environment.");
+    processSection(data["simulation"], "simulation.");
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
