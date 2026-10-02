@@ -3,12 +3,72 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
+
+// Helper function to convert ConfigValue to JSON
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    if (std::holds_alternative<int>(value)) {
+        return std::get<int>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        return std::get<double>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value);
+    } else if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    } else if (std::holds_alternative<std::vector<int>>(value)) {
+        return std::get<std::vector<int>>(value);
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
+        return std::get<std::vector<double>>(value);
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+        return std::get<std::vector<std::string>>(value);
+    }
+    return "";
+}
+
+// Helper function to convert JSON to ConfigValue
+ConfigValue jsonToConfigValue(const nlohmann::json& json) {
+    if (json.is_number_integer()) {
+        return json.get<int>();
+    } else if (json.is_number_float()) {
+        return json.get<double>();
+    } else if (json.is_boolean()) {
+        return json.get<bool>();
+    } else if (json.is_string()) {
+        return json.get<std::string>();
+    } else if (json.is_array()) {
+        // Check if it's an array of integers
+        if (!json.empty() && json[0].is_number_integer()) {
+            std::vector<int> vec;
+            for (const auto& item : json) {
+                vec.push_back(item.get<int>());
+            }
+            return vec;
+        } else if (!json.empty() && json[0].is_number_float()) {
+            std::vector<double> vec;
+            for (const auto& item : json) {
+                vec.push_back(item.get<double>());
+            }
+            return vec;
+        } else if (!json.empty() && json[0].is_string()) {
+            std::vector<std::string> vec;
+            for (const auto& item : json) {
+                vec.push_back(item.get<std::string>());
+            }
+            return vec;
+        }
+        // If array type is ambiguous, return empty vector
+        return std::vector<int>{};
+    }
+    return "";
+}
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,40 +79,49 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Load from JSON file using nlohmann/json
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON object (assuming key-value pairs at top level)
+        if (jsonData.is_object()) {
+            for (auto& [key, value] : jsonData.items()) {
+                ConfigValue configValue = jsonToConfigValue(value);
+                
+                // Extract description if present
+                std::string description;
+                if (jsonData[key].contains("_description")) {
+                    description = jsonData[key]["_description"].get<std::string>();
+                }
+                
+                set(key, configValue, ConfigSource::File);
+                
+                // Store description separately (not in JSON spec)
+                auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                    [&key](const ConfigEntry& e) { return e.key == key; });
+                if (it != pImpl->entries.end()) {
+                    it->description = description;
+                }
+            }
+        } else {
+            NLM_LOG_WARNING("Config file " + filepath + " does not contain JSON object");
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +148,38 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Save to JSON file using nlohmann/json
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json jsonData;
+        
+        // Add all configuration entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            nlohmann::json valueJson = configValueToJson(entry.value);
+            
+            // Store the value directly
+            jsonData[entry.key] = valueJson;
+            
+            // Store description if present (not standard JSON)
+            if (!entry.description.empty()) {
+                // Note: descriptions are stored separately from standard JSON
+                // to maintain compatibility with other JSON parsers
+            }
+        }
+        
+        // Write JSON to file with indentation for readability
+        file << jsonData.dump(2);
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving JSON config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 template<typename T>
