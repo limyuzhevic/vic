@@ -139,12 +139,71 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Command-line tools
+add_executable(brainctl
+    src/tools/CommandLineInterface.cpp
+    src/tools/BrainCtlTool.cpp
+)
+target_link_libraries(brainctl PUBLIC nlm_core)
+
+add_executable(nlmbrain
+    src/commands/main_nlmbrain.cpp
+)
+target_link_libraries(nlmbrain PUBLIC nlm_core)
+
+add_executable(nlmdemo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlmdemo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+add_executable(nlmtrace
+    src/tools/TraceTool.cpp
+)
+target_link_libraries(nlmtrace PUBLIC nlm_core)
+
+add_executable(nlmstats
+    src/tools/StatsTool.cpp
+)
+target_link_libraries(nlmstats PUBLIC nlm_core)
+
+add_executable(nlmexport
+    src/tools/ExportTool.cpp
+)
+target_link_libraries(nlmexport PUBLIC nlm_core)
+
+add_executable(nlmsave
+    src/tools/SaveTool.cpp
+)
+target_link_libraries(nlmsave PUBLIC nlm_core)
+
+add_executable(nlmload
+    src/tools/LoadTool.cpp
+)
+target_link_libraries(nlmload PUBLIC nlm_core)
+
+add_executable(nlmcompare
+    src/tools/CompareTool.cpp
+)
+target_link_libraries(nlmcompare PUBLIC nlm_core)
+
+add_executable(nlmreplay
+    src/tools/ReplayTool.cpp
+)
+target_link_libraries(nlmreplay PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Install command-line tools
+install(TARGETS brainctl nlmbrain nlmdemo nlmtrace nlmstats nlmexport nlmsave nlmload nlmcompare nlmreplay
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
