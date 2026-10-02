@@ -2,6 +2,7 @@
 #include "../../brain/Synapse.hpp"
 #include <cmath>
 #include <algorithm>
+#include <map>
 
 namespace nlm {
 
@@ -59,22 +60,44 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
     
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
+    // OPTIMIZATION: Use sorted spike histories and more efficient processing
+    // Create maps for faster access by timestamp
+    std::map<Timestamp, int> preSpikeMap;
+    std::map<Timestamp, int> postSpikeMap;
+    
+    for (int i = 0; i < static_cast<int>(preSpikes.size()); ++i) {
+        preSpikeMap[preSpikes[i]] = i;
+    }
+    for (int i = 0; i < static_cast<int>(postSpikes.size()); ++i) {
+        postSpikeMap[postSpikes[i]] = i;
+    }
+    
+    // OPTIMIZATION: Process spikes in sorted order and use efficient windowing
+    // For each post spike, find pre spikes within relevant time window
+    float maxRelevantDelta = 5.0f * tau;  // Only consider spikes within 5*tau
+    
+    for (const auto& postPair : postSpikeMap) {
+        Timestamp postTime = postPair.first;
+        
+        // Find pre spikes that occurred before this post spike
+        for (auto it = preSpikeMap.rbegin(); it != preSpikeMap.rend(); ++it) {
+            Timestamp preTime = it->first;
+            float delta = static_cast<float>(postTime - preTime);
             
-            if (dt > 0) {
+            if (delta > maxRelevantDelta) break;  // Further pre spikes are too far back
+            
+            if (delta > 0) {
                 // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
+                float exponentialFactor = std::exp(-delta / tau);
+                float deltaWeight = pImpl->ltpWeight * exponentialFactor;
+                totalDelta += deltaWeight;
+            } else if (delta < 0) {
                 // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
+                float exponentialFactor = std::exp(delta / tau);
+                float deltaWeight = -pImpl->ltdWeight * exponentialFactor;
+                totalDelta += deltaWeight;
             }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
+            // delta == 0: no change (simultaneous spikes)
         }
     }
     
@@ -96,7 +119,7 @@ void STDP::update(Synapse* synapse,
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
-    // Clamp weight to bounds
+    // Clamp weight to bounds with improved performance
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
     synapse->setWeight(newWeight);

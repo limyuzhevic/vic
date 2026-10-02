@@ -48,6 +48,16 @@ void printBanner() {
     )" << std::endl;
 }
 
+// Helper function to print usage information
+void printUsage() {
+    std::cout << "NLM Phase 2 Real Neural Computation" << std::endl;
+    std::cout << "Usage: ./nlm [options]" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=file.cfg    Load configuration from file" << std::endl;
+    std::cout << "  --help, -h          Show this help message" << std::endl;
+    std::cout << "  --verbose, -v       Enable verbose logging" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -322,9 +332,39 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Handle command line arguments
+    bool verboseMode = false;
+    std::string configFile = "configs/default.cfg";
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printBanner();
+            printUsage();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verboseMode = true;
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
+                configFile = argv[++i];
+            } else {
+                NLM_LOG_ERROR("Missing configuration file path after --config option");
+                printUsage();
+                return 1;
+            }
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+    }
+    
+    // Set log level based on verbose mode
+    LogLevel logLevel = verboseMode ? LogLevel::Verbose : LogLevel::Info;
+    
+    printBanner();
+    NLM_LOG_INFO("Initializing NLM Phase 2 Real Neural Computation...");
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -342,19 +382,6 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {

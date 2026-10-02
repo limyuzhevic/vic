@@ -37,10 +37,12 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    bool isValidated;
+    bool isRequired;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), isValidated(false), isRequired(false) {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "", bool validated = false, bool required = false)
+        : key(k), value(v), source(s), description(desc), isValidated(validated), isRequired(required) {}
 };
 
 // Main configuration class
@@ -92,6 +94,14 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation and setup
+    void validateAndApplyDefaults();
+    std::string getValidationErrors() const;
+    
+    // Default configuration for common parameters
+    static Config getDefaultPhase2Config();
+    static Config getDefaultPhase6Config();
     
 private:
     struct Impl;

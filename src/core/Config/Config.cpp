@@ -24,6 +24,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
@@ -48,7 +49,23 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key format (alphanumeric and dots)
+            bool keyValid = true;
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '.' && c != '_' && c != '-') {
+                    keyValid = false;
+                    break;
+                }
+            }
+            
+            if (!keyValid) {
+                NLM_LOG_WARNING("Invalid configuration key format: " + key);
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Malformed configuration line (no '='): " + line);
         }
     }
     
