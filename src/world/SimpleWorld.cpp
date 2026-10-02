@@ -214,6 +214,24 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     return result;
 }
 
+ActionResult SimpleWorld::applyAction(const NeuralRegion* region, MotorCommand cmd) {
+    // For backward compatibility - delegate to applyMotorCommand
+    // The region parameter is ignored for now as the world doesn't need it
+    return applyMotorCommand(cmd, simTime_);
+}
+
+SensoryPercept SimpleWorld::observe(const NeuralRegion* region) {
+    // For backward compatibility - return current sensory percept
+    // The region parameter is ignored for now as the world doesn't need it
+    return sensory_;
+}
+
+float SimpleWorld::computeReward(const ActionResult& actionResult) {
+    // For backward compatibility - compute reward from the most recent action
+    // This returns the action's reward field
+    return actionResult.reward;
+}
+
 ActionResult SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;

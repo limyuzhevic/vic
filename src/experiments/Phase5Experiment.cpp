@@ -447,6 +447,20 @@ MultiSeedExperimentRunner::SeedStatistics MultiSeedExperimentRunner::computeStat
         rewards.push_back(r.totalReward);
     }
     
+    // Check if we have any results
+    if (rewards.empty()) {
+        stats.meanReward = 0.0f;
+        stats.minPerformance = 0.0f;
+        stats.maxPerformance = 0.0f;
+        stats.stdDevReward = 0.0f;
+        stats.coefficientOfVariation = 0.0f;
+        stats.successCount = 0;
+        stats.failureCount = 0;
+        stats.meanPerformance = 0.0f;
+        stats.stdDevPerformance = 0.0f;
+        return stats;
+    }
+    
     // Compute mean
     float sum = 0.0f;
     float min = rewards[0];

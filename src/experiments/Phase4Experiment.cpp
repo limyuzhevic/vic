@@ -291,17 +291,20 @@ Phase4Results AttentionExperiment::run(Brain* brain, size_t numTrials) {
             competitors.push_back(NeuronId(50000 + i));
         }
         
-        // Give one stronger salience
-        attention.applyBottomUpSalience(competitors[0], 1.0f);
-        for (size_t i = 1; i < competitors.size(); ++i) {
-            attention.applyBottomUpSalience(competitors[i], 0.3f);
+        // Give one stronger salience (ensure we have at least one competitor)
+        if (!competitors.empty()) {
+            attention.applyBottomUpSalience(competitors[0], 1.0f);
+            for (size_t i = 1; i < competitors.size(); ++i) {
+                attention.applyBottomUpSalience(competitors[i], 0.3f);
+            }
         }
         
         // Process competition
         auto winners = attention.processCompetition(competitors);
         
         float selectivity = winners.empty() ? 0.0f : 
-                           (winners[0] == competitors[0] ? 1.0f : 0.0f);
+                           (competitors.empty() ? 0.0f : 
+                            (winners[0] == competitors[0] ? 1.0f : 0.0f));
         totalSelectivity += selectivity;
         selectivityHistory_.push_back(selectivity);
         

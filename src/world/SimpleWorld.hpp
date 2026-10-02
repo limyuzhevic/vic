@@ -75,6 +75,8 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getResourceEnergyGain() const { return resourceEnergyGain_; }
+    void setResourceEnergyGain(float e) { resourceEnergyGain_ = e; }
     
     // Time
     double getSimulationTime() const { return simTime_; }
@@ -82,6 +84,19 @@ public:
     // Seed for reproducibility
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
+    
+    // Apply action to a specific brain region (from agent's perspective)
+    // For backward compatibility - calls applyMotorCommand
+    // The region parameter is ignored for now as the world doesn't need it
+    ActionResult applyAction(const class NeuralRegion* region, MotorCommand cmd);
+    
+    // Get sensory percept for a specific brain region
+    // For backward compatibility - returns current sensory percept
+    SensoryPercept observe(const class NeuralRegion* region);
+    
+    // Compute reward from applying an action
+    // For backward compatibility - computes reward from action result
+    float computeReward(const ActionResult& actionResult);
     
 private:
     // Generate vision from current view

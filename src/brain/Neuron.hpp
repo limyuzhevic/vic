@@ -25,17 +25,26 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // Default values for neuron parameters
+    static constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;
+    static constexpr float DEFAULT_THRESHOLD = -55.0f;
+    static constexpr float DEFAULT_RESET_POTENTIAL = -70.0f;
+    static constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;
+    static constexpr float DEFAULT_REFACTORY_PERIOD = 5;
+    static constexpr float DEFAULT_ADAPTATION_DECAY_RATE = 0.95f;
+    static constexpr float DEFAULT_ADAPTATION_UPDATE = 1.0f;
+    
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(DEFAULT_RESTING_POTENTIAL)
+        , restingPotential(DEFAULT_RESTING_POTENTIAL)
+        , threshold(DEFAULT_THRESHOLD)
+        , resetPotential(DEFAULT_RESET_POTENTIAL)
+        , leakConductance(DEFAULT_LEAK_CONDUCTANCE)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(DEFAULT_REFACTORY_PERIOD)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };

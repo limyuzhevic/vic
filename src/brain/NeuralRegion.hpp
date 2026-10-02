@@ -79,6 +79,10 @@ public:
     std::vector<Neuron*> getAllNeurons();
     std::vector<const Neuron*> getAllNeurons() const;
     
+    // For backward compatibility - returns raw pointer
+    NeuralRegion* get() { return this; }
+    const NeuralRegion* get() const { return this; }
+    
 private:
     struct Impl;
     Impl* pImpl;
