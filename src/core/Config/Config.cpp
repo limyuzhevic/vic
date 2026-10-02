@@ -19,16 +19,19 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Configuration file not found: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t successCount = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +44,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            if (key.empty()) {
+                NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": empty key");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,10 +56,19 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+                successCount++;
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse configuration key '" + key + "' on line " + 
+                              std::to_string(lineNumber) + ": " + e.what());
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid configuration line " + std::to_string(lineNumber) + ": missing '='");
         }
     }
     
+    NLM_LOG_INFO("Loaded " + std::to_string(successCount) + " configuration entries from: " + filepath);
     return true;
 }
 
