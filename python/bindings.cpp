@@ -420,6 +420,180 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // ========== PHASE 6 INTEGRATION ==========
+
+    // Phase6Config structure
+    py::class_<Phase6Config>(m, "Phase6Config", R"pbdoc(Phase 6 experiment configuration)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &Phase6Config::connectionProbability)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &Phase6Config::checkpointPath);
+
+    // Phase6IntegrationResult structure
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", R"pbdoc(Phase 6 integration experiment results)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readwrite("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readwrite("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readwrite("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readwrite("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readwrite("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readwrite("replayWorks", &Phase6IntegrationResult::replayWorks)
+        .def_readwrite("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readwrite("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readwrite("avgSynapticWeight", &Phase6IntegrationResult::avgSynapticWeight)
+        .def_readwrite("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readwrite("noveltyLevel", &Phase6IntegrationResult::noveltyLevel)
+        .def_readwrite("curiosityLevel", &Phase6IntegrationResult::curiosityLevel)
+        .def_readwrite("dopamineLevel", &Phase6IntegrationResult::dopamineLevel)
+        .def_readwrite("totalWallClockTime", &Phase6IntegrationResult::totalWallClockTime);
+
+    // Phase6IntegratedExperiment class
+    py::class_<Phase6IntegratedExperiment>(m, "Phase6IntegratedExperiment", R"pbdoc(Phase 6 integration experiment runner)pbdoc")
+        .def(py::init<>())
+        .def("run", &Phase6IntegratedExperiment::run, "Run the complete integration test",
+             py::arg("config"))
+        .def("verifyIntegration", &Phase6IntegratedExperiment::verifyIntegration,
+             "Verify that all systems are properly integrated")
+        .def("testMemoryIntegration", &Phase6IntegratedExperiment::testMemoryIntegration,
+             "Test memory system integration")
+        .def("testNeuromodulationIntegration", &Phase6IntegratedExperiment::testNeuromodulationIntegration,
+             "Test neuromodulation system integration")
+        .def("testCheckpointing", &Phase6IntegratedExperiment::testCheckpointing,
+             "Test checkpoint save/load functionality")
+        .def("testReplay", &Phase6IntegratedExperiment::testReplay,
+             "Test replay system functionality");
+
+    // ========== SEMANTIC MEMORY ==========
+
+    // SemanticMemory class
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory for facts and knowledge)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact,
+             "Store a fact in semantic memory",
+             py::arg("key"), py::arg("value"))
+        .def("retrieveFact", &SemanticMemory::retrieveFact,
+             "Retrieve a fact from semantic memory",
+             py::arg("key"))
+        .def("hasFact", &SemanticMemory::hasFact,
+             "Check if semantic memory contains a fact",
+             py::arg("key"))
+        .def("getAllFacts", &SemanticMemory::getAllFacts,
+             "Get all facts stored in semantic memory")
+        .def("clear", &SemanticMemory::clear,
+             "Clear all semantic memory facts");
+
+    // ========== PROCEDURAL MEMORY ==========
+
+    // ProceduralMemory class
+    py::class_<Skill>(m, "Skill", R"pbdoc(Procedural memory skill)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("name", &Skill::name)
+        .def_readwrite("proficiency", &Skill::proficiency);
+
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Procedural memory for skills and habits)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill,
+             "Learn a new skill",
+             py::arg("name"), py::arg("pattern"))
+        .def("getSkill", &ProceduralMemory::getSkill,
+             "Get a skill by name",
+             py::arg("name"))
+        .def("getAllSkills", &ProceduralMemory::getAllSkills,
+             "Get all skills")
+        .def("updateProficiency", &ProceduralMemory::updateProficiency,
+             "Update skill proficiency",
+             py::arg("name"), py::arg("delta"))
+        .def("clear", &ProceduralMemory::clear,
+             "Clear all procedural memory skills");
+
+    // ========== REMAINING NEUROMODULATORS ==========
+
+    // Acetylcholine neuromodulator
+    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
+        .value("Empty", WorldObjectType::Empty)
+        .value("Resource", WorldObjectType::Resource)
+        .value("Hazard", WorldObjectType::Hazard)
+        .value("Wall", WorldObjectType::Wall)
+        .value("Marker", WorldObjectType::Marker)
+        .export_values();
+
+    // Serotonin neuromodulator
+    py::class_<Serotonin>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Serotonin::getName)
+        .def("getLevel", &Serotonin::getLevel)
+        .def("setLevel", &Serotonin::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor)
+        .def("update", &Serotonin::update, py::arg("dt"));
+
+    // Norepinephrine neuromodulator
+    py::class_<Norepinephrine>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Norepinephrine::getName)
+        .def("getLevel", &Norepinephrine::getLevel)
+        .def("setLevel", &Norepinephrine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor)
+        .def("update", &Norepinephrine::update, py::arg("dt"));
+
+    // Acetylcholine neuromodulator
+    py::class_<Acetylcholine>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getName", &Acetylcholine::getName)
+        .def("getLevel", &Acetylcholine::getLevel)
+        .def("setLevel", &Acetylcholine::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Acetylcholine::getPlasticityFactor)
+        .def("update", &Acetylcholine::update, py::arg("dt"));
+
+    // ========== PREDICTION SYSTEM ==========
+
+    // PredictionSystem class
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for predictive coding)pbdoc")
+        .def(py::init<>())
+        .def("predictNextState", &PredictionSystem::predictNextState,
+             "Predict next sensory state",
+             py::arg("currentState"))
+        .def("updatePredictions", &PredictionSystem::updatePredictions,
+             "Update predictions based on actual observation",
+             py::arg("predicted"), py::arg("actual"))
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get current prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction error history")
+        .def("train", &PredictionSystem::train,
+             "Train prediction model",
+             py::arg("observation"));
+
+    // ========== CONVENIENCE FUNCTIONS ==========
+
+    // Function to create Phase 6 config
+    m.def("createPhase6Config", []() -> Phase6Config {
+        Phase6Config config;
+        config.maxSteps = 10000;
+        config.neuronCount = 1000;
+        config.regionCount = 1;
+        config.connectionProbability = 0.1f;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        config.checkpointPath = "./checkpoint_test.bin";
+        return config;
+    }, "Create a default Phase 6 configuration");
+
+    // Function to create Phase 6 experiment
+    m.def("createPhase6Experiment", []() -> Phase6IntegratedExperiment {
+        return Phase6IntegratedExperiment();
+    }, "Create a new Phase 6 integrated experiment");
 }
 
 } // namespace nlm
