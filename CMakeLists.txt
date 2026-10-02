@@ -48,6 +48,11 @@ add_library(nlm_core STATIC
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
+    # Development
+    src/development/DevelopmentSystem.cpp
+    src/development/Synaptogenesis.cpp
+    src/development/Pruning.cpp
+    src/development/Maturation.cpp
     # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
@@ -55,11 +60,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -85,6 +86,10 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Advanced features
+    src/agent/AdvancedBrain.cpp
+    src/agent/PerformanceProfiler.cpp
+    src/plasticity/CustomPlasticityRule.cpp
 )
 
 target_include_directories(nlm_core PUBLIC

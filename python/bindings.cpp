@@ -400,26 +400,98 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    // Advanced Brain Interface for Python Users
+    py::class_<AdvancedBrain>(m, "AdvancedBrain", 
+        "Enhanced brain interface with advanced monitoring and analytics")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create advanced brain with configuration")
+        .def("initialize", &AdvancedBrain::initialize,
+             "Initialize the advanced brain")
+        .def("step", static_cast<void (AdvancedBrain::*)(SimulationStep)>(&AdvancedBrain::step),
+             py::arg("currentStep"), "Perform a simulation step")
+        .def("step", static_cast<void (AdvancedBrain::*)(SimulationStep, Timestamp)>(&AdvancedBrain::step),
+             py::arg("currentStep"), py::arg("currentTime"), "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &AdvancedBrain::receiveSensoryInput,
+             py::arg("input"), "Inject sensory input into the brain")
+        .def("produceAction", &AdvancedBrain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &AdvancedBrain::reset,
+             "Reset brain state")
+        .def("save", &AdvancedBrain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &AdvancedBrain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("getAdvancedStats", &AdvancedBrain::getAdvancedStats,
+             "Get comprehensive brain statistics")
+        .def("enableMonitoring", &AdvancedBrain::enableMonitoring, py::arg("interval") = 100,
+             "Enable real-time performance monitoring")
+        .def("getPerformanceData", &AdvancedBrain::getPerformanceData,
+             "Get current performance monitoring data")
+        .def("analyzeLearningCurve", &AdvancedBrain::analyzeLearningCurve, py::arg("rewardHistory"),
+             "Analyze learning progress from reward history")
+        .def("runAdvancedExperiment", &AdvancedBrain::runAdvancedExperiment, py::arg("world"), py::arg("agent"), py::arg("experimentConfig"),
+             "Run sophisticated experiment with custom parameters")
+        .def("getBrain", &AdvancedBrain::getBrain,
+             py::return_value_policy::reference_internal, "Get the underlying brain");
+
+    // Performance Profiler
+    py::class_<PerformanceProfiler>(m, "PerformanceProfiler",
+        "Performance profiling and optimization tools")
+        .def_static("profileSimulation", &PerformanceProfiler::profileSimulation,
+                    py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 1000,
+                    "Profile simulation performance and identify bottlenecks")
+        .def_static("optimizeConfiguration", &PerformanceProfiler::optimizeConfiguration,
+                    py::arg("config"), "Suggest optimal configuration for target performance")
+        .def_static("benchmarkMemoryUsage", &PerformanceProfiler::benchmarkMemoryUsage,
+                    py::arg("brain"), py::arg("world"), py::arg("agent"),
+                    "Benchmark memory usage patterns")
+        .def_static("analyzePerformanceBottlenecks", &PerformanceProfiler::analyzePerformanceBottlenecks,
+                    py::arg("brain"), py::arg("world"), py::arg("agent"),
+                    "Analyze performance bottlenecks in detail");
+
+    // Custom Plasticity Rule Interface
+    py::class_<CustomPlasticityRule>(m, "CustomPlasticityRule",
+        "Base class for custom plasticity rules")
+        .def(py::init<>())
+        .def("update", &CustomPlasticityRule::update,
+             py::arg("synapse"), py::arg("history"), py::arg("dt"), py::arg("neuromod"),
+             "Update synapse based on custom plasticity rule")
+        .def("getName", &CustomPlasticityRule::getName,
+             "Get the name of this plasticity rule");
+
+    // Plugin Manager
+    py::class_<PluginManager>(m, "PluginManager",
+        "Plugin system for extending NLM functionality")
+        .def(py::init<>())
+        .def("loadPlugins", &PluginManager::loadPlugins, py::arg("directory"),
+             "Load plugins from directory")
+        .def("registerPlugin", &PluginManager::registerPlugin,
+             "Register a plugin instance")
+        .def("getPlugin", &PluginManager::getPlugin, py::arg("name"),
+             py::return_value_policy::reference_internal,
+             "Get a plugin by name")
+        .def("listPlugins", &PluginManager::listPlugins,
+             "List all registered plugins")
+        .def("enablePlugin", &PluginManager::enablePlugin, py::arg("name"),
+             "Enable a plugin")
+        .def("disablePlugin", &PluginManager::disablePlugin, py::arg("name"),
+             "Disable a plugin");
+
+    // Convenience functions for advanced users
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create an advanced configuration with optimal settings");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createAdvancedBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<AdvancedBrain> {
+        return std::make_shared<AdvancedBrain>(config);
+    }, py::arg("config"), "Create an advanced brain with enhanced features");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createPerformanceProfiler", []() -> std::shared_ptr<PerformanceProfiler> {
+        return std::make_shared<PerformanceProfiler>();
+    }, "Create a performance profiler for simulation analysis");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createPluginManager", []() -> std::shared_ptr<PluginManager> {
+        return std::make_shared<PluginManager>();
+    }, "Create a plugin manager for extending functionality");
 
 } // namespace nlm
