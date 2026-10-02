@@ -17,6 +17,8 @@ public:
     DevelopmentSystem();
     ~DevelopmentSystem();
     
+    // ========== DEVELOPMENT SYSTEM ==========
+
     // Get current developmental stage
     DevelopmentalStage getStage() const;
     void setStage(DevelopmentalStage stage);
@@ -45,6 +47,32 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // ========== DEVELOPMENT EFFECTS ==========
+    
+    // Apply developmental effects to neural excitability
+    float getNeuralExcitabilityModifier() const;
+    
+    // Apply developmental effects to attention
+    float getAttentionModulator() const;
+    
+    // Apply developmental effects to memory consolidation
+    float getMemoryConsolidationRate() const;
+    
+    // Apply developmental effects on plasticity rules
+    void applyDevelopmentalPlasticityRules(Brain* brain);
+    
+    // Check if developmental stage is optimal for learning
+    bool isOptimalLearningStage() const;
+    
+    // Get developmental stage-specific learning rate
+    float getStageSpecificLearningRate() const;
+    
+    // Get developmental stage-specific attention span
+    float getStageSpecificAttentionSpan() const;
+    
+    // Get developmental stage-specific memory capacity
+    float getStageSpecificMemoryCapacity() const;
     
 private:
     struct Impl;

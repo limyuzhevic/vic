@@ -28,6 +28,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class SensoryInput;
+class Action;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -171,7 +176,7 @@ public:
     void setDevelopmentalStage(DevelopmentalStage stage);
     
     // ========== NEUROMODULATION SYSTEMS ==========
-    
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -183,6 +188,34 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
+    
+    // Apply full neuromodulation effects
+    void applyFullNeuromodulation();
+    
+    // Get current sensory input (for integration with other systems)
+    SensoryInput getCurrentSensoryInput() const { return pImpl->currentSensoryInput; }
+    
+    // Get development effects on attention and memory
+    float getAttentionModulation() const { return pImpl->attentionModulation; }
+    float getMemoryConsolidationRate() const { return pImpl->memoryConsolidationRate; }
+    
+    // Get sleep/rest cycle state
+    float getSleepDrive() const { return pImpl->sleepDrive; }
+    float getArousalLevel() const { return pImpl->arousalLevel; }
+    
+    // Set integration state
+    void setResting(bool resting) { pImpl->isResting = resting; }
+    void setSleepDrive(float drive) { pImpl->sleepDrive = drive; }
+    void setArousalLevel(float level) { pImpl->arousalLevel = level; }
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
