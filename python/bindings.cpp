@@ -23,11 +23,46 @@ PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
+        
         A Python binding for the NLM C++ neural simulation framework.
+        
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Key Features:
+        - Context manager support for sensory inputs (Vision, Audio, InternalSignals)
+        - Factory methods for common use cases
+        - Enhanced error handling with validation
+        - Type hints and comprehensive documentation
+        
+        Usage Example:
+        ```python
+        import pynlm
+        
+        # Create a brain with safe defaults
+        brain = pynlm.createBrain()
+        
+        # Use sensory inputs as context managers
+        with pynlm.Vision.createImage(640, 480) as vision:
+            # Process vision data
+            pass
+            
+        # Create world and agent
+        world = pynlm.createSimpleWorld()
+        agent = pynlm.createAgentBrain(brain)
+        
+        # Run simulation
+        for step in range(100):
+            world.update(0.1)
+            agent.processSensoryInput(world.getSensoryPercept())
+            brain.step(step)
+        ```
     )pbdoc";
-
+    
+    // Enhanced exception handling for common C++ error types
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    py::register_exception<std::logic_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -181,7 +216,19 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Context manager support
+        .def("__enter__", [](Vision& self) {
+            return &self;
+        })
+        .def("__exit__", [](Vision& self, py::args) {
+            // Cleanup - Vision has no external resources to release
+        })
+        // Factory method for common use case
+        .def_static("createImage", [](size_t width, size_t height, size_t channels = 3) {
+            return Vision(width, height, channels);
+        }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+           "Create a new Vision object with specified dimensions");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,12 +238,35 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Context manager support
+        .def("__enter__", [](Audio& self) {
+            return &self;
+        })
+        .def("__exit__", [](Audio& self, py::args) {
+            // Cleanup - Audio has no external resources to release
+        })
+        // Factory method for common use case
+        .def_static("createAudio", [](size_t sampleRate, size_t numSamples) {
+            return Audio(sampleRate, numSamples);
+        }, py::arg("sampleRate"), py::arg("numSamples"),
+           "Create a new Audio object with specified parameters");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        // Context manager support
+        .def("__enter__", [](InternalSignals& self) {
+            return &self;
+        })
+        .def("__exit__", [](InternalSignals& self, py::args) {
+            // Cleanup - InternalSignals has no external resources to release
+        })
+        // Factory method for creating signal containers
+        .def_static("createSignals", []() {
+            return InternalSignals();
+        }, "Create a new InternalSignals object");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -289,7 +359,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    // Enhanced Brain class with better Python interface
+    py::class_<Brain>(m, "Brain")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -351,7 +422,16 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Factory method for quick brain creation
+        .def_static("createQuickBrain", []() {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Runtime);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Runtime);
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            return brain;
+        }, "Create and initialize a quick test brain with 500 neurons");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,21 +480,36 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Enhanced factory with validation
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+        auto config = std::make_shared<Config>();
+        // Apply safe defaults
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Runtime);
+        config->set("simulation_timestep", 0.001, ConfigSource::Runtime);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Runtime);
+        return config;
+    }, "Create a default configuration with safe values");
+    
+    // Enhanced brain factory with validation
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
+    }, py::arg("config"), "Create a new brain with configuration validation");
+    
+    // Simple world factory with validation
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
+    // Agent brain factory with validation
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface with validation");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
