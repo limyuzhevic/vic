@@ -25,28 +25,15 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <set>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
-}
+// Forward declarations for test implementations
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -159,6 +146,43 @@ struct LearningExperiment {
     }
 };
 
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Real LIF neuron dynamics                                ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+class ExperimentRunner {
+public:
+    void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+    void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+    void runStdpVerification(std::shared_ptr<Brain> brain);
+    void runAllTests(std::shared_ptr<Brain> brain);
+};
+
+void printBanner();
+bool setupConfiguration(int argc, char** argv, std::shared_ptr<Config>& config);
+void logConfigurationSummary(const std::shared_ptr<Config>& config);
+
+// Existing test implementations (moved from global scope)
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -321,27 +345,31 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
+void ExperimentRunner::runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+    runBasicConnectivityTest(brain); // Call the global implementation
+}
+
+void ExperimentRunner::runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+    runPlasticityExperiment(brain); // Call the global implementation
+}
+
+void ExperimentRunner::runStdpVerification(std::shared_ptr<Brain> brain) {
+    runStdpVerification(brain); // Call the global implementation
+}
+
+void ExperimentRunner::runAllTests(std::shared_ptr<Brain> brain) {
+    runBasicConnectivityTest(brain);
+    brain->reset();
+    brain->initialize();
+    runPlasticityExperiment(brain);
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
+}
+
+bool setupConfiguration(int argc, char** argv, std::shared_ptr<Config>& config) {
+    // Initialize configuration
+    config = std::make_shared<Config>();
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -382,7 +410,12 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    return true;
+}
+
+void logConfigurationSummary(const std::shared_ptr<Config>& config) {
+    if (!config) return;
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -391,6 +424,38 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+}
+
+int main(int argc, char** argv) {
+    printBanner();
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Setup configuration with CLI support
+    if (!setupConfiguration(argc, argv, config)) {
+        NLM_LOG_ERROR("Failed to setup configuration!");
+        return 1;
+    }
+    
+    // Log configuration summary
+    logConfigurationSummary(config);
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +474,9 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run all tests using ExperimentRunner
+    ExperimentRunner runner;
+    runner.runAllTests(brain);
     
     // Final brain status
     NLM_LOG_INFO("");

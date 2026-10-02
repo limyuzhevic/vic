@@ -134,8 +134,85 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Implements real integrate-and-fire dynamics with:
+    // - Leaky integration with conductance-based current
+    // - Threshold crossing and spike detection
+    // - Refractory period handling
+    // - Post-spike reset and adaptation
+    // - Synaptic and injected current integration
+    void step(Timestamp currentTime) {
+        NeuronState& state = pImpl->state;
+        
+        // Skip if in refractory period
+        if (state.refractoryRemaining > 0) {
+            state.refractoryRemaining--;
+            return;
+        }
+        
+        // Calculate total synaptic conductance
+        double totalConductance = state.synapseConductance;
+        
+        // Calculate synaptic current: I_syn = g_syn * (V_syn - V)
+        // Assuming excitatory synapses have +10mV reversal potential
+        const double excitatoryReversal = 10.0;
+        double synapticCurrent = totalConductance * (excitatoryReversal - state.membranePotential);
+        
+        // Calculate injected current (from external sources)
+        double injectedCurrent = static_cast<double>(getTotalCurrent());
+        
+        // Calculate membrane capacitance from leak conductance
+        // Using typical values: C = gL * tau, where tau = 20ms
+        const double membraneCapacitance = static_cast<double>(state.leakConductance) * 20.0; // nF
+        
+        // Calculate time derivative of membrane potential
+        double dvdt = 0.0;
+        if (membraneCapacitance > 0.0) {
+            // LIF equation with conductance-based currents
+            dvdt = (-state.leakConductance * (state.membranePotential - state.restingPotential) +
+                    synapticCurrent + injectedCurrent) / membraneCapacitance;
+        }
+        
+        // Integrate membrane potential
+        double dt = 0.001; // Fixed timestep for now (1ms)
+        state.membranePotential += static_cast<MembranePotential>(dvdt * dt);
+        
+        // Check for threshold crossing
+        if (checkThreshold() && state.firingState != FiringState::Spiking) {
+            state.firingState = FiringState::Spiking;
+            
+            // Record spike time
+            recordSpike(currentTime);
+            
+            // Reset membrane potential
+            state.membranePotential = state.resetPotential;
+            
+            // Start refractory period
+            state.refractoryRemaining = state.refractoryPeriod;
+        }
+        
+        // Apply spike reset for the current timestep
+        if (state.firingState == FiringState::Spiking) {
+            // Set adaptation variable to promote spike frequency adaptation
+            state.adaptationVariable += 1.0f;
+            
+            // Reduce adaptation over time
+            state.adaptationVariable *= 0.95f;
+            
+            // Move to after-spike refractory state
+            state.firingState = FiringState::Refractory;
+        }
+        
+        // Decay adaptation variable
+        if (state.adaptationVariable > 0.0f) {
+            state.adaptationVariable *= 0.99f;
+        }
+        
+        // Clear synaptic conductance
+        state.synapseConductance = 0.0f;
+        
+        // Clear injected current
+        clearTotalCurrent();
+    }
     
     // Reset to initial state
     void reset();
