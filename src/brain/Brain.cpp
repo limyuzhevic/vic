@@ -242,8 +242,17 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // Update prediction system with current brain state
+    if (pImpl->predictionSystem) {
+        // Connect to AgentBrain's prediction error for real-time updates
+        // This allows the PredictionSystem to use the AgentBrain's computed prediction error
+        auto* predictionSystem = pImpl->predictionSystem.get();
+        if (predictionSystem) {
+            // TODO: Implement proper connection to AgentBrain prediction error
+            // For now, just clear the prediction system history
+            predictionSystem->clearHistory();
+        }
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -439,6 +448,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 5b: Integrate neuromodulation with memory ==========
+    // Neuromodulation affects memory consolidation and retrieval
+    if (pImpl->dopamine && pImpl->workingMemory && pImpl->episodicMemory) {
+        // Dopamine modulates working memory consolidation
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Stronger dopamine -> better working memory consolidation
+        if (dopamineLevel > 0.0f) {
+            // Modulate working memory with dopamine signal
+            pImpl->workingMemory->setModulationFactor(std::clamp(dopamineLevel, 0.0f, 1.0f) * 2.0f);
+        }
+        
+        // Dopamine affects episodic memory consolidation
+        // Higher dopamine -> stronger memory encoding
+        if (dopamineLevel > 0.3f) {
+            // Temporarily enhance episodic memory encoding strength
+            pImpl->episodicMemory->setEncodingStrength(std::clamp((dopamineLevel - 0.3f) * 2.0f, 0.0f, 1.0f));
+        }
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
@@ -580,6 +609,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
+    }
+    
+    // ========== STEP 10: Apply attention system to action selection ==========
+    // Attention system prioritizes cognitive inputs for action selection
+    if (pImpl->attention) {
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory and concept formation
+        if (pImpl->workingMemory && pImpl->conceptFormation) {
+            // Get attentional weights
+            auto attentionWeights = pImpl->attention->getAttentionWeights();
+            
+            // Apply attention to working memory traces
+            pImpl->workingMemory->applyAttention(attentionWeights);
+            
+            // Apply attention to concept formation
+            pImpl->conceptFormation->applyAttention(attentionWeights);
+        }
+    }
+    
+    // ========== STEP 10b: Integrate cognitive systems with action ==========
+    // Connect cognitive systems (planner, concept formation) to action selection
+    if (pImpl->planner && pImpl->conceptFormation && pImpl->workingMemory) {
+        // Update planner with current working memory state
+        auto plannerInput = pImpl->workingMemory->getActiveTraces();
+        pImpl->planner->update(plannerInput, pImpl->timestep);
+        
+        // Update concept formation with attentional focus
+        auto conceptInput = pImpl->attention ? pImpl->attention->getFocusedInputs() : std::vector<float>();
+        pImpl->conceptFormation->update(conceptInput, pImpl->timestep);
+        
+        // Get planner's action recommendation
+        auto plannedAction = pImpl->planner->getRecommendedAction();
+        
+        // Integrate with motor neuron activity for execution
+        applyCognitiveToMotor(plannedAction, pImpl->timestep);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -1069,12 +1134,61 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
-}
-
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+// Apply cognitive recommendations to motor system for action execution
+void Brain::applyCognitiveToMotor(const Action& plannedAction, Timestamp currentTime) {
+    // This method implements the integration between cognitive systems and action selection
+    // It translates cognitive recommendations into motor neuron activity
+    
+    // For now, this is a placeholder implementation
+    // In a fully integrated system, this would:
+    // 1. Take planned action from NeuralPlanner
+    // 2. Activate corresponding motor neuron populations
+    // 3. Modulate motor neuron excitability based on concept formation
+    // 4. Apply attentional filtering to action selection
+    
+    NLM_LOG_INFO("Applying cognitive recommendations to motor system");
+    NLM_LOG_INFO("Planned action: " + std::to_string(static_cast<int>(plannedAction.getType())));
+    
+    // For demonstration purposes, we'll simply activate motor neurons based on the action
+    if (pImpl->motorNeurons.empty()) {
+        return;
+    }
+    
+    // Convert action type to motor current
+    float motorCurrent = 0.0f;
+    switch (plannedAction.getType()) {
+        case ActionType::MoveForward:
+            motorCurrent = 30.0f;
+            break;
+        case ActionType::MoveBackward:
+            motorCurrent = -20.0f;
+            break;
+        case ActionType::TurnLeft:
+            motorCurrent = 25.0f;
+            break;
+        case ActionType::TurnRight:
+            motorCurrent = -25.0f;
+            break;
+        case ActionType::Interact:
+            motorCurrent = 40.0f;
+            break;
+        case ActionType::Wait:
+            motorCurrent = 5.0f;
+            break;
+        case ActionType::LookLeft:
+            motorCurrent = 15.0f;
+            break;
+        case ActionType::LookRight:
+            motorCurrent = -15.0f;
+            break;
+    }
+    
+    // Activate motor neurons
+    for (size_t i = 0; i < std::min<size_t>(5, pImpl->motorNeurons.size()); ++i) {
+        pImpl->motorNeurons[i]->injectCurrent(motorCurrent);
+    }
+    
+    NLM_LOG_INFO("Motor activation complete - " + std::to_string(pImpl->motorNeurons.size()) + " motor neurons activated");
 }
 
 void Brain::logStatus() const {

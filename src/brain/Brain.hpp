@@ -28,6 +28,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Action;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -189,6 +190,9 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Apply cognitive recommendations to motor system for action execution
+    void applyCognitiveToMotor(const Action& plannedAction, Timestamp currentTime);
     
     // Logging
     void logStatus() const;
