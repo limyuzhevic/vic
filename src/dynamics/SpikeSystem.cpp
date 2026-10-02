@@ -1,6 +1,8 @@
 #include "SpikeSystem.hpp"
 #include <algorithm>
 #include <limits>
+#include <mutex>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -14,6 +16,9 @@ struct SpikeSystem::Impl {
     
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
+    
+    // Thread safety
+    mutable std::mutex mutex;
     
     Impl() : maxHistorySize(10000) {}
 };
@@ -36,19 +41,24 @@ SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
 }
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->pendingSpikes.push(event);
 }
 
 void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationStep step) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->pendingSpikes.emplace(neuron, timestamp, step);
 }
 
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     // Store by delivery step for efficient processing
     pImpl->delayedSpikes[event.delivery_step].push_back(event);
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     // Process all pending immediate spikes
     while (!pImpl->pendingSpikes.empty()) {
         SpikeEvent event = pImpl->pendingSpikes.front();
@@ -66,7 +76,7 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Track spike count per neuron
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
-        // Trim history if needed
+        // Trim history if needed - use circular buffer for O(1) operation
         if (pImpl->spikeHistory.size() > pImpl->maxHistorySize) {
             pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
         }
@@ -79,6 +89,8 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
 }
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     // Find and process all delayed spikes scheduled for this step
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
@@ -95,31 +107,38 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
 }
 
 void SpikeSystem::registerHandler(SpikeHandler handler) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->handlers.push_back(handler);
 }
 
 void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->delayedHandlers.push_back(handler);
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->spikeHistory;
 }
 
 void SpikeSystem::clearHistory() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
 }
 
 size_t SpikeSystem::getSpikeCount() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->spikeHistory.size();
 }
 
 size_t SpikeSystem::getPendingSpikeCount() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->pendingSpikes.size();
 }
 
 size_t SpikeSystem::getPendingDelayedCount() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     size_t count = 0;
     for (const auto& pair : pImpl->delayedSpikes) {
         count += pair.second.size();
@@ -128,6 +147,8 @@ size_t SpikeSystem::getPendingDelayedCount() const {
 }
 
 float SpikeSystem::getAverageSpikeRate() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     // Calculate average spike rate based on history
     if (pImpl->spikeHistory.size() < 2) {
         return 0.0f;
@@ -151,6 +172,8 @@ float SpikeSystem::getAverageSpikeRate() const {
 }
 
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
     std::vector<std::pair<uint64_t, size_t>> neuronCounts;
     neuronCounts.reserve(pImpl->spikeCountPerNeuron.size());
     
@@ -172,6 +195,7 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
 }
 
 void SpikeSystem::reset() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     while (!pImpl->pendingSpikes.empty()) {
         pImpl->pendingSpikes.pop();
     }
