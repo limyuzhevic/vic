@@ -5,19 +5,68 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include <unordered_set>
 
 namespace py = pybind11;
 namespace nlm {
+
+// Template ID class to eliminate duplication across different ID types
+template<typename IDType, typename ValueType>
+class IDWrapper {
+public:
+    IDWrapper() = default;
+    IDWrapper(uint64_t value) : value_(value) {}
+    
+    // Value accessor
+    uint64_t value() const { return value_; }
+    void value(uint64_t val) { value_ = val; }
+    
+    // Index method (if needed)
+    uint64_t index() const { return value_; }
+    
+    // Comparison operators
+    bool operator==(const IDType& other) const { return value_ == other.value_; }
+    bool operator!=(const IDType& other) const { return value_ != other.value_; }
+    
+    // Hash function for use in Python sets/dicts
+    size_t hash() const { return std::hash<uint64_t>{}(value_); }
+    
+    // String representation
+    std::string repr() const {
+        return "<" + std::string(#IDType) + ": " + std::to_string(value_) + ">";
+    }
+    
+protected:
+    uint64_t value_ = 0;
+};
+
+struct NeuronId : IDWrapper<NeuronId, uint64_t> {};
+struct SynapseId : IDWrapper<SynapseId, uint64_t> {};
+struct RegionId : IDWrapper<RegionId, uint64_t> {};
+struct PopulationId : IDWrapper<PopulationId, uint64_t> {};
+
+// Helper function to create templated ID class bindings
+template<typename IDType>
+void bindIDClass(py::module_& m, const std::string& name, const std::string& docstring) {
+    py::class_<IDType>(m, name.c_str(), docstring.c_str())
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &IDType::value)
+        .def("index", &IDType::index)
+        .def("__eq__", [](const IDType& self, const IDType& other) { return self == other; })
+        .def("__ne__", [](const IDType& self, const IDType& other) { return self != other; })
+        .def("__hash__", [](const IDType& id) { return std::hash<uint64_t>{}(id.value()); })
+        .def("__repr__", [](const IDType& id) {
+            // Extract class name from IDType
+            std::string className = typeid(IDType).name();
+            // Strip namespace and get just the class name
+            size_t pos = className.find_last_of(' ');
+            if (pos != std::string::npos) {
+                className = className.substr(pos + 1);
+            }
+            return "<" + className + ": " + std::to_string(id.value()) + ">";
+        });
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -29,49 +78,11 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+    // Bind ID classes using the helper function
+    bindIDClass<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc");
+    bindIDClass<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc");
+    bindIDClass<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc");
+    bindIDClass<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc");
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
