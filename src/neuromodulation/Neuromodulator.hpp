@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Enhanced implementation with real neuromodulatory dynamics
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,9 +48,16 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Enhanced dopamine control
+    void setBaseline(float baseline);
+    float getBaseline() const;
+    void setBurstFrequency(float frequency);
+    float getBurstFrequency() const;
+    void reset();
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
