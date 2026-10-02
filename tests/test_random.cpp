@@ -80,7 +80,7 @@ void testRandomBool() {
     
     bool val = rng.randomBool();
     // Just check it doesn't crash
-    assert(true || false);  // Always true
+    assert(val == true || val == false);  // Valid boolean value
     
     std::cout << "    testRandomBool passed" << std::endl;
 }
