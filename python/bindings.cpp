@@ -342,6 +342,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -350,8 +352,83 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get the random generator")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // Neuromodulation systems
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error system")
+        
+        // Plasticity systems
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        
+        // Spike system
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        
+        // Update methods (called automatically in step but exposed for control)
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes")
+        
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signals");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -416,10 +493,80 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Error types
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
+    py::register_exception<std::invalid_argument>(m, "ValueError", PyExc_ValueError);
+    py::register_exception<std::out_of_range>(m, "IndexError", PyExc_IndexError);
+    
+    // Version and module information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) - Experimental Artificial Developmental Brain";
+    
+    // Module-level constants
+    m.attr("MAX_NEURONS") = std::numeric_limits<size_t>::max();
+    m.attr("MAX_SYNAPSES") = std::numeric_limits<size_t>::max();
+    m.attr("DEFAULT_TIMESTEP") = 0.001;
+    m.attr("DEFAULT_SEED") = 42;
+
+    // Utility functions for advanced usage
+    m.def("createExampleConfig", [](size_t neuronCount, size_t regionCount) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount, nlm::ConfigSource::Default);
+        config->set("region_count", regionCount, nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, nlm::ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, nlm::ConfigSource::Default);
+        return config;
+    }, py::arg("neuron_count") = 1000, py::arg("region_count") = 1,
+       "Create a configuration optimized for typical NLM simulations");
+
+    m.def("runBrainSimulation", [](std::shared_ptr<Brain> brain, size_t steps, 
+                                 bool verbose = false) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+            if (verbose && i % 100 == 0) {
+                std::cout << "Step " << i << ": " 
+                         << brain->getFiringNeuronCount() << " firing neurons, "
+                         << brain->getTotalSpikeCount() << " total spikes" 
+                         << std::endl;
+            }
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), py::arg("verbose") = false,
+       "Run a complete brain simulation for the specified number of steps");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain for benchmarking");
+        }
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        double msPerStep = static_cast<double>(duration.count()) / steps;
+        
+        std::cout << "Benchmark: " << steps << " steps in " 
+                 << duration.count() << " ms (" 
+                 << msPerStep << " ms/step)" << std::endl;
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getTotalNeuronCount(),
+            duration.count(),
+            msPerStep
+        );
+    }, py::arg("brain"), py::arg("steps"),
+       "Benchmark brain performance and return statistics");
 }
 
 } // namespace nlm

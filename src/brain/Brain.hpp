@@ -187,13 +187,17 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
+// Get random generator
     RandomGenerator* getRandomGenerator();
     
     // Logging
     void logStatus() const;
     
-private:
+    // Get current simulation time and step
+    Timestamp getCurrentTime() const;
+    SimulationStep getCurrentStep() const;
+    
+    private:
     struct Impl;
     Impl* pImpl;
 };

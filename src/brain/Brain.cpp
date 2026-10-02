@@ -1105,6 +1105,10 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
+    // Current simulation state
+    NLM_LOG_INFO("Current step: " + std::to_string(pImpl->currentStep));
+    NLM_LOG_INFO("Current time: " + std::to_string(pImpl->currentTime));
+    
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
@@ -1112,6 +1116,26 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// Get current simulation time
+Timestamp Brain::getCurrentTime() const {
+    return pImpl->currentTime;
+}
+
+// Get current step number
+SimulationStep Brain::getCurrentStep() const {
+    return pImpl->currentStep;
+}
+
+// Get current simulation time
+Timestamp Brain::getCurrentTime() const {
+    return pImpl->currentTime;
+}
+
+// Get current step number
+SimulationStep Brain::getCurrentStep() const {
+    return pImpl->currentStep;
 }
 
 } // namespace nlm
