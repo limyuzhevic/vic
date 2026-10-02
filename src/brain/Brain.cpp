@@ -12,6 +12,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -27,15 +28,12 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+// ========== INTEGRATED PREDICTION SYSTEM =========
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
-    
+    std::unique_ptr<NeuralPrediction> neuralPrediction;
+    std::unique_ptr<ActionConsequencePredictor> actionConsequencePredictor;
+    std::unique_ptr<PredictionErrorSignal> predictionErrorSignal;
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
@@ -113,13 +111,39 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+        // Initialize prediction systems
         predictionSystem = std::make_unique<PredictionSystem>();
+        neuralPrediction = std::make_unique<NeuralPrediction>();
+        predictionError = std::make_unique<PredictionErrorSignal>();
+        actionConsequencePredictor = std::make_unique<ActionConsequencePredictor>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Initialize attentional selection with brain reference
+        if (attention) {
+            attention->initialize(this);
+        }
+        
+        // Initialize prediction systems with brain reference
+        if (neuralPrediction) {
+            neuralPrediction->initialize(this);
+            // Configure prediction parameters from config
+            neuralPrediction->setSequenceMemorySize(100);
+            neuralPrediction->setPredictionHorizon(3);
+            neuralPrediction->enableTemporalPrediction(true);
+            neuralPrediction->enableActionConsequencePrediction(true);
+        }
+        
+        if (actionConsequencePredictor) {
+            actionConsequencePredictor->initialize(this);
+        }
+        
+        if (predictionError) {
+            predictionError->setSurpriseThreshold(0.3f);
+        }
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -128,6 +152,18 @@ struct Brain::Impl {
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
+        novelty = std::make_unique<Novelty>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionErrorSignal>();
+        novelty = std::make_unique<Novelty>();
+        
+        // Initialize neuromodulation systems
+        dopamine = std::make_unique<Dopamine>();
+        curiosity = std::make_unique<Curiosity>();
+        predictionError = std::make_unique<PredictionErrorSignal>();
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
@@ -510,12 +546,33 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->neuralPrediction) {
+        // Neural prediction system updates (replaces placeholder)
+        pImpl->neuralPrediction->updateWithObservation(
+            {}, pImpl->currentStep);  // TODO: Pass actual sensory state
+        
+        // Check for prediction error and integrate with neuromodulation
+        float predictionError = pImpl->neuralPrediction->getPredictionError();
+        if (predictionError > 0.0f && pImpl->predictionError) {
+            // Use prediction error for neuromodulation
+            pImpl->predictionError->recordError(predictionError, pImpl->currentStep);
+            
+            // Convert error to neuromodulation signal
+            float errorSignal = pImpl->predictionError->getModulationSignal();
+            
+            // Apply to dopamine for reward-modulated learning
+            if (errorSignal > 0.0f && pImpl->dopamine) {
+                // Stronger prediction error = stronger dopamine signal
+                pImpl->dopamine->setLevel(std::min(1.0f, errorSignal * 2.0f));
+            }
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
+    if (pImpl->actionConsequencePredictor) {
+        // Action consequence prediction updates
+        // TODO: Integrate with action selection system
+    }
+    
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -1017,10 +1074,18 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// ========== PREDICTION SYSTEM ACCESSORS ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
+}
+
+ActionConsequencePredictor* Brain::getActionConsequencePredictor() {
+    return pImpl->actionConsequencePredictor.get();
+}
+
+PredictionErrorSignal* Brain::getPredictionErrorSignal() {
+    return pImpl->predictionError.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
