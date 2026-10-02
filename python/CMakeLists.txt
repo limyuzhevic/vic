@@ -87,9 +87,16 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+pybind11_add_module(pynlm bindings_enhanced.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
