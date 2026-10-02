@@ -271,27 +271,130 @@ print("Agent simulation complete!")
 
 ---
 
-## Troubleshooting
+## Quick Reference - NEW FACTORIES (ENHANCED!)
+
+| What you want | Code (Old) | Code (New) |
+|--------------|------------|------------|
+| Create default brain | `pynlm.createBrain(config)` | `pynlm.createDefaultBrain()` |
+| Create minimal brain | `pynlm.createBrain(minimal_config)` | `pynlm.createMinimalBrain()` |
+| Create experimental brain | Custom config | `pynlm.createExperimentalBrain()` |
+| Create research brain | Custom config | `pynlm.createResearchBrain()` |
+| Create custom brain | `BrainConfigBuilder()` | `pynlm.BrainConfigBuilder()` |
+| Validate config | Manual checking | `pynlm.validateConfig(config)` |
+| Load from file | Custom code | `pynlm.createBrainFromFile()` |
+
+---
+
+## Troubleshooting (ENHANCED!)
 
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
-- Try increasing the number of steps
+- Try using a brain with features enabled (`createExperimentalBrain()`)
+- Check that the brain has neurons and synapses
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Try enabling curiosity for exploration behavior
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Use a brain with neuromodulation enabled for better activity
+
+**"Configuration validation failed"**
+- Try using `pynlm.validateConfig(config)` before creating brain
+- Use factory methods for pre-validated configurations
+- Check configuration file format if loading from file
+
+---
+
+## New Features Available Now
+
+1. **Factory Methods**: `createDefaultBrain()`, `createMinimalBrain()`, `createExperimentalBrain()`, `createResearchBrain()`
+2. **Configuration Builder**: `BrainConfigBuilder()` for custom configurations
+3. **Validation**: `validateConfig()` for checking configuration before use
+4. **File Loading**: `createBrainFromFile()` for loading saved brains
+5. **Callbacks**: `createBrainWithCallback()` for custom initialization
+6. **Enhanced Error Handling**: Better error messages and recovery
+7. **Memory Management**: Fixed memory leaks in Brain.cpp
+8. **Performance Improvements**: Better initialization and resource management
+
+---
+
+## Example: Using New Factory Methods
+
+### Create Different Types of Brains
+
+```python
+import pynlm
+
+# Fast, simple brain for testing
+minimal_brain = pynlm.createMinimalBrain()
+minimal_brain.initialize()
+
+# General purpose brain with all features
+experimental_brain = pynlm.createExperimentalBrain()
+experimental_brain.initialize()
+
+# Research-grade brain with maximum capabilities
+research_brain = pynlm.createResearchBrain()
+research_brain.initialize()
+```
+
+### Create Custom Brain with Builder
+
+```python
+# Create a custom configuration
+config = pynlm.BrainConfigBuilder() \
+    .set_neuron_count(2000) \
+    .set_region_count(8) \
+    .enable_curiosity(True) \
+    .enable_structural_plasticity(True) \
+    .enable_memory(True) \
+    .build()
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### Validate Configuration Before Use
+
+```python
+config = pynlm.BrainConfigBuilder() \
+    .set_neuron_count(1500) \
+    .enable_neuromodulation(True) \
+    .build()
+
+# Validate before creating brain
+if pynlm.validateConfig(config):
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+else:
+    print("Configuration has errors!")
+```
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read `HOW_TO_USE.md` for more details on the complete API
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the examples in the `examples/` directory
+5. Use the new `docs/ADVANCED_CONFIGURATION.md` for advanced usage
+6. Use `docs/EXPERIMENTS.md` to learn about running experiments
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its new features and improvements.
+
+## Key Improvements Made
+
+1. **Fixed Memory Leaks**: Brain.cpp now properly initializes smart pointers
+2. **Added Factory Methods**: Easy creation of pre-configured brains
+3. **Enhanced Configuration**: BrainConfigBuilder for custom setups
+4. **Better Error Handling**: Comprehensive validation and error messages
+5. **Improved Documentation**: Clearer documentation and examples
+6. **Advanced APIs**: New features for expert users
+7. **Performance Optimizations**: Better resource management
+8. **Backward Compatibility**: All existing code continues to work

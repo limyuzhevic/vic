@@ -80,7 +80,7 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
+        , rng(std::make_unique<RandomGenerator>(42))
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -90,15 +90,32 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
+        rng->setSeed(seed);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();

@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <functional>
 
 namespace nlm {
 
@@ -28,6 +29,57 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointManager;
+
+// Brain configuration builder
+class BrainConfigBuilder {
+public:
+    BrainConfigBuilder();
+    ~BrainConfigBuilder();
+    
+    // Setters for configuration parameters
+    BrainConfigBuilder& setNeuronCount(size_t count);
+    BrainConfigBuilder& setRegionCount(size_t count);
+    BrainConfigBuilder& setConnectionProbability(float prob);
+    BrainConfigBuilder& setTimestep(double timestep);
+    BrainConfigBuilder& setRandomSeed(uint64_t seed);
+    BrainConfigBuilder& enableNeuromodulation(bool enable);
+    BrainConfigBuilder& enableDevelopment(bool enable);
+    BrainConfigBuilder& enableCuriosity(bool enable);
+    BrainConfigBuilder& enableStructuralPlasticity(bool enable);
+    BrainConfigBuilder& enableMemory(bool enable);
+    BrainConfigBuilder& enablePrediction(bool enable);
+    BrainConfigBuilder& enableCognition(bool enable);
+    
+    // Custom configuration callback
+    BrainConfigBuilder& setCustomConfig(const std::function<void(std::shared_ptr<Config>)>& callback);
+    
+    // Build the final configuration
+    std::shared_ptr<Config> build() const;
+    
+    // Apply to an existing config
+    void applyTo(std::shared_ptr<Config> config) const;
+    
+    // Default configurations
+    static std::shared_ptr<Config> defaultConfig();
+    static std::shared_ptr<Config> minimalConfig();
+    static std::shared_ptr<Config> experimentalConfig();
+    static std::shared_ptr<Config> researchConfig();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Simplified brain factory
+class BrainFactory {
+public:
+    static std::shared_ptr<Brain> createDefaultBrain(const std::string& configName = "default");
+    static std::shared_ptr<Brain> createMinimalBrain();
+    static std::shared_ptr<Brain> createExperimentalBrain();
+    static std::shared_ptr<Brain> createFromConfig(const std::string& configFile);
+    static std::shared_ptr<Brain> createWithCallback(const std::function<void(std::shared_ptr<Brain>)>& initCallback);
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

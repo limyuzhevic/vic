@@ -404,7 +404,11 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Python-friendly factory functions for creating brains with different configurations
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("Configuration cannot be null");
+        }
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
@@ -413,8 +417,89 @@ PYBIND11_MODULE(pynlm, m) {
     }, "Create a new simple world");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Configuration validation and error handling
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::invalid_argument("Configuration cannot be null");
+        }
+        if (!config->has("neuron_count") || !config->has("region_count")) {
+            throw std::invalid_argument("Configuration must include neuron_count and region_count");
+        }
+        auto neuronCountOpt = config->get<size_t>("neuron_count");
+        auto regionCountOpt = config->get<size_t>("region_count");
+        if (neuronCountOpt && (*neuronCountOpt == 0 || *neuronCountOpt > 1000000)) {
+            throw std::invalid_argument("Neuron count must be between 1 and 1,000,000");
+        }
+        if (regionCountOpt && (*regionCountOpt == 0 || *regionCountOpt > 100)) {
+            throw std::invalid_argument("Region count must be between 1 and 100");
+        }
+        return true;
+    }, py::arg("config"), "Validate configuration for errors");
+
+    m.def("applyConfigValidation", [](std::shared_ptr<Config> config) {
+        if (!validateConfig(config)) {
+            throw std::runtime_error("Configuration validation failed");
+        }
+        return config;
+    }, py::arg("config"), "Apply configuration validation");
+
+    // Brain factory methods
+    m.def("createDefaultBrain", [](const std::string& configName) -> std::shared_ptr<Brain> {
+        if (configName == "default") {
+            auto config = BrainConfigBuilder::defaultConfig();
+            return std::make_shared<Brain>(config);
+        } else if (configName == "minimal") {
+            auto config = BrainConfigBuilder::minimalConfig();
+            return std::make_shared<Brain>(config);
+        } else if (configName == "experimental") {
+            auto config = BrainConfigBuilder::experimentalConfig();
+            return std::make_shared<Brain>(config);
+        } else if (configName == "research") {
+            auto config = BrainConfigBuilder::researchConfig();
+            return std::make_shared<Brain>(config);
+        } else {
+            throw std::invalid_argument("Unknown configuration name: " + configName);
+        }
+    }, py::arg("configName") = "default", "Create a brain with preset configuration");
+
+    m.def("createMinimalBrain", []() -> std::shared_ptr<Brain> {
+        auto config = BrainConfigBuilder::minimalConfig();
+        return std::make_shared<Brain>(config);
+    }, "Create a minimal brain with reduced features");
+
+    m.def("createExperimentalBrain", []() -> std::shared_ptr<Brain> {
+        auto config = BrainConfigBuilder::experimentalConfig();
+        return std::make_shared<Brain>(config);
+    }, "Create an experimental brain with enhanced features");
+
+    m.def("createResearchBrain", []() -> std::shared_ptr<Brain> {
+        auto config = BrainConfigBuilder::researchConfig();
+        return std::make_shared<Brain>(config);
+    }, "Create a research-grade brain with maximum features");
+
+    m.def("createBrainFromFile", [](const std::string& configFile) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load configuration from file: " + configFile);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFile"), "Create a brain from configuration file");
+
+    m.def("createBrainWithCallback", [](std::function<void(std::shared_ptr<Brain>)> initCallback) -> std::shared_ptr<Brain> {
+        auto config = BrainConfigBuilder::defaultConfig();
+        auto brain = std::make_shared<Brain>(config);
+        initCallback(brain);
+        return brain;
+    }, py::arg("initCallback"), "Create a brain with custom initialization callback");
+
+    // Brain configuration builder with Pythonic interface
+    BrainConfigBuilder::registerPythonBindings(m);
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
