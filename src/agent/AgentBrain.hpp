@@ -109,6 +109,10 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Vision configuration
+    size_t visionWidth_;
+    size_t visionHeight_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;

@@ -279,7 +279,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
+.def("getWidth", &SimpleWorld::getWidth)
         .def("getHeight", &SimpleWorld::getHeight)
         .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
         .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
@@ -420,6 +420,278 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced Python features
+    
+    // Batch simulation operation for efficiency
+    m.def("run_batch_simulation", [](std::shared_ptr<Brain> brain, 
+                                     std::shared_ptr<SimpleWorld> world,
+                                     std::shared_ptr<AgentBrain> agent,
+                                     size_t num_steps, double timestep,
+                                     bool enable_learning = true) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Invalid null pointer provided to run_batch_simulation");
+        }
+        
+        // Validate configuration
+        if (timestep <= 0.0) {
+            throw std::runtime_error("Timestep must be positive");
+        }
+        
+        agent->initialize(*world);
+        
+        // Enable learning features if requested
+        if (enable_learning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+        }
+        
+        // Run batch simulation
+        for (size_t step = 0; step < num_steps; ++step) {
+            // Update world
+            world->update(timestep);
+            
+            // Get sensory input and process
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step, step * timestep);
+            
+            // Decode motor command and apply action
+            auto motor_cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motor_cmd, world->getSimulationTime());
+            
+            // Apply reward modulation if enabled
+            if (enable_learning) {
+                float reward = 0.0f;
+                if (!percept.getInternal().empty()) {
+                    reward = percept.getInternal()[0];
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(timestep);
+            }
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            world->getSimulationTime(),
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+          py::arg("num_steps"), py::arg("timestep"), py::arg("enable_learning") = true,
+          "Run a complete simulation with multiple steps efficiently");
+    
+    // Configuration validation utility
+    m.def("validate_configuration", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Configuration cannot be null");
+        }
+        
+        std::vector<std::string> errors;
+        
+        // Check basic configuration parameters
+        if (!config->has("brain.neuron_count")) {
+            errors.push_back("Missing required parameter: brain.neuron_count");
+        } else {
+            int64_t neuron_count = config->getOr<int64_t>("brain.neuron_count", 0);
+            if (neuron_count <= 0) {
+                errors.push_back("brain.neuron_count must be positive");
+            }
+        }
+        
+        if (!config->has("brain.connection_probability")) {
+            errors.push_back("Missing required parameter: brain.connection_probability");
+        } else {
+            float conn_prob = config->getOr<float>("brain.connection_probability", 0.0f);
+            if (conn_prob < 0.0f || conn_prob > 1.0f) {
+                errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        
+        if (!errors.empty()) {
+            std::string error_msg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                error_msg += "  - " + error + "\n";
+            }
+            throw std::runtime_error(error_msg);
+        }
+        
+        return true;
+    }, py::arg("config"), "Validate configuration and return true if valid");
+    
+    // Utility function for running experiments with statistics
+    m.def("run_experiment", [](std::shared_ptr<Brain> brain,
+                               std::shared_ptr<SimpleWorld> world,
+                               std::shared_ptr<AgentBrain> agent,
+                               size_t num_steps, double timestep) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Invalid null pointer provided to run_experiment");
+        }
+        
+        // Initialize experiment
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        
+        // Track statistics
+        std::vector<float> firing_rates;
+        std::vector<float> curiosity_levels;
+        std::vector<float> novelty_levels;
+        double start_time = world->getSimulationTime();
+        
+        // Run experiment
+        for (size_t step = 0; step < num_steps; ++step) {
+            // Update world
+            world->update(timestep);
+            
+            // Get sensory input and process
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step, step * timestep);
+            
+            // Decode motor command and apply action
+            auto motor_cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motor_cmd, world->getSimulationTime());
+            
+            // Apply learning
+            float reward = 0.0f;
+            if (!percept.getInternal().empty()) {
+                reward = percept.getInternal()[0];
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(timestep);
+            
+            // Collect statistics
+            firing_rates.push_back(brain->getAverageFiringRate());
+            curiosity_levels.push_back(agent->getCuriosityLevel());
+            novelty_levels.push_back(agent->getNoveltyLevel());
+        }
+        
+        double end_time = world->getSimulationTime();
+        double total_time = end_time - start_time;
+        
+        // Calculate summary statistics
+        float avg_firing_rate = 0.0f;
+        float avg_curiosity = 0.0f;
+        float avg_novelty = 0.0f;
+        
+        if (!firing_rates.empty()) {
+            float sum_firing = std::accumulate(firing_rates.begin(), firing_rates.end(), 0.0f);
+            avg_firing_rate = sum_firing / firing_rates.size();
+        }
+        
+        if (!curiosity_levels.empty()) {
+            float sum_curiosity = std::accumulate(curiosity_levels.begin(), curiosity_levels.end(), 0.0f);
+            avg_curiosity = sum_curiosity / curiosity_levels.size();
+        }
+        
+        if (!novelty_levels.empty()) {
+            float sum_novelty = std::accumulate(novelty_levels.begin(), novelty_levels.end(), 0.0f);
+            avg_novelty = sum_novelty / novelty_levels.size();
+        }
+        
+        return std::make_tuple(
+            avg_firing_rate,
+            avg_curiosity,
+            avg_novelty,
+            total_time,
+            brain->getTotalSpikeCount(),
+            brain->getTotalSynapseCount()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), 
+          py::arg("num_steps"), py::arg("timestep"), 
+          "Run a complete experiment and return statistics");
+    
+    // Convenience function for quick test setup
+    m.def("quick_test_setup", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0, 10.0);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, world, agent);
+    }, "Create a quick test setup with reasonable defaults");
+    
+    // Function to run a complete learning episode
+    m.def("run_learning_episode", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t max_steps, double timestep) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Invalid null pointer provided to run_learning_episode");
+        }
+        
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        float total_reward = 0.0f;
+        size_t steps_completed = 0;
+        
+        for (size_t step = 0; step < max_steps; ++step) {
+            // Update world
+            world->update(timestep);
+            
+            // Get sensory input and process
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain step
+            brain->step(step, step * timestep);
+            
+            // Decode motor command and apply action
+            auto motor_cmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motor_cmd, world->getSimulationTime());
+            
+            // Apply reward and learning
+            float reward = 0.0f;
+            if (!percept.getInternal().empty()) {
+                reward = percept.getInternal()[0];
+            }
+            total_reward += reward;
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(timestep);
+            
+            steps_completed = step + 1;
+            
+            // Early stopping if agent falls into a hole or gets too far away
+            auto body = world->getAgentBody();
+            if (body.x < 0.0 || body.x >= world->getWidth() || 
+                body.y < 0.0 || body.y >= world->getHeight() ||
+                body.health <= 0.0f) {
+                break;
+            }
+        }
+        
+        return std::make_tuple(
+            steps_completed,
+            total_reward,
+            brain->getAverageFiringRate(),
+            agent->getCuriosityLevel(),
+            agent->getDevelopmentalStage()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+          py::arg("max_steps"), py::arg("timestep"), 
+          "Run a complete learning episode and return results");
 }
+
+} // namespace nlm
+
 
 } // namespace nlm

@@ -153,6 +153,87 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
+### Pattern 4: Advanced Operations
+
+```python
+# Batch simulation for efficiency
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run efficient batch simulation
+stats = pynlm.run_batch_simulation(brain, world, agent, num_steps=1000, timestep=0.1)
+spike_count, sim_time, curiosity, novelty = stats
+print(f"Completed {sim_time}s simulation with {spike_count} spikes")
+print(f"Final curiosity: {curiosity:.3f}, novelty: {novelty:.3f}")
+```
+
+### Pattern 5: Error Handling and Validation
+
+```python
+import pynlm
+
+# Configuration validation before use
+try:
+    config = pynlm.createDefaultConfig()
+    config.set("brain.neuron_count", 500)
+    
+    # This will raise an exception if validation fails
+    pynlm.validate_configuration(config)
+    print("Configuration is valid")
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    print("Brain initialized successfully")
+    
+except pynlm.RuntimeError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Pattern 6: Complete Experiment Framework
+
+```python
+import pynlm
+
+# Quick setup for experiments
+def run_learning_experiment(num_steps=500):
+    # Use the quick setup helper
+    brain, world, agent = pynlm.quick_test_setup()
+    
+    # Run a complete learning episode
+    results = pynlm.run_learning_episode(
+        brain=brain,
+        world=world, 
+        agent=agent,
+        max_steps=num_steps,
+        timestep=0.1
+    )
+    
+    steps_completed, total_reward, firing_rate, curiosity, dev_stage = results
+    
+    print(f"Learning episode completed:")
+    print(f"  - {steps_completed} steps")
+    print(f"  - Total reward: {total_reward:.2f}")
+    print(f"  - Average firing rate: {firing_rate:.2f} Hz")
+    print(f"  - Final curiosity: {curiosity:.3f}")
+    print(f"  - Development stage: {dev_stage}")
+    
+    return results
+
+# Run the experiment
+experiment_results = run_learning_experiment(1000)
+```
+
 ---
 
 ## What Each Part Does
@@ -178,6 +259,23 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+### New Advanced Functions
+
+#### `pynlm.run_batch_simulation(brain, world, agent, num_steps, timestep, enable_learning=True)`
+Efficient batch simulation that runs multiple steps and returns statistics.
+
+#### `pynlm.validate_configuration(config)`
+Validates configuration parameters and throws descriptive exceptions on errors.
+
+#### `pynlm.run_experiment(brain, world, agent, num_steps, timestep)`
+Runs a complete experiment and returns detailed statistics about the simulation.
+
+#### `pynlm.quick_test_setup()`
+Convenience function that creates a complete test setup with reasonable defaults.
+
+#### `pynlm.run_learning_episode(brain, world, agent, max_steps, timestep)`
+Runs a complete learning episode with automatic error handling and early stopping.
 
 ---
 
@@ -268,6 +366,57 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Run batch sim | `pynlm.run_batch_simulation(...)` |
+| Validate config | `pynlm.validate_configuration(config)` |
+| Quick setup | `pynlm.quick_test_setup()` |
+
+## Advanced Features Documentation
+
+### Batch Simulation
+`run_batch_simulation()` provides efficient batch processing for running multiple simulation steps. This is useful for:
+- Running long simulations without manual intervention
+- Collecting statistical data over time
+- Testing agent behavior in stable environments
+
+**Parameters:**
+- `brain`: Brain instance
+- `world`: World instance  
+- `agent`: Agent brain interface
+- `num_steps`: Number of steps to simulate
+- `timestep`: Simulation time step
+- `enable_learning`: Whether to enable learning features
+
+**Returns:** Tuple of (spike_count, simulation_time, curiosity_level, novelty_level)
+
+### Configuration Validation
+`validate_configuration()` checks if a configuration is valid before use. This helps catch:
+- Missing required parameters
+- Invalid parameter values
+- Type mismatches
+
+**Example:**
+```python
+# This will throw an exception if validation fails
+pynlm.validate_configuration(config)
+```
+
+### Experiment Framework
+`run_experiment()` provides a complete framework for running experiments with automatic statistics collection. Useful for:
+- Scientific experiments
+- Performance benchmarking
+- Research studies
+
+### Quick Setup
+`quick_test_setup()` creates a complete test environment with reasonable defaults. Perfect for:
+- Getting started quickly
+- Testing and development
+- Educational purposes
+
+### Learning Episode
+`run_learning_episode()` runs a complete learning episode with automatic:
+- Early stopping for safety
+- Learning feature activation
+- Result collection and reporting
 
 ---
 
@@ -276,22 +425,64 @@ print("Agent simulation complete!")
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Check that sensory input is connected
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Verify that brain is producing motor commands
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+**"Configuration validation failed"**
+- Run `pynlm.validate_configuration(config)` to see specific errors
+- Check documentation for required parameters
+
+**"Batch simulation returned unexpected results"**
+- Check that all input objects are not null
+- Verify that timestep is positive
+- Ensure brain, world, and agent are properly initialized
+
+**"Learning episode terminated early"**
+- Check agent health and position in world
+- Verify environment has valid termination conditions
+- Review world configuration for obstacles or hazards
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details** - Technical reference and C++ integration guide
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works** - Deep dive into NLM architecture
+3. **Experiment with different configurations!** - Try different parameters and settings
+4. **Use advanced features like `run_batch_simulation()`** - Efficient batch processing for research
+5. **Validate your configurations** - Catch errors early with `validate_configuration()`
+
+That's it! You're now ready to use NLM's advanced features. The system combines simple ease-of-use with powerful capabilities for research and production use.
+
+## Quick Start Summary
+
+For beginners, start with:
+```python
+import pynlm
+
+# Quick setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simple simulation
+for i in range(100):
+    brain.step(i)
+    
+print("Simulation complete!")
+```
+
+For advanced users, explore:
+```python
+import pynlm
+
+# Full experiment with all features
+brain, world, agent = pynlm.quick_test_setup()
+results = pynlm.run_batch_simulation(brain, world, agent, 1000, 0.1)
+pynlm.validate_configuration(brain.getConfig())
+```

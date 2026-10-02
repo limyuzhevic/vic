@@ -18,7 +18,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , visionWidth_(0)
+    , visionHeight_(0)
     , sensoryNoveltyDecay_(0.99f)
+    , previousVision_()
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -64,7 +67,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 AgentBrain::~AgentBrain() = default;
 
 void AgentBrain::initialize(const SimpleWorld& world) {
-    previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
+    visionWidth_ = world.getVisionWidth();
+    visionHeight_ = world.getVisionHeight();
+    previousVision_.resize(visionWidth_ * visionHeight_, 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
@@ -84,67 +89,92 @@ size_t AgentBrain::getMotorOutputSize() const {
     return 6;
 }
 
+// Process sensory input and inject into brain
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Validate input percept
+    if (!percept.getVision().empty() && 
+        sensoryVision_.size() > 0 && visionWidth_ > 0 && visionHeight_ > 0) {
+        // Vision input (256 values -> sensoryVision_ neurons)
+        const auto& vision = percept.getVision();
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                // Clamp to reasonable range to prevent excessive neuron excitation
+                current = std::clamp(current, -100.0f, 100.0f);
+                sensoryVision_[i]->injectCurrent(current);
+            }
+        }
+    }
+    
+    if (!percept.getTouch().empty() && sensoryTouch_.size() > 0) {
+        // Touch input (8 values -> sensoryTouch_ neurons)
+        const auto& touch = percept.getTouch();
+        for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+            if (sensoryTouch_[i]) {
+                float current = touch[i] * 8.0f;  // Collision signal
+                current = std::clamp(current, -50.0f, 50.0f);
+                sensoryTouch_[i]->injectCurrent(current);
+            }
+        }
+    }
+    
+    if (!percept.getInternal().empty() && sensoryInternal_.size() > 0) {
+        // Internal signals (4 values -> sensoryInternal_ neurons)
+        const auto& intern = percept.getInternal();
+        for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+            if (sensoryInternal_[i]) {
+                float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+                current = std::clamp(current, -25.0f, 25.0f);
+                sensoryInternal_[i]->injectCurrent(current);
+            }
+        }
+    }
+    
+    if (!percept.getProprioception().empty() && sensoryProprioception_.size() > 0) {
+        // Proprioception (6 values -> sensoryProprioception_ neurons)
+        const auto& proprio = percept.getProprioception();
+        for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+            if (sensoryProprioception_[i]) {
+                float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+                current = std::clamp(current, -20.0f, 20.0f);
+                sensoryProprioception_[i]->injectCurrent(current);
+            }
+        }
+    }
+    
+    // Compute novelty (difference from previous vision) - optimized with early exit
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
+    if (!vision.empty() && !previousVision_.empty() && 
+        vision.size() == previousVision_.size()) {
+        
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
+        size_t validPixels = 0;
+        
+        // Only compute diff for valid vision pixels
+        for (size_t i = 0; i < vision.size(); ++i) {
             float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+            if (diff > 0.001f) {  // Only count meaningful differences
+                totalDiff += diff;
+                validPixels++;
+            }
         }
         
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
+        // Normalize - only compute if we have valid differences
+        if (validPixels > 0) {
+            noveltyLevel_ = totalDiff / validPixels;
+            noveltyLevel_ *= sensoryNoveltyDecay_;
+            previousVision_ = vision;  // Update only if we computed meaningful novelty
+        }
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty - improved calculation
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        float noveltyContribution = noveltyLevel_ * 2.0f;
+        float errorContribution = std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = noveltyContribution + errorContribution;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
