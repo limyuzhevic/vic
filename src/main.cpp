@@ -1,11 +1,13 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 6: FINAL INTEGRATION
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the complete integrated artificial brain with:
+// - Working & Episodic Memory Systems
+// - Neuromodulation (Dopamine, Curiosity, Novelty)
+// - Prediction System
+// - Cognition (Planner, Concepts, Attention)
+// - Development System
+// - Checkpoint & Replay
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -18,6 +20,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,28 +28,12 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include <map>
+#include <algorithm>
+#include <chrono>
 
 using namespace nlm;
-
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
-}
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
@@ -158,6 +145,232 @@ struct LearningExperiment {
         }
     }
 };
+
+void printPhase6Banner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 6: FINAL INTEGRATION                                ║
+    ║                                                               ║
+    ║     Complete artificial brain with all systems integrated:     ║
+    ║     - Working & Episodic Memory Systems                        ║
+    ║     - Neuromodulation (Dopamine, Curiosity, Novelty)          ║
+    ║     - Prediction System                                        ║
+    ║     - Cognition (Planner, Concepts, Attention)                ║
+    ║     - Development System                                       ║
+    ║     - Checkpoint & Replay                                     ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void printBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 2: Real Neural Computation                         ║
+    ║                                                               ║
+    ║     An experimental artificial developmental brain.            ║
+    ║     This phase implements:                                    ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics          ║
+    ║     - Event-driven spike propagation                          ║
+    ║     - STDP and Hebbian plasticity                            ║
+    ║     - Structural plasticity                                   ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+    std::cout << "  --config <file>          Load configuration from file" << std::endl;
+    std::cout << "  --demo-mode <mode>       Run specific demo (phase2, phase6)" << std::endl;
+    std::cout << "  --checkpoint <file>      Save checkpoint" << std::endl;
+    std::cout << "  --load <file>            Load checkpoint" << std::endl;
+    std::cout << "  --memory-stats           Print memory system statistics" << std::endl;
+    std::cout << "  --neuromod-stats          Print neuromodulation statistics" << std::endl;
+    std::cout << "  --development-stats      Print development statistics" << std::endl;
+    std::cout << "  --prediction-stats       Print prediction system statistics" << std::endl;
+    std::cout << "  --cognition-stats        Print cognition statistics" << std::endl;
+    std::cout << "  --export-neurons <file>  Export neuron network to file" << std::endl;
+    std::cout << "  --export-synapses <file> Export synapse connections to file" << std::endl;
+    std::cout << "  --graph-export <file>    Export brain state as graph" << std::endl;
+    std::cout << "  --analyze-plasticity     Analyze plasticity effects" << std::endl;
+    std::cout << "  --replay-episodes <n>    Replay last n episodes" << std::endl;
+    std::cout << "  --save-episodes <n>      Save last n episodes" << std::endl;
+    std::cout << "  --verify-integration     Verify all systems are connected" << std::endl;
+    std::cout << "  --memory-consolidation    Force memory consolidation" << std::endl;
+    std::cout << "  --development-update     Update developmental stage" << std::endl;
+    std::cout << "  --reward-modulate <r>    Apply reward modulation" << std::endl;
+    std::cout << "  --curiosity-level <l>    Set curiosity level" << std::endl;
+    std::cout << "  --novelty-threshold <t>  Set novelty threshold" << std::endl;
+    std::cout << "  --planning-depth <d>     Set planning depth" << std::endl;
+    std::cout << "  --attention-strength <s> Set attention strength" << std::endl;
+    std::cout << "  --steps <n>              Run for n steps" << std::endl;
+    std::cout << "  --enable-all             Enable all subsystems" << std::endl;
+    std::cout << "  --disable-all            Disable all subsystems" << std::endl;
+    std::cout << "  --random-seed <seed>      Set random seed for reproducible experiments" << std::endl;
+    std::cout << "  --enable-debug-logging   Enable debug logging" << std::endl;
+    std::cout << "  --output <file>          Redirect output to file" << std::endl;
+}
+
+void parseCommandLineArgs(int argc, char** argv, std::string& configFile, 
+                               std::string& demoMode, std::string& checkpointFile, 
+                               std::string& loadFile, std::string& outputFile,
+                               std::string& exportNeuronsFile, std::string& exportSynapsesFile,
+                               std::string& graphExportFile, size_t& steps,
+                               bool& enableDebugLogging, bool& verifyIntegration,
+                               bool& memoryStats, bool& neuromodStats, bool& developmentStats,
+                               bool& predictionStats, bool& cognitionStats,
+                               bool& analyzePlasticity, bool& replayEpisodes,
+                               bool& saveEpisodes, bool& memoryConsolidation,
+                               bool& developmentUpdate, float& rewardModulate,
+                               float& curiosityLevel, float& noveltyThreshold,
+                               float& planningDepth, float& attentionStrength,
+                               bool& enableAll, bool& disableAll, uint64_t& randomSeed) {
+    
+    // Initialize defaults
+    configFile = "configs/default.cfg";
+    demoMode = "none";
+    checkpointFile = "";
+    loadFile = "";
+    outputFile = "";
+    exportNeuronsFile = "";
+    exportSynapsesFile = "";
+    graphExportFile = "";
+    steps = 1000;
+    enableDebugLogging = false;
+    verifyIntegration = false;
+    memoryStats = false;
+    neuromodStats = false;
+    developmentStats = false;
+    predictionStats = false;
+    cognitionStats = false;
+    analyzePlasticity = false;
+    replayEpisodes = false;
+    saveEpisodes = false;
+    memoryConsolidation = false;
+    developmentUpdate = false;
+    rewardModulate = 0.0f;
+    curiosityLevel = 0.0f;
+    noveltyThreshold = 0.0f;
+    planningDepth = 5.0f;
+    attentionStrength = 1.0f;
+    enableAll = false;
+    disableAll = false;
+    randomSeed = 42;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help") {
+            printUsage(argv[0]);
+            exit(0);
+        } else if (arg == "--demo-mode") {
+            if (i + 1 < argc) {
+                demoMode = argv[++i];
+            }
+        } else if (arg == "--config") {
+            if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        } else if (arg == "--load") {
+            if (i + 1 < argc) {
+                loadFile = argv[++i];
+            }
+        } else if (arg == "--output") {
+            if (i + 1 < argc) {
+                outputFile = argv[++i];
+            }
+        } else if (arg == "--export-neurons") {
+            if (i + 1 < argc) {
+                exportNeuronsFile = argv[++i];
+            }
+        } else if (arg == "--export-synapses") {
+            if (i + 1 < argc) {
+                exportSynapsesFile = argv[++i];
+            }
+        } else if (arg == "--graph-export") {
+            if (i + 1 < argc) {
+                graphExportFile = argv[++i];
+            }
+        } else if (arg == "--steps") {
+            if (i + 1 < argc) {
+                steps = std::stoul(argv[++i]);
+            }
+        } else if (arg == "--enable-debug-logging") {
+            enableDebugLogging = true;
+        } else if (arg == "--verify-integration") {
+            verifyIntegration = true;
+        } else if (arg == "--memory-stats") {
+            memoryStats = true;
+        } else if (arg == "--neuromod-stats") {
+            neuromodStats = true;
+        } else if (arg == "--development-stats") {
+            developmentStats = true;
+        } else if (arg == "--prediction-stats") {
+            predictionStats = true;
+        } else if (arg == "--cognition-stats") {
+            cognitionStats = true;
+        } else if (arg == "--analyze-plasticity") {
+            analyzePlasticity = true;
+        } else if (arg == "--replay-episodes") {
+            replayEpisodes = true;
+        } else if (arg == "--save-episodes") {
+            saveEpisodes = true;
+        } else if (arg == "--memory-consolidation") {
+            memoryConsolidation = true;
+        } else if (arg == "--development-update") {
+            developmentUpdate = true;
+        } else if (arg == "--reward-modulate") {
+            if (i + 1 < argc) {
+                rewardModulate = std::stof(argv[++i]);
+            }
+        } else if (arg == "--curiosity-level") {
+            if (i + 1 < argc) {
+                curiosityLevel = std::stof(argv[++i]);
+            }
+        } else if (arg == "--novelty-threshold") {
+            if (i + 1 < argc) {
+                noveltyThreshold = std::stof(argv[++i]);
+            }
+        } else if (arg == "--planning-depth") {
+            if (i + 1 < argc) {
+                planningDepth = std::stof(argv[++i]);
+            }
+        } else if (arg == "--attention-strength") {
+            if (i + 1 < argc) {
+                attentionStrength = std::stof(argv[++i]);
+            }
+        } else if (arg == "--enable-all") {
+            enableAll = true;
+        } else if (arg == "--disable-all") {
+            disableAll = true;
+        } else if (arg == "--random-seed") {
+            if (i + 1 < argc) {
+                randomSeed = std::stoul(argv[++i]);
+            }
+        } else if (arg.find("--") == 0 && i + 1 < argc && arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else {
+                configFile = argv[++i];
+            }
+        }
+    }
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -319,131 +532,4 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
     }
-}
-
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
-    }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
 }
