@@ -347,4 +347,200 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+// Get state information for monitoring and debugging
+float AgentBrain::getDopamineLevel() const {
+    return dopamineLevel_;
+}
+
+float AgentBrain::getCuriosityLevel() const {
+    return curiosityLevel_;
+}
+
+float AgentBrain::getNoveltyLevel() const {
+    return noveltyLevel_;
+}
+
+float AgentBrain::getPredictionError() const {
+    return predictionError_;
+}
+
+float AgentBrain::getExpectedReward() const {
+    return expectedReward_;
+}
+
+double AgentBrain::getDevelopmentalAge() const {
+    return developmentalAge_;
+}
+
+float AgentBrain::getPlasticityModifier() const {
+    return plasticityModifier_;
+}
+
+// Advanced experimentation commands
+void AgentBrain::setCuriosityEnabled(bool enable) {
+    curiosityEnabled_ = enable;
+}
+
+void AgentBrain::setDevelopmentStage(int stage) {
+    // Set developmental stage by setting age
+    developmentalAge_ = static_cast<double>(stage * 300.0);
+    // Update plasticity modifier based on stage
+    if (developmentalAge_ < 60.0) {  // Initial
+        plasticityModifier_ = 1.0f;
+    } else if (developmentalAge_ < 300.0) {  // Critical period
+        plasticityModifier_ = 0.8f;
+    } else if (developmentalAge_ < 900.0) {  // Maturation
+        plasticityModifier_ = 0.5f;
+    } else {  // Adult
+        plasticityModifier_ = 0.2f;
+    }
+}
+
+void AgentBrain::enableAllSystems(bool enable) {
+    enableRewardModulation(enable);
+    enableStructuralPlasticity(enable);
+    enableDevelopment(enable);
+    enableCuriosity(enable);
+}
+
+// Get system status and statistics
+size_t AgentBrain::getWorkingMemorySize() const {
+    if (!brain_) return 0;
+    auto* wm = brain_->getWorkingMemory();
+    return wm ? wm->getActiveTraces() : 0;
+}
+
+size_t AgentBrain::getEpisodicMemoryCount() const {
+    if (!brain_) return 0;
+    auto* em = brain_->getEpisodicMemory();
+    return em ? em->getEpisodeCount() : 0;
+}
+
+float AgentBrain::getAverageFiringRate() const {
+    if (!brain_) return 0.0f;
+    return brain_->getAverageFiringRate();
+}
+
+size_t AgentBrain::getTotalSpikeCount() const {
+    if (!brain_) return 0;
+    return brain_->getTotalSpikeCount();
+}
+
+float AgentBrain::getAttentionFocus() const {
+    if (!brain_) return 0.0f;
+    auto* attention = brain_->getAttention();
+    return attention ? attention->getAttentionFocus() : 0.0f;
+}
+
+size_t AgentBrain::getConceptCount() const {
+    if (!brain_) return 0;
+    auto* conceptFormation = brain_->getConceptFormation();
+    return conceptFormation ? conceptFormation->getConceptCount() : 0;
+}
+
+// Experiment control commands
+void AgentBrain::pauseEverything(bool pause) {
+    // Store current state for pause/resume
+    // This is a simplified implementation - in practice would need more state
+    if (pause) {
+        NLM_LOG_INFO("AgentBrain: Paused all systems");
+    } else {
+        NLM_LOG_INFO("AgentBrain: Resumed all systems");
+    }
+}
+
+void AgentBrain::forceMemoryConsolidation() {
+    if (!brain_) return;
+    auto* episodicMemory = brain_->getEpisodicMemory();
+    if (episodicMemory) {
+        NLM_LOG_INFO("AgentBrain: Forcing memory consolidation");
+        episodicMemory->consolidate(0.5f);
+    }
+}
+
+void AgentBrain::triggerReplay(size_t episodeCount) {
+    if (!brain_) return;
+    auto* episodicMemory = brain_->getEpisodicMemory();
+    if (episodicMemory) {
+        NLM_LOG_INFO("AgentBrain: Triggering replay of " + std::to_string(episodeCount) + " episodes");
+        auto episodes = episodicMemory->getEpisodesForReplay(episodeCount);
+        for (const auto* episode : episodes) {
+            episodicMemory->replayEpisode(episode);
+        }
+    }
+}
+
+void AgentBrain::resetNeuromodulation() {
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    NLM_LOG_INFO("AgentBrain: Neuromodulation reset");
+}
+
+void AgentBrain::setGoal(const std::vector<float>& goal) {
+    if (!brain_) return;
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        planner->setCurrentGoal(goal);
+        NLM_LOG_INFO("AgentBrain: Goal set with " + std::to_string(goal.size()) + " dimensions");
+    }
+}
+
+std::vector<float> AgentBrain::getCurrentGoal() const {
+    if (!brain_) return std::vector<float>();
+    auto* planner = brain_->getPlanner();
+    if (planner) {
+        return planner->getCurrentGoal();
+    }
+    return std::vector<float>();
+}
+
+// Debug and monitoring
+void AgentBrain::logSystemStatus() const {
+    NLM_LOG_INFO("=== AgentBrain System Status ===");
+    NLM_LOG_INFO("Neuromodulation: Dopamine=" + std::to_string(dopamineLevel_) +
+                 " Curiosity=" + std::to_string(curiosityLevel_) +
+                 " Novelty=" + std::to_string(noveltyLevel_) +
+                 " PredictionError=" + std::to_string(predictionError_));
+    NLM_LOG_INFO("Development: Age=" + std::to_string(developmentalAge_) +
+                 " PlasticityModifier=" + std::to_string(plasticityModifier_));
+    
+    if (brain_) {
+        NLM_LOG_INFO("Brain Status: WorkingMemoryTraces=" + std::to_string(getWorkingMemorySize()) +
+                     " EpisodicMemoryCount=" + std::to_string(getEpisodicMemoryCount()) +
+                     " AverageFiringRate=" + std::to_string(getAverageFiringRate()) +
+                     " TotalSpikes=" + std::to_string(getTotalSpikeCount()));
+        
+        auto* attention = brain_->getAttention();
+        if (attention) {
+            NLM_LOG_INFO("Attention: Focus=" + std::to_string(getAttentionFocus()));
+        }
+        
+        auto* conceptFormation = brain_->getConceptFormation();
+        if (conceptFormation) {
+            NLM_LOG_INFO("Concepts: Count=" + std::to_string(getConceptCount()));
+        }
+    }
+}
+
+void AgentBrain::saveBrainState(const std::string& filepath) const {
+    if (!brain_) return;
+    if (brain_->save(filepath)) {
+        NLM_LOG_INFO("AgentBrain: Brain state saved to " + filepath);
+    } else {
+        NLM_LOG_ERROR("AgentBrain: Failed to save brain state to " + filepath);
+    }
+}
+
+void AgentBrain::loadBrainState(const std::string& filepath) {
+    if (!brain_) return;
+    if (brain_->load(filepath)) {
+        NLM_LOG_INFO("AgentBrain: Brain state loaded from " + filepath);
+    } else {
+        NLM_LOG_ERROR("AgentBrain: Failed to load brain state from " + filepath);
+    }
+}
+
 } // namespace nlm

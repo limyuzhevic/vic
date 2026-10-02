@@ -16,6 +16,7 @@ NeuralPlanner::NeuralPlanner()
     , brain_(nullptr)
     , planningDepth_(3)
     , planningConfidence_(0.5f)
+    , plannedAction_(ActionType::Wait)
 {
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
@@ -250,6 +251,15 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
     }
     
     return successCount > recentPlanSuccess_.size() / 2;
+}
+
+// Get/set the last planned action for integration with action selection
+ActionType NeuralPlanner::getPlannedAction() const {
+    return plannedAction_;
+}
+
+void NeuralPlanner::setPlannedAction(ActionType action) {
+    plannedAction_ = action;
 }
 
 // SelfModel Implementation

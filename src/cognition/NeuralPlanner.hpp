@@ -70,6 +70,10 @@ public:
     // Get current goal
     std::vector<float> getCurrentGoal() const { return currentGoal_; }
     void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+    
+    // Get the last planned action (for integration with action selection)
+    ActionType getPlannedAction() const { return plannedAction_; }
+    void setPlannedAction(ActionType action) { plannedAction_ = action; }
 
     // Has recent planning been successful?
     bool wasRecentPlanSuccessful() const;

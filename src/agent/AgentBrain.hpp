@@ -58,16 +58,49 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Get state information for monitoring and debugging
+    float getDopamineLevel() const { return dopamineLevel_; }
+    float getCuriosityLevel() const { return curiosityLevel_; }
+    float getNoveltyLevel() const { return noveltyLevel_; }
+    float getPredictionError() const { return predictionError_; }
+    float getExpectedReward() const { return expectedReward_; }
+    double getDevelopmentalAge() const { return developmentalAge_; }
+    float getPlasticityModifier() const { return plasticityModifier_; }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Advanced experimentation commands
+    void setCuriosityEnabled(bool enable) { curiosityEnabled_ = enable; }
+    void setDevelopmentStage(int stage) { developmentalAge_ = static_cast<double>(stage * 300.0); }
+    void enableAllSystems(bool enable) {
+        enableRewardModulation(enable);
+        enableStructuralPlasticity(enable);
+        enableDevelopment(enable);
+        enableCuriosity(enable);
+    }
+    
+    // Get system status and statistics
+    size_t getWorkingMemorySize() const;
+    size_t getEpisodicMemoryCount() const;
+    float getAverageFiringRate() const;
+    size_t getTotalSpikeCount() const;
+    float getAttentionFocus() const;
+    size_t getConceptCount() const;
+    
+    // Experiment control commands
+    void pauseEverything(bool pause);
+    void forceMemoryConsolidation();
+    void triggerReplay(size_t episodeCount = 5);
+    void resetNeuromodulation();
+    void setGoal(const std::vector<float>& goal);
+    std::vector<float> getCurrentGoal() const;
+    
+    // Debug and monitoring
+    void logSystemStatus() const;
+    void saveBrainState(const std::string& filepath) const;
+    void loadBrainState(const std::string& filepath);
+    void resetAll() {
+        reset();
+        if (brain_) brain_->reset();
+    }
     
 private:
     // Motor decoding: convert neural activity to motor command

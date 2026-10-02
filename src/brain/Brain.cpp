@@ -406,7 +406,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
+    // ========== STEP 5: Enhanced neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
@@ -425,17 +425,64 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Dopamine modulates neural excitability by adjusting effective current injection
         // Higher dopamine increases excitability (lower effective threshold)
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        // Update eligibility traces based on dopamine (reward prediction error)
+        float eligibilityTraceDecay = 0.95f + 0.05f * dopamineLevel;  // More dopamine = slower decay
         for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
+            for (auto* syn : region->getSynapses()) {
+                if (std::abs(syn->getEligibilityTrace()) > 0.001f) {
+                    // Apply dopamine-gated plasticity
+                    float eligibilityTrace = syn->getEligibilityTrace();
+                    eligibilityTrace *= eligibilityTraceDecay;
+                    syn->setEligibilityTrace(eligibilityTrace);
                 }
             }
+        }
+        
+        // Modulate plasticity based on dopamine
+        // Positive dopamine increases plasticity, negative decreases
+        float plasticityFactor = 0.5f + 0.5f * dopamineLevel;
+        plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+        
+        // Apply plasticity factor to STDP parameters
+        if (pImpl->stdp) {
+            pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * plasticityFactor);
+            pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * plasticityFactor);
+        }
+        
+        // Apply dopamine effects on working memory
+        if (pImpl->workingMemory) {
+            // Positive dopamine enhances working memory stability
+            // Negative dopamine promotes working memory updating
+            if (dopamineLevel > 0.0f) {
+                // Stabilize working memory traces
+                pImpl->workingMemory->setDecayRate(0.01f - 0.005f * dopamineLevel);
+            } else {
+                // Promote working memory updating
+                pImpl->workingMemory->setDecayRate(0.05f + 0.02f * std::abs(dopamineLevel));
+            }
+        }
+        }
+        }
+        
+        // Apply dopamine effects on episodic memory consolidation
+        if (pImpl->episodicMemory) {
+            // Positive dopamine enhances memory consolidation
+            if (dopamineLevel > 0.0f) {
+                // Strengthen episode importance
+                pImpl->episodicMemory->setConsolidationStrength(1.0f + dopamineLevel);
+            } else {
+                // Weak consolidation for negative prediction error
+                pImpl->episodicMemory->setConsolidationStrength(0.5f);
+            }
+        }
+        
+        // Apply dopamine effects on attention
+        if (pImpl->attention) {
+            // Positive dopamine enhances attention focus
+            float attentionFocus = 0.5f + 0.5f * dopamineLevel;
+            pImpl->attention->setInhibitionStrength(0.5f * attentionFocus);
+            pImpl->attention->setExcitationStrength(1.5f * attentionFocus);
         }
     }
     
@@ -511,11 +558,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural activity
+        // Use sensory neuron activity as prediction input
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a sensory input pattern from active sensory neurons
+            std::vector<float> sensoryPattern;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activity = neuron->getMembranePotential() - neuron->getState().restingPotential;
+                if (activity > 0.1f) {  // Only significant activity
+                    sensoryPattern.push_back(activity);
+                }
+            }
+            
+            if (!sensoryPattern.empty()) {
+                pImpl->predictionSystem->train(sensoryPattern);
+                pImpl->predictionSystem->makeNextStatePrediction();
+            }
+        }
+        
+        // Get prediction error and use it to modulate learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (std::abs(predictionError) > 0.01f) {
+            // Scale plasticity based on prediction error
+            float errorFactor = 1.0f + predictionError;
+            errorFactor = std::clamp(errorFactor, 0.5f, 1.5f);
+            
+            // Apply error-based modulation to STDP
+            if (pImpl->dopamine) {
+                pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * errorFactor);
+                pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * errorFactor);
+            }
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 9:5: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -526,10 +602,102 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 9:6: Update neural planner ==========
+    if (pImpl->planner) {
+        // Update planner with current neural state and attention
+        // Use sensory input as state for planning
+        std::vector<float> currentState;
+        std::vector<float> currentFeatures;
+        float totalActivity = 0.0f;
+        
+        // Extract state features from sensory neurons
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            float activity = neuron->getMembranePotential() - neuron->getState().restingPotential;
+            if (activity > 0.05f) {
+                currentState.push_back(activity);
+                totalActivity += activity;
+            }
+        }
+        
+        if (!currentState.empty() && totalActivity > 0.0f) {
+            // Normalize features
+            for (float& value : currentState) {
+                currentFeatures.push_back(value / totalActivity);
+            }
+            
+            // Get current goal from planner (could be updated by concept formation)
+            std::vector<float> currentGoal = pImpl->planner->getCurrentGoal();
+            if (currentGoal.empty()) {
+                // Use attention-focused state as default goal
+                currentGoal = currentFeatures;
+            }
+            
+            // Plan next action
+            ActionType plannedAction = pImpl->planner->planAction(currentFeatures, currentGoal);
+            
+            // Store planned action for action selection
+            // This will be used by the produceAction() method
+            pImpl->planner->setPlannedAction(plannedAction);
+        }
+    }
+    
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity patterns
+        // Use active neuron patterns to form concepts
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create neural pattern from sensory neuron activity
+            std::vector<float> neuralPattern;
+            std::vector<float> features;
+            
+            // Get neural activity pattern
+            float totalActivity = 0.0f;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activity = neuron->getMembranePotential() - neuron->getState().restingPotential;
+                if (activity > 0.05f) {  // Only meaningful activity
+                    neuralPattern.push_back(activity);
+                    totalActivity += activity;
+                }
+            }
+            
+            if (!neuralPattern.empty() && totalActivity > 0.0f) {
+                // Normalize to get features
+                for (float& value : neuralPattern) {
+                    features.push_back(value / totalActivity);
+                }
+                
+                // Present experience to concept formation system
+                pImpl->conceptFormation->presentExperience(neuralPattern, features, 
+                                                         pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f, currentStep);
+            }
+        }
+        
+        // Use concepts to guide attention and learning
+        size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+        if (conceptCount > 0 && pImpl->attention) {
+            // Get the most relevant concept based on current activity
+            std::vector<float> currentPattern;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float activity = neuron->getMembranePotential() - neuron->getState().restingPotential;
+                if (activity > 0.1f) {
+                    currentPattern.push_back(activity);
+                }
+            }
+            
+            if (!currentPattern.empty()) {
+                size_t matchingConcept = pImpl->conceptFormation->getMatchingConcept(currentPattern);
+                if (matchingConcept > 0) {
+                    // Activate concept-based attention modulation
+                    const auto& conceptPrototypes = pImpl->conceptFormation->getConcepts();
+                    if (matchingConcept < conceptPrototypes.size()) {
+                        // Concept matches current activity, bias attention
+                        std::vector<float> conceptPrototype = pImpl->conceptFormation->getConceptPrototype(matchingConcept);
+                        pImpl->attention->setInhibitionStrength(0.3f);  // Reduce inhibition, increase focus
+                        pImpl->attention->setExcitationStrength(2.0f);  // Enhance excitation
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
