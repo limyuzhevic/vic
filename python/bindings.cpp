@@ -142,7 +142,345 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::enum_<NeuromodulatorType>(m, "NeuromodulatorType", R"pbdoc(Neuromodulator type enumeration)pbdoc")
+        .value("Dopamine", NeuromodulatorType::Dopamine)
+        .value("Curiosity", NeuromodulatorType::Curiosity)
+        .value("Novelty", NeuromodulatorType::Novelty)
+        .value("PredictionError", NeuromodulatorType::PredictionError)
+        .value("Reward", NeuromodulatorType::Reward)
+        .value("Acetylcholine", NeuromodulatorType::Acetylcholine)
+        .value("Norepinephrine", NeuromodulatorType::Norepinephrine)
+        .value("Serotonin", NeuromodulatorType::Serotonin)
+        .export_values();
+
+    // Add Neuromodulator base class
+    py::class_<Neuromodulator, std::shared_ptr<Neuromodulator>>(
+        m, "Neuromodulator", R"pbdoc(Base neuromodulator class)pbdoc")
+        .def("getName", &Neuromodulator::getName)
+        .def("getLevel", &Neuromodulator::getLevel)
+        .def("setLevel", &Neuromodulator::setLevel, py::arg("level"))
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor)
+        .def("update", &Neuromodulator::update, py::arg("dt"));
+
+    // Add all neuromodulator implementations
+    py::class_<Dopamine, std::shared_ptr<Dopamine>, py::class_<Neuromodulator>>(
+        m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"))
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError,
+             py::arg("error"))
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("setBaseline", &Dopamine::setBaseline, py::arg("baseline"))
+        .def("setPeak", &Dopamine::setPeak, py::arg("peak"))
+        .def("setDecayRate", &Dopamine::setDecayRate, py::arg("rate"))
+        .def("setReleaseRate", &Dopamine::setReleaseRate, py::arg("rate"));
+
+    py::class_<Curiosity, std::shared_ptr<Curiosity>, py::class_<Neuromodulator>>(
+        m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration motivation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Curiosity::initialize, py::arg("brain"))
+        .def("getLevel", &Curiosity::getLevel)
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive)
+        .def("getRecentDrive", &Curiosity::getRecentDrive)
+        .def("update", &Curiosity::update, py::arg("novelty"), py::arg("predictionError"), py::arg("dt"))
+        .def("setNoveltyWeight", &Curiosity::setNoveltyWeight, py::arg("weight"))
+        .def("setPredictionErrorWeight", &Curiosity::setPredictionErrorWeight, py::arg("weight"))
+        .def("reset", &Curiosity::reset);
+
+    py::class_<Novelty, std::shared_ptr<Novelty>, py::class_<Neuromodulator>>(
+        m, "Novelty", R"pbdoc(Novelty neuromodulator for novelty detection)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &Novelty::initialize, py::arg("brain"))
+        .def("getLevel", &Novelty::getLevel)
+        .def("setLevel", &Novelty::setLevel, py::arg("level"))
+        .def("detectNovelty", &Novelty::detectNovelty, py::arg("observation"), py::arg("previousObservation"))
+        .def("detectNoveltyPattern", &Novelty::detectNovelty, py::arg("currentPattern"), py::arg("previousPattern"))
+        .def("update", &Novelty::update, py::arg("dt"))
+        .def("getHistory", &Novelty::getHistory)
+        .def("clearHistory", &Novelty::clearHistory)
+        .def("reset", &Novelty::reset);
+
+    py::class_<PredictionError, std::shared_ptr<PredictionError>, py::class_<Neuromodulator>>(
+        m, "PredictionError", R"pbdoc(Prediction error neuromodulator for learning)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &PredictionError::initialize, py::arg("brain"))
+        .def("getError", &PredictionError::getError)
+        .def("computeError", &PredictionError::computeError, py::arg("predicted"), py::arg("actual"))
+        .def("updatePrediction", &PredictionError::updatePrediction, py::arg("newPrediction"))
+        .def("getHistory", &PredictionError::getHistory)
+        .def("clearHistory", &PredictionError::clearHistory)
+        .def("getMagnitude", &PredictionError::getMagnitude)
+        .def("reset", &PredictionError::reset);
+
+    py::class_<Reward, std::shared_ptr<Reward>, py::class_<Neuromodulator>>(
+        m, "Reward", R"pbdoc(Reward neuromodulator for reinforcement signals)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue)
+        .def("setValue", &Reward::setValue, py::arg("value"))
+        .def("add", &Reward::add, py::arg("delta"))
+        .def("reset", &Reward::reset)
+        .def("computeReward", &Reward::computeReward, py::arg("observation"))
+        .def("getHistory", &Reward::getHistory)
+        .def("clearHistory", &Reward::clearHistory);
+
+    // Add prediction system
+    py::class_<PredictionSystem, std::shared_ptr<PredictionSystem>>(
+        m, "PredictionSystem", R"pbdoc(Prediction system for forecasting future states)pbdoc")
+        .def(py::init<>())
+        .def("predictNextState", &PredictionSystem::predictNextState, py::arg("currentState"))
+        .def("updatePredictions", &PredictionSystem::updatePredictions,
+             py::arg("predicted"), py::arg("actual"))
+        .def("train", &PredictionSystem::train, py::arg("observation"))
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getConfidence", &PredictionSystem::getConfidence)
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory)
+        .def("clearHistory", &PredictionSystem::clearHistory)
+        .def("getAverageError", &PredictionSystem::getAverageError)
+        .def("getMaxError", &PredictionSystem::getMaxError);
+
+    // Add enhanced memory systems
+    py::class_<WorkingMemory, std::shared_ptr<WorkingMemory>>(
+        m, "WorkingMemory", R"pbdoc(Working memory for active information processing)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"))
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"))
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"))
+        .def("clear", &WorkingMemory::clear)
+        .def("getCapacity", &WorkingMemory::getCapacity)
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize)
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"))
+        .def("getAverageActivation", &WorkingMemory::getAverageActivation)
+        .def("getActiveNeurons", &WorkingMemory::getActiveNeurons)
+        .def("getTotalActivation", &WorkingMemory::getTotalActivation);
+
+    py::class_<EpisodicMemory, std::shared_ptr<EpisodicMemory>>(
+        m, "EpisodicMemory", R"pbdoc(Episodic memory for event and experience storage)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"))
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"))
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount)
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"))
+        .def("clear", &EpisodicMemory::clear)
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"))
+        .def("getAllEpisodes", &EpisodicMemory::getAllEpisodes)
+        .def("getRecentEpisodeCount", &EpisodicMemory::getRecentEpisodeCount)
+        .def("getOldestEpisode", &EpisodicMemory::getOldestEpisode)
+        .def("getMostRecentEpisode", &EpisodicMemory::getMostRecentEpisode)
+        .def("reset", &EpisodicMemory::reset);
+
+    py::class_<SemanticMemory, std::shared_ptr<SemanticMemory>>(
+        m, "SemanticMemory", R"pbdoc(Semantic memory for facts and general knowledge)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"))
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"))
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"))
+        .def("getAllFacts", &SemanticMemory::getAllFacts)
+        .def("clear", &SemanticMemory::clear)
+        .def("getFactCount", &SemanticMemory::getFactCount)
+        .def("getFactByKey", &SemanticMemory::getFactByKey, py::arg("key"))
+        .def("findFactsByValue", &SemanticMemory::findFactsByValue, py::arg("substring"))
+        .def("removeFact", &SemanticMemory::removeFact, py::arg("key"));
+
+    py::class_<ProceduralMemory, std::shared_ptr<ProceduralMemory>>(
+        m, "ProceduralMemory", R"pbdoc(Procedural memory for skills and habits)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"))
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"))
+        .def("getAllSkills", &ProceduralMemory::getAllSkills)
+        .def("updateProficiency", &ProceduralMemory::updateProficiency,
+             py::arg("name"), py::arg("delta"))
+        .def("clear", &ProceduralMemory::clear)
+        .def("getSkillCount", &ProceduralMemory::getSkillCount)
+        .def("getSkillByName", &ProceduralMemory::getSkillByName, py::arg("name"))
+        .def("deleteSkill", &ProceduralMemory::deleteSkill, py::arg("name"))
+        .def("hasSkill", &ProceduralMemory::hasSkill, py::arg("name"));
+
+    py::class_<AssociativeMemory, std::shared_ptr<AssociativeMemory>>(
+        m, "AssociativeMemory", R"pbdoc(Associative memory for relationships between representations)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate,
+             py::arg("a"), py::arg("b"), py::arg("strength"))
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"))
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength,
+             py::arg("a"), py::arg("b"))
+        .def("updateAssociation", &AssociativeMemory::updateAssociation,
+             py::arg("a"), py::arg("b"), py::arg("delta"))
+        .def("clear", &AssociativeMemory::clear)
+        .def("getAssociationCount", &AssociativeMemory::getAssociationCount)
+        .def("getAssociativePartners", &AssociativeMemory::getAssociativePartners, py::arg("neuron"))
+        .def("removeAssociation", &AssociativeMemory::removeAssociation,
+             py::arg("a"), py::arg("b"));
+
+    // Add advanced configuration options
+    py::class_<BrainStats>(m, "BrainStats", R"pbdoc(Brain statistics and metrics)pbdoc")
+        .def(py::init<>())
+        .def("getTotalNeuronCount", &BrainStats::getTotalNeuronCount)
+        .def("getTotalSynapseCount", &BrainStats::getTotalSynapseCount)
+        .def("getActiveNeuronCount", &BrainStats::getActiveNeuronCount)
+        .def("getFiringNeuronCount", &BrainStats::getFiringNeuronCount)
+        .def("getAverageFiringRate", &BrainStats::getAverageFiringRate)
+        .def("getExcitationInhibitionRatio", &BrainStats::getExcitationInhibitionRatio)
+        .def("getTotalSpikeCount", &BrainStats::getTotalSpikeCount)
+        .def("getPendingSpikeEventCount", &BrainStats::getPendingSpikeEventCount)
+        .def("getMemoryStats", &BrainStats::getMemoryStats)
+        .def("getNeuromodulationStats", &BrainStats::getNeuromodulationStats)
+        .def("getPredictionStats", &BrainStats::getPredictionStats)
+        .def("getDevelopmentStats", &BrainStats::getDevelopmentStats);
+
+    // Add experimental functions for advanced usage
+    m.def("runAdvancedSimulation", &runAdvancedSimulation,
+          py::arg("config"), py::arg("numSteps"), py::arg("worldEnabled") = true,
+          "Run an advanced simulation with all subsystems enabled");
+
+    m.def("runLearningExperiment", &runLearningExperiment,
+          py::arg("config"), py::arg("experimentType"), py::arg("duration"),
+          "Run a learning experiment with specified parameters");
+
+    m.def("runDevelopmentExperiment", &runDevelopmentExperiment,
+          py::arg("config"), py::arg("numStages"), py::arg("stepsPerStage"),
+          "Run a developmental stage experiment");
+
+    m.def("createDevelopmentConfig", &createDevelopmentConfig,
+          py::arg("stages"), py::arg("plasticityRates"),
+          "Create a development-specific configuration");
+
+    m.def("createLearningConfig", &createLearningConfig,
+          py::arg("enableReward"), py::arg("enableCuriosity"), py::arg("enableNovelty"),
+          "Create a learning-optimized configuration");
+
+    m.def("createExplorationConfig", &createExplorationConfig,
+          py::arg("enableCuriosity"), py::arg("enableNovelty"), py::arg("enablePredictionError"),
+          "Create an exploration-focused configuration");
+
+    // Add statistics functions
+    m.def("calculateBrainHealth", &calculateBrainHealth,
+          py::arg("brain"), py::arg("timeWindow") = 100,
+          "Calculate overall brain health score");
+
+    m.def("analyzeLearningProgress", &analyzeLearningProgress,
+          py::arg("brain"), py::arg("agent"), py::arg("epochs") = 10,
+          "Analyze learning progress over time");
+
+    m.def("compareBrains", &compareBrains,
+          py::arg("brain1"), py::arg("brain2"), py::arg("metrics") = std::vector<std::string>(),
+          "Compare two brains using specified metrics");
+
+    // Add utility functions
+    m.def("generateRandomConfig", &generateRandomConfig,
+          py::arg("seed") = std::random_device{}(),
+          "Generate a random configuration for experimentation");
+
+    m.def("benchmarkPerformance", &benchmarkPerformance,
+          py::arg("config"), py::arg("duration"), py::arg("numTrials") = 5,
+          "Benchmark performance of the brain system");
+
+    m.def("exportBrainState", &exportBrainState,
+          py::arg("brain"), py::arg("filepath"), py::arg("format") = "json",
+          "Export brain state to file");
+
+    m.def("importBrainState", &importBrainState,
+          py::arg("filepath"), py::arg("format") = "json",
+          "Import brain state from file");
+
+    m.def("validateConfiguration", &validateConfiguration,
+          py::arg("config"), py::arg("strict") = false,
+          "Validate configuration parameters");
+
+    m.def("getSystemInfo", &getSystemInfo,
+          "Get information about the NLM system configuration and capabilities");
+
+    m.def("getVersionInfo", &getVersionInfo,
+          "Get version information for NLM and its components");
+
+    // Add helper functions for advanced users
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Apply development configuration
+        config->set("development.enabled", true);
+        config->set("development.maxStages", 5);
+        config->set("development.startStage", "critical_period");
+        
+        // Enable learning subsystems
+        config->set("neuromodulation.reward.enable", true);
+        config->set("neuromodulation.curiosity.enable", true);
+        config->set("neuromodulation.novelty.enable", true);
+        config->set("neuromodulation.prediction_error.enable", true);
+        
+        // Enable plasticity
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Set reasonable defaults
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("brain.connection_probability", 0.05);
+        
+        return config;
+    }, "Create a default configuration with development and learning enabled");
+
+    m.def("createLearningConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Focus on learning capabilities
+        config->set("brain.neuron_count", 5000);
+        config->set("brain.synapse_density", 0.2);
+        config->set("brain.connection_probability", 0.1);
+        
+        // Enable all learning subsystems
+        config->set("neuromodulation.reward.enable", true);
+        config->set("neuromodulation.curiosity.enable", true);
+        config->set("neuromodulation.novelty.enable", true);
+        config->set("neuromodulation.prediction_error.enable", true);
+        
+        // Enhanced plasticity
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Memory systems
+        config->set("memory.working.capacity", 500);
+        config->set("memory.episodic.max_episodes", 2000);
+        config->set("memory.associative.max_associations", 5000);
+        
+        // Development
+        config->set("development.enabled", true);
+        config->set("development.maxStages", 10);
+        
+        return config;
+    }, "Create a learning-optimized configuration");
+
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Focus on exploration and curiosity
+        config->set("brain.neuron_count", 3000);
+        config->set("brain.synapse_density", 0.15);
+        config->set("brain.connection_probability", 0.08);
+        
+        // Curiosity and novelty focused
+        config->set("neuromodulation.reward.enable", false);
+        config->set("neuromodulation.curiosity.enable", true);
+        config->set("neuromodulation.curiosity.novelty_weight", 0.7f);
+        config->set("neuromodulation.curiosity.prediction_error_weight", 0.3f);
+        config->set("neuromodulation.novelty.enable", true);
+        config->set("neuromodulation.prediction_error.enable", true);
+        
+        // STDP with curiosity modulation
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.curiosity_modulation", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Less development plasticity
+        config->set("development.enabled", true);
+        config->set("development.maxStages", 5);
+        config->set("development.startStage", "maturation");
+        
+        return config;
+    }, "Create an exploration-focused configuration");
+
+    // Add advanced configuration methods for Config class
+    py::class_<Config>(m, "Config", R"pbdoc(Advanced configuration class with enhanced features)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -162,7 +500,67 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Advanced configuration methods
+        .def("setFloat", [](Config& self, const std::string& key, float value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+            "Set a float configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+            "Set an integer configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+            "Set a string configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+            "Set a boolean configuration value")
+        .def("setVector", [](Config& self, const std::string& key, const std::vector<float>& value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+            "Set a vector configuration value")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue) {
+            auto value = self.get<float>(key);
+            return value.has_value() ? value.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a float configuration value with default")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue) {
+            auto value = self.get<int>(key);
+            return value.has_value() ? value.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get an integer configuration value with default")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            auto value = self.get<std::string>(key);
+            return value.has_value() ? value.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a string configuration value with default")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) {
+            auto value = self.get<bool>(key);
+            return value.has_value() ? value.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a boolean configuration value with default")
+        .def("getVector", [](Config& self, const std::string& key, const std::vector<float>& defaultValue) {
+            auto value = self.get<std::vector<float>>(key);
+            return value.has_value() ? value.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a vector configuration value with default")
+        .def("setSource", &Config::set, py::arg("key"), py::arg("value"), py::arg("source"),
+             "Set a configuration value with specific source")
+        .def("getSource", &Config::getSource, py::arg("key"),
+             "Get the source of a configuration value")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        .def("getAllSources", &Config::getAllSources,
+             "Get all configuration sources")
+        .def("validate", &Config::validate, py::arg("schema"),
+             "Validate configuration against a schema")
+        .def("merge", &Config::merge, py::arg("other"),
+             "Merge another configuration")
+        .def("clone", &Config::clone,
+             "Clone the configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

@@ -48,9 +48,16 @@ void Dopamine::signalReward(float reward) {
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // More sophisticated reward prediction error signaling
+    // Positive error (better than expected) increases dopamine
+    // Negative error (worse than expected) decreases dopamine more significantly
+    float rewardStrength = std::abs(error);
+    float direction = (error > 0) ? 1.0f : -0.5f;
+    
+    pImpl->level = std::clamp(pImpl->level + rewardStrength * direction * pImpl->releaseRate, 0.0f, pImpl->peak);
+    
+    // Store error for plasticity modulation
+    pImpl->lastPredictionError = error;
 }
 
 } // namespace nlm

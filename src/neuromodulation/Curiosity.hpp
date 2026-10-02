@@ -24,6 +24,9 @@ public:
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
     
+    // Get recent curiosity drive for exploration decisions
+    float getRecentDrive() const;
+    
     // Set curiosity parameters
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);

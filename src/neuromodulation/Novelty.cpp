@@ -73,11 +73,9 @@ void Novelty::update(TimestepDuration dt) {
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
-}
-
-void Novelty::clearHistory() {
+void Novelty::reset() {
+    pImpl->level = 0.0f;
+    pImpl->lastPattern.clear();
     pImpl->history.clear();
 }
 
