@@ -14,7 +14,8 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-set(NLM_CORE_SOURCES
+# Core libraries
+add_library(nlm_core STATIC
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
@@ -60,16 +61,6 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
-)
-
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
-)
-
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
     $<INSTALL_INTERFACE:include>
@@ -79,24 +70,55 @@ target_compile_options(nlm_core PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+# Agent system
+add_library(nlm_agent STATIC
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBody.cpp
+)
+target_include_directories(nlm_agent PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+# World system
+add_library(nlm_world STATIC
+    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+)
+target_include_directories(nlm_world PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Phase experiments
+add_library(nlm_phase3 STATIC
+    ${NLM_SOURCE_DIR}/experiments/Phase3Experiment.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC ${NLM_SOURCE_DIR})
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+add_library(nlm_phase4 STATIC
+    ${NLM_SOURCE_DIR}/experiments/Phase4Experiment.cpp
+)
+target_include_directories(nlm_phase4 PUBLIC ${NLM_SOURCE_DIR})
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Main Python module
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_include_directories(pynlm PRIVATE ${NLM_SOURCE_DIR})
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Installation
 install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/pynlm
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/pynlm
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/pynlm
 )
+
+install(FILES bindings.cpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pynlm
+)
+
+# Testing
+enable_testing()
+add_subdirectory(tests)
