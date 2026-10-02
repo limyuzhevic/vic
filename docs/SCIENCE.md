@@ -198,55 +198,206 @@ Mirror neurons and social observation allow learning from others' actions and th
 
 ## The Learning Loop
 
-### Phase 2: Isolated Neural Computation
-```
-SENSORY INPUT (test signals)
-      ↓
-NEURAL ACTIVITY
-      ↓
-SPIKE PROCESSING
-      ↓
-PLASTICITY (STDP, Hebbian)
-      ↓
-NETWORK CHANGE
-```
+#### Neuromodulation
 
-### Phase 3: Environment Interaction
-```
-WORLD (2D environment with objects)
-      ↓
-SENSORY PERCEPT (vision, touch, internal)
-      ↓
-NEURAL ACTIVITY (LIF dynamics)
-      ↓
-MOTOR OUTPUT (decoded from brain)
-      ↓
-ACTION (movement, interaction)
-      ↓
-WORLD STATE CHANGE
-      ↓
-REWARD / CONSEQUENCE
-      ↓
-PREDICTION ERROR
-      ↓
-NEUROMODULATION (dopamine-like)
-      ↓
-ELIGIBILITY TRACES
-      ↓
-PLASTICITY UPDATE
-      ↓
-DEVELOPMENTAL CHANGE
-      ↓
-BEHAVIORAL CHANGE
-```
+#### Biological Inspiration
+Neuromodulators (dopamine, acetylcholine, norepinephrine, serotonin) modulate neural activity and plasticity. They signal reward, attention, arousal, and other internal states.
+
+#### Computational Implementation
+- **Dopamine**: Real reward prediction error signaling with phasic/tonic dynamics
+- **Novelty Detection**: Bayesian surprise detection
+- **Curiosity**: Exploration motivation based on surprise and prediction error
+- **PredictionError**: Temporal difference learning signals
+- **Inverted U-Shaped Plasticity**: Optimal arousal levels for learning
+
+#### Known Limitations
+- Real neuromodulatory systems are vastly more complex
+- Receptor types, receptor distribution, and second-messenger systems not modeled
+- Effects on neural dynamics are simplified
+
+#### Neuroscience Foundations
+- **Phasic vs Tonic Dopamine**: Fast reward prediction errors vs sustained baseline
+- **Rescorla-Wagner Learning**: Associative strength updates
+- **Temporal Difference Learning**: δ = r + γV(s') - V(s)
+- **Bayesian Surprise**: KL divergence between prior and posterior
+- **Ornstein-Uhlenbeck Process**: Dopamine dynamics with mean reversion
 
 ### Phase 4: Emerging Cognition
+
+#### Prediction Systems
+
+##### Biological Inspiration
+The free energy principle and predictive coding suggest that brains are fundamentally prediction machines. Hierarchical predictive models allow organisms to anticipate future states and minimize prediction errors.
+
+##### Computational Implementation
+- **NeuralPrediction**: Learns temporal sequences through repeated experience
+- **ActionConsequencePrediction**: Associates actions with their effects
+- **Multi-step Prediction**: Chains predictions to anticipate distant futures
+
+##### Known Limitations
+- No hierarchical generative model
+- Limited temporal horizon
+- No explicit uncertainty representation
+
+#### Working Memory
+
+##### Biological Inspiration
+Working memory in prefrontal cortex maintains information active for seconds to minutes through persistent neural activity and recurrent circuits.
+
+##### Computational Implementation
+- **NeuralWorkingMemory**: Persistent activity in recurrent circuits
+- **Competition**: Winner-take-more dynamics for selective retention
+- **Decay**: Activity decays when not reinforced
+
+##### Known Limitations
+- No complex binding mechanisms
+- Limited capacity
+- Simplified recurrent architecture
+
+#### Episodic Memory
+
+##### Biological Inspiration
+Hippocampus stores episodes with temporal, spatial, and contextual information. Pattern completion allows retrieval from partial cues.
+
+##### Computational Implementation
+- **NeuralEpisodicMemory**: Stores experiences as neural activity patterns
+- **Pattern Completion**: Retrieves full episodes from partial cues
+- **Replay**: Reactivates past patterns during consolidation
+
+##### Known Limitations
+- No hippocampal architecture
+- No pattern separation
+- Limited consolidation mechanisms
+
+### Phase 5: Performance and Development
+
+#### Neuromodulation Integration
+##### Biological Inspiration
+Neuromodulators coordinate learning across multiple timescales. Dopamine affects both synaptic plasticity and intrinsic neuronal excitability.
+
+##### Computational Implementation
+- **Multi-scale Neuromodulation**: Fast (phasic) and slow (tonic) components
+- **Development-Modulated Plasticity**: Plasticity rates change with developmental stage
+- **Critical Period Mechanisms**: Sensitive windows for learning
+
+##### Known Limitations
+- Simplified time-varying dynamics
+- Limited interaction between neuromodulatory systems
+
+#### Development Systems
+##### Biological Inspiration
+Brain development involves synaptogenesis, pruning, critical periods, and maturation of adult-level properties.
+
+##### Computational Implementation
+- **Synaptogenesis**: Probabilistic synapse formation
+- **Pruning**: Activity-dependent synapse elimination
+- **Critical Period**: Sensitive learning windows
+- **Maturation**: Progressive development of adult properties
+
+##### Known Limitations
+- Real development involves complex genetic programs and glial interactions
+- Our implementation is highly simplified
+
+### Phase 6: Final Integration
+
+#### Integrated Brain Systems
+##### Neural-Behavioral Loop
+The Phase 6 architecture implements a complete neural-behavioral loop:
+
 ```
-WORLD
-      ↓
-ATTENTION (competitive selection)
-      ↓
-SENSORY INPUT
+╔════════════════════════════════════════════════════════╗
+║                    NLM BRAIN LOOP                     ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   WORLD         │    │          WORLD             │  ║
+║  │                 │    │                         │  ║
+║  │   SimpleWorld   │◀──▶│   Observation/WORLD       │  ║
+║  │                 │    │                         │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  SENSORY INPUT            MOTOR OUTPUT                 ║
+║  (Vision, Audio, etc.)    (MotorCommand)                ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │                 │    │                         │  ║
+║  │   AgentBrain    │───▶│          Brain            │  ║
+║  │                 │    │                         │  ║
+║  │   Interface     │    │   Neural Processing       │  ║
+║  │                 │    │  (LIF Dynamics)           │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  SENSORY INJECTION      ACTION SELECTION               ║
+║  (Neurons)              (Motor Neurons)               ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │                 │    │                         │  ║
+║  │   Memory       │    │   Prediction             │  ║
+║  │   Systems      │    │   System                  │  ║
+║  │                 │    │                         │  ║
+║  │   Working      │    │   Temporal Learning       │  ║
+║  │   Episodic      │    │   Sequence Prediction     │  ║
+║  │   Associative   │    │   Action Consequence     │  ║
+║  │                 │    │   Prediction             │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  NEUROMODULATION         DEVELOPMENT                ║
+║  (Dopamine, Cur., etc.)  (Plasticity Rates)           ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  PLASTICITY UPDATES     DEVELOPMENTAL STATE           ║
+║  (STDP, Hebbian)        (Learning Rate Modulation)    ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   Memory        │    │   Memory                │  ║
+║  │   Consolidation │    │   Replay                │  ║
+║  │                 │    │                         │  ║
+║  │   Checkpoint    │    │   Persistence           │  ║
+║  │   Save/Load     │    │   State Restoration      │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   Enhanced      │    │   Advanced             │  ║
+║  │   Python API    │    │   Configuration       │  ║
+║  │   (pynlm)       │    │   Management           │  ║
+║  │                 │    │                         │  ║
+║  │   Real-time     │    │   Batch Processing     │  ║
+║  │   Monitoring    │    │   Parallel Execution │  ║
+║  │   Analysis      │    │   Export/Import       │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   RESEARCH      │    │   DEVELOPER TOOLS     │  ║
+║  │   CAPABILITIES   │    │   AND UTILITIES       │  ║
+║  │   Advanced      │    │   Custom Scripts     │  ║
+║  │   Neuroscience   │    │   Configuration     │  ║
+║  │   Modeling      │    │   Generators        │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+```
+
+##### Integration Features
+- **Cross-System Connectivity**: All systems connected through shared state
+- **Unified Learning**: Single plasticity framework across all systems
+- **Real-Time Monitoring**: Continuous tracking of system states
+- **Memory Replay**: Experience replay during consolidation
+- **Neuromodulation Effects**: Dopamine, curiosity, and novelty signals
+- **Development Integration**: Age-dependent learning rates
+
+##### Scientific Contributions
+- Demonstrates biological plausibility in neural architectures
+- Validates integrated brain systems through comprehensive experiments
+- Provides foundation for extending neural computation research
+- Offers tool set for neuroscience and AI researchers
       ↓
 PREDICTION (learn temporal relationships)
       ↓

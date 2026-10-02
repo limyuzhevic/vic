@@ -202,16 +202,94 @@ Combines all Phase 4 mechanisms in a complex environment.
 - All individual mechanism metrics
 - Behavior improvement
 
-## Running Phase 4 Experiments
+## Phase 6 Integration Experiments
 
+Phase 6 focuses on comprehensive integration testing to verify that all brain systems work together:
+
+### Phase 6 Integration Demo
+The integration test verifies that:
+- **Memory Integration**: Working memory and episodic memory are connected to neural processing
+- **Neuromodulation Integration**: Dopamine, curiosity, novelty signals affect plasticity
+- **Prediction Integration**: Temporal sequence learning works with other systems
+- **Development Integration**: Developmental stages modulate learning across all systems
+- **Persistence**: Checkpoint save/load works reliably
+- **Replay and Consolidation**: Memory replay reinforces learning
+
+**Run with:**
 ```bash
-./nlm_phase4_demo [num_trials]
+./nlm_phase6_demo
 ```
 
-Example:
-```bash
-./nlm_phase4_demo 100
-```
+**Expected Outcome:**
+All systems integrated and functioning together as a coherent artificial brain.
+
+### Integration Verification Tests
+Phase 6 includes specific tests for each integrated system:
+
+#### Memory Integration Test
+- **Working Memory**: Verify temporary storage integrates with neural processing
+- **Episodic Memory**: Test experience encoding and retrieval
+- **Associative Memory**: Validate experience-based associations
+
+#### Neuromodulation Integration Test
+- **Dopamine**: Test reward prediction error signaling
+- **Curiosity**: Verify exploration motivation
+- **Novelty**: Test surprise detection
+- **PredictionError**: Validate temporal difference learning
+
+#### Development Integration Test
+- **Plasticity Rates**: Verify age-dependent learning rates
+- **Critical Periods**: Test sensitive learning windows
+- **Maturation**: Assess adult-level development
+
+#### Persistence Test
+- **Checkpoint**: Test save/load functionality
+- **State Restoration**: Verify brain state recovery
+- **Memory Preservation**: Ensure memory survival across sessions
+
+#### Replay Test
+- **Memory Replay**: Test consolidation through replay
+- **Experience Rehearsal**: Verify learning through replay
+- **Consolidation Effects**: Assess replay's role in learning
+
+## Updated Experiment Metrics
+
+### Neural Activity
+- Firing rate distribution
+- Spike timing statistics
+- Population activity levels
+- Synchrony measures
+- Neuromodulation effects
+- Developmental progression
+
+### Memory
+- Retention accuracy
+- Recall success rate
+- Pattern stability
+- Generalization
+- Integration with neural processing
+- Replay effectiveness
+
+### Learning
+- Prediction error over time
+- Concept formation rate
+- Planning success
+- Self-prediction accuracy
+- Neuromodulation-based learning
+- Development-modulated learning
+
+### Social
+- Imitation success
+- Observation efficiency
+- Communication signal learning
+- Theory of mind development
+
+### Development
+- Learning rate progression
+- Critical period effects
+- Maturation milestones
+- Plasticity decline/retention
+- Experience-dependent development
 
 ## Experiment Configuration
 
@@ -220,32 +298,51 @@ Experiments can be configured via command line or config file:
 config->set("neuron_count", size_t(1000));
 config->set("prediction_horizon", size_t(3));
 config->set("working_memory_capacity", size_t(100));
+config->set("enable_checkpointing", bool(true));
+config->set("enable_replay", bool(true));
+config->set("enable_development", bool(true));
 ```
 
-## Standard Metrics
+## Anti-Cheating Measures
 
-### Neural Activity
-- Firing rate distribution
-- Spike timing statistics
-- Population activity levels
-- Synchrony measures
+All experiments are designed to prevent shortcuts:
+- No predefined correct answers
+- No hard-coded task solutions
+- No symbolic lookups
+- External experiment code measures, not solves
+- All learning must come from experience
 
-### Memory
-- Retention accuracy
-- Recall success rate
-- Pattern stability
-- Generalization
+## Reproducibility
 
-### Learning
-- Prediction error over time
-- Concept formation rate
-- Planning success
-- Self-prediction accuracy
+All experiments use:
+- Explicit random seeds
+- Version-controlled code
+- Deterministic simulation
+- Multiple seed runs for statistics
+- Integration verification before execution
 
-### Social
-- Imitation success
-- Observation efficiency
-- Communication signal learning
+## New Phase 6 Test Framework
+
+### Integration Verification
+Phase 6 includes a comprehensive integration verification framework that tests:
+
+#### System Connectivity Tests
+- **Memory System Integration**: Verify memory systems connect to neural processing
+- **Neuromodulation Integration**: Test neuromodulator effects on neural dynamics
+- **Prediction Integration**: Verify temporal sequence learning works
+- **Development Integration**: Test age-dependent effects
+
+#### Behavioral Output Tests
+- **Adaptive Behavior**: Verify behavior improves with experience
+- **Exploration-Exploitation**: Test balance between familiar and novel actions
+- **Generalization**: Assess ability to apply learned knowledge to new situations
+- **Transfer Learning**: Test knowledge transfer between tasks
+
+#### Neural Dynamics Tests
+- **Plasticity Effects**: Verify synaptic changes over time
+- **Network Stability**: Test attractor dynamics
+- **State Transitions**: Assess stability of behavioral states
+- **Learning Curves**: Track learning progression across systems
 
 ## Analysis Tools
 

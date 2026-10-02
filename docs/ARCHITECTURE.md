@@ -80,14 +80,15 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **Pruning**: Weak synapse removal
 - **Maturation**: Adult property development
 
-### 6. Neuromodulation Layer
+### 7. Neuromodulation Layer
 - **Neuromodulator**: Abstract base for neuromodulators
-- **Dopamine**: Reward and reinforcement
-- **Novelty**: Novelty detection
-- **Curiosity**: Exploration motivation
-- **PredictionError**: Error signals
+- **Dopamine**: Real reward prediction error signaling
+- **Novelty**: Bayesian surprise detection
+- **Curiosity**: Exploration motivation and intrinsic reward
+- **PredictionError**: Temporal difference learning signals
+- **Reward**: Multimodal reward computation
 
-### 7. Memory Layer (Phase 4)
+### 8. Memory Integration (Phase 6)
 - **NeuralWorkingMemory**: Persistent activity for temporary storage
 - **NeuralEpisodicMemory**: Experience encoding in neural patterns
 - **NeuralAssociativeMemory**: Experience-based associations
@@ -95,37 +96,37 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **SpatialRepresentation**: Learned spatial relationships
 - **TemporalRelation**: Before/after/sequence encoding
 
-### 8. Prediction Layer (Phase 4)
+### 9. Prediction Integration (Phase 6)
 - **NeuralPrediction**: Temporal sequence learning
 - **ActionConsequencePredictor**: Action effect prediction
 - **PredictionErrorSignal**: Error computation for learning
 
-### 9. Cognitive Layer (Phase 4)
+### 10. Cognitive Integration (Phase 6)
 - **AttentionalSelection**: Competition-based attention (NOT Transformer QKV)
 - **NeuralPlanner**: Predictive action selection
 - **SelfModel**: Sensorimotor self-awareness
 - **SocialLearning**: Observation and imitation
 
-### 10. Sensory Layer
+### 11. Sensory Layer
 - **SensoryInput**: Base class for sensory data
 - **Vision**: Visual input processing
 - **Audio**: Audio input processing
 - **InternalSignals**: Internal state signals
 
-### 11. Motor Layer
+### 12. Motor Layer
 - **Action**: Action representation
 - **MotorSystem**: Neural-to-action conversion
 
-### 12. Environment Layer
+### 13. Environment Layer
 - **Environment**: Abstract environment interface
 - **Observation**: Sensory observation wrapper
 - **Action**: Action wrapper
 
-### 13. Experiments Layer
+### 14. Experiments Layer
 - **Experiment**: Single experiment recording
 - **ExperimentRunner**: Experiment execution
 - **Metrics**: Data analysis
-- **Phase4Experiment**: Phase 4 cognitive experiments
+- **Phase6Experiment**: Phase 6 integration experiment
 
 ## Data Flow
 
@@ -179,46 +180,128 @@ Structural Plasticity (synaptogenesis/pruning)
 Development System (stage progression)
 ```
 
-### Phase 4: Emerging Cognition
+### Phase 5: Performance Optimization
 ```
-WORLD (SimpleWorld)
+Advanced memory management with memory pools
       ↓
-SENSORY PERCEPT
+Event-driven processing with optimized queues
       ↓
-ATTENTION (competitive selection)
+SIMD vectorization for neural computations
       ↓
-NEURAL PROCESSING
+Parallel processing for large networks
       ↓
-PREDICTION (temporal sequence learning)
+Checkpoint system with compression
       ↓
-WORKING MEMORY (persistent activity)
+Development-aware plasticity
+```
+
+### Phase 6: Final Integration
+```
+ALL SYSTEMS INTEGRATED:
       ↓
-EPISODIC MEMORY (experience storage)
+MEMORY SYSTEMS ↔ NEURAL PROCESSING
       ↓
-CONCEPT FORMATION (pattern discovery)
+NEUROMODULATION ↔ PLASTICITY
       ↓
-PLANNING (multi-step prediction)
+DEVELOPMENT ↔ PLASTICITY RATES
       ↓
-SELF-MODEL (sensorimotor learning)
+PREDICTION ↔ LEARNING
       ↓
-MOTOR ACTION
+CHECKPOINT ↔ SAVE/LOAD
       ↓
-WORLD.applyMotorCommand()
+REPLAY ↔ CONSOLIDATION
       ↓
-ACTION RESULT
-      ↓
-REWARD / ERROR
-      ↓
-NEUROMODULATION
-      ↓
-PLASTICITY
-      ↓
-SOCIAL LEARNING (observation/imitation)
+COHERENT BRAIN LOOP:
+WORLD → SENSORY → NEURAL → MEMORY → PREDICTION → MOTIVATION → ACTION → WORLD
+```
+
+## Integration Architecture
+
+### Phase 6 Brain Loop
+```
+╔════════════════════════════════════════════════════════╗
+║                    NLM BRAIN LOOP                     ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   WORLD         │    │          WORLD             │  ║
+║  │                 │    │                         │  ║
+║  │   SimpleWorld   │◀──▶│   Observation/WORLD       │  ║
+║  │                 │    │                         │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  SENSORY INPUT            MOTOR OUTPUT                 ║
+║  (Vision, Audio, etc.)    (MotorCommand)                ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │                 │    │                         │  ║
+║  │   AgentBrain    │───▶│          Brain            │  ║
+║  │                 │    │                         │  ║
+║  │   Interface     │    │   Neural Processing       │  ║
+║  │                 │    │  (LIF Dynamics)           │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  SENSORY INJECTION      ACTION SELECTION               ║
+║  (Neurons)              (Motor Neurons)               ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │                 │    │                         │  ║
+║  │   Memory       │    │   Prediction             │  ║
+║  │   Systems      │    │   System                  │  ║
+║  │                 │    │                         │  ║
+║  │   Working      │    │   Temporal Learning       │  ║
+║  │   Episodic      │    │   Sequence Prediction     │  ║
+║  │   Associative   │    │   Action Consequence     │  ║
+║  │                 │    │   Prediction             │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  NEUROMODULATION         DEVELOPMENT                ║
+║  (Dopamine, Cur., etc.)  (Plasticity Rates)           ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  PLASTICITY UPDATES     DEVELOPMENTAL STATE           ║
+║  (STDP, Hebbian)        (Learning Rate Modulation)    ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   Memory        │    │   Memory                │  ║
+║  │   Consolidation │    │   Replay                │  ║
+║  │                 │    │                         │  ║
+║  │   Checkpoint    │    │   Persistence           │  ║
+║  │   Save/Load     │    │   State Restoration      │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   Enhanced      │    │   Advanced             │  ║
+║  │   Python API    │    │   Configuration       │  ║
+║  │   (pynlm)       │    │   Management           │  ║
+║  │                 │    │                         │  ║
+║  │   Real-time     │    │   Batch Processing     │  ║
+║  │   Monitoring    │    │   Parallel Execution │  ║
+║  │   Analysis      │    │   Export/Import       │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+║  ↓                        ↓                            ║
+║  ┌─────────────────┐    ┌───────────────────────────┐  ║
+║  │   RESEARCH      │    │   DEVELOPER TOOLS     │  ║
+║  │   CAPABILITIES   │    │   AND UTILITIES       │  ║
+║  │   Advanced      │    │   Custom Scripts     │  ║
+║  │   Neuroscience   │    │   Configuration     │  ║
+║  │   Modeling      │    │   Generators        │  ║
+║  └─────────────────┘    └───────────────────────────┘  ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
 ```
 
 ## Agent-Brain Interface
 
-Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world:
+Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the world. Phase 6 enhances this interface with advanced neuromodulation and memory integration:
 
 - **SensoryTransduction**: Converts world percepts to neural input
 - **MotorDecoding**: Converts neural activity to motor commands
@@ -226,8 +309,26 @@ Phase 3/4 introduces the AgentBrain class that connects the NLM brain to the wor
 - **Development**: Updates developmental stage
 - **Attention**: Selective processing through competition
 - **Planning**: Uses predictions to select actions
+- **Memory Integration**: Connects memory systems to neural processing
+- **Replay Control**: Manages memory replay and consolidation
 
 ## Key Design Principles
+
+1. **No ML Frameworks**: NLM implements its own neural computation
+2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
+3. **Biological Inspiration**: Designed to be incrementally more biologically accurate
+4. **Modularity**: Clear interfaces between components
+5. **Determinism**: Reproducible experiments via explicit random seeds
+6. **Performance**: Data-oriented design for large-scale simulation
+7. **Extensibility**: Clear patterns for adding new components
+8. **No Predefined Knowledge**: All learning from experience
+9. **Neuromodulation Integration**: Dopamine and other signals modulate plasticity
+10. **Memory Integration**: All memory systems connected to neural processing
+11. **Development Integration**: Developmental stages affect learning rates
+
+## Phase 4 Key Innovations
+
+### Prediction System
 
 1. **No ML Frameworks**: NLM implements its own neural computation
 2. **No Transformer Architecture**: Uses spiking dynamics and competitive attention
