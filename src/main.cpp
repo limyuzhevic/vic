@@ -28,6 +28,7 @@
 
 using namespace nlm;
 
+// Display the NLM banner
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -44,8 +45,48 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+// Display help information
+void printHelp() {
+    std::cout << R"(
+=== NLM Phase 2: Real Neural Computation ===
+
+Usage: nlm_phase2 [options] [config_file]
+
+Options:
+  -h, --help                    Show this help message and exit
+  -v, --version                 Show version information and exit
+  -d, --debug                   Enable debug logging
+  -b, --benchmark               Enable benchmark mode
+  -t, --test-mode               Run optimized test mode (faster, smaller network)
+      --quick-test              Ultra-quick test mode (smallest network)
+      --show-config             Show current configuration and exit
+      --set key=value           Override configuration value
+
+Configuration file:
+  config_file                 Path to configuration file (default: configs/default.cfg)
+
+Examples:
+  nlm_phase2                           # Run with default config
+  nlm_phase2 --test-mode               # Run optimized test
+  nlm_phase2 --debug --set neuron_count=1000
+  nlm_phase2 configs/custom.cfg
+
+For more information, visit: https://nlm.readthedocs.io
+
+)" << std::endl;
+}
+
+// Display version information
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0" << std::endl;
+    std::cout << "Phase: Final Integration" << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Author: NLM Research Project" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -340,31 +381,111 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with improved command-line parsing
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Parse command line arguments with better interface
+    bool enableHelp = false;
+    bool enableVersion = false;
+    bool enableDebug = false;
+    bool enableBenchmark = false;
     std::string configFile = "configs/default.cfg";
+    
+    std::vector<std::string> configOverrides;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        if (arg == "--help" || arg == "-h") {
+            enableHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            enableVersion = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            enableDebug = true;
+        } else if (arg == "--benchmark" || arg == "-b") {
+            enableBenchmark = true;
+        } else if (arg == "--test-mode" || arg == "-t") {
+            // Enable test mode with optimized settings
+            config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::CommandLine);
+            config->set("max_steps", static_cast<int64_t>(500), ConfigSource::CommandLine);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::CommandLine);
+            config->set("stdp_ltd_weight", 0.008f, ConfigSource::CommandLine);
+        } else if (arg == "--quick-test") {
+            // Ultra-quick test mode
+            config->set("neuron_count", static_cast<int64_t>(50), ConfigSource::CommandLine);
+            config->set("max_steps", static_cast<int64_t>(200), ConfigSource::CommandLine);
+            config->set("connection_probability", 0.1f, ConfigSource::CommandLine);
+        } else if (arg == "--show-config") {
+            // Show current configuration and exit
+            config->showConfig(std::cout);
+            return 0;
+        } else if (arg.substr(0, 7) == "--config") {
+            // Handle --config=file or --config file
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 4) == "--set") {
+            // Handle --set key=value
+            if (arg.find('=') != std::string::npos) {
+                configOverrides.push_back(arg.substr(4));
+            }
+        } else if (arg[0] == '-') {
+            // Unknown option
+            std::cerr << "WARNING: Unknown option \"" << arg << "\" (ignored)" << std::endl;
+        } else {
+            // Positional argument - could be config file or other parameter
+            configFile = arg;
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Show help and exit
+    if (enableHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    // Show version and exit
+    if (enableVersion) {
+        printVersion();
+        return 0;
+    }
+    
+    // Load configuration from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Apply configuration overrides
+    for (const auto& override : configOverrides) {
+        size_t equalsPos = override.find('=');
+        if (equalsPos != std::string::npos) {
+            std::string key = override.substr(0, equalsPos);
+            std::string value = override.substr(equalsPos + 1);
+            
+            // Try to parse as integer, float, or string
+            try {
+                size_t intPos = value.find('.');
+                if (intPos == std::string::npos) {
+                    // Try as integer
+                    int64_t intValue = std::stoll(value);
+                    config->set(key, intValue, ConfigSource::CommandLine);
+                } else {
+                    // Try as float
+                    float floatValue = std::stof(value);
+                    config->set(key, floatValue, ConfigSource::CommandLine);
+                }
+            } catch (...) {
+                // Try as string
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+            
+            NLM_LOG_INFO("Applied override: " + key + " = " + value);
+        }
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -414,14 +535,12 @@ int main(int argc, char** argv) {
     
     // Reset brain for plasticity experiment
     brain->reset();
-    brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
-    brain->initialize();
     runStdpVerification(brain);
     
     // Final brain status
