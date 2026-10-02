@@ -7,7 +7,9 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Phase 6: Simplified working memory implementation
+// Current placeholder implementation with basic storage and capacity management
+// TODO FUTURE PHASE: Implement real working memory with decay and competition dynamics
 
 class WorkingMemory {
 public:
@@ -15,7 +17,9 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // Phase 6: Simplified storage implementation
+    // Current implementation: Basic storage with overwriting behavior
+    // TODO FUTURE PHASE: Implement real working memory with decay and competition
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -40,7 +44,9 @@ private:
 };
 
 // Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Phase 6: Simplified episodic memory implementation
+// Current implementation: Basic episode storage with temporal indexing
+// TODO FUTURE PHASE: Implement real episodic memory with replay and consolidation
 
 struct EpisodicMemoryItem {
     SimulationStep timestamp;
@@ -80,7 +86,9 @@ private:
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Phase 6: Simplified semantic memory implementation
+// Current implementation: Key-value storage for facts and concepts
+// TODO FUTURE PHASE: Implement real semantic memory with schema and inference
 
 class SemanticMemory {
 public:
@@ -108,7 +116,9 @@ private:
 };
 
 // Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Phase 6: Simplified procedural memory implementation
+// Current implementation: Skill storage with neural patterns and proficiency
+// TODO FUTURE PHASE: Implement real procedural memory with motor control and practice
 
 struct Skill {
     std::string name;
@@ -144,7 +154,9 @@ private:
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Phase 6: Simplified associative memory implementation
+// Current implementation: Pattern-based association storage
+// TODO FUTURE PHASE: Implement real associative memory with Hebbian dynamics and decay
 
 class AssociativeMemory {
 public:

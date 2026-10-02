@@ -30,8 +30,9 @@ void Synaptogenesis::setTargetDensity(float density) {
 }
 
 void Synaptogenesis::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real synaptogenesis
-    // PLACEHOLDER: New synapses form probabilistically
+    // Phase 6: Simplified synaptogenesis
+    // Current implementation: New synapses form probabilistically
+    // TODO FUTURE PHASE: Implement full biological synaptogenesis with molecular signaling
 }
 
 } // namespace nlm

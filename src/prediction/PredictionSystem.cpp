@@ -15,14 +15,16 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
+    // Phase 6: Simplified prediction
+    // Current implementation: Copy current state as prediction
+    // TODO FUTURE PHASE: Implement real prediction using NLM's neural substrate
     return currentState.clone();
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
+    // Phase 6: Simplified prediction update
+    // Current implementation: Calculate squared error
+    // TODO FUTURE PHASE: Implement real prediction error computation with neural mechanisms
     const auto& predData = predicted.getData();
     const auto& actualData = actual.getData();
     
@@ -54,7 +56,9 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // Phase 6: Simplified training
+    // Current implementation: Placeholder
+    // TODO FUTURE PHASE: Implement real prediction model training with gradient-based learning
 }
 
 } // namespace nlm

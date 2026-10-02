@@ -14,18 +14,23 @@ VisualizationInterface::VisualizationInterface() : pImpl(new Impl) {}
 VisualizationInterface::~VisualizationInterface() = default;
 
 bool VisualizationInterface::initialize() {
-    // TODO PHASE 2: Initialize real visualization (e.g., with GLFW, SDL, or custom)
-    // PLACEHOLDER: No visualization in Phase 1
+    // Phase 6: Simplified visualization interface
+    // Current implementation: Placeholder with no active visualization
+    // TODO FUTURE PHASE: Implement real visualization with GLFW, SDL, or custom rendering
     pImpl->active = false;
     return true;
 }
 
 void VisualizationInterface::update() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Phase 6: Simplified update
+    // Current implementation: No-op
+    // TODO FUTURE PHASE: Implement visualization updates
 }
 
 void VisualizationInterface::render() {
-    // PLACEHOLDER: No visualization in Phase 1
+    // Phase 6: Simplified render
+    // Current implementation: No-op
+    // TODO FUTURE PHASE: Implement visualization rendering
 }
 
 void VisualizationInterface::close() {
@@ -45,19 +50,27 @@ double VisualizationInterface::getUpdateRate() const {
 }
 
 void VisualizationInterface::visualizeNetwork(const Brain& brain) {
-    // TODO PHASE 2: Implement network visualization
+    // Phase 6: Simplified network visualization
+    // Current implementation: No visualization
+    // TODO FUTURE PHASE: Implement network structure visualization (neurons, synapses)
 }
 
 void VisualizationInterface::visualizeActivity(const Brain& brain) {
-    // TODO PHASE 2: Implement activity visualization
+    // Phase 6: Simplified activity visualization
+    // Current implementation: No visualization
+    // TODO FUTURE PHASE: Implement activity patterns (firing rates, population dynamics)
 }
 
 void VisualizationInterface::visualizeSpikes(const std::vector<SpikeEvent>& spikes) {
-    // TODO PHASE 2: Implement spike raster plot
+    // Phase 6: Simplified spike visualization
+    // Current implementation: No visualization
+    // TODO FUTURE PHASE: Implement spike raster plots and activity histograms
 }
 
 void VisualizationInterface::visualizeWeights(const Brain& brain) {
-    // TODO PHASE 2: Implement weight matrix visualization
+    // Phase 6: Simplified weight visualization
+    // Current implementation: No visualization
+    // TODO FUTURE PHASE: Implement weight matrix visualization and connectivity analysis
 }
 
 } // namespace nlm

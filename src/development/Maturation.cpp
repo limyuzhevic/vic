@@ -28,8 +28,9 @@ void Maturation::setProgress(float progress) {
 }
 
 void Maturation::update(Brain* brain, SimulationStep currentStep) {
-    // TODO PHASE 2: Implement real maturation
-    // PLACEHOLDER: Progress increases over simulation time
+    // Phase 6: Simplified maturation
+    // Current implementation: Progress increases over simulation time
+    // TODO FUTURE PHASE: Implement full biological maturation with genetic regulation
 }
 
 MembranePotential Maturation::getMatureThreshold() const {

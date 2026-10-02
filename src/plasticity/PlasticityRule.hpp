@@ -6,14 +6,17 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Phase 6: Plasticity rule framework
+// Current implementation: Abstract base with placeholder updates
+// TODO FUTURE PHASE: Implement real plasticity rules with biological accuracy
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
+    // Phase 6: Abstract plasticity update
+    // TODO FUTURE PHASE: Implement real plasticity rules with biological mechanisms
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -37,7 +40,8 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// Phase 6: Simplified Hebbian implementation
+// TODO FUTURE PHASE: Implement real Hebbian learning with saturation and competition
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();

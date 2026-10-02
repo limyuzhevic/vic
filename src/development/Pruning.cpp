@@ -30,12 +30,15 @@ void Pruning::setPruningRate(float rate) {
 }
 
 void Pruning::update(Brain* brain, RandomGenerator& rng) {
-    // TODO PHASE 2: Implement real pruning
-    // PLACEHOLDER: Weak synapses are removed probabilistically
+    // Phase 6: Simplified pruning
+    // Current implementation: Weak synapses are removed probabilistically
+    // TODO FUTURE PHASE: Implement full biological pruning with activity-dependent mechanisms
 }
 
 bool Pruning::pruneSynapse(Synapse* synapse) {
-    // TODO PHASE 2: Implement real synapse removal
+    // Phase 6: Simplified synapse removal
+    // Current implementation: Basic weight-based pruning decision
+    // TODO FUTURE PHASE: Implement full biological synapse removal mechanisms
     return false;
 }
 

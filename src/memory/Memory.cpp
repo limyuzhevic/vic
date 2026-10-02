@@ -16,7 +16,9 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Phase 6: Simplified storage implementation
+    // Current implementation: Basic storage with overwriting and capacity management
+    // TODO FUTURE PHASE: Implement real working memory with decay and competition dynamics
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -108,7 +110,9 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Phase 6: Simplified consolidation
+    // Current implementation: Placeholder for memory consolidation
+    // TODO FUTURE PHASE: Implement real episodic consolidation with systems consolidation
 }
 
 // Semantic Memory Implementation

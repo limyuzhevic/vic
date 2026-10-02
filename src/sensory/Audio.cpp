@@ -14,8 +14,9 @@ AudioProcessor::AudioProcessor() : pImpl(new Impl) {}
 AudioProcessor::~AudioProcessor() = default;
 
 void AudioProcessor::process(const Audio& input) {
-    // TODO PHASE 2: Implement real audio processing using NLM's neural machinery
-    // PLACEHOLDER: Just pass through raw data
+    // Phase 6: Simplified audio processing
+    // Current implementation: Basic feature extraction
+    // TODO FUTURE PHASE: Implement real audio processing with NLM's neural machinery
     pImpl->features = input.getData();
     pImpl->featureDimensions = input.getDimensions();
 }

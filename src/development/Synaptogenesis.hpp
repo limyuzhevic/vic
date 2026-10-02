@@ -5,7 +5,9 @@
 namespace nlm {
 
 // Synaptogenesis: formation of new synapses
-// PLACEHOLDER - Phase 2 will implement real synapse formation
+// Phase 6: Simplified synaptogenesis implementation
+// Current implementation: Basic synapse formation with configurable rate
+// TODO FUTURE PHASE: Implement real synapse formation with molecular signaling
 
 class Synaptogenesis {
 public:

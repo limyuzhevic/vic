@@ -33,8 +33,9 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // Phase 6: Simplified reward computation
+    // Current implementation: Placeholder returns 0
+    // TODO FUTURE PHASE: Implement real reward computation from observation
     return 0.0f;
 }
 

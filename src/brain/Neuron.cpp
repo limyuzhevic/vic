@@ -37,6 +37,10 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }

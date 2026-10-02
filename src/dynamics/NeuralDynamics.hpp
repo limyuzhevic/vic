@@ -14,11 +14,13 @@ public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // Phase 6: Abstract neuron dynamics
+    // TODO FUTURE PHASE: Implement real dynamics models with ion channel dynamics
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 6: Abstract synaptic dynamics
+    // TODO FUTURE PHASE: Implement real synaptic dynamics with short-term plasticity
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
@@ -53,7 +55,8 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// Phase 6: Hodgkin-Huxley implementation placeholder
+// TODO FUTURE PHASE: Implement Hodgkin-Huxley dynamics with ion channel models
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement HH dynamics

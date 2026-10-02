@@ -14,8 +14,9 @@ InternalSignalsProcessor::InternalSignalsProcessor() : pImpl(new Impl) {}
 InternalSignalsProcessor::~InternalSignalsProcessor() = default;
 
 void InternalSignalsProcessor::process(const InternalSignals& signals) {
-    // TODO PHASE 2: Implement real internal signal processing
-    // PLACEHOLDER: Just pass through
+    // Phase 6: Simplified internal signal processing
+    // Current implementation: Basic signal passing with homeostatic generation
+    // TODO FUTURE PHASE: Implement real internal signal processing with homeostatic regulation
     pImpl->processedSignals = signals.getData();
     
     // Generate some homeostatic signals
