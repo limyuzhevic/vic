@@ -1,0 +1,54 @@
+# NLM Examples Directory
+
+This directory contains advanced examples for using the NLM (Neural Learning Machine) framework in research and production scenarios. These examples demonstrate complex use cases, research experiments, and advanced features that go beyond basic usage.
+
+## Table of Contents
+
+- [AdvancedBrainDevelopment.md](AdvancedBrainDevelopment.md) - Examples of brain development, training, and maturation
+- [MemorySystemAnalysis.md](MemorySystemAnalysis.md) - Analysis of memory systems (working, episodic, associative)
+- [NeuromodulationExperiments.md](NeuromodulationExperiments.md) - Experiments with reward, curiosity, and novelty
+- [PerformanceProfiling.md](PerformanceProfiling.md) - Performance analysis and profiling tools
+- [ResearchScenarios.md](ResearchScenarios.md) - Real-world research scenarios and protocols
+- [IntegrationTesting.md](IntegrationTesting.md) - Comprehensive integration and system testing
+- [CustomBrainConfigurations.md](CustomBrainConfigurations.md) - Custom brain architectures and configurations
+
+## Key Features Demonstrated
+
+- **Brain Development**: Custom developmental stages and plasticity rules
+- **Memory Management**: Working memory tracking, episodic storage, consolidation
+- **Learning Algorithms**: Reinforcement learning with neuromodulation
+- **Performance Analysis**: Benchmarking and profiling tools
+- **Research Protocols**: Reproducible experimental setups
+- **System Integration**: End-to-end system testing
+- **Configuration Management**: Advanced configuration options
+
+## Getting Started
+
+To run these examples, ensure you have:
+- NLM compiled and installed
+- Required dependencies (Python bindings if needed)
+- Sufficient computational resources
+
+Examples can be run with various command-line options:
+```bash
+# Run specific example
+./example_name [options]
+
+# Run all examples in sequence
+./run_all_examples.sh
+```
+
+## Advanced Usage Tips
+
+- Use configuration files for complex setups
+- Enable logging for detailed analysis
+- Profile performance for large-scale simulations
+- Use checkpointing for long-running experiments
+- Monitor memory usage during extended runs
+
+These examples are designed for researchers, developers, and advanced users who want to:
+- Explore NLM's capabilities in depth
+- Run reproducible research experiments
+- Benchmark system performance
+- Develop custom applications
+- Integrate NLM into larger workflows
