@@ -3,6 +3,10 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <cmath>
+#include <algorithm>
+#include <functional>
+#include <memory>
 
 namespace nlm {
 
@@ -10,7 +14,7 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
+// Enhanced NeuronState with additional metrics for advanced analysis
 struct NeuronState {
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
@@ -25,6 +29,14 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // Advanced metrics for expert users
+    float totalInput;                      // Total synaptic input accumulated
+    float voltageDerivative;               // Rate of change of membrane potential
+    float timeSinceLastSpike;              // Time since last spike
+    float predictedNextSpike;              // Predicted next spike time (for rate-based neurons)
+    uint32_t consecutiveSpikes;            // Count of consecutive spikes
+    float averageVoltage;                  // Running average of membrane potential
+    
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -37,15 +49,20 @@ struct NeuronState {
         , refractoryRemaining(0)
         , refractoryPeriod(5)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(-1.0f)
+        , totalInput(0.0f)
+        , voltageDerivative(0.0f)
+        , timeSinceLastSpike(0.0f)
+        , predictedNextSpike(-1.0f)
+        , consecutiveSpikes(0)
+        , averageVoltage(0.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Enhanced Neuron class with improved lifecycle management and expert features
 class Neuron {
 public:
-    // Create neuron with ID
-    explicit Neuron(NeuronId id);
+    // Create neuron with ID and optional type
+    explicit Neuron(NeuronId id, NeuronType type = NeuronType::Internal);
     
     ~Neuron();
     
@@ -55,77 +72,12 @@ public:
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
-    NeuronId getId() const;
+    // === IDENTITY & BASIC PROPERTIES ===
     
-    // Type
+    // Neuron identity
+    NeuronId getId() const;
     NeuronType getType() const;
     void setType(NeuronType type);
-    
-    // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
-    
-    // Membrane potential
-    MembranePotential getMembranePotential() const;
-    void setMembranePotential(MembranePotential potential);
-    void addToMembranePotential(MembranePotential delta);
-    
-    // Threshold
-    MembranePotential getThreshold() const;
-    void setThreshold(MembranePotential threshold);
-    
-    // Firing state
-    bool isFiring() const;
-    bool isRefractory() const;
-    void setFiringState(FiringState state);
-    void setRefractoryPeriod(uint32_t steps);
-    void decrementRefractory();
-    
-    // Firing rate (for rate-based computation)
-    FiringRate getFiringRate() const;
-    void setFiringRate(FiringRate rate);
-    
-    // LIF neuron parameters
-    void setLeakConductance(MembranePotential conductance);
-    MembranePotential getLeakConductance() const;
-    uint32_t getRefractoryPeriod() const;
-    void setRestingPotential(MembranePotential potential);
-    MembranePotential getRestingPotential() const;
-    void setResetPotential(MembranePotential potential);
-    
-    // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
-    
-    // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
-    
-    // Incoming signals (post-synaptic potentials)
-    void receiveExcitatoryInput(MembranePotential amplitude);
-    void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
-    
-    // Current injection (from external sources)
-    void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
-    
-    // Spike history (recent spikes for STDP)
-    void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
-    void clearSpikeHistory();
-    
-    // Synapse management (incoming and outgoing)
-    void addIncomingSynapse(SynapseHandle handle);
-    void addOutgoingSynapse(SynapseHandle handle);
-    const std::vector<SynapseHandle>& getIncomingSynapses() const;
-    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
-    
-    // Plasticity state
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
     // Region/population membership
     void setRegionId(RegionId region);
@@ -133,15 +85,167 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // === ENHANCED STATE MANAGEMENT ===
     
-    // Reset to initial state
+    // Complete state access with validation
+    const NeuronState& getState() const;
+    NeuronState& getState();
+    
+    // Reset neuron to initial state with full cleanup
     void reset();
     
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    // Initialize with random biological parameters
+    void initializeRandom(RandomGenerator& rng, bool includeBiophysicalVariability = true);
+    
+    // === IMPROVED LIF DYNAMICS ===
+    
+    // Advanced LIF step with detailed metrics
+    bool step(Timestamp currentTime, TimestepDuration dt = 0.001);
+    
+    // Basic threshold check with hysteresis support
+    bool checkThreshold() const;
+    bool checkThresholdWithHysteresis() const;
+    
+    // === INPUT & OUTPUT MANAGEMENT ===
+    
+    // Enhanced input handling with input history tracking
+    void receiveExcitatoryInput(MembranePotential amplitude);
+    void receiveInhibitoryInput(MembranePotential amplitude);
+    void receiveModulatoryInput(MembranePotential amplitude);
+    
+    // Current injection with limits and clamping
+    void injectCurrent(MembranePotential current);
+    MembranePotential getTotalCurrent() const;
+    void clearTotalCurrent();
+    
+    // Spike history with enhanced tracking
+    void recordSpike(Timestamp timestamp);
+    const std::vector<Timestamp>& getSpikeHistory() const;
+    void clearSpikeHistory();
+    
+    // Advanced spike analysis
+    size_t getRecentSpikeCount(Timestamp currentTime, TimestepDuration window) const;
+    float getAverageInterSpikeInterval() const;
+    float getFiringRate(TimestepDuration window) const;
+    
+    // === PLASTICITY MANAGEMENT ===
+    
+    // Enhanced plasticity flags with more granular control
+    const PlasticityFlags& getPlasticityFlags() const;
+    PlasticityFlags& getPlasticityFlags();
+    
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    void disablePlasticity();
+    void setPlasticityFlag(PlasticityFlag flag, bool enabled);
+    bool isPlastic(PlasticityFlag flag) const;
+    
+    // === NEUROPHYSIOLOGICAL PARAMETERS ===
+    
+    // Membrane potential control with validation
+    MembranePotential getMembranePotential() const;
+    void setMembranePotential(MembranePotential potential);
+    void addToMembranePotential(MembranePotential delta);
+    
+    // Advanced membrane potential management
+    void clampMembranePotential();           // Clamp to biologically plausible range
+    bool isVoltageClampActive() const;
+    void setVoltageClamp(bool active, MembranePotential minV, MembranePotential maxV);
+    
+    // LIF neuron parameters with biological defaults
+    void setLeakConductance(MembranePotential conductance);
+    MembranePotential getLeakConductance() const;
+    void setMembraneCapacitance(float capacitance);
+    float getMembraneCapacitance() const;
+    void setTimeConstant(float timeConstant);
+    float getTimeConstant() const;
+    void setRestingPotential(MembranePotential potential);
+    MembranePotential getRestingPotential() const;
+    void setResetPotential(MembranePotential potential);
+    MembranePotential getResetPotential() const;
+    void setThreshold(MembranePotential threshold);
+    MembranePotential getThreshold() const;
+    void setThresholdWithHysteresis(MembranePotential up, MembranePotential down);
+    
+    // === REFRACTORY PERIOD MANAGEMENT ===
+    
+    // Enhanced refractory period control
+    bool isRefractory() const;
+    uint32_t getRefractoryRemaining() const;
+    uint32_t getRefractoryPeriod() const;
+    void setRefractoryPeriod(uint32_t steps);
+    void setAdaptiveRefractory(bool adaptive, float adaptationRate = 0.1f);
+    void decrementRefractory();
+    
+    // === ADVANCED NEURAL DYNAMICS ===
+    
+    // Spike-frequency adaptation control
+    void setAdaptationEnabled(bool enabled);
+    void setAdaptationStrength(float strength);
+    float getAdaptationStrength() const;
+    float getAdaptationVariable() const;
+    
+    // Temperature compensation for LIF parameters
+    void setTemperature(float celsius);
+    float getTemperature() const;
+    void applyTemperatureCompensation();
+    
+    // === SYNAPSE INTEGRATION ===
+    
+    // Enhanced synapse management
+    void addIncomingSynapse(SynapseHandle handle);
+    void addOutgoingSynapse(SynapseHandle handle);
+    const std::vector<SynapseHandle>& getIncomingSynapses() const;
+    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
+    void removeIncomingSynapse(SynapseHandle handle);
+    void removeOutgoingSynapse(SynapseHandle handle);
+    size_t getIncomingSynapseCount() const;
+    size_t getOutgoingSynapseCount() const;
+    
+    // === EXPERT FEATURES ===
+    
+    // Advanced neural configuration
+    void configureForTask(NeuralTask task);
+    void enableBurstMode(bool enabled, uint32_t burstFrequency = 100);
+    void enableOscillatoryBehavior(bool enabled, float frequency = 10.0f);
+    
+    // Performance and monitoring
+    void enablePerformanceMonitoring(bool enabled);
+    float getAverageMembranePotential() const;
+    float getMembranePotentialVariance() const;
+    float getMembranePotentialMax() const;
+    float getMembranePotentialMin() const;
+    
+    // External input processing
+    void processExternalInput(float input, float weight = 1.0f);
+    float getExternalInputHistory(size_t index = 0) const;
+    
+    // === SAFETY & STABILITY ===
+    
+    // Neuron health monitoring
+    bool isHealthy() const;
+    std::string getHealthStatus() const;
+    void setHealthMonitor(std::function<bool(const Neuron&)> monitor);
+    
+    // Stability and convergence control
+    bool isStable() const;
+    float getStabilityMetric() const;
+    void enableStabilityControl(bool enabled, float targetFiringRate = 10.0f);
+    
+    // === DEBUGGING & ANALYSIS ===
+    
+    // Advanced debugging features
+    void enableDebugMode(bool enabled);
+    void logState() const;
+    void validateState() const;
+    
+    // Detailed spike analysis
+    Timestamp getLastSpikeTime() const;
+    float getLastSpikeInterval() const;
+    std::vector<Timestamp> getSpikesInWindow(Timestamp start, Timestamp end) const;
+    
+    // Memory usage and optimization
+    size_t getMemoryUsage() const;
+    void optimizeMemoryUsage();
     
 private:
     struct Impl;

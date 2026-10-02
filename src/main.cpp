@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <cassert>
 
 using namespace nlm;
 
@@ -48,7 +49,7 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Enhanced Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -58,16 +59,23 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0) {
+        assert(b != nullptr && "Brain pointer cannot be null");
+    }
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+        // Record initial weights from first region with null check
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            const auto& synapses = region->getSynapses();
+            initialWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
+                if (syn != nullptr) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -83,10 +91,15 @@ struct LearningExperiment {
     void recordFinalState() {
         finalWeights.clear();
         
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+        // Record final weights from first region with null check
+        auto* region = brain->getRegion(RegionId(1));
+        if (region) {
+            const auto& synapses = region->getSynapses();
+            finalWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
+                if (syn != nullptr) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -107,7 +120,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded");
             return;
         }
         
@@ -163,9 +176,12 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
+    // Get first region with null check
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: No brain region found");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -179,7 +195,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        if (neurons[i] != nullptr) {
+            neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        }
     }
     
     // Run a few steps
@@ -195,9 +213,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i] != nullptr) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
 }
@@ -211,10 +231,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+    // Enable plasticity on synapses with null check
+    auto* region = brain->getRegion(RegionId(1));
+    if (region) {
+        const auto& synapses = region->getSynapses();
+        for (const auto& syn : synapses) {
+            if (syn != nullptr) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
         }
     }
     
@@ -250,10 +274,13 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: No brain region found");
+        return;
+    }
     
-    // Get first few synapses
-    auto& synapses = region->getSynapses();
+    // Get first few synapses with null check
+    const auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
         NLM_LOG_INFO("  Not enough synapses for STDP test");
         return;
@@ -263,11 +290,14 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record initial weights
     std::vector<float> beforeWeights;
+    beforeWeights.reserve(5);
     for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+        if (synapses[i] != nullptr) {
+            beforeWeights.push_back(synapses[i]->getWeight());
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " before: " + std::to_string(beforeWeights[i]));
+        }
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -279,7 +309,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         Neuron* preNeuron = nullptr;
         Neuron* postNeuron = nullptr;
         
-        auto neurons = region->getAllNeurons();
+        const auto& neurons = region->getAllNeurons();
         if (neurons.size() >= 2) {
             preNeuron = neurons[0];
             postNeuron = neurons[1];
@@ -298,17 +328,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
     float totalDelta = 0.0f;
     for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+        if (i < synapses.size() && synapses[i] != nullptr) {
+            float delta = synapses[i]->getWeight() - beforeWeights[i];
+            totalDelta += delta;
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
+        }
     }
     
     NLM_LOG_INFO("");
@@ -345,6 +373,7 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configLoaded = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -357,14 +386,24 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
+    try {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+            configLoaded = true;
+        } else {
+            NLM_LOG_INFO("Config file not found or invalid: " + configFile + ". Using defaults.");
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARN("Error loading config file " + configFile + ": " + std::string(e.what()));
         NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    try {
+        config->loadFromArgs(argc, argv);
+    } catch (const std::exception& e) {
+        NLM_LOG_WARN("Error parsing command line args: " + std::string(e.what()));
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -401,6 +440,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain) {
+        NLM_LOG_ERROR("Failed to allocate brain!");
+        return 1;
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
