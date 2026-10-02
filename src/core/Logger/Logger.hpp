@@ -9,14 +9,113 @@
 
 namespace nlm {
 
-// Log severity levels
-enum class LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Critical = 4
-};
+    // Enhanced log severity levels with more granularity
+    enum class LogLevel {
+        Trace = 0,
+        Debug = 1,
+        Info = 2,
+        Notice = 3,
+        Warning = 4,
+        Error = 5,
+        Critical = 6,
+        Alert = 7,
+        Emergency = 8
+    };
+
+    // Log categories for better organization
+    enum class LogCategory {
+        System = 0,
+        Neural,
+        Memory,
+        Plasticity,
+        Neuromodulation,
+        Cognition,
+        Development,
+        Prediction,
+        Sensory,
+        Motor,
+        Environment,
+        Agent,
+        Experiment,
+        Performance,
+        Configuration
+    };
+
+    // Enhanced log entry structure with category and performance tracking
+    struct LogEntry {
+        LogLevel level;
+        LogCategory category;
+        std::string message;
+        std::string file;
+        int line;
+        std::string function;
+        std::chrono::system_clock::time_point timestamp;
+        
+        // Performance tracking
+        std::chrono::microseconds duration;
+        
+        // Context information
+        uint64_t threadId;
+        uint64_t processId;
+        std::string operation;
+        double simulationTime;
+    };
+
+    // Logger interface
+    class ILogger {
+    public:
+        virtual ~ILogger() = default;
+        virtual void log(const LogEntry& entry) = 0;
+        virtual void setLevel(LogLevel level) = 0;
+        virtual LogLevel getLevel() const = 0;
+        virtual void setCategoryLevel(LogCategory category, LogLevel level) = 0;
+        virtual LogLevel getCategoryLevel(LogCategory category) const = 0;
+        
+        // Performance logging
+        virtual void startPerformanceTimer(const std::string& operation) = 0;
+        virtual void endPerformanceTimer(const std::string& operation) = 0;
+        
+        // Memory tracking
+        virtual void logMemoryUsage(size_t allocated, size_t peak, size_t available) = 0;
+    };
+
+    // Enhanced log entry structure with category and performance tracking
+    struct LogEntry {
+        LogLevel level;
+        LogCategory category;
+        std::string message;
+        std::string file;
+        int line;
+        std::string function;
+        std::chrono::system_clock::time_point timestamp;
+        
+        // Performance tracking
+        std::chrono::microseconds duration;
+        
+        // Context information
+        uint64_t threadId;
+        uint64_t processId;
+        std::string operation;
+        double simulationTime;
+    };
+
+    // Logger interface
+    class ILogger {
+    public:
+        virtual ~ILogger() = default;
+        virtual void log(const LogEntry& entry) = 0;
+        virtual void setLevel(LogLevel level) = 0;
+        virtual LogLevel getLevel() const = 0;
+        virtual void setCategoryLevel(LogCategory category, LogLevel level) = 0;
+        virtual LogLevel getCategoryLevel(LogCategory category) const = 0;
+        
+        // Performance logging
+        virtual void startPerformanceTimer(const std::string& operation) = 0;
+        virtual void endPerformanceTimer(const std::string& operation) = 0;
+        
+        // Memory tracking
+        virtual void logMemoryUsage(size_t allocated, size_t peak, size_t available) = 0;
+    };
 
 // Log entry structure
 struct LogEntry {

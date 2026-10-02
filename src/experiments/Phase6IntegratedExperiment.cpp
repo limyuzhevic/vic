@@ -23,7 +23,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with Phase 6 integration options
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", config.neuronCount);
     cfg->set("region_count", config.regionCount);
@@ -32,6 +32,96 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    
+    // Phase 6 Integration Configuration
+    cfg->set("phase6.enable_memory_integration", true, ConfigSource::Default);
+    cfg->set("phase6.enable_neuromodulation", true, ConfigSource::Default);
+    cfg->set("phase6.enable_prediction_system", true, ConfigSource::Default);
+    cfg->set("phase6.enable_cognition", true, ConfigSource::Default);
+    cfg->set("phase6.enable_development", true, ConfigSource::Default);
+    cfg->set("phase6.enable_replay", true, ConfigSource::Default);
+    cfg->set("phase6.checkpoint_interval", 1000, ConfigSource::Default);
+    cfg->set("phase6.consolidation_interval", 5000, ConfigSource::Default);
+    
+    // Neuromodulation Configuration
+    cfg->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+    cfg->set("neuromod.curiosity.exploration_rate", 0.3f, ConfigSource::Default);
+    cfg->set("neuromod.novelty.threshold", 0.1f, ConfigSource::Default);
+    cfg->set("neuromod.prediction.error_weight", 1.0f, ConfigSource::Default);
+    
+    // Memory System Configuration
+    cfg->set("memory.working.capacity", 1000, ConfigSource::Default);
+    cfg->set("memory.episodic.max_episodes", 1000, ConfigSource::Default);
+    cfg->set("memory.associative.learning_rate", 0.01f, ConfigSource::Default);
+    cfg->set("memory.associative.similarity_threshold", 0.5f, ConfigSource::Default);
+    
+    // Prediction System Configuration
+    cfg->set("prediction.horizon", 10, ConfigSource::Default);
+    cfg->set("prediction.confidence_threshold", 0.7f, ConfigSource::Default);
+    cfg->set("prediction.update_rate", 0.5f, ConfigSource::Default);
+    
+    // Cognition System Configuration
+    cfg->set("cognition.planning.depth", 5, ConfigSource::Default);
+    cfg->set("cognition.attention.excitation_strength", 1.5f, ConfigSource::Default);
+    cfg->set("cognition.attention.inhibition_strength", 0.5f, ConfigSource::Default);
+    cfg->set("cognition.concept.learning_rate", 0.001f, ConfigSource::Default);
+    
+    // Development System Configuration
+    cfg->set("development.initial_plasticity", 1.0f, ConfigSource::Default);
+    cfg->set("development.critical_period_end", 300.0, ConfigSource::Default);
+    cfg->set("development.maturation_start", 600.0, ConfigSource::Default);
+    cfg->set("development.plasticity_decay_rate", 0.01f, ConfigSource::Default);
+    
+    // Replay and Consolidation Configuration
+    cfg->set("replay.min_episode_length", 10, ConfigSource::Default);
+    cfg->set("replay.consolidation_threshold", 0.8f, ConfigSource::Default);
+    cfg->set("replay.max_episodes_to_replay", 5, ConfigSource::Default);
+    cfg->set("replay.sleep_cycles", 100, ConfigSource::Default);
+    
+    // Enhanced Performance Configuration
+    cfg->set("performance.enable_event_queues", true, ConfigSource::Default);
+    cfg->set("performance.memory_pool_size", 1000000, ConfigSource::Default);
+    cfg->set("performance.max_spike_events", 1000000, ConfigSource::Default);
+    cfg->set("performance.checkpoint_compression", "balanced", ConfigSource::Default);
+    
+    // Debugging and Monitoring Configuration
+    cfg->set("debug.log_level", "info", ConfigSource::Default);
+    cfg->set("debug.log_to_file", false, ConfigSource::Default);
+    cfg->set("debug.performance_logging", true, ConfigSource::Default);
+    cfg->set("debug.memory_tracking", true, ConfigSource::Default);
+    cfg->set("debug.checkpoint_validation", true, ConfigSource::Default);
+    
+    // Environment Configuration
+    cfg->set("environment.obstacle_density", 0.1f, ConfigSource::Default);
+    cfg->set("environment.resource_spawn_rate", 0.05f, ConfigSource::Default);
+    cfg->set("environment.hazard_spawn_rate", 0.02f, ConfigSource::Default);
+    cfg->set("environment.agent_vision_range", 5.0f, ConfigSource::Default);
+    
+    // Learning and Adaptation Configuration
+    cfg->set("learning.stdp.learning_rate", 0.01f, ConfigSource::Default);
+    cfg->set("learning.hebbian.threshold", 0.5f, ConfigSource::Default);
+    cfg->set("learning.structural.synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    cfg->set("learning.structural.pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Simulation Control Configuration
+    cfg->set("simulation.max_steps", 10000, ConfigSource::Default);
+    cfg->set("simulation.time_limit", 0.0, ConfigSource::Default);
+    cfg->set("simulation.random_seed", 42, ConfigSource::Default);
+    cfg->set("simulation.export_data", false, ConfigSource::Default);
+    cfg->set("simulation.data_format", "csv", ConfigSource::Default);
+    
+    // Visualization Configuration
+    cfg->set("visualization.enabled", false, ConfigSource::Default);
+    cfg->set("visualization.update_rate", 30.0, ConfigSource::Default);
+    cfg->set("visualization.show_neurons", true, ConfigSource::Default);
+    cfg->set("visualization.show_synapses", true, ConfigSource::Default);
+    cfg->set("visualization.show_memory_traces", true, ConfigSource::Default);
+    
+    // Advanced Experimental Configuration
+    cfg->set("experimental.enable_ablation_studies", false, ConfigSource::Default);
+    cfg->set("experimental.stochasticity_level", 0.1f, ConfigSource::Default);
+    cfg->set("experimental.mutation_rate", 0.001f, ConfigSource::Default);
+    cfg->set("experimental.selection_pressure", 1.0f, ConfigSource::Default);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -62,7 +152,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        const auto& regions = agent.getBrain()->getRegions();
+        if (regions.empty()) {
+            NLM_LOG_ERROR("No brain regions available");
+            break;
+        }
+        auto* firstRegion = regions[0].get();
+        SensoryPercept percept = world.observe(firstRegion);
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +170,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(firstRegion, cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(firstRegion);
         totalReward += reward;
         
         // Apply reward modulation

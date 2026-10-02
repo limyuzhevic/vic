@@ -106,15 +106,52 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    // Category-specific log levels
+    std::map<LogCategory, LogLevel> categoryLevels;
+    
+    // Performance timers
+    std::map<std::string, std::chrono::steady_clock::time_point> performanceTimers;
+    
+    // Memory tracking
+    size_t currentMemoryUsage;
+    size_t peakMemoryUsage;
+    size_t availableMemory;
+    
+    // Error tracking
+    size_t errorCount;
+    size_t warningCount;
+    
+    Logger::Impl() : currentMemoryUsage(0), peakMemoryUsage(0), availableMemory(0), 
+                     errorCount(0), warningCount(0) {}
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    // Initialize default category levels
+    for (int i = 0; i <= static_cast<int>(LogCategory::Configuration); ++i) {
+        pImpl->categoryLevels[static_cast<LogCategory>(i)] = LogLevel::Info;
+    }
+    
+    // Initialize memory tracking (placeholder values)
+    pImpl->currentMemoryUsage = 0;
+    pImpl->peakMemoryUsage = 0;
+    pImpl->availableMemory = 0;
+    
+    // Initialize error tracking
+    pImpl->errorCount = 0;
+    pImpl->warningCount = 0;
+}
 
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
+    
+    // Set category levels for the new logger
+    for (const auto& [category, level] : pImpl->categoryLevels) {
+        logger->setCategoryLevel(category, level);
+    }
 }
 
 void Logger::clearLoggers() {
@@ -129,51 +166,89 @@ void Logger::setLevel(LogLevel level) {
     }
 }
 
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+void Logger::setCategoryLevel(LogCategory category, LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->categoryLevels[category] = level;
+    for (auto& logger : pImpl->loggers) {
+        logger->setCategoryLevel(category, level);
+    }
+}
+
+LogLevel Logger::getCategoryLevel(LogCategory category) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    auto it = pImpl->categoryLevels.find(category);
+    return (it != pImpl->categoryLevels.end()) ? it->second : LogLevel::Info;
+}
+
+void Logger::log(LogLevel level, LogCategory category, const std::string& message,
+                 const std::string& file, int line, const std::string& function) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Check if this category/level combination is enabled
+    if (level < getCategoryLevel(category)) {
+        return;
+    }
     
     LogEntry entry;
     entry.level = level;
+    entry.category = category;
     entry.message = message;
     entry.file = file;
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    entry.duration = std::chrono::microseconds(0); // Default
+    entry.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    entry.processId = getpid();
+    entry.operation = "log";
+    entry.simulationTime = 0.0; // Default
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
 }
 
+void Logger::trace(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Trace, LogCategory::System, message, file, line, function);
+}
+
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
+    log(LogLevel::Debug, LogCategory::System, message, file, line, function);
 }
 
 void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
+    log(LogLevel::Info, LogCategory::System, message, file, line, function);
+}
+
+void Logger::notice(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Notice, LogCategory::System, message, file, line, function);
 }
 
 void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
+    log(LogLevel::Warning, LogCategory::System, message, file, line, function);
 }
 
 void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
+    log(LogLevel::Error, LogCategory::System, message, file, line, function);
+    pImpl->errorCount++;
 }
 
 void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
+    log(LogLevel::Critical, LogCategory::System, message, file, line, function);
 }
 
-bool Logger::isEnabled(LogLevel level) const {
+void Logger::alert(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Alert, LogCategory::System, message, file, line, function);
+}
+
+void Logger::emergency(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Emergency, LogCategory::System, message, file, line, function);
+}
+
+bool Logger::isEnabled(LogLevel level, LogCategory category) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
-        }
-    }
-    return false;
+    LogLevel catLevel = getCategoryLevel(category);
+    return level <= catLevel;
 }
 
 Logger& Logger::getGlobal() {
