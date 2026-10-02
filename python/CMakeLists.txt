@@ -12,7 +12,13 @@ endif()
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
 
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Modern build optimizations
+add_compile_options(-fdiagnostics-color=always -fPIC -O3 -march=native)
+if(MSVC)
+    target_compile_options(pynlm PRIVATE /permissive-)
+endif()
 
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp

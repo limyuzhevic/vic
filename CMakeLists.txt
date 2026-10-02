@@ -18,8 +18,14 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Modern C++ features
+add_compile_options(-fdiagnostics-color=always -fPIC)
+if(CMAKE_COMPILER_IS_GNUC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-march=native -mtune=native -ffast-math -flto)
+endif()
+
+# Position independent code for shared libraries
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Core library
 add_library(nlm_core STATIC
