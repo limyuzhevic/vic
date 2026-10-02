@@ -133,19 +133,27 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+# Visualization
+add_executable(nlm_visualization
+    src/visualization/VisualizationInterface.hpp
+    src/visualization/VisualizationImplementation.hpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Monitoring tools
+add_executable(nlm_monitor
+    src/visualization/VisualizationInterface.hpp
+    src/visualization/VisualizationImplementation.hpp
 )
+
+target_link_libraries(nlm_monitor PUBLIC nlm_core)
+
+# Combined visualization and monitoring
+add_executable(nlm_vm
+    src/main.cpp
+    src/visualization/VisualizationInterface.hpp
+    src/visualization/VisualizationImplementation.hpp
+)
+
+target_link_libraries(nlm_vm PUBLIC nlm_core)

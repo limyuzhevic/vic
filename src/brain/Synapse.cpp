@@ -177,7 +177,15 @@ void Synapse::setEligibilityTrace(float trace) {
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Validate input parameters
+    if (decayRate < 0.0f || decayRate >= 1.0f) {
+        return;
+    }
+    
+    // Decay eligibility trace for reward-modulated learning
     pImpl->eligibilityTrace *= (1.0f - decayRate);
+    
+    // Reset trace if it's below threshold to prevent numerical noise
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
     }
@@ -202,6 +210,7 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Use exponential decay with proper time constant
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
@@ -211,26 +220,50 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // Recovery from depression toward 1.0 using proper exponential recovery
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * 
+            (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
+    // Clamp weight bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::reset() {
-    pImpl->weight = 0.0f;
-    pImpl->preSpikeHistory.clear();
-    pImpl->postSpikeHistory.clear();
-    pImpl->eligibilityTrace = 0.0f;
-    pImpl->efficacy = 1.0f;
+    // Validate current state before reset
+    if (pImpl) {
+        // Reset weight to neutral value
+        pImpl->weight = 0.0f;
+        
+        // Clear all spike history to ensure clean state
+        pImpl->preSpikeHistory.clear();
+        pImpl->postSpikeHistory.clear();
+        
+        // Reset plasticity traces to ensure clean learning state
+        pImpl->eligibilityTrace = 0.0f;
+        
+        // Reset synaptic efficacy to baseline
+        pImpl->efficacy = 1.0f;
+        
+        // Reset short-term plasticity state
+        pImpl->shortTermDepression = 1.0f;  // Fully recovered
+        pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
+        
+        // Reset last spike times
+        pImpl->lastPreSpikeTime = -1.0f;
+        pImpl->lastPostSpikeTime = -1.0f;
+    }
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
+    // Validate input parameters
+    if (!pImpl) {
+        return;
+    }
+    
     // Proper random initialization based on synapse type
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
@@ -248,6 +281,7 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
+    // Ensure valid delay range
     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
     
     // Initialize short-term plasticity state

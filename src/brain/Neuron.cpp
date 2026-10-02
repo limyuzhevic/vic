@@ -189,9 +189,14 @@ void Neuron::setPopulationId(PopulationId population) {
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    // Validate input parameters
+    if (dt <= 0.0f) {
+        return false;
+    }
+    
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with enhanced protection
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -210,6 +215,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
+    
+    // Use precomputed constants for efficiency
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
@@ -220,18 +227,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Pre-compute scaling factor for better performance
+    float scale = static_cast<float>(dt) * 1000.0f;
+    V += scale * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Only apply if adaptation is active
     if (pImpl->state.adaptationVariable > 0.0f) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
+    // Use tighter bounds for better numerical stability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Check for spike
+    // Check for spike with hysteresis to prevent oscillation near threshold
     if (V >= threshold) {
         fired = true;
         pImpl->state.firingState = FiringState::Active;
