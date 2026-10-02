@@ -14,6 +14,10 @@
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognitive/SocialLearning.hpp"
+#include "../cognitive/SpatialRepresentation.hpp"
+#include "../cognitive/SelfModel.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -40,6 +44,9 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<SelfModel> selfModel;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -120,6 +127,9 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        selfModel = std::make_unique<SelfModel>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -229,35 +239,62 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(pImpl->config->getOr<size_t>("working_memory_capacity", pImpl->neuronCount / 10));
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(pImpl->config->getOr<size_t>("max_episodes", 1000));
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(pImpl->config->getOr<size_t>("planning_depth", 5));
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(pImpl->config->getOr<float>("attention_inhibition_strength", 0.5f));
+        pImpl->attention->setExcitationStrength(pImpl->config->getOr<float>("attention_excitation_strength", 1.5f));
+    }
+    
+    // Initialize additional cognitive systems
+    if (pImpl->socialLearning) {
+        pImpl->socialLearning->initialize(this);
+    }
+    
+    if (pImpl->spatialRepresentation) {
+        pImpl->spatialRepresentation->initialize(this);
+    }
+    
+    if (pImpl->selfModel) {
+        pImpl->selfModel->initialize(this);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -404,38 +441,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
-    }
-    
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
-                    }
-                }
-            }
+        // Apply attention to working memory winners
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
+    }
+    
+    // ========== STEP 6.5: Apply NEURAL PLANNING ==========
+    if (pImpl->planner && pImpl->workingMemory) {
+        // Get current working memory state for planning
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        // Check if we have a goal to work towards
+        std::vector<float> goal;
+        if (pImpl->planner->getCurrentGoal().empty() && 
+            pImpl->dopamine && pImpl->dopamine->getLevel() > 0.1f) {
+            // Create a simple exploratory goal based on current sensory input
+            goal = currentState;
+            pImpl->planner->setCurrentGoal(goal);
+            pImpl->planner->setPlanningDepth(pImpl->config->getOr<size_t>("planning_depth", 5));
+        }
+        
+        // Plan action based on current state and goals
+        if (!pImpl->planner->getCurrentGoal().empty()) {
+            ActionType plannedAction = pImpl->planner->planAction(currentState);
+            
+            // Store planned action in working memory
+            pImpl->workingMemory->store(std::vector<float>(1, static_cast<float>(plannedAction)), 0.9f);
+            
+            // Add planning metrics tracking
+            pImpl->planner->updatePlanQuality(std::vector<ActionType>(), 
+                                            std::vector<ActionType>(), 
+                                            0.5f);
         }
     }
     
@@ -509,14 +548,119 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    // ========== STEP 8.5: INTEGRATE SPATIAL REPRESENTATION ==========
+    if (pImpl->spatialRepresentation && !pImpl->sensoryNeurons.empty()) {
+        // Record current sensory state as spatial experience
+        // Simplified: use first few sensory neurons for position estimation
+        float x = 0.0f, y = 0.0f;
+        std::vector<float> sensoryCues;
+        
+        // Extract position-related sensory data (simplified)
+        size_t numCues = std::min(pImpl->sensoryNeurons.size(), size_t(5));
+        for (size_t i = 0; i < numCues; ++i) {
+            float potential = pImpl->sensoryNeurons[i]->getState().membranePotential;
+            sensoryCues.push_back(potential);
+            
+            // Simple position estimation from first two sensory inputs
+            if (i == 0) x = potential * 10.0f;  // Scale to reasonable range
+            if (i == 1) y = potential * 10.0f;
+        }
+        
+        // Record spatial experience
+        pImpl->spatialRepresentation->recordPosition(x, y, sensoryCues);
+        
+        // Path integration based on motor output
+        if (!pImpl->motorNeurons.empty()) {
+            float movementX = 0.0f, movementY = 0.0f;
+            for (auto* neuron : pImpl->motorNeurons) {
+                if (neuron->isFiring()) {
+                    // Simple movement direction based on firing patterns
+                    movementX += neuron->getState().membranePotential * 0.1f;
+                    movementY += neuron->getState().membranePotential * 0.1f;
+                }
+            }
+            pImpl->spatialRepresentation->integrateMovement(movementX, movementY);
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
+    // ========== STEP 8.6: INTEGRATE SELF-MODEL ==========
+    if (pImpl->selfModel && pImpl->workingMemory) {
+        // Get current state for self-modeling
+        std::vector<float> currentState = pImpl->workingMemory->retrieve();
+        
+        // Record self-action effects if we have motor activity
+        bool hasMotorActivity = false;
+        for (auto* neuron : pImpl->motorNeurons) {
+            if (neuron->isFiring()) {
+                hasMotorActivity = true;
+                break;
+            }
+        }
+        
+        if (hasMotorActivity && !currentState.empty()) {
+            // Predict sensory consequences using self-model
+            ActionType predictedAction = ActionType::Wait;
+            if (pImpl->planner) {
+                predictedAction = pImpl->planner->planAction(currentState);
+            }
+            
+            std::vector<float> predictedState = pImpl->selfModel->predictActionConsequence(
+                predictedAction, currentState);
+            
+            // Record self-action for learning
+            pImpl->selfModel->recordSelfAction(predictedAction, currentState, predictedState);
+        }
+        
+        // Update self-model based on prediction error
+        if (pImpl->predictionSystem && pImpl->selfModel) {
+            // Get prediction error from prediction system
+            // For now, use novelty signal as proxy for prediction error
+            float predictionError = 0.0f;
+            if (pImpl->novelty) {
+                predictionError = pImpl->novelty->getLevel();
+            }
+            
+            if (predictionError > 0.1f) {
+                // We have a prediction error, update self-model
+                // Simplified: update with current working memory state
+                std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+                std::vector<float> errorPattern = currentPattern;
+                
+                // Update self-model using current and error patterns
+                for (ActionType action : {ActionType::Wait, ActionType::MoveForward}) {
+                    pImpl->selfModel->updateSelfModel(errorPattern, currentPattern, action);
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 8.7: INTEGRATE SOCIAL LEARNING ==========
+    if (pImpl->socialLearning && !pImpl->sensoryNeurons.empty()) {
+        // Simple social learning from environmental patterns
+        // Record observations from current sensory input
+        std::vector<float> currentObservation;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentObservation.push_back(neuron->getState().membranePotential);
+        }
+        
+        // Record observation (simplified - treating environment as other agent)
+        pImpl->socialLearning->observeAgentAction(
+            ActionType::MoveForward, 
+            currentObservation, 
+            std::vector<float>(currentObservation.size(), 0.0f));  // Simplified effect
+        
+        // Update social knowledge based on reward
+        float socialReward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        pImpl->socialLearning->updateSocialKnowledge(socialReward);
+        
+        // Learn communication signals from reward correlations
+        if (socialReward > 0.5f) {
+            pImpl->socialLearning->learnCommunicationSignal(currentObservation, socialReward);
+        }
+    }
+    
+    // ========== STEP 9.5: EXPANDED ATTENTION SYSTEM ==========
+    if (pImpl->attention && pImpl->workingMemory) {
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
@@ -524,12 +668,110 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Apply top-down attention bias from goals/plans
+        if (pImpl->planner && !pImpl->planner->getCurrentGoal().empty()) {
+            // Convert goal to neuron ID for attention biasing (simplified)
+            for (size_t i = 0; i < pImpl->workingMemory->getMemoryNeurons().size(); ++i) {
+                if (i < pImpl->planner->getCurrentGoal().size()) {
+                    pImpl->attention->applyTopDownBias(
+                        pImpl->workingMemory->getMemoryNeurons()[i],
+                        pImpl->planner->getCurrentGoal()[i] * 2.0f);  // Scale goal value to bias
+                }
+            }
+        }
+        
+        // Apply bottom-up attention based on sensory input
+        if (!pImpl->sensoryNeurons.empty()) {
+            float maxSensoryInput = 0.0f;
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                maxSensoryInput = std::max(maxSensoryInput, std::abs(neuron->getState().membranePotential));
+            }
+            
+            if (maxSensoryInput > 0.1f) {  // Only apply attention if there's significant input
+                for (auto* neuron : pImpl->sensoryNeurons) {
+                    float salience = std::abs(neuron->getState().membranePotential) / maxSensoryInput;
+                    pImpl->attention->applyBottomUpSalience(neuron->getId(), salience);
+                }
+            }
+        }
+        
+        // Dynamic attentional focus shifts based on neuromodulation
+        if (pImpl->dopamine) {
+            float dopamineLevel = pImpl->dopamine->getLevel();
+            if (dopamineLevel > 0.5f) {
+                // High dopamine = exploratory attention (broad focus)
+                pImpl->attention->releaseAttention();
+            } else if (dopamineLevel < 0.2f) {
+                // Low dopamine = focused attention (narrow focus)
+                pImpl->attention->focusOnRegion(pImpl->regions[0]->getId());
+            }
+        }
+        
+        // Check attention metrics
+        float totalInhibition = 0.0f;
+        float totalExcitation = 0.0f;
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                totalInhibition += pImpl->attention->getInhibitionFor(neuron->getId());
+                totalExcitation += pImpl->attention->getExcitationFor(neuron->getId());
+            }
+        }
+        
+        if (totalExcitation > 0.0f) {
+            // Track attention allocation metric
+            float attentionAllocation = totalExcitation / (totalExcitation + totalInhibition);
+            // Could store this for cognitive metrics tracking
+        }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 10.5: ENHANCED CONCEPT FORMATION ==========
+    if (pImpl->conceptFormation && pImpl->workingMemory && 
+        pImpl->associativeMemory && pImpl->predictionSystem) {
+        
+        // Get current working memory state as pattern for concept formation
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        
+        // Extract features from pattern (squared values for nonlinearity)
+        std::vector<float> features(currentPattern.size());
+        for (size_t i = 0; i < currentPattern.size(); ++i) {
+            features[i] = currentPattern[i] * currentPattern[i];
+        }
+        
+        // Get reward from dopamine system
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, features, reward, pImpl->currentStep);
+        
+        if (conceptId > 0) {
+            // Store concept in associative memory for action selection
+            if (pImpl->associativeMemory) {
+                pImpl->associativeMemory->storeAssociation(
+                    conceptId, currentPattern, reward);
+            }
+            
+            // Check if concept can be used for planning
+            const auto* concept = pImpl->conceptFormation->getConcept(conceptId);
+            if (concept && concept->avgStability > 0.5f) {
+                // Use stable concept to guide planning
+                if (pImpl->planner) {
+                    pImpl->planner->setCurrentGoal(concept->prototype);
+                }
+            }
+        }
+        
+        // Check for concept formation metrics
+        if (pImpl->conceptFormation->getConceptCount() > 0) {
+            // Track concept formation rate
+            static size_t lastConceptCount = 0;
+            if (pImpl->conceptFormation->getConceptCount() > lastConceptCount) {
+                // New concept formed - increment counter
+                lastConceptCount = pImpl->conceptFormation->getConceptCount();
+                // Could track formation rate here
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -586,9 +828,111 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // ========== COGNITIVE METRICS TRACKING ==========
+    // Track planning efficiency
+    if (pImpl->planner && pImpl->currentStep > 0) {
+        // Track planning efficiency over time
+        static size_t totalPlanningSteps = 0;
+        totalPlanningSteps++;
+        
+        // Calculate planning metrics (simplified)
+        float planningEfficiency = 1.0f;
+        if (pImpl->attention) {
+            const auto& winners = pImpl->attention->getWinners();
+            if (!winners.empty()) {
+                // If attention selected a winner, consider planning efficient
+                planningEfficiency = 0.8f;
+            }
+        }
+        
+        // Could store planning metrics for later analysis
+        // pImpl->planningMetrics.push_back({currentStep, planningEfficiency});
+    }
+    
+    // Track concept formation rate
+    if (pImpl->conceptFormation && pImpl->currentStep > 0) {
+        static size_t lastConceptCount = 0;
+        if (pImpl->conceptFormation->getConceptCount() > lastConceptCount) {
+            // New concept formed
+            lastConceptCount = pImpl->conceptFormation->getConceptCount();
+            // Concept formation rate could be tracked here
+        }
+        
+        // Track concept stability
+        if (pImpl->conceptFormation->getConceptCount() > 0) {
+            float totalStability = 0.0f;
+            size_t count = 0;
+            
+            for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                const auto* concept = pImpl->conceptFormation->getConcept(i);
+                if (concept) {
+                    totalStability += concept->avgStability;
+                    count++;
+                }
+            }
+            
+            if (count > 0) {
+                float avgConceptStability = totalStability / static_cast<float>(count);
+                // Could track concept stability metrics
+            }
+        }
+    }
+    
+    // Track attention allocation metrics
+    if (pImpl->attention) {
+        float totalInhibition = 0.0f;
+        float totalExcitation = 0.0f;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                totalInhibition += pImpl->attention->getInhibitionFor(neuron->getId());
+                totalExcitation += pImpl->attention->getExcitationFor(neuron->getId());
+            }
+        }
+        
+        if (totalExcitation > 0.0f) {
+            float attentionAllocation = totalExcitation / (totalExcitation + totalInhibition);
+            // Could track attention allocation metrics
+        }
+    }
+    
+    // Track cognitive complexity measures
+    float cognitiveComplexity = 0.0f;
+    
+    // Measure system integration complexity
+    int activeSystems = 0;
+    if (pImpl->workingMemory) activeSystems++;
+    if (pImpl->episodicMemory) activeSystems++;
+    if (pImpl->associativeMemory) activeSystems++;
+    if (pImpl->predictionSystem) activeSystems++;
+    if (pImpl->planner) activeSystems++;
+    if (pImpl->conceptFormation) activeSystems++;
+    if (pImpl->attention) activeSystems++;
+    if (pImpl->socialLearning) activeSystems++;
+    if (pImpl->spatialRepresentation) activeSystems++;
+    if (pImpl->selfModel) activeSystems++;
+    if (pImpl->dopamine) activeSystems++;
+    if (pImpl->curiosity) activeSystems++;
+    if (pImpl->predictionError) activeSystems++;
+    if (pImpl->novelty) activeSystems++;
+    if (pImpl->developmentSystem) activeSystems++;
+    
+    // Calculate complexity based on number of integrated systems
+    cognitiveComplexity = static_cast<float>(activeSystems) / 15.0f;  // Normalize to 0-1 range
+    
+    // Could track cognitive complexity metrics
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Inject current into sensory neurons based on input
+    // This is a simple mapping - sensory encoding
+    
+    const auto& values = input.getData();
+    if (values.empty()) return;
+    
+    size_t numSensory = pImpl->sensoryNeurons.size();
+    if (numSensory == 0) return;
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
@@ -617,23 +961,30 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Search for neuron across all regions with proper validation
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
-            if (n->getId() == neuron) {
+        if (!neurons) continue; // Null check
+        for (auto* n : *neurons) {
+            if (n && n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }
         }
     }
+    // Neuron not found - could log a warning here in production
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                auto neurons = pop->getNeurons();
+                if (!neurons) continue; // Null check
+                for (auto* neuron : *neurons) {
+                    if (neuron) {
+                        neuron->injectCurrent(current);
+                    }
                 }
             }
         }
@@ -1035,6 +1386,30 @@ ConceptFormation* Brain::getConceptFormation() {
 
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
+}
+
+// Spatial representation system
+SpatialRepresentation* Brain::getSpatialRepresentation() {
+    return pImpl->spatialRepresentation.get();
+}
+const SpatialRepresentation* Brain::getSpatialRepresentation() const {
+    return pImpl->spatialRepresentation.get();
+}
+
+// Self model system
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+const SelfModel* Brain::getSelfModel() const {
+    return pImpl->selfModel.get();
+}
+
+// Social learning system
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+const SocialLearning* Brain::getSocialLearning() const {
+    return pImpl->socialLearning.get();
 }
 
 // ========== DEVELOPMENT SYSTEM ==========

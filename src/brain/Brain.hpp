@@ -23,6 +23,9 @@ class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+class SocialLearning;
+class SpatialRepresentation;
+class SelfModel;
 class DevelopmentSystem;
 class Dopamine;
 class Curiosity;
@@ -163,6 +166,18 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Spatial representation system
+    SpatialRepresentation* getSpatialRepresentation();
+    const SpatialRepresentation* getSpatialRepresentation() const;
+    
+    // Self model system
+    SelfModel* getSelfModel();
+    const SelfModel* getSelfModel() const;
+    
+    // Social learning system
+    SocialLearning* getSocialLearning();
+    const SocialLearning* getSocialLearning() const;
     
     // ========== DEVELOPMENT SYSTEM ==========
     

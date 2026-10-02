@@ -40,17 +40,23 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
     
     for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
+        NeuronId neuron = memoryNeurons_[i];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
+        // Validate neuron exists in brain
+        bool neuronFound = false;
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* nn : pop->getNeurons()) {
+                    if (nn->getId() == neuron) {
+                        nn->injectCurrent(activation * 5.0f);
+                        neuronFound = true;
+                        break;
+                    }
                 }
+                if (neuronFound) break;
             }
+            if (neuronFound) break;
         }
         
         // Update stored activation
@@ -70,6 +76,23 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Validate neuron exists in brain before adding to memory
+    bool neuronExists = false;
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* nn : pop->getNeurons()) {
+                    if (nn->getId() == neuron) {
+                        neuronExists = true;
+                        break;
+                    }
+                }
+                if (neuronExists) break;
+            }
+            if (neuronExists) break;
+        }
+    }
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     
@@ -77,7 +100,7 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
+    } else if (memoryNeurons_.size() < capacity_ && neuronExists) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
@@ -114,10 +137,15 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    if (!brain_ || memoryNeurons_.empty()) return;
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Bounds check for memory arrays
+        if (i >= memoryActivations_.size() || i >= memoryTimestamps_.size()) {
+            continue;
+        }
+        
         NeuronId neuron = memoryNeurons_[i];
         float activation = memoryActivations_[i];
         
@@ -142,6 +170,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
@@ -161,12 +192,15 @@ void NeuralWorkingMemory::strengthenMemory(float factor) {
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
-    if (memoryActivations_.empty()) return;
+    if (memoryNeurons_.empty() || memoryActivations_.empty()) return;
     
     // Find neurons with above-threshold activation
     float threshold = 0.3f;
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Bounds check
+        if (i >= memoryActivations_.size()) break;
+        
         if (memoryActivations_[i] >= threshold) {
             winners_.push_back(memoryNeurons_[i]);
         }
@@ -174,6 +208,9 @@ void NeuralWorkingMemory::runCompetition() {
     
     // Inhibitory competition - suppress non-winners
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Bounds check
+        if (i >= memoryActivations_.size()) break;
+        
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
         if (!isWinner && brain_) {
@@ -211,11 +248,13 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
     for (const auto& conn : pImpl->maintenanceSynapses) {
         float fromActivation = 0.0f;
         
-        // Find from neuron activation
+        // Find from neuron activation in memory
         auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), conn.first);
         if (it != memoryNeurons_.end()) {
             size_t idx = std::distance(memoryNeurons_.begin(), it);
-            fromActivation = memoryActivations_[idx];
+            if (idx < memoryActivations_.size()) {
+                fromActivation = memoryActivations_[idx];
+            }
         }
         
         if (fromActivation > 0.1f && brain_) {
