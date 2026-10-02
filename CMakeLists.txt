@@ -26,9 +26,11 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigManager.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/ErrorHandling/ErrorHandling.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -48,12 +50,13 @@ add_library(nlm_core STATIC
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
-    # Neuromodulation
+    # Neuromodulation library
     src/neuromodulation/Neuromodulator.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/AdvancedNeuromodulation.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -91,6 +94,18 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Neuromodulation library
+add_library(nlm_neuromodulation STATIC
+    src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Reward.cpp
+    src/neuromodulation/PredictionError.cpp
+    src/neuromodulation/Novelty.cpp
+    src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/AdvancedNeuromodulation.cpp
+)
+target_include_directories(nlm_neuromodulation PUBLIC src)
+target_link_libraries(nlm_neuromodulation PUBLIC nlm_core)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -138,6 +153,12 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Advanced neuromodulation demo executable
+add_executable(nlm_advanced_neuromodulation_demo
+    src/test_improvements/test_advanced_neuromodulation.cpp
+)
+target_link_libraries(nlm_advanced_neuromodulation_demo PUBLIC nlm_core nlm_neuromodulation)
 
 # Testing
 enable_testing()

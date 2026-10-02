@@ -357,8 +357,43 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    bool configLoaded = config->loadFromFile(configFile);
+    if (configLoaded) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        // Log configuration summary
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration summary:");
+        for (const auto& key : config->getKeys()) {
+            if (key == "random_seed") {
+                NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+            } else if (key == "simulation_timestep") {
+                NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+            } else if (key == "neuron_count") {
+                NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 1000)));
+            } else if (key == "region_count") {
+                NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+            } else if (key == "connection_probability") {
+                NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.1f)));
+            } else if (key == "stdp_ltp_weight") {
+                NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.01f)));
+            } else if (key == "stdp_ltd_weight") {
+                NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.012f)));
+            } else if (key == "stdp_tau") {
+                NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+            } else if (key == "synaptogenesis_rate") {
+                NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+            } else if (key == "pruning_rate") {
+                NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+            } else if (key == "dopamine_baseline") {
+                NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.0f)));
+            } else if (key == "reward_discount_factor") {
+                NLM_LOG_INFO("  reward_discount_factor: " + std::to_string(config->getOr<double>("reward_discount_factor", 0.99)));
+            } else if (key == "environment_name") {
+                NLM_LOG_INFO("  environment_name: " + std::to_string(config->getOr<std::string>("environment_name", "GridWorld")));
+            } else if (key == "log_level") {
+                NLM_LOG_INFO("  log_level: " + std::to_string(config->getOr<std::string>("log_level", "INFO")));
+            }
+        }
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
