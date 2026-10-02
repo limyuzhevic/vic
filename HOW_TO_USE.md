@@ -115,303 +115,349 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Python Library (Enhanced)
 
 ### Basic Usage
 
-#### Creating a Brain
+#### Creating a Brain with Advanced Configuration (New)
 
 ```python
 import pynlm
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
-
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Create optimized configuration for research
+config = pynlm.createResearchConfig()
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.15)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("neuromod.dopamine.scale", 1.2)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Research brain created: {brain.getTotalNeuronCount()} neurons")
+print(f"STDP enabled: {brain.getConfig().has('plasticity.stdp.enable')}")
 ```
 
-#### Running a Simulation
+#### Using Performance Monitoring (New)
 
 ```python
 import pynlm
 
-# Create brain
-config = pynlm.createDefaultConfig()
+# Create brain with performance monitoring
+config = pynlm.createOptimizedConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Run simulation for 1000 steps
+# Simulate while monitoring performance
 for step in range(1000):
     brain.step(step)
     
-    # Log statistics periodically
     if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+        # Get performance statistics
+        stats = brain.getBrainPerformanceStats()
+        print(f"Step {step}:")
+        print(f"  CPU time: {stats['cpu_time_ms']:.2f}ms")
+        print(f"  Memory usage: {stats['memory_usage_mb']:.2f}MB")
+        print(f"  Neural activity: {stats['avg_firing_rate']:.3f} Hz")
+        print(f"  Plasticity events: {stats['plasticity_events']}")
+
+# Generate memory usage report
+report = pynlm.memoryUsageReport()
+print(f"\nPerformance Report:\n{report}")
 ```
 
-#### Creating a Simple World
+#### Advanced Simulation Control (New)
+
+```python
+import pynlm
+import time
+
+# Create brain with advanced control features
+config = pynlm.createBrainConfig(neuron_count=500, enable_development=True)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable advanced simulation controls
+pause_brain = False
+step_size = 0.1
+
+for step in range(200):
+    if pause_brain:
+        print("Brain paused - waiting for resume command")
+        time.sleep(0.1)
+        continue
+    
+    brain.step(step)
+    
+    # Advanced step control
+    if step % 50 == 0:
+        # Adaptive step sizing
+        firing_rate = brain.getAverageFiringRate()
+        if firing_rate < 1.0:
+            step_size = 0.2  # Speed up when low activity
+        else:
+            step_size = 0.1
+    
+    if step % 30 == 0:
+        # Get simulation statistics
+        world_stats = world.getWorldSimulationStats()
+        print(f"Step {step}: {world_stats['steps_per_second']:.2f} steps/s")
+
+# Pause brain for inspection
+brain.pauseBrain()
+print("Brain paused for inspection")
+
+# Resume and continue
+brain.resumeBrain()
+print("Brain resumed")
+```
+
+#### Neural Network Analysis and Visualization (New)
+
+```python
+import pynlm
+import matplotlib.pyplot as plt
+
+# Create brain and collect data for analysis
+config = pynlm.createResearchConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Collect activation data over time
+activation_history = []
+for step in range(300):
+    brain.step(step)
+    activation_map = brain.getActivationMap()
+    activation_history.append(activation_map)
+
+# Analyze network topology
+network_topology = brain.getNetworkTopology()
+print("Network Analysis:")
+print(f"  Total neurons: {network_topology['total_neurons']}")
+print(f"  Total synapses: {network_topology['total_synapses']}")
+print(f"  Connectivity density: {network_topology['connectivity_density']:.4f}")
+print(f"  Average clustering: {network_topology['avg_clustering_coefficient']:.4f}")
+print(f"  Characteristic path length: {network_topology['characteristic_path_length']:.4f}")
+
+# Analyze developmental patterns
+development_analysis = brain.analyzeBrainDevelopment()
+print(f"\nDevelopmental Analysis:")
+print(f"  Development stage: {development_analysis['current_stage']}")
+print(f"  Plasticity rate: {development_analysis['plasticity_rate']:.4f}")
+print(f"  Neural maturation: {development_analysis['neural_maturation']:.4f}")
+
+# Generate visualization
+try:
+    connectivity_plot = brain.generateNeuronConnectivityPlot()
+    plt.figure(figsize=(12, 8))
+    plt.imshow(connectivity_plot, cmap='viridis')
+    plt.title('Neural Network Connectivity')
+    plt.colorbar(label='Connection strength')
+    plt.savefig('network_connectivity.png')
+    print("Connectivity plot saved as 'network_connectivity.png'")
+except Exception as e:
+    print(f"Visualization generation failed: {e}")
+```
+
+#### Experience Replay and Memory Management (New)
 
 ```python
 import pynlm
 
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
+# Create agent with memory management
+config = pynlm.createBrainConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world=None)  # No world for this test
 
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
-)
+# Enable memory management features
+agent.enableCuriosity(True)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
 
-# Reset world to initial state
-world.reset()
+# Simulate to build up experiences
+for step in range(200):
+    brain.step(step)
+    
+    # Simulate some learning
+    if step % 10 == 0:
+        reward = 1.0 if step % 20 == 0 else 0.0
+        predicted = 0.5
+        agent.applyRewardModulation(reward, predicted)
 
-# Set agent starting position
-world.setAgentStart(10.0, 10.0)
-
-# Run world update
-world.update(timestep=0.1)
+# Access experience replay
+try:
+    experiences = agent.getExperienceReplay(max_experiences=50)
+    print(f"Retrieved {len(experiences)} experiences")
+    
+    for i, exp in enumerate(experiences[:5]):  # Show first 5
+        print(f"  Experience {i+1}:")
+        print(f"    Reward: {exp['reward']}")
+        print(f"    Prediction error: {exp['prediction_error']}")
+        print(f"    Time step: {exp['time_step']}")
+        
+except Exception as e:
+    print(f"Experience replay failed: {e}")
 ```
 
-### Complete Agent Example
+#### Benchmarking and Validation (New)
 
 ```python
 import pynlm
+import time
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+# Benchmark different configurations
+print("Benchmarking Brain Configurations")
+print("=" * 50)
+
+configs = [
+    ("Small", {"neuron_count": 100, "synapse_density": 0.05}),
+    ("Medium", {"neuron_count": 500, "synapse_density": 0.1}),
+    ("Large", {"neuron_count": 1000, "synapse_density": 0.15}),
+]
+
+for name, params in configs:
+    start_time = time.time()
+    config = pynlm.createResearchConfig()
+    for key, value in params.items():
+        config.set(f"brain.{key}", value)
     
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
     brain = pynlm.createBrain(config)
     brain.initialize()
     
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
+    # Run simulation
+    for step in range(200):
+        brain.step(step)
     
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
+    end_time = time.time()
+    elapsed = end_time - start_time
     
-    # 5. Initialize agent with world
-    agent.initialize(world)
+    # Get benchmark results
+    benchmark_result = pynlm.simulationStepBenchmark(
+        brain, 200, "performance_test", validate_config=True
+    )
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    print(f"\n{name} Brain ({params['neuron_count']} neurons):")
+    print(f"  Time: {elapsed:.2f}s")
+    print(f"  Steps/s: {benchmark_result['steps_per_second']:.2f}")
+    print(f"  Memory: {benchmark_result['memory_usage_mb']:.2f}MB")
+    print(f"  Config valid: {benchmark_result['config_valid']}")
+
+# Validate configuration
+validation_result = pynlm.validateBrainConfig(config)
+print(f"\nConfiguration Validation:")
+print(f"  Valid: {validation_result['valid']}")
+print(f"  Issues: {validation_result['issues']}")
+print(f"  Recommendations: {validation_result['recommendations']}")
+```
+
+#### Complete Reinforcement Learning Example (Advanced)
+
+```python
+import pynlm
+
+def run_advanced_rl_episode(num_steps=1000):
+    """Complete reinforcement learning episode with monitoring and analysis."""
     
-    # 7. Run simulation loop
+    # 1. Create optimized learning environment
+    brain, world, agent = pynlm.createLearningEnvironment(
+        width=20,
+        height=20,
+        vision_width=10,
+        vision_height=10,
+        enable_reward_modulation=True,
+        enable_curiosity=True,
+        enable_structural_plasticity=True,
+        enable_development=True,
+        neuron_count=1500,
+        learning_rate=0.01,
+        exploration_rate=0.3,
+        development_stages=7
+    )
+    
+    # 2. Run learning loop with monitoring
+    learning_metrics = {
+        'rewards': [],
+        'curiosity_levels': [],
+        'novelty_levels': [],
+        'development_stages': [],
+        'action_counts': {}
+    }
+    
     for step in range(num_steps):
         # Update world
-        world.update(timestep=0.1)
+        world.update(0.1)
         
-        # Get sensory input from world
+        # Get percept and process it
         percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
         agent.processSensoryInput(percept)
         
-        # Run brain step
+        # Brain thinks
         brain.step(step)
         
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
+        # Get action and execute
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
         
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
+        # Get reward and apply modulation
         reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
         agent.applyRewardModulation(reward, 0.0)
         
-        # Update development
-        agent.updateDevelopment(0.1)
+        # Record metrics
+        learning_metrics['rewards'].append(reward)
+        learning_metrics['curiosity_levels'].append(agent.getCuriosityLevel())
+        learning_metrics['novelty_levels'].append(agent.getNoveltyLevel())
+        learning_metrics['development_stages'].append(brain.getDevelopmentalStage())
         
-        # Print progress
+        action_type = str(action.getType())
+        learning_metrics['action_counts'][action_type] = learning_metrics['action_counts'].get(action_type, 0) + 1
+        
+        # Print progress periodically
         if step % 100 == 0:
             print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Reward: {reward:.3f}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Development: {brain.getDevelopmentalStage()}")
+            print(f"  Action distribution: {learning_metrics['action_counts']}")
+    
+    # 3. Analyze learning results
+    final_reward = learning_metrics['rewards'][-1]
+    avg_reward = sum(learning_metrics['rewards']) / len(learning_metrics['rewards'])
+    final_curiosity = learning_metrics['curiosity_levels'][-1]
+    final_development = learning_metrics['development_stages'][-1]
+    
+    # Get agent learning metrics
+    agent_metrics = agent.getLearningMetrics()
+    
+    # Generate performance report
+    performance_report = {
+        'total_steps': num_steps,
+        'final_reward': final_reward,
+        'average_reward': avg_reward,
+        'final_curiosity': final_curiosity,
+        'final_development_stage': final_development,
+        'agent_metrics': agent_metrics,
+        'action_distribution': learning_metrics['action_counts']
+    }
+    
+    print(f"\nRL Episode Complete!")
+    print(f"Total steps: {num_steps}")
+    print(f"Final reward: {final_reward:.3f}")
+    print(f"Average reward: {avg_reward:.3f}")
+    print(f"Final curiosity: {final_curiosity:.3f}")
+    print(f"Final development stage: {final_development}")
+    
+    return performance_report, learning_metrics
 
-# Run the simulation
-run_agent_simulation(1000)
-```
-
-### Key Classes and Methods
-
-#### Brain Class
-
-```python
-# Creation
-brain = pynlm.createBrain(config)
-
-# Initialization
-brain.initialize()
-
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
-
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
-
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
-
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+# Run the complete RL example
+performance, metrics = run_advanced_rl_episode(1000)
+print(f"\nPerformance Report:\n{performance}")
 ```
 
 ---

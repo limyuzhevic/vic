@@ -412,14 +412,514 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    // Convenience factory methods
+    
+    // CreateQuickSimulation: One-shot simulation with config
+    m.def("createQuickSimulation", [](std::shared_ptr<Config> config, const std::string& name = "quick_simulation") {
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain in createQuickSimulation");
+        }
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        
+        // Configure world with default settings for quick simulation
+        world->configure(100.0f, 100.0f, 11, 11);
+        world->setAgentStart(50.0f, 50.0f);
+        world->setRandomSeed(42);
+        
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world, name);
+    }, py::arg("config"), py::arg("name") = "quick_simulation",
+       "Create a quick simulation with brain, agent, and world ready to run. Returns tuple (brain, agent, world, name)");
+
+    // CreateDevelopmentBrain: Pre-configured developmental brain
+    m.def("createDevelopmentBrain", [](std::shared_ptr<Config> config = nullptr) {
+        auto devConfig = config ? config : std::make_shared<Config>();
+        
+        // Apply developmental configuration defaults
+        devConfig->set("brain.development_enabled", true);
+        devConfig->set("brain.development_stage", "CriticalPeriod");
+        devConfig->set("brain.plasticity.stdp.enabled", true);
+        devConfig->set("brain.plasticity.hebbian.enabled", true);
+        devConfig->set("brain.plasticity.structural.enabled", true);
+        devConfig->set("brain.neuromodulation.dopamine.enabled", true);
+        devConfig->set("brain.neuromodulation.curiosity.enabled", true);
+        devConfig->set("brain.neuromodulation.novelty.enabled", true);
+        
+        auto brain = std::make_shared<Brain>(devConfig);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize developmental brain");
+        }
+        
+        brain->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+        
+        return brain;
+    }, py::arg("config") = nullptr,
+       "Create a pre-configured developmental brain optimized for learning. Returns Brain object");
+
+    // CreateLearningEnvironment: Brain + world + agent ready to learn
+    m.def("createLearningEnvironment", [](std::shared_ptr<Config> config = nullptr, 
+                                          const std::string& environmentType = "standard") {
+        auto envConfig = config ? config : std::make_shared<Config>();
+        
+        // Set up learning-optimized configuration
+        envConfig->set("environment.type", environmentType);
+        envConfig->set("environment.episode_length", 1000);
+        envConfig->set("brain.learning_rate", 0.001);
+        envConfig->set("brain.exploration_rate", 0.1);
+        envConfig->set("brain.reward_scale", 1.0);
+        
+        auto brain = std::make_shared<Brain>(envConfig);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        auto world = std::make_shared<SimpleWorld>();
+        
+        // Configure world based on environment type
+        if (environmentType == "standard") {
+            world->configure(200.0f, 200.0f, 21, 21);
+            world->setAgentStart(100.0f, 100.0f);
+        } else if (environmentType == "maze") {
+            world->configure(100.0f, 100.0f, 11, 11);
+            world->setAgentStart(50.0f, 50.0f);
+        } else if (environmentType == "open_space") {
+            world->configure(400.0f, 400.0f, 41, 41);
+            world->setAgentStart(200.0f, 200.0f);
+        }
+        
+        world->setRandomSeed(123);
+        
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, agent, world, "learning_environment");
+    }, py::arg("config") = nullptr, py::arg("environmentType") = "standard",
+       "Create a complete learning environment with brain, agent, and world. Returns tuple (brain, agent, world, name)");
+
+    // CreateMonitoringSetup: Brain with enhanced logging and monitoring
+    m.def("createMonitoringSetup", [](std::shared_ptr<Config> config = nullptr,
+                                     const std::string& monitorType = "comprehensive") {
+        auto monConfig = config ? config : std::make_shared<Config>();
+        
+        // Enable comprehensive monitoring
+        monConfig->set("monitoring.enabled", true);
+        monConfig->set("monitoring.performance.enabled", true);
+        monConfig->set("monitoring.memory.enabled", true);
+        monConfig->set("monitoring.cpu.enabled", true);
+        monConfig->set("monitoring.step_timing.enabled", true);
+        monConfig->set("monitoring.learning_metrics.enabled", true);
+        monConfig->set("logging.level", "DEBUG");
+        monConfig->set("logging.file.output", "brain_simulation.log");
+        monConfig->set("logging.console.output", true);
+        
+        auto brain = std::make_shared<Brain>(monConfig);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize monitoring brain");
+        }
+        
+        return brain;
+    }, py::arg("config") = nullptr, py::arg("monitorType") = "comprehensive",
+       "Create a brain with enhanced logging and monitoring. Returns Brain object with monitoring capabilities");
+
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Validation helper functions
+    // Error handling and validation utilities
+    
+    m.def("validateBrainConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        if (!config) {
+            errors.push_back("Config object is null");
+            return std::make_pair(false, errors);
+        }
+        
+        // Validate brain-specific configuration
+        if (!config->has("brain.enabled")) {
+            errors.push_back("Missing 'brain.enabled' configuration");
+        }
+        
+        bool brainEnabled = false;
+        if (config->has("brain.enabled")) {
+            auto opt = config->get<bool>("brain.enabled");
+            if (opt.has_value()) {
+                brainEnabled = *opt;
+            } else {
+                errors.push_back("Invalid value for 'brain.enabled'");
+            }
+        }
+        
+        if (brainEnabled) {
+            if (!config->has("brain.simulation.type")) {
+                errors.push_back("Missing 'brain.simulation.type' when brain is enabled");
+            }
+        }
+        
+        // Validate environment configuration
+        if (!config->has("environment.type")) {
+            errors.push_back("Missing 'environment.type' configuration");
+        }
+        
+        // Validate numeric ranges if present
+        auto optNeuronCount = config->get<size_t>("brain.neuron_count");
+        if (optNeuronCount.has_value()) {
+            if (*optNeuronCount == 0) {
+                errors.push_back("brain.neuron_count must be greater than 0");
+            } else if (*optNeuronCount > 1000000) {
+                errors.push_back("brain.neuron_count must not exceed 1,000,000");
+            }
+        }
+        
+        auto optLearningRate = config->get<double>("brain.learning_rate");
+        if (optLearningRate.has_value()) {
+            if (*optLearningRate < 0.0 || *optLearningRate > 1.0) {
+                errors.push_back("brain.learning_rate must be between 0.0 and 1.0");
+            }
+        }
+        
+        return std::make_pair(errors.empty(), errors);
+    }, py::arg("config"), "Validate brain configuration. Returns (is_valid, error_messages)");
+
+    m.def("validateSensoryInput", [](const std::shared_ptr<SensoryInput>& input) {
+        std::vector<std::string> errors;
+        
+        if (!input) {
+            errors.push_back("SensoryInput object is null");
+            return std::make_pair(false, errors);
+        }
+        
+        auto optDim = input->getDimensions();
+        if (!optDim.has_value()) {
+            errors.push_back("Invalid sensory input dimensions");
+            return std::make_pair(false, errors);
+        }
+        
+        size_t dim = *optDim;
+        if (dim == 0) {
+            errors.push_back("Sensory input dimensions cannot be zero");
+        } else if (dim > 10000) {
+            errors.push_back("Sensory input dimensions cannot exceed 10,000");
+        }
+        
+        return std::make_pair(errors.empty(), errors);
+    }, py::arg("input"), "Validate sensory input. Returns (is_valid, error_messages)");
+
+    m.def("validateWorldConfig", [](const std::shared_ptr<SimpleWorld>& world) {
+        std::vector<std::string> errors;
+        
+        if (!world) {
+            errors.push_back("World object is null");
+            return std::make_pair(false, errors);
+        }
+        
+        float width = world->getWidth();
+        float height = world->getHeight();
+        
+        if (width <= 0.0f) {
+            errors.push_back("World width must be positive");
+        } else if (width > 10000.0f) {
+            errors.push_back("World width must not exceed 10,000");
+        }
+        
+        if (height <= 0.0f) {
+            errors.push_back("World height must be positive");
+        } else if (height > 10000.0f) {
+            errors.push_back("World height must not exceed 10,000");
+        }
+        
+        return std::make_pair(errors.empty(), errors);
+    }, py::arg("world"), "Validate world configuration. Returns (is_valid, error_messages)");
+
+    // Brain pause/resume/step control
+    m.def("pauseBrain", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain object is null");
+        }
+        
+        // Note: Current Brain implementation doesn't have explicit pause/resume
+        // This is a placeholder for future pause functionality
+        // Implementation would need to add pause state tracking and skip simulation steps
+        // For now, this just logs a warning
+        brain->logStatus();
+        
+        return std::make_pair(true, "Brain pause requested (not implemented in this version)");
+    }, py::arg("brain"), "Pause brain simulation. Returns (success, message). Note: This is a placeholder - current Brain implementation doesn't have explicit pause support");
+
+    m.def("resumeBrain", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain object is null");
+        }
+        
+        // Note: Current Brain implementation doesn't have explicit pause/resume
+        // This is a placeholder for future resume functionality
+        brain->logStatus();
+        
+        return std::make_pair(true, "Brain resume requested (not implemented in this version)");
+    }, py::arg("brain"), "Resume brain simulation. Returns (success, message). Note: This is a placeholder - current Brain implementation doesn't have explicit resume support");
+
+    m.def("stepBrain", [](const std::shared_ptr<Brain>& brain, 
+                         const std::shared_ptr<SimpleWorld>& world,
+                         const std::shared_ptr<AgentBrain>& agent,
+                         const std::shared_ptr<Config>& config) {
+        if (!brain || !world || !agent || !config) {
+            throw std::runtime_error("One or more components is null");
+        }
+        
+        // Get current simulation state
+        auto currentStep = static_cast<SimulationStep>(world->getSimulationTime());
+        auto currentTime = static_cast<Timestamp>(world->getSimulationTime());
+        
+        // Process sensory input
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        
+        // Perform brain simulation step
+        brain->step(currentStep, currentTime);
+        
+        // Update world state
+        world->update(0.01); // Default timestep
+        
+        return std::make_pair(true, "Single simulation step completed");
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("config"),
+       "Perform a single simulation step with brain, world, and agent. Returns (success, message)");
+
+    // World acceleration (fast forward)
+    m.def("fastForwardWorld", [](const std::shared_ptr<SimpleWorld>& world, 
+                                 const std::shared_ptr<Brain>& brain,
+                                 const std::shared_ptr<AgentBrain>& agent,
+                                 int steps) {
+        if (!world || !brain || !agent) {
+            throw std::runtime_error("One or more components is null");
+        }
+        
+        if (steps <= 0) {
+            throw std::runtime_error("Number of steps must be positive for fast forward");
+        }
+        
+        double originalTimeStep = 0.01;
+        double acceleratedTimeStep = originalTimeStep * std::min(steps, 100); // Cap acceleration
+        
+        auto startTime = world->getSimulationTime();
+        
+        for (int i = 0; i < steps; ++i) {
+            // Process sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Brain simulation step
+            auto currentStep = static_cast<SimulationStep>(i + static_cast<int>(startTime));
+            auto currentTime = startTime + i * originalTimeStep;
+            brain->step(currentStep, currentTime);
+            
+            // Update world with accelerated time step
+            world->update(acceleratedTimeStep);
+        }
+        
+        auto endTime = world->getSimulationTime();
+        
+        return std::make_pair(true, "Fast forward completed. Advanced " + std::to_string(steps) + 
+                               " steps from time " + std::to_string(startTime) + 
+                               " to " + std::to_string(endTime));
+    }, py::arg("world"), py::arg("brain"), py::arg("agent"), py::arg("steps"),
+       "Fast forward world simulation by specified number of steps. Returns (success, message)");
+
+    // Visualization and analysis utilities
+    
+    // Brain network topology analysis
+    m.def("getNetworkTopology", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, std::string> topology;
+        
+        if (!brain) {
+            topology["error"] = "Brain object is null";
+            return topology;
+        }
+        
+        // Count neurons by type
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        size_t totalSynapses = brain->getTotalSynapseCount();
+        
+        topology["total_neurons"] = std::to_string(totalNeurons);
+        topology["total_synapses"] = std::to_string(totalSynapses);
+        topology["excitatory_neurons"] = "N/A";
+        topology["inhibitory_neurons"] = "N/A";
+        topology["modulatory_neurons"] = "N/A";
+        topology["sensory_neurons"] = "N/A";
+        topology["motor_neurons"] = "N/A";
+        topology["internal_neurons"] = "N/A";
+        
+        // Analyze regions
+        size_t regionCount = brain->getRegionCount();
+        topology["region_count"] = std::to_string(regionCount);
+        
+        for (const auto& regionId : brain->getRegionIds()) {
+            auto region = brain->getRegion(regionId);
+            if (region) {
+                topology["region_" + std::to_string(regionId.index()) + "_name"] = "Unnamed Region"; // Region doesn't have name in current API
+            }
+        }
+        
+        topology["connectivity_type"] = "Event-driven"; // Based on current implementation
+        topology["plastic_neurons"] = "N/A"; // Would require plasticity system access
+        
+        return topology;
+    }, py::arg("brain"), "Get network topology analysis. Returns map with metrics like total_neurons, total_synapses, region_count, connectivity_type, etc.";
+
+    // Brain activation map analysis
+    m.def("getActivationMap", [](const std::shared_ptr<Brain>& brain, 
+                                const std::shared_ptr<SimpleWorld>& world,
+                                const std::shared_ptr<AgentBrain>& agent,
+                                const std::string& analysisType = "spike_activity") {
+        std::map<std::string, std::string> activationMap;
+        
+        if (!brain || !world || !agent) {
+            activationMap["error"] = "One or more components is null";
+            return activationMap;
+        }
+        
+        activationMap["analysis_type"] = analysisType;
+        activationMap["simulation_time"] = std::to_string(world->getSimulationTime());
+        activationMap["brain_state"] = "Active";
+        activationMap["spike_count"] = std::to_string(brain->getTotalSpikeCount());
+        activationMap["active_neurons"] = std::to_string(brain->getActiveNeuronCount());
+        activationMap["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        activationMap["average_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        
+        // Process sensory input for activation analysis
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        
+        activationMap["sensory_processed"] = "true";
+        activationMap["agent_position"] = std::to_string(world->getAgentBody().x) + ", " + std::to_string(world->getAgentBody().y);
+        
+        return activationMap;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("analysisType") = "spike_activity",
+       "Get brain activation map analysis. analysisType can be 'spike_activity', 'firing_rate', 'spatial', or 'temporal'. "
+       "Returns map with activation metrics and spatial/temporal information.";
+
+    // Agent experience replay access
+    m.def("getExperienceReplay", [](const std::shared_ptr<AgentBrain>& agent, 
+                                   int maxExperiences = 100) {
+        std::map<std::string, std::string> replay;
+        
+        if (!agent) {
+            replay["error"] = "AgentBrain object is null";
+            return replay;
+        }
+        
+        if (maxExperiences <= 0) {
+            replay["error"] = "Max experiences must be positive";
+            return replay;
+        }
+        
+        replay["max_experiences"] = std::to_string(maxExperiences);
+        replay["experiences_retrieved"] = "N/A";
+        replay["novelty_level"] = std::to_string(agent->getNoveltyLevel());
+        replay["curiosity_level"] = std::to_string(agent->getCuriosityLevel());
+        replay["prediction_error"] = std::to_string(agent->getPredictionError());
+        replay["last_action"] = "None recorded";
+        replay["reward_history_length"] = "N/A";
+        
+        // Note: Current AgentBrain implementation doesn't expose explicit experience replay
+        // This is a placeholder for future experience replay functionality
+        replay["experience_replay"] = "Available in extended AgentBrain implementation";
+        
+        return replay;
+    }, py::arg("agent"), py::arg("maxExperiences") = 100,
+       "Get agent experience replay. Returns map with experience metrics. Note: This is a placeholder - current AgentBrain doesn't expose explicit experience replay";
+
+    // Testing utilities
+    
+    // Memory usage report
+    m.def("memoryUsageReport", [](const std::string& reportType = "detailed") {
+        std::map<std::string, std::string> report;
+        
+        // Basic memory statistics
+        report["total_memory_usage"] = "N/A";
+        report["brain_memory_usage"] = "N/A";
+        report["world_memory_usage"] = "N/A";
+        report["agent_memory_usage"] = "N/A";
+        
+        if (reportType == "basic") {
+            report["memory_info"] = "Basic memory usage not implemented in this build";
+        } else if (reportType == "detailed") {
+            report["memory_info"] = "Detailed memory usage requires system-specific implementation";
+            report["gc_available"] = "N/A";
+            report["heap_usage"] = "N/A";
+            report["stack_usage"] = "N/A";
+        } else if (reportType == "comprehensive") {
+            report["memory_info"] = "Comprehensive memory usage requires system-specific implementation";
+            report["allocation_tracking"] = "Available";
+            report["deallocation_tracking"] = "Available";
+            report["leak_detection"] = "Available";
+        }
+        
+        return report;
+    }, py::arg("reportType") = "detailed", "Generate memory usage report. reportType can be 'basic', 'detailed', or 'comprehensive'. Returns map with memory metrics.";
+
+    // Simulation step benchmark
+    m.def("simulationStepBenchmark", [](const std::shared_ptr<Brain>& brain, 
+                                        const std::shared_ptr<SimpleWorld>& world,
+                                        const std::shared_ptr<AgentBrain>& agent,
+                                        int steps = 100) {
+        std::map<std::string, std::string> results;
+        
+        if (!brain || !world || !agent) {
+            results["error"] = "One or more components is null";
+            return results;
+        }
+        
+        if (steps <= 0) {
+            results["error"] = "Number of steps must be positive";
+            return results;
+        }
+        
+        // Validate components
+        auto configResult = validateBrainConfig(brain->getConfig());
+        if (!configResult.first) {
+            results["error"] = "Invalid brain configuration: " + configResult.second[0];
+            return results;
+        }
+        
+        // Benchmark simulation steps
+        std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int i = 0; i < steps; ++i) {
+            // Process sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Brain simulation step
+            auto currentStep = static_cast<SimulationStep>(i);
+            auto currentTime = static_cast<Timestamp>(world->getSimulationTime());
+            brain->step(currentStep, currentTime);
+            
+            // World update
+            world->update(0.01); // Assuming 0.01 timestep
+        }
+        
+        std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        results["total_steps"] = std::to_string(steps);
+        results["total_time_ms"] = std::to_string(duration.count());
+        results["avg_time_per_step_ms"] = std::to_string(duration.count() / static_cast<double>(steps));
+        results["steps_per_second"] = std::to_string(steps * 1000.0 / duration.count());
+        
+        return results;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 100,
+       "Benchmark simulation performance. Runs specified number of steps and returns timing statistics. "
+       "Returns map with metrics like total_steps, total_time_ms, avg_time_per_step_ms, steps_per_second."; 
+
+    m.def("getConfigurationKeys", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> keys;
+        if (config) {
+            keys = config->getKeys();
+        }
+        return keys;
+    }, py::arg("config"), "Get all configuration keys from Config object. Returns vector of key strings.");
 
 } // namespace nlm

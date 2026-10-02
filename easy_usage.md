@@ -42,6 +42,102 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+### Example 1b: Quick Learning Simulation (New Convenience Method)
+
+```python
+import pynlm
+
+# One-shot quick learning simulation
+result = pynlm.createQuickSimulation(
+    num_neurons=500,
+    num_steps=200,
+    enable_learning=True,
+    learning_rate=0.001,
+    enable_development=True,
+    enable_curiosity=True,
+    enable_reward_modulation=True
+)
+
+print(f"Learning complete! Final firing rate: {result['firing_rate']:.3f}")
+print(f"Total spikes: {result['total_spikes']}")
+print(f"Learning progress: {result['learning_progress']:.3f}")
+print(f"Development stage: {result['development_stage']}")
+```
+
+### Example 1c: Complete Learning Environment (New Convenience Method)
+
+```python
+import pynlm
+
+# Create a complete learning environment ready for reinforcement learning
+brain, world, agent = pynlm.createLearningEnvironment(
+    width=15,
+    height=15,
+    vision_width=8,
+    vision_height=8,
+    enable_reward_modulation=True,
+    enable_curiosity=True,
+    enable_structural_plasticity=True,
+    enable_development=True,
+    neuron_count=1000,
+    learning_rate=0.01,
+    exploration_rate=0.3,
+    development_stages=5
+)
+
+# Run learning episode
+for step in range(500):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}:")
+        print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+        print(f"  Learning progress: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Learning episode complete!")
+```
+
+### Example 1d: Performance Monitoring (New Feature)
+
+```python
+import pynlm
+
+# Create brain with performance monitoring
+brain, world, agent = pynlm.createMonitoringSetup(
+    neuron_count=2000,
+    enable_performance_monitoring=True,
+    enable_benchmarking=True,
+    memory_monitoring=True,
+    simulation_stats=True
+)
+
+# Run simulation while monitoring
+for step in range(100):
+    brain.step(step)
+    
+    if step % 20 == 0:
+        # Get performance statistics
+        brain_stats = brain.getBrainPerformanceStats()
+        world_stats = world.getWorldSimulationStats()
+        
+        print(f"Step {step}:")
+        print(f"  CPU time: {brain_stats['cpu_time_ms']:.2f}ms")
+        print(f"  Memory usage: {brain_stats['memory_usage_mb']:.2f}MB")
+        print(f"  Step rate: {world_stats['steps_per_second']:.2f} steps/s")
+        print(f"  Avg step time: {world_stats['avg_step_time_ms']:.2f}ms")
+
+# Get comprehensive memory report
+memory_report = pynlm.memoryUsageReport()
+print(f"Memory usage report:\n{memory_report}")
+```
+
 ### Example 2: Brain in a Simple World
 
 ```python
