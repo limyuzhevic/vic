@@ -13,6 +13,9 @@ add_executable(nlm_test
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
+    test_hebbian.cpp
+    test_antihb.cpp
+    test_bcm.cpp
     test_brain.cpp
 )
 

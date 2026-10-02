@@ -33,6 +33,18 @@ namespace test_stdp {
     void runAll();
 }
 
+namespace test_hebbian {
+    void runAll();
+}
+
+namespace test_antihb {
+    void runAll();
+}
+
+namespace test_bcm {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
@@ -43,6 +55,9 @@ int main() {
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Hebbian Plasticity" << std::endl;
+    std::cout << "  - AntiHebbian Plasticity (Homeostatic)" << std::endl;
+    std::cout << "  - BCM Plasticity (Sliding Threshold)" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -104,6 +119,33 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Hebbian tests..." << std::endl;
+    try {
+        test_hebbian::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running AntiHebbian tests..." << std::endl;
+    try {
+        test_antihb::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running BCM tests..." << std::endl;
+    try {
+        test_bcm::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
