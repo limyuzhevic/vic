@@ -127,6 +127,27 @@ public:
     PlasticityFlags& getPlasticityFlags();
     void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
     
+    // Current management
+    void injectCurrent(MembranePotential current);
+    MembranePotential getTotalCurrent() const;
+    void clearTotalCurrent();
+    
+    // Spike history (for STDP)
+    void recordSpike(Timestamp timestamp);
+    const std::vector<Timestamp>& getSpikeHistory() const;
+    void clearSpikeHistory();
+    
+    // Synapse management (incoming and outgoing)
+    void addIncomingSynapse(SynapseHandle handle);
+    void addOutgoingSynapse(SynapseHandle handle);
+    const std::vector<SynapseHandle>& getIncomingSynapses() const;
+    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
+    
+    // Plasticity state
+    const PlasticityFlags& getPlasticityFlags() const;
+    PlasticityFlags& getPlasticityFlags();
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    
     // Region/population membership
     void setRegionId(RegionId region);
     RegionId getRegionId() const;

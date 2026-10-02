@@ -1,11 +1,11 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 4: Core Brain Systems Implemented
 //
-// This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// This phase implements the core computational brain systems:
+// - Neuromodulatory systems (Dopamine, Reward, PredictionError, Novelty, Curiosity)
+// - Plasticity rules (Hebbian covariance learning, synaptic normalization)
+// - Prediction systems (Predictive coding, hierarchical models)
+// - Integrated brain loop with all systems connected
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -35,17 +35,18 @@ void printBanner() {
     ║     NLM — 熙然                                                ║
     ║     Neural Learning Machine                                   ║
     ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
+    ║     Phase 4: Core Brain Systems Implemented                  ║
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - Neuromodulatory systems                                  ║
+    ║     - Hebbian covariance learning                              ║
+    ║     - Predictive coding                                         ║
+    ║     - Integrated brain loop                                    ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -332,12 +333,13 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("=== NLM Phase 4: Core Brain Systems ===");
     NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Neuromodulatory systems (Dopamine, Reward, PredictionError)");
+    NLM_LOG_INFO("  - Hebbian covariance learning with synaptic normalization");
+    NLM_LOG_INFO("  - Predictive coding and hierarchical models");
+    NLM_LOG_INFO("  - Integrated brain loop with all systems connected");
+    NLM_LOG_INFO("  - Intrinsic motivation and curiosity-driven exploration");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -433,16 +435,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("=== Phase 2 Complete ===");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  ✓ Covariance-based Hebbian learning implemented");
+    NLM_LOG_INFO("  ✓ Predictive coding with hierarchical models");
+    NLM_LOG_INFO("  ✓ Neuromodulatory integration (dopamine, reward, curiosity)");
+    NLM_LOG_INFO("  ✓ Intrinsic motivation and exploration behavior");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("The NLM brain is now an intelligent artificial neural substrate");
+    NLM_LOG_INFO("capable of learning, prediction, and adaptive behavior through");
+    NLM_LOG_INFO("experience and neuromodulatory guidance.");
     NLM_LOG_INFO("");
     
     return 0;

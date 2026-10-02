@@ -20,49 +20,52 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 4: CORE BRAIN SYSTEMS IMPLEMENTED**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 4 focuses on implementing the core computational brain systems that enable learning and adaptation. This phase implements:
 
-### Phase 6 Integration Achievements
+### Core Neuromodulatory Systems
+- **Dopamine**: Reward prediction error signaling and plasticity modulation
+- **Reward**: Temporal difference learning and value estimation
+- **Prediction Error**: Credit assignment for learning
+- **Novelty**: Exploration and intrinsic motivation signals
+- **Curiosity**: Adaptive exploration behavior
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### Learning Systems
+- **Plasticity Rules**: Hebbian covariance learning with synaptic normalization
+- **Prediction System**: Hierarchical predictive coding and forward models
+- **Memory System**: Experience storage and consolidation
 
-#### Neuromodulation Integration
+### Neural Dynamics
+- **Integrate-and-Fire Neurons**: Realistic LIF neuron dynamics
+- **Synaptic Transmission**: Event-driven spike propagation with delays
+- **Network Integration**: All systems connected into a coherent brain loop
+
+## Phase 4 Integration Achievements
+
+### Neuromodulation Integration
 - Dopamine affects neural excitability and plasticity
 - Curiosity drives exploration behavior
 - Novelty detection integrated with sensory processing
 - All neuromodulators connected to plasticity rules
 
-#### Prediction System
+### Learning System Integration
 - Prediction system integrated into brain loop
 - Prediction error signals affect learning
 - Confidence tracking implemented
+- Hebbian and STDP plasticity rules implemented
+- Temporal difference learning for reward prediction
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+### Memory Systems
+- Working memory with persistent activity and competition
+- Episodic memory with experience encoding and replay
+- Associative memory with Hebbian pattern associations
+- All memory systems connected to neural processing
 
-#### Development Integration
+### Development Integration
 - Developmental stages affect plasticity rates
 - Structural plasticity modulated by age
 - Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
 
 ## Building
 
@@ -75,12 +78,12 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 4 Demo (Core Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the core integration test verifying all brain systems are connected.
 
 ## Project Structure
 
@@ -94,22 +97,22 @@ NLM/
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   └── PHASE4_CORE_AUDIT.md    # Phase 4 audit
 ├── src/
 │   ├── core/           # Core utilities
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
+│   ├── plasticity/     # Plasticity rules (implemented)
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/# Neuromodulators (implemented)
 │   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── prediction/     # Prediction systems (implemented)
+│   ├── cognition/     # Cognitive mechanisms
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
+│   ├── experiments/   # Experiment framework
+│   └── visualization/ # Visualization
 ├── tests/
 └── configs/
 ```
@@ -134,33 +137,25 @@ NLM/
 - Developmental stages
 - Novelty and curiosity
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+### Phase 4 (IN PROGRESS)
+- **Neuromodulation System**: Dopamine, Reward, PredictionError, Novelty, Curiosity
+- **Learning Systems**: Hebbian covariance learning, Predictive coding
+- **Memory Integration**: All memory systems connected to neural processing
+- **Development Integration**: Age-dependent plasticity rates
+- **Core Integration**: All systems working together as a unified brain
 
-### Phase 5 (Complete)
+### Phase 5 (Planned)
 - Performance optimizations
 - Memory pools and event queues
 - SIMD vectorization
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (Planned)
+- Advanced cognitive capabilities
+- Social learning and theory of mind
+- Continual learning from lifelong experience
+- Full biological realism
 
 ## Scientific Limitations
 
@@ -172,20 +167,6 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No detailed cortical architecture
 - No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
 
 ## Architecture Philosophy
 
