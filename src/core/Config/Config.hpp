@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    std::vector<std::string> validate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +103,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
 };
-
-} // namespace nlm

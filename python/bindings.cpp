@@ -160,6 +160,63 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate,
+             "Validate configuration values and return error messages if any")
+        .def("validateOrThrow", [](const Config& self) {
+            auto errors = self.validate();
+            if (!errors.empty()) {
+                std::string errorMsg = "Configuration validation failed:\n";
+                for (const auto& error : errors) {
+                    errorMsg += "  - " + error + "\n";
+                }
+                throw std::runtime_error(errorMsg);
+            }
+        }, "Validate configuration and throw exception if invalid")
+        .def("set", [](Config& self, const std::string& key, const py::object& value, ConfigSource source = ConfigSource::Runtime) {
+            if (py::isinstance<py::int_>(value)) {
+                self.set(key, py::cast<int64_t>(value), source);
+            } else if (py::isinstance<py::float_>(value)) {
+                self.set(key, py::cast<float>(value), source);
+            } else if (py::isinstance<py::bool_>(value)) {
+                self.set(key, py::cast<bool>(value), source);
+            } else if (py::isinstance<py::str>(value)) {
+                self.set(key, py::cast<std::string>(value), source);
+            } else if (py::isinstance<py::list>(value)) {
+                auto list = value.cast<std::vector<float>>();
+                self.set(key, ConfigValue(list), source);
+            } else {
+                throw std::runtime_error("Unsupported configuration value type");
+            }
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value with type validation")
+        .def("get", [](const Config& self, const std::string& key) {
+            if (self.has(key)) {
+                if (self.get<int64_t>(key).has_value()) {
+                    return py::cast(self.get<int64_t>(key).value());
+                } else if (self.get<double>(key).has_value()) {
+                    return py::cast(self.get<double>(key).value());
+                } else if (self.get<float>(key).has_value()) {
+                    return py::cast(self.get<float>(key).value());
+                } else if (self.get<bool>(key).has_value()) {
+                    return py::cast(self.get<bool>(key).value());
+                } else if (self.get<std::string>(key).has_value()) {
+                    return py::cast(self.get<std::string>(key).value());
+                }
+            }
+            throw std::runtime_error("Key not found: " + key);
+        }, py::arg("key"), "Get configuration value with type inference")
+        .def("getOr", [](const Config& self, const std::string& key, const py::object& defaultValue) {
+            if (py::isinstance<py::int_>(defaultValue)) {
+                return py::cast(self.getOr<int64_t>(key, py::cast<int64_t>(defaultValue)));
+            } else if (py::isinstance<py::float_>(defaultValue)) {
+                return py::cast(self.getOr<double>(key, py::cast<double>(defaultValue)));
+            } else if (py::isinstance<py::bool_>(defaultValue)) {
+                return py::cast(self.getOr<bool>(key, py::cast<bool>(defaultValue)));
+            } else if (py::isinstance<py::str>(defaultValue)) {
+                return py::cast(self.getOr<std::string>(key, py::cast<std::string>(defaultValue)));
+            }
+            throw std::runtime_error("Unsupported default value type");
+        }, py::arg("key"), py::arg("defaultValue"), "Get configuration value with default and type inference")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -207,7 +264,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("getDuration", &Action::getDuration)
+        .def("setDuration", &Action::setDuration, py::arg("duration"))
+        .def("getEnergyCost", &Action::getEnergyCost)
+        .def("setEnergyCost", &Action::setEnergyCost, py::arg("cost"))
+        .def("getTimestamp", &Action::getTimestamp)
+        .def("setTimestamp", &Action::setTimestamp, py::arg("timestamp"))
+        .def("isValid", &Action::isValid)
+        .def("toString", [](const Action& a) {
+            std::stringstream ss;
+            ss << "Action[Type=" << a.getName() 
+               << ", Duration=" << a.getDuration()
+               << ", Energy=" << a.getEnergyCost() << "]";
+            return ss.str();
+        }, "Get string representation");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -351,7 +422,55 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("batchStep", [](Brain& self, size_t numSteps, bool logProgress = false) {
+            for (size_t i = 0; i < numSteps; ++i) {
+                self.step(i);
+                if (logProgress && (i % 100 == 0)) {
+                    std::cout << "Step " << i << ": " 
+                              << self.getFiringNeuronCount() << " firing neurons\n";
+                }
+            }
+        }, py::arg("numSteps"), py::arg("logProgress") = false,
+             "Perform multiple steps in batch")
+        .def("batchInjectCurrent", [](Brain& self, const std::vector<NeuronId>& neuronIds, float current) {
+            for (const auto& id : neuronIds) {
+                self.injectCurrent(id, current);
+            }
+        }, py::arg("neuronIds"), py::arg("current"),
+             "Inject current to multiple neurons")
+        .def("getNeuronStats", [](const Brain& self) {
+            return std::make_tuple(self.getTotalNeuronCount(),
+                                   self.getActiveNeuronCount(),
+                                   self.getFiringNeuronCount(),
+                                   self.getTotalSpikeCount());
+        }, "Get comprehensive neuron statistics")
+        .def("enableSystem", [](Brain& self, const std::string& systemName, bool enable) {
+            auto config = self.getConfig();
+            std::string key = "system." + systemName + ".enabled";
+            config->set(key, enable);
+        }, py::arg("systemName"), py::arg("enable"),
+             "Enable/disable a system")
+        .def("getSystemStatus", [](const Brain& self) {
+            auto config = self.getConfig();
+            std::map<std::string, bool> status;
+            for (const auto& key : config->getKeys()) {
+                if (key.find("system.") == 0 && key.find(".enabled") != std::string::npos) {
+                    std::string systemName = key.substr(7, key.find(".enabled") - 8);
+                    status[systemName] = config->getOr<bool>(key, false);
+                }
+            }
+            return status;
+        }, "Get status of all systems")
+        .def("getPerformanceMetrics", [](const Brain& self) {
+            std::map<std::string, double> metrics;
+            metrics["neuron_count"] = self.getTotalNeuronCount();
+            metrics["firing_rate"] = self.getAverageFiringRate();
+            metrics["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            metrics["total_spikes"] = self.getTotalSpikeCount();
+            metrics["development_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return metrics;
+        }, "Get performance metrics");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -364,14 +483,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
+        .def("processBatchSensoryInput", [](AgentBrain& self, const std::vector<SensoryPercept>& percepts) {
+            for (const auto& percept : percepts) {
+                self.processSensoryInput(percept);
+            }
+        }, py::arg("percepts"),
+             "Process multiple sensory inputs in batch")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
+        .def("getActions", [](AgentBrain& self, size_t numActions) {
+            std::vector<Action> actions;
+            for (size_t i = 0; i < numActions; ++i) {
+                actions.push_back(self.decodeMotorCommand());
+            }
+            return actions;
+        }, py::arg("numActions"),
+             "Generate multiple actions in batch")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
+        .def("applyBatchRewardModulation", [](AgentBrain& self, const std::vector<std::pair<float, float>>& rewards) {
+            for (const auto& reward : rewards) {
+                self.applyRewardModulation(reward.first, reward.second);
+            }
+        }, py::arg("rewards"),
+             "Apply multiple reward modulations in batch")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
+        .def("updateBatchDevelopment", [](AgentBrain& self, const std::vector<double>& timesteps) {
+            for (double t : timesteps) {
+                self.updateDevelopment(t);
+            }
+        }, py::arg("timesteps"),
+             "Update development system for multiple timesteps")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -382,8 +527,26 @@ PYBIND11_MODULE(pynlm, m) {
              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+        .def("getLearningStats", [](AgentBrain& self) {
+            std::map<std::string, double> stats;
+            stats["curiosity"] = self.getCuriosityLevel();
+            stats["novelty"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["neuromodulation"] = self.getNeuromodulationLevel();
+            stats["development_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get comprehensive learning statistics")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
+        .def("resetBatch", [](AgentBrain& self, const std::vector<size_t>& episodeCounts) {
+            for (size_t count : episodeCounts) {
+                self.reset();
+                for (size_t i = 0; i < count; ++i) {
+                    self.reset();
+                }
+            }
+        }, py::arg("episodeCounts"),
+             "Reset agent for multiple episodes")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
@@ -395,6 +558,21 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
+        .def("enableAllSystems", [](AgentBrain& self, bool enable) {
+            self.enableRewardModulation(enable);
+            self.enableStructuralPlasticity(enable);
+            self.enableDevelopment(enable);
+            self.enableCuriosity(enable);
+        }, py::arg("enable"),
+             "Enable/disable all systems")
+        .def("getAllSystemStates", [](AgentBrain& self) {
+            std::map<std::string, bool> states;
+            states["reward_modulation"] = self.isRewardModulationEnabled();
+            states["structural_plasticity"] = self.isStructuralPlasticityEnabled();
+            states["development"] = self.isDevelopmentEnabled();
+            states["curiosity"] = self.isCuriosityEnabled();
+            return states;
+        }, "Get state of all systems")
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
@@ -402,19 +580,69 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration")
+    .def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Create configuration from file")
+    .def("createConfigFromDict", [](const py::dict& dict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (auto it : dict) {
+            std::string key = py::cast<std::string>(it.first);
+            auto value = it.second;
+            if (py::isinstance<py::int_>(value)) {
+                config->set(key, py::cast<int64_t>(value));
+            } else if (py::isinstance<py::float_>(value)) {
+                config->set(key, py::cast<float>(value));
+            } else if (py::isinstance<py::bool_>(value)) {
+                config->set(key, py::cast<bool>(value));
+            } else if (py::isinstance<py::str>(value)) {
+                config->set(key, py::cast<std::string>(value));
+            }
+        }
+        return config;
+    }, py::arg("dict"), "Create configuration from dictionary");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("create_experiment_config", [](const std::string& type) {
+        auto config = std::make_shared<Config>();
+        
+        if (type == "learning") {
+            config->set("brain.neuron_count", 500);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("neuromod.dopamine.scale", 1.0f);
+            config->set("neuromod.curiosity.enable", true);
+        } else if (type == "structural") {
+            config->set("brain.neuron_count", 200);
+            config->set("plasticity.structural.enable", true);
+            config->set("plasticity.stdp.enable", true);
+            config->set("development.enable", true);
+        } else if (type == "prediction") {
+            config->set("brain.neuron_count", 300);
+            config->set("plasticity.stdp.enable", true);
+            config->set("prediction.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        } else {
+            config->set("brain.neuron_count", 100);
+        }
+        
+        return config;
+    }, py::arg("type"), "Create experiment configuration of specified type");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Constants for Python API
+    m.attr("DEFAULT_CONFIG") = py::dict({
+        {"brain.neuron_count", 100},
+        {"brain.synapse_density", 0.1},
+        {"plasticity.stdp.enable", true},
+        {"plasticity.hebbian.enable", true},
+        {"neuromod.curiosity.enable", true},
+        {"neuromod.novelty.enable", true}
+    });
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.attr("VERSION") = "1.0.0";
+    m.attr("BUILD_DATE") = __DATE__;
+    m.attr("BUILD_TIME") = __TIME__;
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -212,4 +212,229 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::string error = validateKeyAndValue(entry.key, entry.value);
+        if (!error.empty()) {
+            errors.push_back(error);
+        }
+    }
+    
+    return errors;
+}
+
+std::string Config::validateKeyAndValue(const std::string& key, const ConfigValue& value) const {
+    // Validate key format
+    if (key.empty()) {
+        return "Empty key is not allowed";
+    }
+    
+    if (key.find('.') == std::string::npos) {
+        return "Key must contain a dot separator (e.g., 'section.key')";
+    }
+    
+    // Check for invalid characters in key
+    for (char c : key) {
+        if (!(std::isalnum(c) || c == '.' || c == '_' || c == '-')) {
+            return "Key contains invalid characters: " + std::string(1, c);
+        }
+    }
+    
+    // Validate value based on key type
+    return validateValueByKey(key, value);
+}
+
+std::string Config::validateValueByKey(const std::string& key, const ConfigValue& value) const {
+    std::string section = key.substr(0, key.find('.'));
+    std::string field = key.substr(key.find('.') + 1);
+    
+    try {
+        if (section == "brain") {
+            return validateBrainField(field, value);
+        } else if (section == "plasticity") {
+            return validatePlasticityField(field, value);
+        } else if (section == "neuromod") {
+            return validateNeuromodField(field, value);
+        } else if (section == "development") {
+            return validateDevelopmentField(field, value);
+        } else if (section == "prediction") {
+            return validatePredictionField(field, value);
+        }
+    } catch (const std::bad_variant_access&) {
+        return "Invalid value type for key: " + key;
+    }
+    
+    return "";
+}
+
+std::string Config::validateBrainField(const std::string& field, const ConfigValue& value) const {
+    try {
+        if (field == "neuron_count") {
+            int64_t count = std::get<int64_t>(value);
+            if (count <= 0 || count > 1000000) {
+                return "brain.neuron_count must be between 1 and 1000000";
+            }
+        } else if (field == "synapse_density") {
+            float density = std::get<float>(value);
+            if (density < 0.0f || density > 1.0f) {
+                return "brain.synapse_density must be between 0.0 and 1.0";
+            }
+        } else if (field == "connection_probability") {
+            float prob = std::get<float>(value);
+            if (prob < 0.0f || prob > 1.0f) {
+                return "brain.connection_probability must be between 0.0 and 1.0";
+            }
+        } else if (field == "v_thresh") {
+            float vthresh = std::get<float>(value);
+            if (vthresh < -100.0f || vthresh > 100.0f) {
+                return "brain.v_thresh must be between -100.0 and 100.0";
+            }
+        } else if (field == "v_rest") {
+            float vrest = std::get<float>(value);
+            if (vrest < -100.0f || vrest > 100.0f) {
+                return "brain.v_rest must be between -100.0 and 100.0";
+            }
+        } else if (field == "v_reset") {
+            float vreset = std::get<float>(value);
+            if (vreset < -100.0f || vreset > 100.0f) {
+                return "brain.v_reset must be between -100.0 and 100.0";
+            }
+        } else if (field == "tau_mem") {
+            float tau = std::get<float>(value);
+            if (tau <= 0.0f || tau > 1000.0f) {
+                return "brain.tau_mem must be between 0.0 and 1000.0";
+            }
+        } else if (field == "tau_ref") {
+            float tau = std::get<float>(value);
+            if (tau < 0.0f || tau > 100.0f) {
+                return "brain.tau_ref must be between 0.0 and 100.0";
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        // Ignore type errors - they'll be caught by the caller
+    }
+    
+    return "";
+}
+
+std::string Config::validatePlasticityField(const std::string& field, const ConfigValue& value) const {
+    try {
+        if (field == "stdp.enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "plasticity.stdp.enable should be true for Phase 2";
+            }
+        } else if (field == "stdp.learning_rate") {
+            float rate = std::get<float>(value);
+            if (rate <= 0.0f || rate > 1.0f) {
+                return "plasticity.stdp.learning_rate must be between 0.0 and 1.0";
+            }
+        } else if (field == "stdp.tau_plus") {
+            float tau = std::get<float>(value);
+            if (tau <= 0.0f) {
+                return "plasticity.stdp.tau_plus must be positive";
+            }
+        } else if (field == "stdp.tau_minus") {
+            float tau = std::get<float>(value);
+            if (tau <= 0.0f) {
+                return "plasticity.stdp.tau_minus must be positive";
+            }
+        } else if (field == "hebbian.enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "plasticity.hebbian.enable should be true for Phase 2";
+            }
+        } else if (field == "structural.enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "plasticity.structural.enable should be true for Phase 2";
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        // Ignore type errors - they'll be caught by the caller
+    }
+    
+    return "";
+}
+
+std::string Config::validateNeuromodField(const std::string& field, const ConfigValue& value) const {
+    try {
+        if (field == "dopamine.scale") {
+            float scale = std::get<float>(value);
+            if (scale < 0.0f || scale > 10.0f) {
+                return "neuromod.dopamine.scale must be between 0.0 and 10.0";
+            }
+        } else if (field == "curiosity.enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "neuromod.curiosity.enable should be true for Phase 2";
+            }
+        } else if (field == "novelty.enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "neuromod.novelty.enable should be true for Phase 2";
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        // Ignore type errors - they'll be caught by the caller
+    }
+    
+    return "";
+}
+
+std::string Config::validateDevelopmentField(const std::string& field, const ConfigValue& value) const {
+    try {
+        if (field == "enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "development.enable should be true for Phase 2";
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        // Ignore type errors - they'll be caught by the caller
+    }
+    
+    return "";
+}
+
+std::string Config::validatePredictionField(const std::string& field, const ConfigValue& value) const {
+    try {
+        if (field == "enable") {
+            bool enable = std::get<bool>(value);
+            if (!enable) {
+                return "prediction.enable should be true for Phase 2";
+            }
+        }
+    } catch (const std::bad_variant_access&) {
+        // Ignore type errors - they'll be caught by the caller
+    }
+    
+    return "";
+}
+
+std::string Config::validateKey(const std::string& key) const {
+    // Validate key format
+    if (key.empty()) {
+        return "Empty key is not allowed";
+    }
+    
+    if (key.find('.') == std::string::npos) {
+        return "Key must contain a dot separator (e.g., 'section.key')";
+    }
+    
+    // Check for invalid characters in key
+    for (char c : key) {
+        if (!(std::isalnum(c) || c == '.' || c == '_' || c == '-')) {
+            return "Key contains invalid characters: " + std::string(1, c);
+        }
+    }
+    
+    return "";
+}
+
+std::string Config::validateValue(const std::string& key, const ConfigValue& value) const {
+    // This is a helper method for backward compatibility
+    return validateKeyAndValue(key, value);
+}
