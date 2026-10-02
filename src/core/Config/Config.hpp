@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -17,10 +19,7 @@ using ConfigValue = std::variant<
     int64_t,
     double,
     bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
+    std::string
 >;
 
 // Configuration source
@@ -75,6 +74,7 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -98,8 +98,35 @@ private:
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
+    static std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> createDefaultValidators();
+    static std::unordered_map<std::string, ConfigValue> createDefaultValues();
+    static std::unordered_map<std::string, std::string> createDescriptions();
+    static void initializeConfiguration();
+    
+    bool setValueWithValidation(const std::string& key, const std::string& value, ConfigSource source);
+    bool parseValue(const std::string& key, const std::string& valueStr, ConfigValue& outValue);
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getTimestamp();
+    
+    // Helper for friend function
+    friend std::string validateConfig(const Config& config);
 };
+
+// Configuration validation function
+std::string validateConfig(const Config& config);
+
+// Explicit template instantiations
+extern template std::optional<int> Config::get<int>(const std::string&) const;
+extern template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+extern template std::optional<double> Config::get<double>(const std::string&) const;
+extern template std::optional<bool> Config::get<bool>(const std::string&) const;
+extern template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+extern template int Config::getOr<int>(const std::string&, const int&) const;
+extern template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+extern template double Config::getOr<double>(const std::string&, const double&) const;
+extern template bool Config::getOr<bool>(const std::string&, const bool&) const;
+extern template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
