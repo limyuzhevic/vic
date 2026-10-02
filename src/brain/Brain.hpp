@@ -29,6 +29,13 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declarations for brain managers
+class BrainInitializer;
+class BrainRegionManager;
+class BrainSystemManager;
+class BrainSpikeManager;
+class BrainPlasticityManager;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
