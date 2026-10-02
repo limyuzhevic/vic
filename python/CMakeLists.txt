@@ -11,6 +11,8 @@ endif()
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
@@ -81,14 +83,14 @@ target_compile_options(nlm_core PRIVATE
 
 add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_link_libraries(nlm_agent PUBLIC nlm_core nlohmann_json::nlohmann_json yaml-cpp)
 
 add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_link_libraries(nlm_world PUBLIC nlm_core nlohmann_json::nlohmann_json yaml-cpp)
 
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json yaml-cpp)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)

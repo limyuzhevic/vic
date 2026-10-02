@@ -1,0 +1,88 @@
+{
+    "brain": {
+        "neuron_count": 500,
+        "region_count": 3,
+        "connection_probability": 0.02,
+        "initial_weight_mean": 0.6,
+        "initial_weight_std": 0.15,
+        "v_thresh": -50.0,
+        "v_rest": -70.0,
+        "v_reset": -75.0,
+        "tau_mem": 20.0,
+        "tau_ref": 2.0
+    },
+    "dynamics": {
+        "neuron_types": {
+            "excitatory": true,
+            "inhibitory": true,
+            "sensory": true,
+            "motor": true,
+            "modulatory": true,
+            "internal": true
+        }
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.001,
+            "tau_plus": 20.0,
+            "tau_minus": 20.0
+        },
+        "hebbian": {
+            "enable": true,
+            "learning_rate": 0.0005
+        },
+        "structural": {
+            "enable": true,
+            "synaptogenesis_rate": 0.001,
+            "pruning_rate": 0.0001
+        }
+    },
+    "neuromod": {
+        "dopamine": {
+            "scale": 1.0
+        },
+        "curiosity": {
+            "enable": true
+        },
+        "novelty": {
+            "enable": true
+        },
+        "prediction_error": {
+            "scale": 1.0
+        }
+    },
+    "development": {
+        "initial_plasticity": 1.0,
+        "critical_period_duration": 1000.0,
+        "maturation_rate": 0.01,
+        "synapse_maturation_rate": 0.1
+    },
+    "memory": {
+        "working_capacity": 200,
+        "episodic_capacity": 2000,
+        "associative_capacity": 1000,
+        "replay_frequency": 100,
+        "consolidation_threshold": 1000
+    },
+    "prediction": {
+        "horizon": 3,
+        "confidence_decay": 0.95,
+        "error_threshold": 0.1
+    },
+    "environment": {
+        "name": "GridWorld",
+        "width": 20,
+        "height": 20,
+        "vision_width": 8,
+        "vision_height": 8,
+        "max_energy": 100.0
+    },
+    "logging": {
+        "level": "INFO",
+        "to_file": true,
+        "filename": "nlm_simulation.log",
+        "max_size": 10485760,
+        "backup_count": 5
+    }
+}

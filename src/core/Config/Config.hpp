@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -58,6 +60,18 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonStr);
+    
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Save to JSON file
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Save to command line arguments format
+    bool saveToArgs(int argc, char** argv) const;
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -100,6 +114,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    friend class ConfigValidator;
+    friend namespace ConfigPresets;
 };
 
 } // namespace nlm

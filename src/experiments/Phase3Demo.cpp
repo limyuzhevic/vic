@@ -5,14 +5,25 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/CLI/CLIEngine.hpp"
+#include "../core/CLI/SubcommandHandlers.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
-namespace nlm {
+// Legacy argument parsing for backward compatibility
+bool parseLegacyArgs(int argc, char* argv[], int& numEpisodes, int& stepsPerEpisode) {
+    if (argc > 1) {
+        numEpisodes = std::atoi(argv[1]);
+    }
+    if (argc > 2) {
+        stepsPerEpisode = std::atoi(argv[2]);
+    }
+    return true;
+}
 
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
+namespace nlm {
 
 class Phase3Demo {
 public:
@@ -247,13 +258,33 @@ int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    // Parse legacy arguments for backward compatibility
+    bool legacyUsed = parseLegacyArgs(argc, argv, numEpisodes, stepsPerEpisode);
+    
+    if (legacyUsed) {
+        std::cout << "[INFO] Legacy argument parsing detected. Using backward compatibility mode.\n";
     }
     
+    // Show help if requested via --help
+    bool showHelp = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+            break;
+        }
+    }
+    
+    if (showHelp) {
+        std::cout << "Usage: " << argv[0] << " [options]\n";
+        std::cout << "Options:\n";
+        std::cout << "  <numEpisodes>         Number of episodes (default: 5)\n";
+        std::cout << "  <stepsPerEpisode>     Steps per episode (default: 200)\n";
+        std::cout << "  --help,-h             Show this help message\n";
+        return 0;
+    }
+    
+    // Create and run demo
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);
     
