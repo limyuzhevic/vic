@@ -158,8 +158,15 @@ PYBIND11_MODULE(pynlm, m) {
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("get", static_cast<std::optional<int> (Config::*)(const std::string&) const>(&Config::get), py::arg("key"), "Get an int value or nullopt if key doesn't exist")
+        .def("get", static_cast<std::optional<double> (Config::*)(const std::string&) const>(&Config::get), py::arg("key"), "Get a double value or nullopt if key doesn't exist")
+        .def("get", static_cast<std::optional<std::string> (Config::*)(const std::string&) const>(&Config::get), py::arg("key"), "Get a string value or nullopt if key doesn't exist")
+        .def("get", static_cast<std::optional<bool> (Config::*)(const std::string&) const>(&Config::get), py::arg("key"), "Get a bool value or nullopt if key doesn't exist")
+        .def("getOr", static_cast<std::optional<int> (Config::*)(const std::string&, const int&) const>(&Config::getOr), py::arg("key"), py::arg("defaultValue"), "Get an int value or default if key doesn't exist")
+        .def("getOr", static_cast<std::optional<double> (Config::*)(const std::string&, const double&) const>(&Config::getOr), py::arg("key"), py::arg("defaultValue"), "Get a double value or default if key doesn't exist")
+        .def("getOr", static_cast<std::optional<std::string> (Config::*)(const std::string&, const std::string&) const>(&Config::getOr), py::arg("key"), py::arg("defaultValue"), "Get a string value or default if key doesn't exist")
+        .def("getOr", static_cast<std::optional<bool> (Config::*)(const std::string&, const bool&) const>(&Config::getOr), py::arg("key"), py::arg("defaultValue"), "Get a bool value or default if key doesn't exist")
+        .def("summary", &Config::summary, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -170,7 +177,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        .def("clone", &SensoryInput::clone, "Create a copy of this sensory input");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -279,6 +287,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"))
         .def("getWidth", &SimpleWorld::getWidth)
         .def("getHeight", &SimpleWorld::getHeight)
         .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
