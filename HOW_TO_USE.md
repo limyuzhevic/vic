@@ -1,4 +1,4 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+# NLM (Neural Learning Machine) - Enhanced HOW TO USE
 
 ## Overview
 
@@ -7,7 +7,7 @@ NLM is a brain-inspired spiking neural network simulator written in C++20. It im
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
-3. Using the NLM Python API
+3. Using the enhanced NLM Python API
 
 ---
 
@@ -115,7 +115,7 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the Enhanced Python Library
 
 ### Basic Usage
 
@@ -184,13 +184,14 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Enhanced Complete Agent Example
 
 ```python
 import pynlm
+import time
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_agent_simulation_enhanced(num_steps=1000):
+    """Run a complete agent simulation with enhanced features."""
     
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
@@ -211,13 +212,18 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable all learning subsystems
     agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
     agent.enableCuriosity(True)
+    agent.enableDevelopment(True)
+    agent.enableStructuralPlasticity(True)
     
-    # 7. Run simulation loop
+    print(f"Starting enhanced simulation with {num_steps} steps...")
+    print(f"Initial firing rate: {brain.getAverageFiringRate():.2f} Hz")
+    
+    # 7. Run simulation loop with monitoring
+    start_time = time.time()
+    
     for step in range(num_steps):
         # Update world
         world.update(timestep=0.1)
@@ -237,26 +243,50 @@ def run_agent_simulation(num_steps=1000):
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Enhanced monitoring every 100 steps
         if step % 100 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Total spikes: {brain.getTotalSpikeCount()}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Development stage: {brain.getDevelopmentalStage()}")
+            print(f"  Simulation time: {world.getSimulationTime():.2f}s")
+    
+    end_time = time.time()
+    
+    # 8. Print comprehensive final statistics
+    print(f"\nEnhanced simulation complete!")
+    print(f"Total time: {end_time - start_time:.2f} seconds")
+    print(f"Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Final novelty level: {agent.getNoveltyLevel():.3f}")
+    print(f"Total simulation time: {world.getSimulationTime():.2f} seconds")
+    print(f"Total reward received: {agent.getNeuromodulationLevel():.3f}")
+    
+    # 9. Get comprehensive brain statistics
+    brain_stats = brain.getNeuronStats()
+    print(f"\nBrain Statistics:")
+    for key, value in brain_stats.items():
+        print(f"  {key}: {value}")
+    
+    return {
+        'brain': brain,
+        'agent': agent,
+        'world': world,
+        'duration': end_time - start_time,
+        'brain_stats': brain_stats
+    }
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the enhanced simulation
+if __name__ == "__main__":
+    results = run_agent_simulation_enhanced(1000)
 ```
 
-### Key Classes and Methods
+### Key Classes and Methods (Enhanced)
 
 #### Brain Class
 
@@ -287,12 +317,19 @@ brain.getExcitationInhibitionRatio()  # E/I balance
 brain.save("checkpoint.bin")       # Save state
 brain.load("checkpoint.bin")       # Load state
 
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+# Development and learning
+brain.getDevelopmentalStage()     # Get developmental stage
+brain.setDevelopmentalStage(stage) # Set developmental stage
+brain.updateDevelopment(timestep)  # Update development
+
+# Enhanced methods
+brain.simulateEpisode(sensory_input, num_steps)  # Run episode
+brain.compareBrains(brain2)                    # Compare with another brain
+brain.getNeuronStats()                          # Get comprehensive stats
+brain.getDevelopmentStats()                     # Get development stats
 ```
 
-#### Config Class
+#### Config Class (Enhanced)
 
 ```python
 # Create
@@ -306,12 +343,14 @@ if config.has("brain.neuron_count"):
 config.set("brain.neuron_count", 1000)
 config.set("learning.rate", 0.001)
 
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# Validation and utilities
+config.validate()                         # Validate configuration
+config.getInt("key", 0)                   # Get with default
+config.getFloat("key", 0.0)               # Get with default
+config.getString("key", "")               # Get with default
 ```
 
-#### AgentBrain Class
+#### AgentBrain Class (Enhanced)
 
 ```python
 # Creation
@@ -340,13 +379,17 @@ agent.enableDevelopment(True/False)
 agent.enableCuriosity(True/False)
 
 # Statistics
+agent.getLearningStats()                  # Get learning statistics
+agent.getNeuromodulationLevel()
 agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
-agent.getNeuromodulationLevel()
+
+# Enhanced methods
+agent.runEpisode(world, num_steps)         # Run complete episode
 ```
 
-#### SimpleWorld Class
+#### SimpleWorld Class (Enhanced)
 
 ```python
 # Creation
@@ -368,50 +411,182 @@ world.applyMotorCommand(motor_cmd, current_time)
 percept = world.getSensoryPercept()
 body = world.getAgentBody()
 
-# World objects
+# World objects (enhanced)
 world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
 world.removeObject(x, y)
 world.isValidPosition(x, y)
 
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+# Enhanced object creation
+resource = world.createResourceObject(x, y, value)
+hazard = world.createHazardObject(x, y, radius)
+wall = world.createWallObject(x, y, radius)
+
+# Enhanced query
+nearest = world.findNearestObject(x, y, type)
+```
+
+#### SensoryPercept Class (Enhanced)
+
+```python
+# Creation
+percept = pynlm.SensoryPercept()
+
+# Data access and manipulation
+percept.setVision(data)
+percept.setTouch(data)
+percept.setInternal(data)
+percept.setProprioception(data)
+percept.setAudio(data)
+
+# Enhanced methods
+percept.hasVision()                      # Check for vision data
+percept.hasTouch()                       # Check for touch data
+percept.hasInternal()                    # Check for internal signals
+percept.hasProprioception()              # Check for proprioception
+percept.hasAudio()                       # Check for audio data
+
+# Data processing
+percept.getAllSignalsAsDict()            # Get as dictionary
+percept.setFromDict(data)                # Set from dictionary
+```
+
+### Utility Functions
+
+```python
+import pynlm
+
+# Data processing utilities
+data = [1.0, 2.0, 3.0, 4.0, 5.0]
+normalized = pynlm.normalize(data)                    # Normalize to [0, 1]
+normalized = pynlm.normalize(data, min=-1.0, max=1.0) # Normalize to custom range
+sliced = pynlm.slice(data, 1, 4)                      # Extract subvector
+mean_val = pynlm.mean([1.0, 2.0, 3.0, 4.0, 5.0])      # Calculate mean
+std_val = pynlm.standardDeviation([1.0, 2.0, 3.0, 4.0, 5.0])  # Calculate std dev
+
+# Comparison utilities
+comparison = pynlm.compareBrains(brain1, brain2)     # Compare two brains
+```
+
+### Enhanced Brain Analysis
+
+```python
+import pynlm
+
+# Create and configure brain
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("random_seed", 42)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(500):
+    brain.step(step)
+
+# Get comprehensive analysis
+analysis = {
+    'total_neurons': brain.getTotalNeuronCount(),
+    'total_synapses': brain.getTotalSynapseCount(),
+    'firing_neurons': brain.getFiringNeuronCount(),
+    'active_neurons': brain.getActiveNeuronCount(),
+    'total_spikes': brain.getTotalSpikeCount(),
+    'average_firing_rate': brain.getAverageFiringRate(),
+    'e_i_ratio': brain.getExcitationInhibitionRatio(),
+    'developmental_stage': brain.getDevelopmentalStage(),
+    'brain_stats': brain.getNeuronStats(),
+    'development_stats': brain.getDevelopmentStats()
+}
+
+print("Brain Analysis:")
+for key, value in analysis.items():
+    print(f"  {key}: {value}")
+```
+
+### Advanced Agent Learning
+
+```python
+import pynlm
+
+# Create agent system
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(20, 20, 8, 8)
+world.reset()
+
+agent.initialize(world)
+
+# Enable advanced learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Run episode with learning
+episode_result = agent.runEpisode(world, 200)
+
+print("Episode Results:")
+for key, value in episode_result.items():
+    print(f"  {key}: {value}")
+
+# Get detailed learning statistics
+learning_stats = agent.getLearningStats()
+print("\nLearning Statistics:")
+for key, value in learning_stats.items():
+    print(f"  {key}: {value}")
+```
+
+### Examples and Demos
+
+#### Hello World Example
+
+```python
+import pynlm
+
+# Run the built-in hello world example
+pynlm.runHelloWorldExample()
+```
+
+#### Complete Agent Example
+
+```python
+import pynlm
+
+# Run the complete agent example
+pynlm.runAgentExample()
 ```
 
 ### Enumerations
 
 ```python
+import pynlm
+
 # Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
+print(pynlm.NeuronType.Excitatory)
+print(pynlm.NeuronType.Inhibitory)
+print(pynlm.NeuronType.Sensory)
+print(pynlm.NeuronType.Motor)
 
 # Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
+print(pynlm.DevelopmentalStage.Initial)
+print(pynlm.DevelopmentalStage.CriticalPeriod)
+print(pynlm.DevelopmentalStage.Maturation)
+print(pynlm.DevelopmentalStage.Adult)
 
 # Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
+print(pynlm.ActionType.MoveForward)
+print(pynlm.ActionType.TurnLeft)
+print(pynlm.ActionType.Interact)
+print(pynlm.ActionType.Eat)
 
 # World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+print(pynlm.WorldObjectType.Resource)
+print(pynlm.WorldObjectType.Hazard)
+print(pynlm.WorldObjectType.Wall)
 ```
 
 ---
@@ -498,7 +673,7 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 6: Troubleshooting
 
 ### Build Issues
 
@@ -526,8 +701,26 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+## Part 7: Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [README.md](python/README.md) - Enhanced Python bindings documentation
+
+## Version Information
+
+```python
+import pynlm
+print(f"NLM Version: {pynlm.__version__}")
+print(f"Author: {pynlm.__author__}")
+print(f"Description: {pynlm.__description__}")
+```
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.

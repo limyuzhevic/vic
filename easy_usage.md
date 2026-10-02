@@ -287,11 +287,83 @@ print("Agent simulation complete!")
 
 ---
 
+## Enhanced Features (Version 2.0+)
+
+NLM now includes enhanced features for better usability and advanced functionality:
+
+### 1. Utility Functions
+
+```python
+import pynlm
+
+# Data processing utilities
+data = [1.0, 2.0, 3.0, 4.0, 5.0]
+normalized = pynlm.normalize(data)
+sliced = pynlm.slice(data, 1, 4)
+mean_val = pynlm.mean([1.0, 2.0, 3.0, 4.0, 5.0])
+std_val = pynlm.standardDeviation([1.0, 2.0, 3.0, 4.0, 5.0])
+```
+
+### 2. Enhanced Error Handling
+
+```python
+import pynlm
+
+try:
+    config = pynlm.createDefaultConfig()
+    if not config.validate():
+        raise pynlm.NLMError("Invalid configuration")
+except pynlm.NLMError as e:
+    print(f"NLM error: {e}")
+```
+
+### 3. Brain Comparison
+
+```python
+import pynlm
+
+comparison = pynlm.compareBrains(brain1, brain2)
+print(f"Neuron count match: {comparison['neuron_count_match']}")
+print(f"Spike count difference: {comparison['spike_count_diff']}")
+```
+
+### 4. Development Statistics
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+    dev_stats = brain.getDevelopmentStats()
+    print(f"Step {step}: {dev_stats['developmental_stage']}")
+```
+
+### 5. Episode-based Simulation
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+sensory_input = [0.1, 0.2, 0.3, 0.4, 0.5] * 20
+
+episode_result = brain.simulateEpisode(sensory_input, 500)
+print(f"Final spikes: {episode_result['final_spikes']}")
+print(f"Final rate: {episode_result['final_rate']:.2f} Hz")
+```
+
+---
+
 ## Next Steps
 
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Explore the enhanced features in the README.md
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its enhanced features and capabilities.
