@@ -25,6 +25,20 @@ struct Neuron::Impl {
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
+    
+    // Deep copy constructor
+    Impl(const Impl& other) 
+        : id(other.id)
+        , type(other.type)
+        , state(other.state)
+        , regionId(other.regionId)
+        , populationId(other.populationId)
+        , totalCurrent(other.totalCurrent)
+        , synapticInput(other.synapticInput)
+        , spikeHistory(other.spikeHistory)
+        , incomingSynapses(other.incomingSynapses)
+        , outgoingSynapses(other.outgoingSynapses)
+        , plasticityFlags(other.plasticityFlags) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -39,6 +53,15 @@ Neuron::~Neuron() = default;
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
+}
+
+Neuron::Neuron(const Neuron& other) {
+    // Deep copy - needed for experimental replication scenarios
+    if (other.pImpl) {
+        pImpl = new Impl(*other.pImpl);
+    } else {
+        pImpl = nullptr;
+    }
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
@@ -266,33 +289,43 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    // Efficient reset - directly reset state and clear vectors
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    // Note: incoming/outgoing synapses preserved as they're structural
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + 
+                                    rng.uniformReal(-constants::MEMBRANE_POTENTIAL_VARIATION, 
+                                                   constants::MEMBRANE_POTENTIAL_VARIATION);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = constants::DEFAULT_THRESHOLD + 
+                            rng.uniformReal(-constants::THRESHOLD_VARIATION, 
+                                           constants::THRESHOLD_VARIATION);
     
     // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.restingPotential = constants::DEFAULT_RESTING_POTENTIAL + 
+                                    rng.uniformReal(-constants::THRESHOLD_VARIATION, 
+                                                   constants::THRESHOLD_VARIATION);
     
     // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    pImpl->state.resetPotential = pImpl->state.restingPotential + 
+                                  rng.uniformReal(0.0f, constants::RESET_POTENTIAL_VARIATION);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(
+        constants::REFECTORY_PERIOD_MIN, constants::REFECTORY_PERIOD_MAX));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
-    pImpl->state.lastSpikeTime = -1.0f;
+    pImpl->state.lastSpikeTime = constants::DEFAULT_LAST_SPIKE_TIME;
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;

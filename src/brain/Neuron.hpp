@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/Constants.hpp"
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
@@ -26,18 +27,18 @@ struct NeuronState {
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
-        , synapseConductance(0.0f)
-        , firingRate(0.0f)
+        : membranePotential(constants::DEFAULT_RESTING_POTENTIAL)
+        , restingPotential(constants::DEFAULT_RESTING_POTENTIAL)
+        , threshold(constants::DEFAULT_THRESHOLD)
+        , resetPotential(constants::DEFAULT_RESET_POTENTIAL)
+        , leakConductance(constants::DEFAULT_LEAK_CONDUCTANCE)
+        , synapseConductance(constants::DEFAULT_SYNAPSE_CONDUCTANCE)
+        , firingRate(constants::DEFAULT_FIRING_RATE)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(constants::DEFAULT_REFECTORY_PERIOD)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(constants::DEFAULT_LAST_SPIKE_TIME) {}
 };
 
 // Neuron class representing a single neuron
@@ -149,3 +150,4 @@ private:
 };
 
 } // namespace nlm
+
