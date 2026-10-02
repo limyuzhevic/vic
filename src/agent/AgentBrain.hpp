@@ -4,6 +4,9 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include <memory>
 #include <vector>
 
@@ -52,6 +55,22 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
+    // Get current goal state for planning
+    const std::vector<float>& getCurrentGoal() const { return currentGoal_; }
+    void setCurrentGoal(const std::vector<float>& goal) { currentGoal_ = goal; }
+    
+    // Get planning confidence
+    float getPlanningConfidence() const { return planningConfidence_; }
+    
+    // Get planning depth
+    size_t getPlanningDepth() const { return planningDepth_; }
+    
+    // Get active concepts
+    std::vector<size_t> getActiveConcepts() const;
+    
+    // Get attended regions
+    std::vector<RegionId> getAttendedRegions() const;
+    
     // Reset agent for new episode
     void reset();
     
@@ -63,11 +82,17 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    void enableAttention(bool enable) { attentionEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    bool isAttentionEnabled() const { return attentionEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -77,6 +102,11 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Cognitive systems
+    std::shared_ptr<NeuralPlanner> planner_;
+    std::shared_ptr<ConceptFormation> conceptFormation_;
+    std::shared_ptr<AttentionalSelection> attention_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -103,11 +133,19 @@ private:
     double developmentalAge_;
     float plasticityModifier_;
     
+    // Planning state
+    std::vector<float> currentGoal_;
+    float planningConfidence_;
+    size_t planningDepth_;
+    
     // Configuration flags
     bool rewardModulationEnabled_;
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool planningEnabled_;
+    bool conceptFormationEnabled_;
+    bool attentionEnabled_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
