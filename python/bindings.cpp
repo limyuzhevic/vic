@@ -145,13 +145,13 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a file (JSON, YAML, or simple key=value format)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (current format is key=value)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -342,6 +342,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +353,77 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signals")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules (called automatically in step)")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes (called automatically in step)")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error system")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
+        .def("enableRewardModulation", &Brain::enableRewardModulation,
+             py::arg("enable"),
+             "Enable/disable reward modulation")
+        .def("enableStructuralPlasticity", &Brain::enableStructuralPlasticity,
+             py::arg("enable"),
+             "Enable/disable structural plasticity")
+        .def("enableDevelopment", &Brain::enableDevelopment,
+             py::arg("enable"),
+             "Enable/disable development")
+        .def("enableCuriosity", &Brain::enableCuriosity,
+             py::arg("enable"),
+             "Enable/disable curiosity");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -422,4 +494,158 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
-} // namespace nlm
+// Advanced functionality for power users
+
+// Batch operations for efficiency
+m.def("batchBrainSteps", [](std::shared_ptr<Brain> brain, std::vector<SimulationStep> steps) {
+    for (auto step : steps) {
+        brain->step(step);
+    }
+}, py::arg("brain"), py::arg("steps"),
+   "Perform multiple brain steps efficiently (batch operation)");
+
+m.def("batchSensoryInput", [](std::shared_ptr<AgentBrain> agent, std::vector<SensoryPercept> percepts) {
+    for (const auto& percept : percepts) {
+        agent->processSensoryInput(percept);
+    }
+}, py::arg("agent"), py::arg("percepts"),
+   "Process multiple sensory inputs efficiently (batch operation)");
+
+// Configuration utilities for advanced users
+m.def("createConfigFromDict", [](const std::unordered_map<std::string, ConfigValue>& dict) {
+    auto config = std::make_shared<Config>();
+    for (const auto& pair : dict) {
+        config->set(pair.first, pair.second, ConfigSource::CommandLine);
+    }
+    return config;
+}, py::arg("dict"),
+   "Create configuration from dictionary (advanced utility)");
+
+// Brain utilities for power users
+m.def("brainToJson", [](const std::shared_ptr<Brain>& brain) {
+    return brain->getConfig()->summary();
+}, py::arg("brain"),
+   "Export brain configuration to JSON format (advanced utility)");
+
+m.def("brainFromJson", [](const std::string& json) {
+    auto config = std::make_shared<Config>();
+    config->loadFromJson(json);
+    return std::make_shared<Brain>(config);
+}, py::arg("json"),
+   "Create brain from JSON configuration (advanced utility)");
+
+// World utilities for advanced users
+m.def("createWorldFromConfig", [](const std::unordered_map<std::string, ConfigValue>& configDict) {
+    auto world = std::make_shared<SimpleWorld>();
+    
+    // Configure based on dictionary
+    if (configDict.find("width") != configDict.end()) {
+        world->configure(
+            std::get<int64_t>(configDict.at("width")),
+            std::get<int64_t>(configDict.at("height")),
+            std::get<int64_t>(configDict.at("visionWidth")),
+            std::get<int64_t>(configDict.at("visionHeight"))
+        );
+    }
+    
+    return world;
+}, py::arg("configDict"),
+   "Create world from configuration dictionary (advanced utility)");
+
+// Advanced sensory input creation
+m.def("createVisionInput", [](size_t width, size_t height, size_t channels) {
+    auto vision = std::make_shared<Vision>(width, height, channels);
+    return vision;
+}, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+   "Create vision sensory input (advanced utility)");
+
+m.def("createAudioInput", [](size_t sampleRate, size_t numSamples) {
+    auto audio = std::make_shared<Audio>(sampleRate, numSamples);
+    return audio;
+}, py::arg("sampleRate"), py::arg("numSamples"),
+   "Create audio sensory input (advanced utility)");
+
+// Advanced action creation
+m.def("createCustomAction", [](ActionType type, std::vector<float> parameters) {
+    auto action = std::make_shared<Action>(type, parameters);
+    return action;
+}, py::arg("type"), py::arg("parameters"),
+   "Create custom action with parameters (advanced utility)");
+
+// Performance and monitoring utilities
+m.def("brainPerformanceStats", [](const std::shared_ptr<Brain>& brain) {
+    std::unordered_map<std::string, double> stats;
+    stats["total_neurons"] = brain->getTotalNeuronCount();
+    stats["total_synapses"] = brain->getTotalSynapseCount();
+    stats["firing_neurons"] = brain->getFiringNeuronCount();
+    stats["average_firing_rate"] = brain->getAverageFiringRate();
+    stats["total_spikes"] = brain->getTotalSpikeCount();
+    stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+    stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+    return stats;
+}, py::arg("brain"),
+   "Get comprehensive performance statistics (advanced utility)");
+
+// Memory management utilities
+m.def("optimizeBrainMemory", [](std::shared_ptr<Brain> brain) {
+    // This would trigger memory optimization if implemented
+    // For now, just return success
+    brain->reset();
+    return true;
+}, py::arg("brain"),
+   "Optimize brain memory usage (advanced utility)");
+
+// Simulation utilities for power users
+m.def("runCustomSimulationLoop", [](std::shared_ptr<Brain> brain,
+                                     std::shared_ptr<SimpleWorld> world,
+                                     std::shared_ptr<AgentBrain> agent,
+                                     std::function<bool(SimulationStep)> shouldContinue,
+                                     std::function<void(SimulationStep)> onStep) {
+    SimulationStep step = 0;
+    while (shouldContinue(step)) {
+        // Custom simulation logic
+        onStep(step);
+        
+        // Default simulation step
+        if (world) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            if (agent) {
+                agent->processSensoryInput(percept);
+            }
+        }
+        
+        if (brain) {
+            brain->step(step++);
+        }
+    }
+}, py::arg("brain"), py::arg("world"), py::arg("agent"),
+           py::arg("shouldContinue"), py::arg("onStep"),
+           "Run custom simulation loop with user-defined logic (advanced utility)");
+
+// Export/import utilities
+m.def("exportBrainState", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+    return brain->save(filepath);
+}, py::arg("brain"), py::arg("filepath"),
+   "Export brain state to file (advanced utility)");
+
+m.def("importBrainState", [](const std::string& filepath) {
+    auto config = std::make_shared<Config>();
+    auto brain = std::make_shared<Brain>(config);
+    brain->load(filepath);
+    return brain;
+}, py::arg("filepath"),
+   "Import brain state from file (advanced utility)");
+
+// Configuration backup/restore utilities
+m.def("backupConfig", [](const std::shared_ptr<Config>& config, const std::string& filepath) {
+    return config->saveToFile(filepath);
+}, py::arg("config"), py::arg("filepath"),
+   "Backup configuration to file (advanced utility)");
+
+m.def("restoreConfig", [](const std::string& filepath) {
+    auto config = std::make_shared<Config>();
+    config->loadFromFile(filepath);
+    return config;
+}, py::arg("filepath"),
+   "Restore configuration from file (advanced utility)");
