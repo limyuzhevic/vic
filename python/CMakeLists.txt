@@ -25,7 +25,6 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
     ${NLM_SOURCE_DIR}/brain/Brain.cpp
-    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
@@ -40,11 +39,19 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Dopamine.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/memory/Memory.cpp
+    ${NLM_SOURCE_DIR}/memory/WorkingMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/EpisodicMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/SemanticMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/ProceduralMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/AssociativeMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
     ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
+    ${NLM_SOURCE_DIR}/cognition/AttentionalSelection.cpp
     ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
     ${NLM_SOURCE_DIR}/sensory/Vision.cpp
     ${NLM_SOURCE_DIR}/sensory/Audio.cpp
@@ -52,11 +59,19 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
     ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
+    ${NLM_SOURCE_DIR}/motor/Action.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
+    ${NLM_SOURCE_DIR}/environment/Action.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBody.cpp
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase3Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase4Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/Phase5Experiment.cpp
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
