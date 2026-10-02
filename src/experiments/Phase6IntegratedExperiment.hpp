@@ -32,9 +32,17 @@ struct Phase6IntegrationResult {
     // System integration status
     bool memoryWorkingMemoryIntegrated;
     bool memoryEpisodicMemoryIntegrated;
+    bool memorySemanticMemoryIntegrated;
+    bool memoryProceduralMemoryIntegrated;
     bool neuromodulationIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
+    bool cognitionPlannerIntegrated;
+    bool cognitionConceptFormationIntegrated;
+    bool cognitionSelfModelIntegrated;
+    bool cognitionSocialLearningIntegrated;
+    bool cognitionSpatialRepresentationIntegrated;
+    bool cognitionTemporalRelationIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
     
@@ -55,9 +63,17 @@ struct Phase6IntegrationResult {
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
         , memoryEpisodicMemoryIntegrated(false)
+        , memorySemanticMemoryIntegrated(false)
+        , memoryProceduralMemoryIntegrated(false)
         , neuromodulationIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
+        , cognitionPlannerIntegrated(false)
+        , cognitionConceptFormationIntegrated(false)
+        , cognitionSelfModelIntegrated(false)
+        , cognitionSocialLearningIntegrated(false)
+        , cognitionSpatialRepresentationIntegrated(false)
+        , cognitionTemporalRelationIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
         , totalReward(0.0f)

@@ -19,9 +19,15 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
@@ -148,6 +154,12 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - gradually acquired knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - learned skills and habits
+    ProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
@@ -161,8 +173,17 @@ public:
     // Concept formation for pattern discovery
     ConceptFormation* getConceptFormation();
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // Self-model for agency and ownership
+    SelfModel* getSelfModel();
+    
+    // Social learning for observation
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation for navigation
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relations for sequential processing
+    TemporalRelation* getTemporalRelation();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

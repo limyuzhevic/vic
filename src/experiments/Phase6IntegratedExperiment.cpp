@@ -114,16 +114,33 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
+    result.memorySemanticMemoryIntegrated = (brain->getSemanticMemory() != nullptr);
+    result.memoryProceduralMemoryIntegrated = (brain->getProceduralMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    result.cognitionPlannerIntegrated = (brain->getPlanner() != nullptr);
+    result.cognitionConceptFormationIntegrated = (brain->getConceptFormation() != nullptr);
+    result.cognitionSelfModelIntegrated = (brain->getSelfModel() != nullptr);
+    result.cognitionSocialLearningIntegrated = (brain->getSocialLearning() != nullptr);
+    result.cognitionSpatialRepresentationIntegrated = (brain->getSpatialRepresentation() != nullptr);
+    result.cognitionTemporalRelationIntegrated = (brain->getTemporalRelation() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Semantic Memory: " + std::string(result.memorySemanticMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Procedural Memory: " + std::string(result.memoryProceduralMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Cognitive Systems:");
+    NLM_LOG_INFO("  Neural Planner: " + std::string(result.cognitionPlannerIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("  Concept Formation: " + std::string(result.cognitionConceptFormationIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("  Self-Model: " + std::string(result.cognitionSelfModelIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("  Social Learning: " + std::string(result.cognitionSocialLearningIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("  Spatial Representation: " + std::string(result.cognitionSpatialRepresentationIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("  Temporal Relation: " + std::string(result.cognitionTemporalRelationIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
     if (config.enableCheckpointing) {
@@ -190,7 +207,22 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 2: Neuromodulation systems exist
+    // Test 2b: Additional memory systems
+    if (brain->getSemanticMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Semantic memory is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Semantic memory is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getProceduralMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Procedural memory is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Procedural memory is NOT integrated");
+        success = false;
+    }
+    
+    // Test 3: Neuromodulation systems exist
     if (brain->getDopamine() != nullptr) {
         NLM_LOG_INFO("[PASS] Dopamine system is integrated");
     } else {
@@ -213,25 +245,39 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 4: Cognition systems exist
-    if (brain->getPlanner() != nullptr) {
-        NLM_LOG_INFO("[PASS] Planner is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
-        success = false;
-    }
-    
-    if (brain->getConceptFormation() != nullptr) {
-        NLM_LOG_INFO("[PASS] Concept formation is integrated");
-    } else {
-        NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
-        success = false;
-    }
-    
     if (brain->getAttention() != nullptr) {
         NLM_LOG_INFO("[PASS] Attention is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
+        success = false;
+    }
+    
+    // Test 4b: Additional cognition systems
+    if (brain->getSelfModel() != nullptr) {
+        NLM_LOG_INFO("[PASS] Self-model is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Self-model is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSocialLearning() != nullptr) {
+        NLM_LOG_INFO("[PASS] Social learning is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Social learning is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getSpatialRepresentation() != nullptr) {
+        NLM_LOG_INFO("[PASS] Spatial representation is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Spatial representation is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getTemporalRelation() != nullptr) {
+        NLM_LOG_INFO("[PASS] Temporal relation is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Temporal relation is NOT integrated");
         success = false;
     }
     
