@@ -287,11 +287,12 @@ print("Agent simulation complete!")
 
 ---
 
-## Next Steps
+# Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read the README.md for complete setup and usage instructions
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Read `docs/SCIENCE.md` for the scientific background
+4. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
