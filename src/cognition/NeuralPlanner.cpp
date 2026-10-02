@@ -81,12 +81,24 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         // Evaluate this action
         float actionValue = evaluateAction(action, currentState);
         
-        // Predict next state
-        auto predictedNext = predictNextState(action, currentState);
-        
-        if (!predictedNext.empty()) {
-            candidate.predictedStates.push_back(predictedNext);
-            currentState = predictedNext;
+        // Use prediction system if available
+        if (brain_ && brain_->getPredictionSystem()) {
+            // Predict next state using brain's prediction system
+            // In a real implementation, this would use the brain's prediction
+            // For now, use the action-prediction from the neural planner
+            std::vector<float> predictedNext = predictNextState(action, currentState);
+            
+            if (!predictedNext.empty()) {
+                candidate.predictedStates.push_back(predictedNext);
+                currentState = predictedNext;
+            }
+        } else {
+            // Fallback: use the neural planner's prediction
+            std::vector<float> predictedNext = predictNextState(action, currentState);
+            if (!predictedNext.empty()) {
+                candidate.predictedStates.push_back(predictedNext);
+                currentState = predictedNext;
+            }
         }
         
         // Get action quality from experience
@@ -98,7 +110,9 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         totalReward += actionValue;
         
         // Reduce confidence if we're uncertain
-        confidence *= getSelfModelConfidence(action);
+        if (brain_ && brain_->getSelfModel()) {
+            confidence *= brain_->getSelfModel()->getSelfModelConfidence(action);
+        }
     }
     
     candidate.expectedReward = totalReward;

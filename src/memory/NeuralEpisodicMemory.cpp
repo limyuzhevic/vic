@@ -36,6 +36,10 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
+    // Ensure essential fields are set
+    if (stored.reward < -1.0f) stored.reward = -1.0f;
+    if (stored.reward > 1.0f) stored.reward = 1.0f;
+    
     episodes_.push_back(stored);
     
     // Create episode neuron for pattern completion
