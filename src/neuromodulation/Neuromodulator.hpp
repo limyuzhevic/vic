@@ -86,4 +86,58 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
+// Curiosity: Exploration and seeking behavior
+// PLACEHOLDER - Phase 2
+class Curiosity : public Neuromodulator {
+public:
+    Curiosity();
+    ~Curiosity() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Novelty: Detection of unexpected events
+// PLACEHOLDER - Phase 2
+class Novelty : public Neuromodulator {
+public:
+    Novelty();
+    ~Novelty() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Prediction Error: Reward prediction error signaling
+// PLACEHOLDER - Phase 2
+class PredictionError : public Neuromodulator {
+public:
+    PredictionError();
+    ~PredictionError() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
 } // namespace nlm

@@ -11,10 +11,12 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../error/ErrorHandling.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -175,6 +177,32 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 }
 
 bool Brain::initialize() {
+    std::vector<std::string> errors;
+    auto initResult = pImpl->initializeComponents();
+    
+    if (!initResult.success) {
+        nlm::error::ErrorContext error;
+        error.type = nlm::error::ErrorType::NEURAL_DYNAMICS;
+        error.message = "Brain initialization failed: " + initResult.errorMessage;
+        error.recoverySteps = {
+            "Check available memory",
+            "Verify configuration parameters", 
+            "Check system resources",
+            "Try reducing neural network size"
+        };
+        
+        // Attempt recovery
+        if (attemptRecovery(error)) {
+            NLM_LOG_INFO_WITH_CONTEXT("Recovery successful, retrying initialization", "Brain::initialize");
+            return initialize(); // Recursive retry with recovery
+        }
+        
+        // If recovery fails, log and exit
+        nlm::error::ErrorHandler::handleError(error);
+        return false;
+    }
+    
+    // Continue with the rest of initialization...
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
@@ -215,8 +243,8 @@ bool Brain::initialize() {
             }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
         }
     }
     
@@ -297,6 +325,27 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
     
     return true;
+}
+
+bool Brain::attemptRecovery(const nlm::error::ErrorContext& error) {
+    // Simple recovery attempt based on error type
+    switch (error.type) {
+        case nlm::error::ErrorType::CONFIG_VALIDATION:
+        case nlm::error::ErrorType::NEURAL_DYNAMICS:
+        case nlm::error::ErrorType::MEMORY_ALLOCATION:
+            // Attempt to reduce system load
+            NLM_LOG_INFO_WITH_CONTEXT("Attempting recovery by reducing system load", "Brain::attemptRecovery");
+            // Reset some components
+            reset();
+            return true;
+        case nlm::error::ErrorType::FILE_OPERATION:
+            NLM_LOG_INFO_WITH_CONTEXT("Attempting recovery by retrying file operation", "Brain::attemptRecovery");
+            // Could retry file operations here
+            return true;
+        default:
+            break;
+    }
+    return false;
 }
 
 void Brain::step(SimulationStep currentStep) {

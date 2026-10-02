@@ -1,0 +1,43 @@
+# Modern CMake Configuration for NLM
+# This file provides CMake package configuration for NLM
+
+include(CMakeFindDependencyMacro)
+
+# Define the NLM package targets
+include("${CMAKE_CURRENT_LIST_DIR}/nlm-targets.cmake")
+
+# Provide imported targets for downstream projects
+# nlm::nlm_core - Core neural network library
+# nlm::nlm_application - Application layer library
+# nlm::nlm_agent - Agent system library
+# nlm::nlm_world - World simulation library
+# nlm::nlm_phase3 - Phase 3 experiments library
+# nlm::nlm_phase4 - Phase 4 experiments library
+
+# Provide NLM functionality macros and helper functions
+macro(nlm_add_test target_name)
+    if(TARGET ${target_name})
+        add_test(NAME ${target_name} COMMAND ${target_name})
+        set_tests_properties(${target_name} PROPERTIES LABELS "nlm")
+    endif()
+endmacro()
+
+# Macro to create a standard NLM test target
+function(nlm_create_test target_name source_files)
+    add_executable(${target_name} ${source_files})
+    target_link_libraries(${target_name} PRIVATE nlm::nlm_core)
+    target_compile_features(${target_name} PRIVATE cxx_std_20)
+    nlm_add_test(${target_name})
+endfunction()
+
+# Macro to configure NLM library for export
+macro(nlm_configure_export)
+    set(NLM_EXPORT_TARGETS
+        nlm::nlm_core
+        nlm::nlm_application
+        nlm::nlm_agent
+        nlm::nlm_world
+        nlm::nlm_phase3
+        nlm::nlm_phase4
+    )
+endmacro()

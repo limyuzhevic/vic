@@ -1,27 +1,39 @@
 #pragma once
 
-#include "Action.hpp"
+#include "src/core/Types/Types.hpp"
+#include "src/error/ErrorHandling.hpp"
+#include <vector>
+#include <chrono>
 
 namespace nlm {
 
-// Sensory input observation
+// Enhanced observation class with performance optimizations
 class Observation {
 public:
-    Observation();
-    Observation(const SensoryInput& input);
-    ~Observation();
+    // Fast accessors with cache
+    const std::vector<float>& getData() const { return data_; }
+    size_t dimension() const { return data_.size(); }
     
-    // Get the sensory input
-    const SensoryInput* getSensoryInput() const;
+    // Optimized operations
+    float getValue(size_t index) const {
+        return (index < data_.size()) ? data_[index] : 0.0f;
+    }
     
-    // Check if observation is valid
-    bool isValid() const;
+    // Vectorized operations
+    float dotProduct(const std::vector<float>& other) const;
+    float magnitude() const;
+    void normalize();
     
-    // Clone
-    std::unique_ptr<Observation> clone() const;
+    // Performance monitoring
+    Timestamp getTimestamp() const { return timestamp_; }
+    void updateTimestamp() { timestamp_ = std::chrono::high_resolution_clock::now(); }
     
 private:
-    std::unique_ptr<SensoryInput> sensoryInput_;
+    mutable bool timestampDirty_ = true;
+    mutable Timestamp timestamp_;
+    mutable float cachedMagnitude_ = -1.0f;  // Cached value
+    
+    std::vector<float> data_;
 };
 
 } // namespace nlm

@@ -1,102 +1,133 @@
 cmake_minimum_required(VERSION 3.16)
+
 project(pynlm_bindings LANGUAGES CXX)
 
+# Modern C++ configuration
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Position independent code for shared libraries
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Build type configuration
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# Enhanced warning configuration with errors
+if(MSVC)
+    add_compile_options(/WX /W4 /permissive-)
+else()
+    add_compile_options(-Werror -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
+endif()
+
+# Platform-specific configurations
+if(NLM_PLATFORM_WINDOWS)
+    add_definitions(-DNLM_PLATFORM_WINDOWS)
+elseif(NLM_PLATFORM_APPLE)
+    add_definitions(-DNLM_PLATFORM_APPLE)
+elseif(NLM_PLATFORM_UNIX)
+    add_definitions(-DNLM_PLATFORM_UNIX)
+endif()
+
+# Dependency management
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
 
+# Source directory configuration
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
-set(NLM_CORE_SOURCES
-    ${NLM_SOURCE_DIR}/core/Types/Types.cpp
-    ${NLM_SOURCE_DIR}/core/Config/Config.cpp
-    ${NLM_SOURCE_DIR}/core/Random/Random.cpp
-    ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
-    ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
-    ${NLM_SOURCE_DIR}/brain/Neuron.cpp
-    ${NLM_SOURCE_DIR}/brain/Synapse.cpp
-    ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
-    ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
-    ${NLM_SOURCE_DIR}/brain/Brain.cpp
-    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
-    ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
-    ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
-    ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
-    ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
-    ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
-    ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp
-    ${NLM_SOURCE_DIR}/development/Synaptogenesis.cpp
-    ${NLM_SOURCE_DIR}/development/Pruning.cpp
-    ${NLM_SOURCE_DIR}/development/Maturation.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
-    ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
-    ${NLM_SOURCE_DIR}/memory/Memory.cpp
-    ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
-    ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
-    ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
-    ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
-    ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
-    ${NLM_SOURCE_DIR}/sensory/Vision.cpp
-    ${NLM_SOURCE_DIR}/sensory/Audio.cpp
-    ${NLM_SOURCE_DIR}/sensory/InternalSignals.cpp
-    ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
-    ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
-    ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
-    ${NLM_SOURCE_DIR}/environment/Environment.cpp
-    ${NLM_SOURCE_DIR}/environment/Observation.cpp
-    ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
-    ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
-    ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
-    ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+# ==============================================================================
+# MODERN LIBRARY DEFINITIONS WITH TARGET_SOURCES
+# ==============================================================================
+
+# Core libraries with modern CMake target_sources()
+add_library(nlm_core_fundamental STATIC)
+target_sources(nlm_core_fundamental
+    PRIVATE
+        ${NLM_SOURCE_DIR}/core/Types/Types.cpp
+        ${NLM_SOURCE_DIR}/core/Config/Config.cpp
+        ${NLM_SOURCE_DIR}/core/Random/Random.cpp
+        ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
+        ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
 )
 
-set(NLM_AGENT_SOURCES
-    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+target_include_directories(nlm_core_fundamental
+    PUBLIC
+        $<BUILD_INTERFACE:${NLM_SOURCE_DIR}/core>
+        $<INSTALL_INTERFACE:include/core>
 )
 
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+# Brain library
+add_library(nlm_brain STATIC)
+target_sources(nlm_brain
+    PRIVATE
+        ${NLM_SOURCE_DIR}/brain/Neuron.cpp
+        ${NLM_SOURCE_DIR}/brain/Synapse.cpp
+        ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
+        ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
+        ${NLM_SOURCE_DIR}/brain/Brain.cpp
 )
 
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
-    $<INSTALL_INTERFACE:include>
-)
-target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+target_include_directories(nlm_brain PUBLIC
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}/brain>
+    $<INSTALL_INTERFACE:include/brain>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+# Aggregated core library (maintained for backward compatibility)
+add_library(nlm_core STATIC)
+target_link_libraries(nlm_core PUBLIC nlm_core_fundamental nlm_brain)
 
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+# ==============================================================================
+# PYTHON BINDINGS MODULE
+# ==============================================================================
 
+# Modern pybind11 module with proper target dependencies
 pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
-endif()
+target_link_libraries(pynlm PRIVATE nlm_core)
 
-install(TARGETS pynlm
-    LIBRARY DESTINATION pynlm
-    ARCHIVE DESTINATION pynlm
-    RUNTIME DESTINATION pynlm
+target_include_directories(pynlm PRIVATE
+    ${NLM_SOURCE_DIR}
 )
+
+# Compiler-specific options
+target_compile_options(pynlm PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/permissive->
+)
+
+# ==============================================================================
+# PACKAGE CONFIGURATION
+# ==============================================================================
+
+# Configure Python package
+include(CMakePackageConfigHelpers)
+
+# Generate Python-specific configuration
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/pynlm-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm-config.cmake
+)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION ${PYTHON_SITE_PACKAGES}
+    ARCHIVE DESTINATION ${PYTHON_SITE_PACKAGES}
+    RUNTIME DESTINATION ${PYTHON_SITE_PACKAGES}
+)
+
+# Install configuration file
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm-config.cmake
+    DESTINATION ${PYTHON_SITE_PACKAGES}/pynlm/cmake
+)
+
+# Set output directories
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+message(STATUS "pyNLM Bindings Configuration Complete")
+message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")

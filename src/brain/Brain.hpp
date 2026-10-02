@@ -8,8 +8,21 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include "../error/ErrorHandling.hpp"
 
 namespace nlm {
+
+// Structure to represent initialization result
+struct InitResult {
+    bool success;
+    std::string errorMessage;
+    std::vector<std::string> warnings;
+};
+
+// Define NLM_LOG_INFO_WITH_CONTEXT macro
+#define NLM_LOG_INFO_WITH_CONTEXT(msg, context) \
+    nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, context)
 
 // Forward declarations
 class Config;
@@ -42,6 +55,13 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Initialization result structure
+struct InitResult {
+    bool success;
+    std::string errorMessage;
+    std::vector<std::string> warnings;
 };
 
 // Brain: The central coordinator of the neural system
@@ -193,9 +213,18 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== ERROR HANDLING ==========
+
+    // Attempt recovery from an error
+    bool attemptRecovery(const nlm::error::ErrorContext& error);
+
 private:
     struct Impl;
     Impl* pImpl;
 };
+
+// Define NLM_LOG_INFO_WITH_CONTEXT macro
+#define NLM_LOG_INFO_WITH_CONTEXT(msg, context) \
+    nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, context)
 
 } // namespace nlm

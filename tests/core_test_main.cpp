@@ -1,5 +1,5 @@
-// NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// NLM Test Main - Core Module Tests
+// Testing the new refactored core structure
 
 #include <iostream>
 #include <cassert>
@@ -38,11 +38,16 @@ namespace test_brain {
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Core Module Tests ===" << std::endl;
+    std::cout << "Testing the new refactored core structure:" << std::endl;
+    std::cout << "  - Types" << std::endl;
+    std::cout << "  - Config" << std::endl;
+    std::cout << "  - Random" << std::endl;
+    std::cout << "  - Clock" << std::endl;
+    std::cout << "  - Neuron" << std::endl;
+    std::cout << "  - Synapse" << std::endl;
+    std::cout << "  - STDP" << std::endl;
+    std::cout << "  - Brain" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -121,10 +126,10 @@ int main() {
     
     std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== All Core Tests PASSED ===" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "=== Some Core Tests FAILED ===" << std::endl;
         return 1;
     }
 }

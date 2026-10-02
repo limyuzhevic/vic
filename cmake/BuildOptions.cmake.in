@@ -1,0 +1,235 @@
+# NLM Build Options Documentation
+# This file provides HTML documentation for NLM build options
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NLM Build Options</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        h1 { color: #2c3e50; }
+        h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 5px; }
+        h3 { color: #2980b9; }
+        .option { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .option h4 { color: #e74c3c; margin-top: 0; }
+        .value { font-family: monospace; background: #ecf0f1; padding: 2px 6px; border-radius: 3px; }
+        .example { background: #e8f4fd; padding: 10px; border-left: 4px solid #3498db; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>NLM Build Options Documentation</h1>
+    
+    <p>NLM (Neural Language Model) provides enhanced CMake configuration with modern CMake features for cross-platform development.</p>
+    
+    <h2>Build Types</h2>
+    <div class="option">
+        <h4>Debug Build</h4>
+        <p><strong>Command:</strong> <code class="value">cmake .. -DCMAKE_BUILD_TYPE=Debug</code></p>
+        <p><strong>Flags:</strong> <code class="value">-g -O0 -DDEBUG</code></p>
+        <p><strong>Use case:</strong> Development with maximum debugging information and no optimizations.</p>
+    </div>
+    
+    <div class="option">
+        <h4>Release Build</h4>
+        <p><strong>Command:</strong> <code class="value">cmake .. -DCMAKE_BUILD_TYPE=Release</code></p>
+        <p><strong>Flags:</strong> <code class="value">-O3 -DNDEBUG</code></p>
+        <p><strong>Use case:</strong> Production builds with maximum performance optimizations.</p>
+    </div>
+    
+    <div class="option">
+        <h4>RelWithDebInfo</h4>
+        <p><strong>Command:</strong> <code class="value">cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo</code></p>
+        <p><strong>Flags:</strong> <code class="value">-g -O2 -DNDEBUG -DOPTIMIZED</code></p>
+        <p><strong>Use case:</strong> Balanced build with debug info and optimized performance.</p>
+    </div>
+    
+    <h2>Platform Configuration</h2>
+    <p>NLM automatically detects and configures for the target platform:</p>
+    
+    <table>
+        <tr>
+            <th>Platform</th>
+            <th>Compiler Detection</th>
+            <th>Special Features</th>
+        </tr>
+        <tr>
+            <td>Windows</td>
+            <td>MSVC</td>
+            <td>/WX, /permissive-</td>
+        </tr>
+        <tr>
+            <td>Apple (macOS)</td>
+            <td>Clang</td>
+            <td>Additional security flags</td>
+        </tr>
+        <tr>
+            <td>Unix (Linux, BSD)</td>
+            <td>GCC/Clang</td>
+            <td>Wall, Wextra, Wpedantic</td>
+        </tr>
+    </table>
+    
+    <h2>Compiler Flags</h2>
+    <p>Enhanced warning configuration with errors on warnings:</p>
+    
+    <table>
+        <tr>
+            <th>Compiler</th>
+            <th>Warning Flags</th>
+            <th>Treat as Error</th>
+        </tr>
+        <tr>
+            <td>MSVC</td>
+            <td>/W4</td>
+            <td>/WX</td>
+        </tr>
+        <tr>
+            <td>GCC/Clang</td>
+            <td>-Wall -Wextra -Wpedantic</td>
+            <td>-Werror</td>
+        </tr>
+    </table>
+    
+    <h2>Installation Options</h2>
+    <div class="option">
+        <h4>Default Installation</h4>
+        <p><strong>Command:</strong> <code class="value">make install</code></p>
+        <p><strong>Default prefix:</strong> <code class="value">/usr/local</code></p>
+        <p><strong>Install directories:</strong></p>
+        <ul>
+            <li>Libraries: <code class="value">lib</code></li>
+            <li>Executables: <code class="value">bin</code></li>
+            <li>Headers: <code class="value">include</code></li>
+            <li>CMake config: <code class="value">lib/cmake/nlm</code></li>
+        </ul>
+    </div>
+    
+    <div class="option">
+        <h4>Custom Installation Prefix</h4>
+        <p><strong>Command:</strong> <p>
+        <code class="value">cmake .. -DCMAKE_INSTALL_PREFIX=/custom/path</code></p>
+        <p><strong>Example:</strong> <code class="value">cmake .. -DCMAKE_INSTALL_PREFIX=/opt/nlm</code></p>
+    </div>
+    
+    <h2>Package Configuration</h2>
+    <p>NLM provides CMake package configuration for downstream projects:</p>
+    
+    <div class="example">
+        <p><strong>Finding NLM in your project:</strong></p>
+        <code class="value">find_package(nlm REQUIRED)</code>
+        <p><strong>Using targets:</strong></p>
+        <code class="value">nlm::nlm_core</code> - Core neural network library<br>
+        <code class="value">nlm::nlm_application</code> - Application layer library<br>
+        <code class="value">nlm::nlm_agent</code> - Agent system library<br>
+        <code class="value">nlm::nlm_world</code> - World simulation library
+    </div>
+    
+    <h2>Build Directory Structure</h2>
+    <p>After running CMake configuration:</p>
+    <ul>
+        <li><code class="value">build/</code> - Source directory</li>
+        <li><code class="value">build/lib</code> - Static libraries (.a, .lib)</li>
+        <li><code class="value">build/bin</code> - Executables (nlm, nlm_phase3_demo, etc.)</li>
+        <li><code class="value">build/include</code> - Installed header files</li>
+        <li><code class="value">build/lib/cmake/nlm</code> - CMake package configuration</li>
+    </ul>
+    
+    <h2>Testing Options</h2>
+    <p>NLM includes comprehensive test support:</p>
+    
+    <table>
+        <tr>
+            <th>Test Target</th>
+            <th>Description</th>
+            <th>Command</th>
+        </tr>
+        <tr>
+            <td>nlm_core_test</td>
+            <td>Core functionality tests</td>
+            <td><code class="value">./nlm_core_test</code></td>
+        </tr>
+        <tr>
+            <td>nlm_application_test</td>
+            <td>Application module tests</td>
+            <td><code class="value">./nlm_application_test</code></td>
+        </tr>
+        <tr>
+            <td>nlm_agent_test</td>
+            <td>Agent system tests</td>
+            <td><code class="value">./nlm_agent_test</code></td>
+        </tr>
+        <tr>
+            <td>nlm_world_test</td>
+            <td>World system tests</td>
+            <td><code class="value">./nlm_world_test</code></td>
+        </tr>
+        <tr>
+            <td>nlm_phase3_test</td>
+            <td>Phase 3 experiment tests</td>
+            <td><code class="value">./nlm_phase3_test</code></td>
+        </tr>
+        <tr>
+            <td>nlm_phase4_test</td>
+            <td>Phase 4 experiment tests</td>
+            <td><code class="value">./nlm_phase4_test</code></td>
+        </tr>
+    </table>
+    
+    <p><strong>Run all tests:</strong> <code class="value">ctest --output-on-failure</code></p>
+    
+    <h2>Generator Expressions</h2>
+    <p>NLM uses modern CMake generator expressions for conditional compilation:</p>
+    
+    <div class="example">
+        <p><strong>Compiler-specific flags:</strong></p>
+        <code class="value">$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic></code><br>
+        <code class="value">$<$<CXX_COMPILER_ID:MSVC>:/W4></code>
+    </div>
+    
+    <h2>Target Properties</h2>
+    <p>NLM libraries export proper CMake properties:</p>
+    
+    <ul>
+        <li><strong>POSITION_INDEPENDENT_CODE:</strong> ON for all targets</li>
+        <li><strong>CXX_STANDARD:</strong> 20 with required and extensions disabled</li>
+        <li><strong>INCLUDE_DIRECTORIES:</strong> Properly managed with BUILD/INSTALL interfaces</li>
+        <li><strong>EXPORT_NAME:</strong> Targets export with namespace <code class="value">nlm::</code></li>
+    </ul>
+    
+    <h2>Modern CMake Features</h2>
+    <ul>
+        <li><strong>target_sources():</strong> Used for clean source file management</li>
+        <li><strong>target_compile_features():</strong> Language standard specification</li>
+        <li><strong>INTERFACE_INCLUDE_DIRECTORIES:</strong> Proper header export</li>
+        <li><strong>EXPORT frameworks:</strong> CMake package exports</li>
+        <li><strong>Generator expressions:</strong> Conditional compilation</li>
+        <li><strong>Unity builds:</strong> Support for optimized build systems</li>
+    </ul>
+    
+    <h2>Troubleshooting</h2>
+    
+    <div class="option">
+        <h4>Common Issues</h4>
+        <p><strong>Compiler not found:</strong> Set <code class="value">CMAKE_CXX_COMPILER</code> explicitly</p>
+        <p><strong>Build type not recognized:</strong> Use one of <code class="value">Debug, Release, RelWithDebInfo, MinSizeRel</code></p>
+        <p><strong>Missing headers:</strong> Check that source directory structure is intact</p>
+        <p><strong>Installation permissions:</strong> Use sudo for system-wide installation</p>
+    </div>
+    
+    <h2>Best Practices</h2>
+    <ul>
+        <li>Use <code class="value">-DCMAKE_BUILD_TYPE=Release</code> for production builds</li>
+        <li>Always run <code class="value">cmake ..</code> in a separate build directory</li>
+        <li>Use <code class="value">make -j$(nproc)</code> for parallel builds</li>
+        <li>For development, use <code class="value">Debug</code> builds for full debugging info</li>
+        <li>Clean rebuilds: <code class="value">rm -rf build</code> then re-run CMake</li>
+    </ul>
+    
+    <hr>
+    <p><em>Document generated by enhanced CMake configuration.</em></p>
+</body>
+</html>
