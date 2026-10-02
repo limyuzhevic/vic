@@ -256,6 +256,99 @@ print("Agent simulation complete!")
 
 ---
 
+## Advanced Features (for experienced users)
+
+### 1. Performance Monitoring
+
+```python
+import pynlm
+
+# Create brain and agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.setAgentStart(10.0, 10.0)
+agent.initialize(world)
+
+# Enable curiosity for interesting behavior
+agent.enableCuriosity(True)
+
+print("=== Performance Monitoring ===")
+
+# Run simulation with tracking
+for step in range(50):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    reward = world.getEnergyDecayRate()
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+
+print(f"Performance stats: {agent.getPerformanceStats()}")
+```
+
+### 2. Advanced Agent Configuration
+
+```python
+import pynlm
+
+# Create agent with advanced settings
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+agent = pynlm.createAgentBrain(brain)
+
+world = pynlm.createSimpleWorld()
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+world.setAgentStart(15.0, 15.0)
+agent.initialize(world)
+
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Configure advanced parameters
+agent.setCuriosityThreshold(0.4)
+agent.setExplorationRate(0.3)
+agent.setNoveltyDecay(0.95)
+
+print(f"Advanced agent configured with {agent.getVisionNeuronCount()} vision neurons")
+```
+
+### 3. Error Handling
+
+```python
+import pynlm
+
+# Test error handling
+def safeOperation():
+    try:
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        return brain
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+# Use safe operation
+brain = safeOperation()
+if brain:
+    print("Brain created successfully")
+```
+
+---
+
 ## Quick Reference
 
 | What you want | Code |
@@ -290,8 +383,64 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
+
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**That's it! You're now ready to use NLM.**
+
+## New Advanced Features Added
+
+This version includes significant improvements:
+
+### 🚀 Advanced Python API Features
+- Enhanced error handling with custom exception classes
+- Performance monitoring and debugging tools
+- Event system for agent behavior tracking
+- Advanced configuration options
+- Serialization and state management
+
+### 🧠 Improved AgentBrain Architecture
+- Better separation of concerns
+- Dependency injection for testability
+- Advanced processing strategies
+- Enhanced neuromodulation
+
+### 📊 Performance Monitoring
+- Real-time performance tracking
+- Resource usage monitoring
+- Anomaly detection
+- Performance benchmarking
+
+### 🛡️ Enhanced Error Handling
+- Custom exception hierarchy
+- Context-aware error reporting
+- Recovery mechanisms
+- Validation utilities
+
+### ⚡ Optimization Tools
+- Performance profiling
+- Resource optimization
+- Parameter tuning
+- Advanced analytics
+
+These features make NLM more powerful, easier to use, and more suitable for complex neural simulation tasks while maintaining backward compatibility with existing code.
+
+For detailed documentation of all new features, see the updated `HOW_TO_USE.md` and explore the new `PerformanceMonitoring.hpp` header.
+
+---
+
+## Want to Learn More?
+
+- **Quick Start**: See `HOW_TO_USE.md` for comprehensive setup and usage instructions
+- **Architecture**: Check `docs/ARCHITECTURE.md` for deep technical details
+- **Examples**: Explore the test files and example scripts
+- **API Reference**: Refer to the Python bindings in `python/bindings.cpp`
+
+The NLM system continues to evolve with new features and improvements. Happy experimenting!
+
+---
+
+*Version 0.1.0 - Advanced Edition*  
+*Enhanced for researchers, developers, and AI enthusiasts*
