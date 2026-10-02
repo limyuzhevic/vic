@@ -589,8 +589,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
-    // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    // Enhanced sensory input processing with integrated memory systems
+    // This now integrates working memory, prediction system, and cognitive processing
     
     const auto& values = input.getData();
     if (values.empty()) return;
@@ -598,7 +598,125 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Enhanced prediction system integration
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->recordSensoryState(values, pImpl->currentStep);
+    }
+    
+    // Enhanced working memory integration
+    if (pImpl->workingMemory) {
+        // Store sensory input in working memory
+        for (size_t i = 0; i < std::min(values.size(), numSensory); ++i) {
+            float normalizedValue = static_cast<float>(values[i]) * 10.0f;
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            
+            // Update attention based on input strength
+            if (pImpl->attention && normalizedValue > 0.5f) {
+                pImpl->attention->applyBottomUpSalience(pImpl->sensoryNeurons[i]->getId(), std::abs(normalizedValue));
+            }
+        }
+    }
+    
+    // Enhanced episodic memory integration
+    if (pImpl->episodicMemory) {
+        // Create episodic memory item for this sensory experience
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.sensoryState = values;
+        episode.action = ActionType::Wait; // Will be updated by action selection
+        episode.reward = 0.0f; // Will be updated by reward signal
+        episode.context = pImpl->currentStep % 100; // Episode context
+        
+        // Store in episodic memory
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+    
+    // Enhanced concept formation integration
+    if (pImpl->conceptFormation) {
+        // Present experience to concept formation system for learning
+        std::vector<float> features;
+        if (!values.empty()) {
+            features.push_back(values[0]); // Use first sensory value as feature
+        }
+        
+        pImpl->conceptFormation->presentExperience(values, features, 0.5f, pImpl->currentStep);
+    }
+    
+    // Enhanced attentional selection integration
+    if (pImpl->attention) {
+        // Apply bottom-up salience from sensory input
+        for (size_t i = 0; i < std::min(values.size(), numSensory); ++i) {
+            float salience = std::abs(static_cast<float>(values[i]) * 10.0f);
+            if (salience > 0.5f) {
+                pImpl->attention->applyBottomUpSalience(pImpl->sensoryNeurons[i]->getId(), salience);
+            }
+        }
+        
+        // Process attention competition
+        pImpl->attention->processCompetition();
+        
+        // Get attended neuron for prioritized processing
+        auto attendedNeurons = pImpl->attention->getAttendedNeurons(5);
+        for (auto* neuron : attendedNeurons) {
+            if (neuron && neuron->getType() == NeuronType::Sensory) {
+                // Enhance processing of attended sensory neurons
+                neuron->injectCurrent(5.0f); // Boost current
+            }
+        }
+    }
+    
+    // Enhanced prediction error integration
+    if (pImpl->predictionError && pImpl->predictionSystem) {
+        // Get prediction from prediction system
+        auto prediction = pImpl->predictionSystem->generatePrediction(pImpl->currentStep);
+        
+        // Compute prediction error if we have actual values
+        if (!values.empty() && !prediction.empty()) {
+            float actual = values[0];
+            float predicted = prediction[0];
+            float error = actual - predicted;
+            
+            pImpl->predictionError->computeError(predicted, actual);
+            
+            // Use prediction error to modulate learning
+            float errorMagnitude = std::abs(error);
+            if (errorMagnitude > 0.01f) {
+                // Enhance plasticity based on prediction error
+                if (pImpl->developmentSystem) {
+                    pImpl->developmentSystem->increasePlasticityRate(errorMagnitude * 10.0f);
+                }
+            }
+        }
+    }
+    
+    // Enhanced neuromodulation integration
+    if (pImpl->dopamine) {
+        // Update dopamine level based on prediction error
+        if (pImpl->predictionError) {
+            float error = pImpl->predictionError->getError();
+            pImpl->dopamine->updatePredictionError(error);
+            
+            // Apply reward modulation based on prediction error
+            if (std::abs(error) > 0.5f) {
+                // Strong prediction error -> reward signal
+                pImpl->dopamine->applyRewardModulation(std::abs(error), 0.1f);
+            }
+        }
+    }
+    
+    if (pImpl->curiosity) {
+        // Update curiosity based on sensory novelty
+        float novelty = calculateSensoryNovelty(values);
+        pImpl->curiosity->updateNovelty(novelty);
+    }
+    
+    if (pImpl->novelty) {
+        // Update novelty detection
+        float novelty = calculateSensoryNovelty(values);
+        pImpl->novelty->updateNovelty(novelty);
+    }
+    
+    // Distribute input across sensory neurons (original functionality)
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
@@ -609,11 +727,31 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
-        }
+        // Note: Working memory integration already handled above for enhanced functionality
     }
+}
+
+float Brain::calculateSensoryNovelty(const std::vector<float>& values) const {
+    if (values.empty()) return 0.0f;
+    
+    // Calculate novelty based on deviation from expected patterns
+    // This is a simplified novelty calculation
+    float mean = 0.0f;
+    for (float v : values) {
+        mean += v;
+    }
+    mean /= values.size();
+    
+    float variance = 0.0f;
+    for (float v : values) {
+        variance += (v - mean) * (v - mean);
+    }
+    variance /= values.size();
+    
+    float stddev = std::sqrt(variance);
+    
+    // Novelty is proportional to standard deviation
+    return std::min(stddev * 2.0f, 1.0f);
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
