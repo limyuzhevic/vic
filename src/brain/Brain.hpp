@@ -61,18 +61,28 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
-    bool initialize();
-    
-    // Main simulation step
+    // Brain step management
     void step(SimulationStep currentStep);
-    
-    // Simulation time step
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    // Internal step processing methods
+    void _initializeStepState(SimulationStep currentStep, Timestamp currentTime);
+    void _processDelayedSpikes();
+    void _updateNeuronDynamics();
+    void _detectAndScheduleSpikes();
+    void _updateWorkingMemory();
+    void _applyNeuromodulation();
+    void _applyPlasticityRules(SimulationStep currentStep);
+    void _updateEpisodicMemory();
+    void _updatePredictionSystem();
+    void _updateAttentionSystem();
+    void _updateConceptFormation();
+    void _applyStructuralPlasticity();
+    void _replayImportantMemories();
+    void _applyDevelopmentEffects();
+    void _periodicMemoryConsolidation();
+    void _updateCheckpointManager();
+    void _collectStepStatistics();
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -105,6 +115,9 @@ public:
     
     // Apply developmental changes (called automatically in step)
     void develop();
+    
+    // Initialize brain with configuration
+    bool initialize();
     
     // Reset brain state
     void reset();
