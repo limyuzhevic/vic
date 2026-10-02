@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Real neuromodulatory systems that affect neural plasticity and behavior
 
 class Neuromodulator {
 public:
@@ -16,23 +16,29 @@ public:
     // Get modulator name
     virtual const char* getName() const = 0;
     
-    // Get current concentration/level
+    // Get current concentration/level (normalized 0-1)
     virtual float getLevel() const = 0;
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Returns plasticity modulation factor (1.0 = normal, <1.0 = reduced, >1.0 = enhanced)
     virtual float getPlasticityFactor() const = 0;
     
-    // Update neuromodulator state
+    // Update neuromodulator state based on current timestep
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Get baseline level (steady-state concentration)
+    virtual float getBaselineLevel() const = 0;
+    
+    // Check if neuromodulator is currently active
+    virtual bool isActive() const = 0;
     
 protected:
     Neuromodulator() = default;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Implements phasic and tonic dopamine dynamics with reward prediction error
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -44,9 +50,23 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
+    // Get baseline dopamine level (steady-state)
+    float getBaselineLevel() const override;
+    
+    // Check if dopamine is in phasic burst state
+    bool isActive() const override;
+    
+    // Reward signaling - phasic burst response to unexpected rewards
     void signalReward(float reward);
+    
+    // Reward prediction error signaling - core RL mechanism
     void signalRewardPredictionError(float error);
+    
+    // Set baseline dopamine level for tonic firing
+    void setBaselineLevel(float level);
+    
+    // Configure dopamine dynamics parameters
+    void configure(float baseline, float peak, float decayRate, float releaseRate);
     
 private:
     struct Impl;
