@@ -176,28 +176,249 @@ std::string Config::summary() const {
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
+                oss << "\\"" << arg << "\\"";
             } else {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ")\\n";
     }
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Validation errors storage
+std::string Config::validationErrors = "";
+
+// New: typed getters with error handling
+template<typename T>
+std::optional<T> Config::getTyped(const std::string& key) const {
+    return get<T>(key);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+float Config::getFloat(const std::string& key) const {
+    auto val = get<double>(key);
+    if (val) return static_cast<float>(val.value());
+    return 0.0f;
 }
+
+int Config::getInt(const std::string& key) const {
+    auto val = get<int>(key);
+    if (val) return val.value();
+    return 0;
+}
+
+bool Config::getBool(const std::string& key) const {
+    auto val = get<bool>(key);
+    if (val) return val.value();
+    return false;
+}
+
+std::string Config::getString(const std::string& key) const {
+    auto val = get<std::string>(key);
+    if (val) return val.value();
+    return "";
+}
+
+std::vector<float> Config::getFloatArray(const std::string& key) const {
+    auto val = get<std::vector<double>>(key);
+    if (val) {
+        std::vector<float> result;
+        result.reserve(val.value().size());
+        for (double v : val.value()) {
+            result.push_back(static_cast<float>(v));
+        }
+        return result;
+    }
+    return {};
+}
+
+std::vector<int> Config::getIntArray(const std::string& key) const {
+    auto val = get<std::vector<int>>(key);
+    return val.value_or(std::vector<int>());
+}
+
+// New: configuration validation
+bool Config::validate() const {
+    std::ostringstream errors;
+    bool valid = true;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            errors << "Empty key found. ";
+            valid = false;
+        }
+        
+        // Type-specific validation
+        std::visit([&errors, &valid, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                if (arg.empty()) {
+                    errors << "String value for key '" << entry.key << "' is empty. ";
+                    valid = false;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                if (arg.empty()) {
+                    errors << "Float array for key '" << entry.key << "' is empty. ";
+                    valid = false;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                if (arg.empty()) {
+                    errors << "Int array for key '" << entry.key << "' is empty. ";
+                    valid = false;
+                }
+            }
+        }, entry.value);
+    }
+    
+    if (!valid) {
+        validationErrors = errors.str();
+    } else {
+        validationErrors = "";
+    }
+    return valid;
+}
+
+std::string Config::getValidationErrors() const {
+    return validationErrors;
+}
+
+// New: configuration factory methods
+std::shared_ptr<Config> Config::createFromFile(const std::string& filepath) {
+    auto config = std::make_shared<Config>();
+    if (config->loadFromFile(filepath)) {
+        return config;
+    }
+    return nullptr;
+}
+
+std::shared_ptr<Config> Config::createFromDict(const std::string& dictString) {
+    auto config = std::make_shared<Config>();
+    // Parse simple key=value pairs from string
+    std::istringstream stream(dictString);
+    std::string line;
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            config->set(key, value, ConfigSource::File);
+        }
+    }
+    return config;
+}
+
+std::shared_ptr<Config> Config::createFromString(const std::string& jsonString) {
+    // For now, parse as simple key=value pairs
+    auto config = std::make_shared<Config>();
+    
+    // Simple JSON parsing for common cases
+    // This is a basic implementation - real implementation would use proper JSON parser
+    if (jsonString.empty()) {
+        return config;
+    }
+    
+    // Try to parse as JSON-like string
+    if (jsonString.front() == '{' && jsonString.back() == '}') {
+        std::string content = jsonString.substr(1, jsonString.size() - 2);
+        // Simple parsing for key:value pairs
+        // This is a placeholder for proper JSON parsing
+    }
+    
+    return config;
+}
+
+// New: configuration merging and comparison
+void Config::merge(const std::shared_ptr<Config>& other) {
+    if (!other) return;
+    
+    for (const auto& entry : other->pImpl->entries) {
+        // Override with higher priority
+        if (entry.source == ConfigSource::Runtime || 
+            static_cast<int>(entry.source) > static_cast<int>(getSource(entry.key))) {
+            set(entry.key, entry.value, entry.source);
+        }
+    }
+}
+
+std::shared_ptr<Config> Config::diff(const std::shared_ptr<Config>& other) const {
+    if (!other) return nullptr;
+    
+    auto diffConfig = std::make_shared<Config>();
+    
+    // Find entries that differ
+    for (const auto& thisEntry : pImpl->entries) {
+        auto otherVal = other->get(thisEntry.key);
+        if (!otherVal) {
+            // This entry doesn't exist in other config
+            diffConfig->set(thisEntry.key, thisEntry.value, thisEntry.source);
+        } else {
+            // Check if values differ
+            if (!compareValues(thisEntry.value, otherVal.value())) {
+                diffConfig->set(thisEntry.key, thisEntry.value, thisEntry.source);
+            }
+        }
+    }
+    
+    // Find entries that exist only in other config
+    for (const auto& otherEntry : other->pImpl->entries) {
+        auto thisVal = get(otherEntry.key);
+        if (!thisVal) {
+            diffConfig->set(otherEntry.key, otherEntry.value, otherEntry.source);
+        }
+    }
+    
+    return diffConfig;
+}
+
+// New: configuration sections
+std::shared_ptr<Config> Config::getSection(const std::string& prefix) const {
+    auto section = std::make_shared<Config>();
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.size() >= prefix.size() && 
+            entry.key.substr(0, prefix.size()) == prefix) {
+            std::string key = entry.key.substr(prefix.size());
+            if (!key.empty() && key[0] == '.') {
+                key = key.substr(1);
+            }
+            section->set(key, entry.value, entry.source);
+        }
+    }
+    return section;
+}
+
+void Config::setSection(const std::string& prefix, const std::shared_ptr<Config>& section) {
+    if (!section) return;
+    
+    for (const auto& entry : section->pImpl->entries) {
+        std::string key = prefix + "." + entry.key;
+        set(key, entry.value, entry.source);
+    }
+}
+
+// New: configuration cloning
+std::shared_ptr<Config> Config::clone() const {
+    auto clone = std::make_shared<Config>();
+    for (const auto& entry : pImpl->entries) {
+        clone->set(entry.key, entry.value, entry.source);
+    }
+    return clone;
+}
+
+// New: configuration statistics
+
+} // namespace nlm
 
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
@@ -211,5 +432,3 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

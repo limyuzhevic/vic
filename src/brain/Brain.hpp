@@ -94,104 +94,151 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // ========== ADVANCED STATISTICS ==========
     
-    // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    // Working memory statistics
+    size_t getWorkingMemoryCapacity() const;
+    size_t getWorkingMemoryActiveSlots() const;
+    size_t getWorkingMemoryAccessCount() const;
     
-    // Update plasticity rules (called automatically in step)
-    void updatePlasticity();
+    // Episodic memory statistics
+    size_t getEpisodicMemoryEpisodeCount() const;
+    size_t getEpisodicMemoryCapacity() const;
+    double getEpisodicMemoryReplaySuccessRate() const;
     
-    // Apply developmental changes (called automatically in step)
-    void develop();
+    // Associative memory statistics
+    size_t getAssociativeMemoryPatternCount() const;
+    size_t getAssociativeMemoryActiveAssociations() const;
     
-    // Reset brain state
-    void reset();
+    // Prediction system statistics
+    size_t getPredictionSystemUpdateCount() const;
+    double getPredictionSystemAccuracy() const;
+    double getPredictionSystemConfidence() const;
     
-    // Save brain state to file (checkpointing)
-    bool save(const std::string& filepath) const;
+    // Cognition system statistics
+    size_t getPlannerActionCount() const;
+    size_t getConceptFormationConceptCount() const;
+    size_t getAttentionFocusCount() const;
     
-    // Load brain state from file
-    bool load(const std::string& filepath);
+    // Development system statistics
+    double getDevelopmentPlasticityRate() const;
+    size_t getDevelopmentStructuralChanges() const;
+    size_t getDevelopmentMaturationEvents() const;
     
-    // Region management
-    RegionId addRegion(const std::string& name = "");
-    NeuralRegion* getRegion(RegionId id);
-    const NeuralRegion* getRegion(RegionId id) const;
-    size_t getRegionCount() const;
-    std::vector<RegionId> getRegionIds() const;
+    // Neuromodulation statistics
+    double getDopamineLevel() const;
+    double getCuriosityLevel() const;
+    double getNoveltyLevel() const;
+    double getPredictionErrorLevel() const;
     
-    // Get all regions
-    const std::vector<std::unique_ptr<NeuralRegion>>& getRegions() const;
+    // ========== PERFORMANCE MONITORING ==========
     
-    // Inter-region connection management
-    void addInterRegionConnection(RegionId source, RegionId target, 
-                                  float weight = 0.0f, Delay delay = 1);
-    void removeInterRegionConnection(RegionId source, RegionId target);
-    
-    // Global statistics
+    // Performance statistics
     size_t getTotalNeuronCount() const;
     size_t getTotalSynapseCount() const;
     size_t getActiveNeuronCount() const;
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
+    // Simulation performance
+    float getStepsPerSecond() const;
+    double getSimulationTime() const;
+    size_t getStepsSinceLastCheckpoint() const;
+    size_t getStepsSinceLastReplay() const;
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
+    // Memory usage statistics
+    size_t getMemoryPoolUsage() const;
+    size_t getEventQueueUsage() const;
+    double getMemoryUtilizationPercentage() const;
     
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
+    // ========== NETWORK ANALYSIS ==========
     
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+    // Network topology statistics
+    size_t getRegionCount() const;
+    size_t getConnectionCount() const;
+    size_t getIntraRegionConnections() const;
+    size_t getInterRegionConnections() const;
+    float getAverageConnectionWeight() const;
+    float getMaxConnectionWeight() const;
+    float getMinConnectionWeight() const;
     
-    // ========== PREDICTION SYSTEM ==========
+    // Activity statistics
+    size_t getTotalNeuronCount() const override;
+    size_t getTotalSynapseCount() const override;
+    size_t getActiveNeuronCount() const override;
+    size_t getFiringNeuronCount() const override;
+    float getAverageFiringRate() const override;
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
+    // Advanced connectivity
+    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
+    std::vector<RegionId> getMostActiveRegions(size_t count) const;
+    float getNetworkEfficiency() const;
+    float getClusteringCoefficient() const;
     
-    // ========== COGNITION SYSTEMS ==========
+    // ========== STATE ANALYSIS ==========
     
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
+    // Brain state information
+    std::string getWorkingMemoryState() const;
+    std::string getEpisodicMemorySummary() const;
+    std::string getPredictionSystemStatus() const;
+    std::string getDevelopmentStageDescription() const;
+    std::string getNeuromodulationStatus() const;
     
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
+    // State validation
+    bool validateBrainState() const;
+    std::string getStateValidationErrors() const;
     
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
+    // ========== ADVANCED ANALYSIS ==========
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Learning progress tracking
+    double getLearningProgress() const;
+    double getPlasticityEfficiency() const;
+    double getMemoryConsolidationProgress() const;
     
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
+    // Behavioral statistics
+    std::unique_ptr<class Action> getActionSequence(size_t steps) const;
+    size_t getBehaviorPatternCount() const;
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // ========== REAL-TIME MONITORING ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Real-time monitoring
+    void startMonitoring(float intervalSeconds = 0.1f);
+    void stopMonitoring();
+    bool isMonitoring() const;
+    std::string getMonitoringData() const;
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Performance profiling
+    void enableProfiling(bool enable = true);
+    bool isProfilingEnabled() const;
+    std::string getProfileStats() const;
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+    // ========== ADVANCED CONTROL ==========
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Advanced simulation control
+    void runEpisode(size_t maxSteps, TimestepDuration timestep = TimestepDuration(0.001));
+    void stepBatched(size_t steps, TimestepDuration timestep = TimestepDuration(0.001));
+    void pause();
+    void resume();
+    bool isPaused() const;
+    float getSimulationSpeed() const;
+    void setSimulationSpeed(float speed);
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // ========== EXPORT/ANALYSIS ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Export data for analysis
+    void exportDebugInfo(const std::string& filepath) const;
+    void exportForAnalysis(const std::string& filepath, const std::string& format = "json") const;
     
-    // Logging
-    void logStatus() const;
+    // ========== HELPERS ==========
+    
+    // Brain health check
+    bool checkForMemoryLeaks() const;
+    bool checkForPerformanceBottlenecks() const;
+    bool checkSynchronization() const;
+    std::string generateHealthReport() const;
+    
+    // Get most active neurons
+    std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
 private:
     struct Impl;
