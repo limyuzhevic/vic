@@ -49,6 +49,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -68,6 +71,9 @@ struct Brain::Impl {
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
+    
+    // Last sensory input for prediction system
+    std::unique_ptr<SensoryInput> lastSensoryInput;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -91,7 +97,7 @@ struct Brain::Impl {
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , consolidationInterval(1000)  // Consolidate every 1000 steps)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -129,6 +135,43 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Initialize additional neuromodulators (Phase 2)
+        // ACh - Acetylcholine: attention and memory consolidation
+        // NE - Norepinephrine: arousal and vigilance
+        // 5-HT - Serotonin: mood and social behavior
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        
+        // Configure neuromodulators with initial parameters from config
+        float dopamineScale = config->getOr<float>("neuromod.dopamine.scale", 1.0f);
+        dopamine->setLearningRate(config->getOr<float>("neuromod.dopamine.learning_rate", 0.01f));
+        dopamine->setRewardScale(dopamineScale);
+        
+        float curiosityWeight = config->getOr<float>("neuromod.curiosity.weight", 1.0f);
+        curiosity->setWeight(curiosityWeight);
+        
+        float noveltyWeight = config->getOr<float>("neuromod.novelty.weight", 1.0f);
+        novelty->setWeight(noveltyWeight);
+        
+        float predictionErrorWeight = config->getOr<float>("neuromod.prediction.error.weight", 1.0f);
+        predictionError->setWeight(predictionErrorWeight);
+        
+        // ACh configuration
+        acetylcholine->setAttentionWeight(config->getOr<float>("neuromod.acetylcholine.attention_weight", 0.7f));
+        acetylcholine->setMemoryConsolidationWeight(config->getOr<float>("neuromod.acetylcholine.memory_weight", 0.3f));
+        
+        // NE configuration
+        norepinephrine->setArousalWeight(config->getOr<float>("neuromod.norepinephrine.arousal_weight", 0.4f));
+        norepinephrine->setVigilanceWeight(config->getOr<float>("neuromod.norepinephrine.vigilance_weight", 0.4f));
+        norepinephrine->setStressWeight(config->getOr<float>("neuromod.norepinephrine.stress_weight", 0.2f));
+        
+        // Serotonin configuration
+        serotonin->setRewardWeight(config->getOr<float>("neuromod.serotonin.reward_weight", 0.3f));
+        serotonin->setPunishmentWeight(config->getOr<float>("neuromod.serotonin.punishment_weight", 0.3f));
+        serotonin->setSocialWeight(config->getOr<float>("neuromod.serotonin.social_weight", 0.2f));
+        serotonin->setMoodWeight(config->getOr<float>("neuromod.serotonin.mood_weight", 0.2f));
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -235,15 +278,12 @@ bool Brain::initialize() {
     pImpl->workingMemory->initialize(this);
     pImpl->workingMemory->setCapacity(neuronCount / 10);
     
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        // TODO PHASE 2: Implement prediction system initialization
+        // For now, just mark as available
+        pImpl->predictionSystem->train(pImpl->lastSensoryInput ? *pImpl->lastSensoryInput : SensoryInput());
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -258,6 +298,11 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -510,9 +555,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->lastSensoryInput) {
+        // Make predictions based on current neural state and sensory input
+        // This is a simplified version - real implementation would use neural patterns
+        
+        // Use neuromodulation to guide prediction processing
+        float neuromodulationLevel = 1.0f;
+        if (pImpl->dopamine) {
+            neuromodulationLevel = pImpl->dopamine->getLevel();
+        }
+        
+        // Update prediction system with current state
+        // The prediction system would normally use neural activity patterns
+        // For now, we'll simulate prediction error generation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error for learning and adaptation
+        if (predictionError > 0.1f) {  // Significant prediction error
+            if (pImpl->dopamine) {
+                // Update dopamine level based on prediction error
+                float newDopamineLevel = pImpl->dopamine->getLevel() + predictionError * 0.1f;
+                pImpl->dopamine->setLevel(newDopamineLevel);
+            }
+            
+            // Store prediction error in episodic memory for learning
+            if (pImpl->episodicMemory) {
+                EpisodicMemoryItem predictionEpisode;
+                predictionEpisode.timestamp = pImpl->currentStep;
+                predictionEpisode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                predictionEpisode.predictionError = predictionError;
+                pImpl->episodicMemory->storeEpisode(predictionEpisode);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -589,6 +663,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
+    // Store last sensory input for prediction system
+    pImpl->lastSensoryInput = std::make_unique<SensoryInput>(input);
+    
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     

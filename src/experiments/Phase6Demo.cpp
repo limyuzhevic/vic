@@ -5,8 +5,7 @@
  * that all brain systems are properly connected.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
-#include "core/Logger/Logger.hpp"
+#include "Phase6Experiment.hpp"
 #include <iostream>
 
 using namespace nlm;
@@ -15,11 +14,8 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
-    // Initialize logging
-    Logger::getInstance().setLevel(Logger::Level::Info);
-    
     // Create experiment
-    Phase6IntegratedExperiment experiment;
+    Phase6Experiment experiment;
     
     // First, run the quick integration verification
     std::cout << "--- Integration Verification ---" << std::endl;
@@ -57,7 +53,6 @@ int main(int argc, char* argv[]) {
     config.neuronCount = 500;
     config.maxSteps = 2000;
     config.enableCheckpointing = true;
-    config.enableReplay = true;
     config.enableDevelopment = true;
     
     auto result = experiment.run(config);

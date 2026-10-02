@@ -48,6 +48,15 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Accessors
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    float getLearningRate() const { return learningRate_; }
+    
+    void setRewardScale(float scale) { rewardScale_ = scale; }
+    float getRewardScale() const { return rewardScale_; }
+    
+    void reset() { pImpl_->level = 0.0f; }
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -57,33 +66,84 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(float attention, float memory, TimestepDuration dt) override;
+    
+    // Accessors
+    void setAttentionWeight(float weight);
+    void setMemoryConsolidationWeight(float weight);
+    float getAttentionWeight() const;
+    float getMemoryConsolidationWeight() const;
+    
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
 // PLACEHOLDER - Phase 2
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(float arousal, float vigilance, float stress, TimestepDuration dt) override;
+    
+    // Accessors
+    void setArousalWeight(float weight);
+    void setVigilanceWeight(float weight);
+    void setStressWeight(float weight);
+    float getArousalWeight() const;
+    float getVigilanceWeight() const;
+    float getStressWeight() const;
+    
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
 // PLACEHOLDER - Phase 2
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(float reward, float punishment, float social, float mood, TimestepDuration dt) override;
+    
+    // Accessors
+    void setRewardWeight(float weight);
+    void setPunishmentWeight(float weight);
+    void setSocialWeight(float weight);
+    void setMoodWeight(float weight);
+    float getRewardWeight() const;
+    float getPunishmentWeight() const;
+    float getSocialWeight() const;
+    float getMoodWeight() const;
+    
+    void reset();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
