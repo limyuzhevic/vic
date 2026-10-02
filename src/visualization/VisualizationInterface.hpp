@@ -2,47 +2,52 @@
 
 #include <string>
 #include <vector>
-#include <memory>
+#include <unordered_map>
+#include "brain/Neuron.hpp"
+#include "brain/Synapse.hpp"
+#include "brain/Brain.hpp"
+#include "core/Logger/Logger.hpp"
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
 class VisualizationInterface {
 public:
     VisualizationInterface();
     ~VisualizationInterface();
     
-    // Initialize visualization
+    // Disable copying
+    VisualizationInterface(const VisualizationInterface&) = delete;
+    VisualizationInterface& operator=(const VisualizationInterface&) = delete;
+    
+    // Initialization and control
     bool initialize();
-    
-    // Update visualization data
     void update();
-    
-    // Render current state
     void render();
-    
-    // Close visualization
     void close();
     
-    // Check if visualization is active
+    // Status
     bool isActive() const;
     
-    // Set update rate
+    // Configuration
     void setUpdateRate(double hz);
     double getUpdateRate() const;
+    void setSaveToFile(bool save);
+    bool getSaveToFile() const;
+    void setOutputDirectory(const std::string& directory);
+    std::string getOutputDirectory() const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Visualization methods
+    void visualizeNetwork(const Brain& brain);
+    void visualizeActivity(const Brain& brain);
+    void visualizeSpikes(const std::vector<SpikeEvent>& spikes);
+    void visualizeWeights(const Brain& brain);
+    void visualizeDevelopment(const Brain& brain);
+    void saveAll(const Brain& brain, const std::vector<SpikeEvent>& spikes);
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
-    
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
-    
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    // Static helper methods
+    static std::string getTimestamp();
+    static double getMinSpikeTime(const std::vector<SpikeEvent>& spikes);
+    static double getMaxSpikeTime(const std::vector<SpikeEvent>& spikes);
     
 private:
     struct Impl;
