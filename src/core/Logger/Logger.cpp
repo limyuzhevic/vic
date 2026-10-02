@@ -29,28 +29,102 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
+    // Performance optimization: Use single string buffer to reduce allocations
+    static thread_local std::string logBuffer;
+    logBuffer.clear();
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Structured log format
+    logBuffer.reserve(256); // Pre-allocate for common log sizes
     
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
     if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
+        logBuffer += levelToColor(entry.level);
     }
     
-    // File output if set
+    // Add timestamp with millisecond precision
+    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
+    
+    char timeBuffer[20];
+    std::strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", std::localtime(&time));
+    logBuffer += "[";
+    logBuffer += levelToString(entry.level);
+    logBuffer += "] ";
+    logBuffer += timeBuffer;
+    logBuffer += ".";
+    logBuffer += std::to_string(ms.count());
+    logBuffer += " ";
+    
+    // Add source location for debugging
+    if (!entry.file.empty()) {
+        // Extract filename from path
+        size_t pos = entry.file.find_last_of("/\\\\");
+        std::string filename = (pos != std::string::npos) ? entry.file.substr(pos + 1) : entry.file;
+        logBuffer += "[";
+        logBuffer += filename;
+        logBuffer += ":";
+        logBuffer += std::to_string(entry.line);
+        logBuffer += "] ";
+    }
+    
+    logBuffer += entry.message;
+    
+    if (pImpl->useColors) {
+        logBuffer += "\033[0m";
+    }
+    logBuffer += "\n";
+    
+    // Console output
+    std::cout << logBuffer;
+    
+    // File output if set (buffered for performance)
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        pImpl->fileOut << logBuffer;
+        // Flush periodically rather than on every log
+        static size_t flushCounter = 0;
+        if (++flushCounter % 100 == 0) {
+            pImpl->fileOut.flush();
+        }
+    }
+}
+
+void ConsoleLogger::setLevel(LogLevel level) {
+    pImpl->level = level;
+}
+
+LogLevel ConsoleLogger::getLevel() const {
+    return pImpl->level;
+}
+
+void ConsoleLogger::setUseColors(bool useColors) {
+    pImpl->useColors = useColors;
+}
+
+bool ConsoleLogger::getUseColors() const {
+    return pImpl->useColors;
+}
+
+void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Create directory if it doesn't exist
+    std::filesystem::path dir = std::filesystem::path(filepath).parent_path();
+    if (!dir.empty() && !std::filesystem::exists(dir)) {
+        std::filesystem::create_directories(dir);
+    }
+    
+    pImpl->fileOut.open(filepath, std::ios::app | std::ios::out);
+    if (!pImpl->fileOut.is_open()) {
+        throw std::runtime_error("Failed to open log file: " + filepath);
+    }
+}
+
+void ConsoleLogger::closeOutputFile() {
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
     }
 }
 
@@ -188,7 +262,10 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
 
 // LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+    : level_(level), file_(file), line_(line), function_(function) {
+    // Reserve space for better performance
+    oss_.reserve(256);
+}
 
 LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);

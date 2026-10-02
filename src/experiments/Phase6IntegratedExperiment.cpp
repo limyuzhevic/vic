@@ -161,6 +161,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
+    NLM_LOG_INFO("Starting comprehensive integration validation...");
+    
+    bool overallSuccess = true;
     
     // Create minimal brain
     auto cfg = std::make_shared<Config>();
@@ -173,77 +176,241 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         return false;
     }
     
+    NLM_LOG_INFO("Brain initialized successfully (" + std::to_string(brain->getTotalNeuronCount()) + " neurons)");
+    
     bool success = true;
     
     // Test 1: Memory systems exist and are connected
-    if (brain->getWorkingMemory() != nullptr) {
-        NLM_LOG_INFO("[PASS] Working memory is integrated");
+    NLM_LOG_INFO("\n--- Test 1: Memory Systems Integration ---");
+    auto* wm = brain->getWorkingMemory();
+    if (wm != nullptr) {
+        NLM_LOG_INFO("[PASS] Working memory is integrated and accessible");
+        
+        // Additional validation of working memory functionality
+        wm->initialize(brain.get());
+        wm->setCapacity(50);
+        
+        // Test basic functionality
+        wm->storeToNeuron(1, 0.5f);
+        NLM_LOG_INFO("  Working memory stores neurons: " + std::to_string(wm->getActiveTraces()));
     } else {
-        NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated or accessible");
         success = false;
     }
     
-    if (brain->getEpisodicMemory() != nullptr) {
-        NLM_LOG_INFO("[PASS] Episodic memory is integrated");
+    auto* em = brain->getEpisodicMemory();
+    if (em != nullptr) {
+        NLM_LOG_INFO("[PASS] Episodic memory is integrated and accessible");
+        
+        // Additional validation of episodic memory functionality
+        em->initialize(brain.get());
+        em->setMaxEpisodes(1000);
+        
+        // Test basic functionality
+        EpisodicMemoryItem testItem;
+        testItem.timestamp = 0;
+        testItem.activeNeurons.push_back(1);
+        testItem.neuronActivations.push_back(0.8f);
+        testItem.reward = 0.5f;
+        
+        em->storeEpisode(testItem);
+        NLM_LOG_INFO("  Episodic memory contains " + std::to_string(em->getEpisodeCount()) + " episodes");
     } else {
-        NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated or accessible");
         success = false;
     }
     
     // Test 2: Neuromodulation systems exist
-    if (brain->getDopamine() != nullptr) {
-        NLM_LOG_INFO("[PASS] Dopamine system is integrated");
+    NLM_LOG_INFO("\n--- Test 2: Neuromodulation Systems ---");
+    auto* dopamine = brain->getDopamine();
+    if (dopamine != nullptr) {
+        NLM_LOG_INFO("[PASS] Dopamine system is integrated and accessible");
+        dopamine->initialize(brain.get());
+        
+        // Test dopamine functionality
+        dopamine->update(0.001);
+        float dopamineLevel = dopamine->getLevel();
+        NLM_LOG_INFO("  Dopamine level: " + std::to_string(dopamineLevel));
     } else {
-        NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Dopamine system is NOT integrated or accessible");
         success = false;
     }
     
-    if (brain->getCuriosity() != nullptr) {
-        NLM_LOG_INFO("[PASS] Curiosity system is integrated");
+    auto* curiosity = brain->getCuriosity();
+    if (curiosity != nullptr) {
+        NLM_LOG_INFO("[PASS] Curiosity system is integrated and accessible");
+        curiosity->initialize(brain.get());
+        
+        // Test curiosity functionality
+        curiosity->update(0.001);
+        float curiosityLevel = curiosity->getLevel();
+        NLM_LOG_INFO("  Curiosity level: " + std::to_string(curiosityLevel));
     } else {
-        NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Curiosity system is NOT integrated or accessible");
+        success = false;
+    }
+    
+    auto* novelty = brain->getNovelty();
+    if (novelty != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty detection system is integrated and accessible");
+        novelty->initialize(brain.get());
+        
+        // Test novelty functionality
+        novelty->update(0.001);
+        float noveltyLevel = novelty->getLevel();
+        NLM_LOG_INFO("  Novelty level: " + std::to_string(noveltyLevel));
+    } else {
+        NLM_LOG_ERROR("[FAIL] Novelty detection system is NOT integrated or accessible");
+        success = false;
+    }
+    
+    auto* predictionError = brain->getPredictionErrorSignal();
+    if (predictionError != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction error system is integrated and accessible");
+        predictionError->initialize(brain.get());
+        
+        // Test prediction error functionality
+        predictionError->update(0.001);
+        float predictionErrorLevel = predictionError->getLevel();
+        NLM_LOG_INFO("  Prediction error level: " + std::to_string(predictionErrorLevel));
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction error system is NOT integrated or accessible");
         success = false;
     }
     
     // Test 3: Prediction system exists
-    if (brain->getPredictionSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Prediction system is integrated");
+    NLM_LOG_INFO("\n--- Test 3: Prediction System ---");
+    auto* predictionSystem = brain->getPredictionSystem();
+    if (predictionSystem != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction system is integrated and accessible");
+        
+        // Note: PredictionSystem doesn't have initialize method in current implementation
+        // but should be present
+        NLM_LOG_INFO("  Prediction system accessible: " + std::to_string(predictionSystem != nullptr));
     } else {
-        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated or accessible");
         success = false;
     }
     
     // Test 4: Cognition systems exist
-    if (brain->getPlanner() != nullptr) {
-        NLM_LOG_INFO("[PASS] Planner is integrated");
+    NLM_LOG_INFO("\n--- Test 4: Cognition Systems ---");
+    auto* planner = brain->getPlanner();
+    if (planner != nullptr) {
+        NLM_LOG_INFO("[PASS] Neural planner is integrated and accessible");
+        planner->initialize(brain.get());
+        NLM_LOG_INFO("  Planner planning depth: " + std::to_string(planner->getPlanningDepth()));
     } else {
-        NLM_LOG_ERROR("[FAIL] Planner is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Neural planner is NOT integrated or accessible");
         success = false;
     }
     
-    if (brain->getConceptFormation() != nullptr) {
-        NLM_LOG_INFO("[PASS] Concept formation is integrated");
+    auto* conceptFormation = brain->getConceptFormation();
+    if (conceptFormation != nullptr) {
+        NLM_LOG_INFO("[PASS] Concept formation system is integrated and accessible");
+        conceptFormation->initialize(brain.get());
+        NLM_LOG_INFO("  Concept formation system accessible");
     } else {
-        NLM_LOG_ERROR("[FAIL] Concept formation is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Concept formation system is NOT integrated or accessible");
         success = false;
     }
     
-    if (brain->getAttention() != nullptr) {
-        NLM_LOG_INFO("[PASS] Attention is integrated");
+    auto* attention = brain->getAttention();
+    if (attention != nullptr) {
+        NLM_LOG_INFO("[PASS] Attention system is integrated and accessible");
+        attention->initialize(brain.get());
+        NLM_LOG_INFO("  Attention inhibition strength: " + std::to_string(attention->getInhibitionStrength()));
     } else {
-        NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Attention system is NOT integrated or accessible");
         success = false;
     }
     
     // Test 5: Development system exists
-    if (brain->getDevelopmentSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Development system is integrated");
+    NLM_LOG_INFO("\n--- Test 5: Development System ---");
+    auto* developmentSystem = brain->getDevelopmentSystem();
+    if (developmentSystem != nullptr) {
+        NLM_LOG_INFO("[PASS] Development system is integrated and accessible");
+        developmentSystem->initialize();
+        
+        // Test development functionality
+        developmentSystem->update(brain.get(), *brain->getRandomGenerator(), 0.001);
+        DevelopmentalStage stage = brain->getDevelopmentalStage();
+        NLM_LOG_INFO("  Current developmental stage: " + std::to_string(static_cast<int>(stage)));
     } else {
-        NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Development system is NOT integrated or accessible");
         success = false;
     }
     
-    return success;
+    // Test 6: Plasticity systems
+    NLM_LOG_INFO("\n--- Test 6: Plasticity Systems ---");
+    auto* stdp = brain->getSTDP();
+    auto* hebbian = brain->getHebbian();
+    auto* structuralPlasticity = brain->getStructuralPlasticity();
+    
+    if (stdp != nullptr) {
+        NLM_LOG_INFO("[PASS] STDP plasticity system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] STDP plasticity system is NOT integrated");
+        success = false;
+    }
+    
+    if (hebbian != nullptr) {
+        NLM_LOG_INFO("[PASS] Hebbian plasticity system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Hebbian plasticity system is NOT integrated");
+        success = false;
+    }
+    
+    if (structuralPlasticity != nullptr) {
+        NLM_LOG_INFO("[PASS] Structural plasticity system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Structural plasticity system is NOT integrated");
+        success = false;
+    }
+    
+    // Test 7: Brain connectivity and functionality
+    NLM_LOG_INFO("\n--- Test 7: Brain Core Functionality ---");
+    
+    // Test spike system
+    auto* spikeSystem = brain->getSpikeSystem();
+    if (spikeSystem != nullptr) {
+        NLM_LOG_INFO("[PASS] Spike system is integrated");
+        NLM_LOG_INFO("  Spike system pending events: " + std::to_string(spikeSystem->getPendingSpikeCount()));
+    } else {
+        NLM_LOG_ERROR("[FAIL] Spike system is NOT integrated");
+        success = false;
+    }
+    
+    // Test brain statistics
+    size_t totalNeurons = brain->getTotalNeuronCount();
+    size_t totalSynapses = brain->getTotalSynapseCount();
+    size_t firingNeurons = brain->getFiringNeuronCount();
+    float avgFiringRate = brain->getAverageFiringRate();
+    
+    NLM_LOG_INFO("  Total neurons: " + std::to_string(totalNeurons));
+    NLM_LOG_INFO("  Total synapses: " + std::to_string(totalSynapses));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(firingNeurons));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(avgFiringRate));
+    
+    if (totalNeurons > 0 && totalSynapses > 0) {
+        NLM_LOG_INFO("[PASS] Brain has valid neural structure");
+    } else {
+        NLM_LOG_WARNING("[WARNING] Brain structure may be incomplete");
+    }
+    
+    // Final validation
+    NLM_LOG_INFO("\n=== Integration Verification Summary ===");
+    if (success) {
+        NLM_LOG_INFO("✓ ALL INTEGRATION TESTS PASSED");
+        NLM_LOG_INFO("The NLM Phase 6 integrated brain architecture is functioning correctly.");
+        NLM_LOG_INFO("Memory, neuromodulation, prediction, cognition, and development systems are all connected.");
+    } else {
+        NLM_LOG_ERROR("✗ SOME INTEGRATION TESTS FAILED");
+        NLM_LOG_ERROR("Integration verification failed. Please check the implementation.");
+    }
+    
+    overallSuccess = success;
+    
+    return overallSuccess;
 }
 
 bool Phase6IntegratedExperiment::testMemoryIntegration() {

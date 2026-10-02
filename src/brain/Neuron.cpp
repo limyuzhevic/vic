@@ -137,14 +137,12 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     pImpl->state.adaptationVariable += amplitude * 0.1f;
 }
 
-void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
-}
-
 void Neuron::clearTotalCurrent() {
     pImpl->synapticInput = 0.0f;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->synapticInput;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {

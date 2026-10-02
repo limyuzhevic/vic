@@ -752,11 +752,42 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Reset memory systems with error handling
+    if (pImpl->workingMemory) {
+        try {
+            pImpl->workingMemory->clear();
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error clearing working memory: " + std::string(e.what()));
+        }
+    }
+    
+    if (pImpl->episodicMemory) {
+        try {
+            pImpl->episodicMemory->clear();
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error clearing episodic memory: " + std::string(e.what()));
+        }
+    }
+    
+    if (pImpl->associativeMemory) {
+        try {
+            pImpl->associativeMemory->clear();
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error clearing associative memory: " + std::string(e.what()));
+        }
+    }
+    
+    if (pImpl->attention) {
+        try {
+            pImpl->attention->reset();
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error resetting attention: " + std::string(e.what()));
+        }
+    }
+    
+    // Clear sensory and motor neuron collections
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

@@ -107,7 +107,9 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_WARNING("WARNING: No weights recorded - integration may have failed");
+            NLM_LOG_INFO("  Initial weights: " + std::to_string(initialWeights.size()));
+            NLM_LOG_INFO("  Final weights: " + std::to_string(finalWeights.size()));
             return;
         }
         
