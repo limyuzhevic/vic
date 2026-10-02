@@ -75,12 +75,62 @@ make -j4
 
 ## Running
 
+### Phase 2 - Real Neural Computation Test
+```bash
+./nlm [options]
+```
+
+**Enhanced Options:**
+```
+  --help                    Show this help message
+  --version                 Show version information
+  --config <file>           Load configuration from file (default: configs/default.cfg)
+  --neurons <N>             Number of neurons (default: 500)
+  --steps <N>               Number of simulation steps per experiment (default: 50)
+  --plasticity              Enable plasticity experiments (default: enabled)
+  --no-plasticity           Disable plasticity experiments
+  --stdp                     Enable STDP experiments (default: enabled)
+  --no-stdp                  Disable STDP experiments
+  --hebbian                 Enable Hebbian experiments (default: enabled)
+  --no-hebbian              Disable Hebbian experiments
+  --structural              Enable structural plasticity (default: enabled)
+  --no-structural           Disable structural plasticity
+  --log-level <level>       Log level (debug, info, warning, error, critical)
+  --log-file <file>          Log output to file
+  --quiet                   Suppress informational messages
+  --timestep <T>             Simulation timestep in milliseconds (default: 0.001)
+  --random-seed <S>          Random seed for reproducible experiments
+  --connection-prob <P>      Connection probability (0.0-1.0)
+  --stdp-ltp <W>             STDP LTP weight (default: 0.02)
+  --stdp-ltd <W>             STDP LTD weight (default: 0.015)
+  --stdp-tau <T>             STDP time constant (default: 20.0)
+```
+
 ### Phase 6 Demo (Integration Test)
 ```bash
 ./nlm_phase6_demo
 ```
 
+**Integration Test Options:**
+```
+  --episodes <N>           Number of episodes (default: 5)
+  --steps-per-episode <N>   Steps per episode (default: 200)
+  --checkpoint <file>       Checkpoint file path (default: ./checkpoint_test.bin)
+```
+
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 3 Demo (World Interaction)
+```bash
+./nlm_phase3_demo [episodes] [steps_per_episode]
+```
+
+```bash
+# Run 10 episodes with 500 steps each
+./nlm_phase3_demo 10 500
+```
+
+This demonstrates world interaction with sensory input, motor output, and learning.
 
 ## Project Structure
 
