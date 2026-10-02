@@ -37,6 +37,14 @@ public:
     const std::vector<float>& getAudio() const { return audio_; }
     void setAudio(const std::vector<float>& a) { audio_ = a; }
     
+    // Smell signals (olfactory)
+    const std::vector<float>& getSmell() const { return smell_; }
+    void setSmell(const std::vector<float>& s) { smell_ = s; }
+    
+    // Taste signals (gustatory)
+    const std::vector<float>& getTaste() const { return taste_; }
+    void setTaste(const std::vector<float>& t) { taste_ = t; }
+    
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     
@@ -52,6 +60,8 @@ private:
     std::vector<float> internal_;
     std::vector<float> proprioception_;
     std::vector<float> audio_;
+    std::vector<float> smell_;
+    std::vector<float> taste_;
     double timestamp_;
 };
 

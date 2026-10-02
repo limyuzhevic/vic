@@ -146,4 +146,93 @@ void InternalSignals::clearSignals() {
     pImpl->signals.clear();
 }
 
+// Smell implementations
+
+struct Smell::Impl {
+    std::vector<float> scents;
+    
+    Impl() = default;
+};
+
+Smell::Smell() : pImpl(new Impl) {}
+
+Smell::Smell(size_t numSamples) : pImpl(new Impl) {
+    pImpl->scents.resize(numSamples, 0.0f);
+}
+
+Smell::~Smell() = default;
+
+const char* Smell::getType() const {
+    return "Smell";
+}
+
+const std::vector<float>& Smell::getData() const {
+    return pImpl->scents;
+}
+
+size_t Smell::getDimensions() const {
+    return pImpl->scents.size();
+}
+
+std::unique_ptr<SensoryInput> Smell::clone() const {
+    auto smell = std::make_unique<Smell>(pImpl->scents.size());
+    smell->setData(pImpl->scents);
+    return smell;
+}
+
+void Smell::addScent(float intensity) {
+    pImpl->scents.push_back(intensity);
+}
+
+void Smell::clearScents() {
+    pImpl->scents.clear();
+}
+
+// Taste implementations
+
+struct Taste::Impl {
+    std::vector<float> intensities;
+    std::vector<int> tasteTypes;
+    
+    Impl() = default;
+};
+
+Taste::Taste() : pImpl(new Impl) {}
+
+Taste::Taste(size_t numTastes) : pImpl(new Impl) {
+    pImpl->intensities.resize(numTastes, 0.0f);
+    pImpl->tasteTypes.resize(numTastes, 0);
+}
+
+Taste::~Taste() = default;
+
+const char* Taste::getType() const {
+    return "Taste";
+}
+
+const std::vector<float>& Taste::getData() const {
+    return pImpl->intensities;
+}
+
+size_t Taste::getDimensions() const {
+    return pImpl->intensities.size() * 2; // Both intensity and taste type
+}
+
+std::unique_ptr<SensoryInput> Taste::clone() const {
+    auto taste = std::make_unique<Taste>(pImpl->intensities.size());
+    taste->setData(pImpl->intensities);
+    // Note: taste types not preserved in clone for simplicity
+    return taste;
+}
+
+void Taste::addTaste(float intensity, int tasteType) {
+    pImpl->intensities.push_back(intensity);
+    pImpl->tasteTypes.push_back(tasteType);
+}
+
+void Taste::clearTastes() {
+    pImpl->intensities.clear();
+    pImpl->tasteTypes.clear();
+}
+
 } // namespace nlm

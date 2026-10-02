@@ -181,6 +181,160 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
+## Advanced Learning Examples
+
+### Example 1: Working Memory for Sequential Tasks
+
+```python
+import pynlm
+
+# Create brain with working memory
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable working memory system
+working_memory = brain.getWorkingMemory()
+working_memory.setCapacity(5)
+working_memory.setDecayRate(0.05)
+
+# Store a sequence in working memory
+sequence_actions = [
+    pynlm.ActionType.MoveForward,
+    pynlm.ActionType.TurnLeft,
+    pynlm.ActionType.Interact
+]
+
+for i, action in enumerate(sequence_actions):
+    # Encode action with context
+    pattern = [float(action.value), float(i) / len(sequence_actions)]
+    working_memory.store(pattern, strength=1.0)
+    print(f"Stored {action} in working memory")
+
+# Retrieve and use working memory
+retrieved = working_memory.retrieve()
+print(f"Working memory content: {retrieved}")
+
+# Plan next action based on memory
+if working_memory.getMemoryActivity() > 0.3:
+    print("Working memory active - planning based on stored sequence")
+```
+
+### Example 2: Self-Model Development
+
+```python
+import pynlm
+
+# Create agent with self-model
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable self-model development
+self_model = agent.getSelfModel()
+
+# Develop self-model through experience
+for step in range(300):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Record action-effect relationships
+    before_state = agent.getCurrentSensorimotorState()
+    after_state = world.getSensoryPercept()
+    self_model.recordSelfAction(action, before_state, after_state)
+    
+    if step % 100 == 0:
+        confidence = self_model.getSelfModelConfidence(action)
+        print(f"Self-model confidence for {action}: {confidence:.3f}")
+        print(f"Body awareness: {self_model.getBodyAwareness():.3f}")
+```
+
+### Example 3: Social Learning
+
+```python
+import pynlm
+
+# Create two agents for social learning
+agent1 = pynlm.createAgentBrain(pynlm.createBrain(pynlm.createDefaultConfig()))
+agent1.initialize(pynlm.createSimpleWorld())
+
+agent2 = pynlm.createAgentBrain(pynlm.createBrain(pynlm.createDefaultConfig()))
+agent2.initialize(pynlm.createSimpleWorld())
+
+# Enable social learning
+social_learning1 = agent1.getSocialLearning()
+social_learning2 = agent2.getSocialLearning()
+
+# Agent 2 demonstrates an action
+observed_action = pynlm.ActionType.Eat
+observer_state = [0.1, 0.2, 0.3]
+resulting_state = [0.1, 0.2, 0.4]  # Effect of action
+
+# Agent 1 observes
+agent1.observeAgentAction(observed_action, observer_state, resulting_state)
+
+# Agent 2 learns from its own action
+agent2.updateSocialKnowledge(1.0)
+
+print(f"Agent 1 can imitate: {social_learning1.canImitate(observed_action)}")
+print(f"Agent 2 observations: {social_learning2.getObservationCount()}")
+```
+
+### Example 4: Prediction-Based Planning
+
+```python
+import pynlm
+
+# Create agent with prediction system
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=10, visionHeight=10)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable planning with predictions
+agent.setPlanningDepth(3)
+agent.setCurrentGoal([0.8, 0.3, 0.5])  # Target location/state
+
+print("Running prediction-based planning...")
+print(f"Goal: {agent.getCurrentGoal()}")
+print(f"Planning depth: {agent.getPlanningDepth()}")
+
+for step in range(150):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Get planned action
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 50 == 0:
+        candidate = agent.evaluateSequence(
+            [action, pynlm.ActionType.MoveForward], 
+            agent.getCurrentState()
+        )
+        print(f"Step {step}: Action {action}")
+        print(f"  Expected reward: {candidate.expectedReward:.3f}")
+        print(f"  Confidence: {candidate.confidence:.3f}")
+```
+
+---
+
 ## Mini Projects
 
 ### Project 1: Silent Brain (Just Neurons)
@@ -195,6 +349,8 @@ for i in range(10):
     brain.step(i)
 
 print("Silent brain test done!")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
 ```
 
 ### Project 2: Brain Watching a World
@@ -211,6 +367,10 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
 # Watch the world for 30 steps
 for i in range(30):
     world.update(0.1)
@@ -219,37 +379,57 @@ for i in range(30):
     
 print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
+print("Curiosity level:", agent.getCuriosityLevel())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with All Features
 
 ```python
 import pynlm
 
-# Setup
+# Setup with advanced configuration
 config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 2000)  # Larger brain
+config.set("plasticity.structural.enable", True)  # Allow growth
+
 brain = pynlm.createBrain(config)
 brain.initialize()
+
 world = pynlm.createSimpleWorld()
 world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
 world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable ALL features
 agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
-# Run agent
-for step in range(100):
+# Set up advanced capabilities
+agent.setPlanningDepth(4)
+agent.setCurrentGoal([0.5, 0.5, 0.0])
+
+# Run complete agent simulation
+for step in range(300):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
+    # Apply all learning systems
+    reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+    agent.applyRewardModulation(reward, 0.0)
+    agent.updateDevelopment(0.1)
+    
+    if step % 50 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"  Action: {action}")
+        print(f"  Reward: {reward:.3f}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Planning Confidence: {agent.getPlanningConfidence():.3f}")
 
 print("Agent simulation complete!")
 ```
@@ -269,29 +449,66 @@ print("Agent simulation complete!")
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
 
+**Advanced Features:**
+| Advanced capability | Code |
+|-------------------|------|
+| Working memory | `brain.getWorkingMemory()` |
+| Prediction system | `brain.getPredictionSystem()` |
+| Planning | `brain.getPlanner()` |
+| Self-model | `brain.getSelfModel()` |
+| Social learning | `brain.getSocialLearning()` |
+| Attention | `brain.getAttention()` |
+
 ---
 
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
+**"My brain isn't learning"**
+- Did you call `agent.enableRewardModulation(True)`?
+- Is the agent receiving sensory input?
 - Try increasing the number of steps
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+**"The agent isn't planning"**
+- Did you set up a goal? `agent.setCurrentGoal([0.5, 0.5, 0.0])`
+- Is planning depth set? `agent.setPlanningDepth(3)`
+- Is the planner initialized?
+
+**"Working memory not working"**
+- Did you access the working memory system? `brain.getWorkingMemory()`
+- Is working memory capacity set?
+- Check that working memory decay rate is appropriate
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Check that learning features are enabled
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. **Read `HOW_TO_USE.md`** for more detailed installation and configuration instructions
+2. **Read `docs/ARCHITECTURE.md`** to understand how all systems integrate
+3. **Experiment with different configurations!**
+4. **Try creating your own examples** using the advanced features
+5. **Read `EXAMPLES.md`** for more complex example programs
+6. **Join the NLM research community** to share your findings!
 
-That's it! You're now ready to use NLM.
+## New Features Available
+
+The current version includes **Phase 6 integration** with advanced cognitive capabilities:
+
+- **Working Memory**: `brain.getWorkingMemory()` - Store and maintain information
+- **Prediction System**: `brain.getPredictionSystem()` - Predict future states
+- **Planning**: `brain.getPlanner()` - Plan multi-step actions
+- **Self-Model**: `brain.getSelfModel()` - Learn about self and body
+- **Social Learning**: `brain.getSocialLearning()` - Learn from others
+- **Attention**: `brain.getAttention()` - Selectively focus on information
+- **Concept Formation**: `brain.getConceptFormation()` - Discover patterns
+- **Development**: `brain.getDevelopmentSystem()` - Age-based changes
+- **Neuromodulation**: `brain.getDopamine()`, `brain.getCuriosity()` - Drive behavior
+
+**All these features are available through the Python API!**
+
+That's it! You're now ready to use NLM with both basic and advanced capabilities.

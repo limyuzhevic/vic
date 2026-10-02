@@ -33,8 +33,8 @@ const char* Action::actionTypeToString(ActionType type) {
         case ActionType::MoveBackward: return "MoveBackward";
         case ActionType::MoveLeft: return "MoveLeft";
         case ActionType::MoveRight: return "MoveRight";
-        case ActionType::TurnLeft: return "TurnLeft";
-        case ActionType::TurnRight: return "TurnRight";
+        case ActionType::LookLeft: return "LookLeft";
+        case ActionType::LookRight: return "LookRight";
         case ActionType::Look: return "Look";
         case ActionType::LookUp: return "LookUp";
         case ActionType::LookDown: return "LookDown";
@@ -45,6 +45,7 @@ const char* Action::actionTypeToString(ActionType type) {
         case ActionType::Wait: return "Wait";
         case ActionType::Custom: return "Custom";
         default: return "Unknown";
+    }
     }
 }
 

@@ -16,47 +16,31 @@ public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
-    // Initialize with world
-    void initialize(const SimpleWorld& world);
+    // Optimized sensory processing
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void processSmellInput(const std::vector<float>& smell);
+    void processTasteInput(const std::vector<float>& taste);
     
-    // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    // Optimized novelty detection
+    void computeNoveltyLevel(const std::vector<float>& vision);
     
-    // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    // Random action selection for exploration
+    MotorCommand getRandomMotorCommand() const;
     
-    // Process sensory percept and inject into brain
-    void processSensoryInput(const SensoryPercept& percept);
+    // Additional helper methods for new sensory modalities
+    void processAudioInput(const std::vector<float>& audio);
     
-    // Decode brain motor activity into motor command
-    MotorCommand decodeMotorCommand();
-    
-    // Apply neuromodulation based on reward
+    // Development methods
     void applyRewardModulation(float reward, float predictedReward);
-    
-    // Update development system
     void updateDevelopment(double timestep);
-    
-    // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
-    
-    // Get neuromodulation level
     float getNeuromodulationLevel() const;
-    
-    // Get curiosity level
     float getCuriosityLevel() const;
-    
-    // Get novelty level
     float getNoveltyLevel() const;
-    
-    // Get prediction error
     float getPredictionError() const;
-    
-    // Reset agent for new episode
-    void reset();
-    
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
@@ -69,6 +53,38 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Reset agent for new episode
+    void reset();
+    
+    // Get brain pointer
+    Brain* getBrain() { return brain_.get(); }
+    
+    // Learning rate control
+    void adaptiveLearningRate(float error);
+    void scheduleLearningRateChange(float newRate, double timestep);
+    
+    // Configuration and export
+    // Network topology export
+    std::string exportNetworkTopology() const;
+    
+    // Behavioral pattern recording
+    void recordBehaviorPattern(const std::string& patternName);
+    
+    // State serialization formats
+    bool saveState(const std::string& filepath) const;
+    bool loadState(const std::string& filepath);
+    
+    // Configuration
+    void setLearningRate(float rate) { learningRate_ = rate; }
+    void setWeightDecay(float decay) { weightDecay_ = decay; }
+    void setExplorationRate(float rate) { explorationRate_ = rate; }
+    void setTargetNetworkUpdateInterval(int interval) { targetNetworkUpdateInterval_ = interval; }
+    
+    float getLearningRate() const { return learningRate_; }
+    float getWeightDecay() const { return weightDecay_; }
+    float getExplorationRate() const { return explorationRate_; }
+    int getTargetNetworkUpdateInterval() const { return targetNetworkUpdateInterval_; }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -76,6 +92,24 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+// Helper methods for neuron distribution
+    void distributeMotorNeurons(const NeuralPopulation* population);
+    void distributeSensoryNeurons(const NeuralPopulation* population);
+    
+    // Optimized sensory processing
+    void processVisionInput(const std::vector<float>& vision);
+    void processTouchInput(const std::vector<float>& touch);
+    void processInternalInput(const std::vector<float>& internal);
+    void processProprioceptionInput(const std::vector<float>& proprio);
+    void processSmellInput(const std::vector<float>& smell);
+    void processTasteInput(const std::vector<float>& taste);
+    
+    // Optimized novelty detection
+    void computeNoveltyLevel(const std::vector<float>& vision);
+    
+    // Random action selection for exploration
+    MotorCommand getRandomMotorCommand() const;
+
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups
@@ -91,6 +125,8 @@ private:
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    std::vector<Neuron*> sensorySmell_;
+    std::vector<Neuron*> sensoryTaste_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -98,6 +134,12 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    
+    // Learning rate control
+    float learningRate_;
+    float weightDecay_;
+    float explorationRate_;
+    int targetNetworkUpdateInterval_;
     
     // Development state
     double developmentalAge_;
@@ -109,9 +151,39 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Constants
+    static constexpr float DEFAULT_SENSORY_NOVELTY_DECAY_ = 0.99f;
+    static constexpr float NEURON_SCALE_FACTOR_VISION_ = 5.0f;
+    static constexpr float NEURON_SCALE_FACTOR_TOUCH_ = 8.0f;
+    static constexpr float NEURON_SCALE_FACTOR_INTERNAL_ = 5.0f;
+    static constexpr float NEURON_SCALE_FACTOR_PROPRIOCEPTION_ = 3.0f;
+    static constexpr float NEURON_SCALE_FACTOR_SMELL_ = 4.0f;
+    static constexpr float NEURON_SCALE_FACTOR_TASTE_ = 4.0f;
+    static constexpr float NEURON_ACTIVITY_THRESHOLD_ = 0.5f;
+    static constexpr float NEURON_SCALE_FACTOR_INITIAL_ = 1.0f;
+    static constexpr float NEURON_SCALE_FACTOR_CRITICAL_ = 0.8f;
+    static constexpr float NEURON_SCALE_FACTOR_MATURE_ = 0.5f;
+    static constexpr float NEURON_SCALE_FACTOR_ADULT_ = 0.2f;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Optimized configuration constants
+    static constexpr size_t MAX_VISION_DIMENSIONS_ = 256;
+    static constexpr size_t MAX_TOUCH_DIMENSIONS_ = 8;
+    static constexpr size_t MAX_INTERNAL_DIMENSIONS_ = 4;
+    static constexpr size_t MAX_PROPRIOCEPTION_DIMENSIONS_ = 6;
+    static constexpr size_t MAX_SMELL_DIMENSIONS_ = 16;
+    static constexpr size_t MAX_TASTE_DIMENSIONS_ = 8;
+    static constexpr size_t MOTOR_COMMAND_COUNT_ = 6;
+    static constexpr float NOVELTY_THRESHOLD_ = 0.001f;
+    static constexpr float PREDICTION_ERROR_NOISE_ = 0.005f;
+    
+    // Developmental stage constants
+    static constexpr double DEVELOPMENTAL_STAGE_INITIAL_ = 60.0;
+    static constexpr double DEVELOPMENTAL_STAGE_CRITICAL_ = 300.0;
+    static constexpr double DEVELOPMENTAL_STAGE_MATURATION_ = 900.0;
 };
 
 } // namespace nlm

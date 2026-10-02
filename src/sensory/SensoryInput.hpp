@@ -82,6 +82,48 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
+// Smell input placeholder
+class Smell : public SensoryInput {
+public:
+    Smell();
+    explicit Smell(size_t numSamples);
+    ~Smell() override;
+    
+    const char* getType() const override;
+    const std::vector<float>& getData() const override;
+    size_t getDimensions() const override;
+    std::unique_ptr<SensoryInput> clone() const override;
+    
+    // Add scent
+    void addScent(float intensity);
+    void clearScents();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Taste input placeholder
+class Taste : public SensoryInput {
+public:
+    Taste();
+    explicit Taste(size_t numTastes);
+    ~Taste() override;
+    
+    const char* getType() const override;
+    const std::vector<float>& getData() const override;
+    size_t getDimensions() const override;
+    std::unique_ptr<SensoryInput> clone() const override;
+    
+    // Add taste
+    void addTaste(float intensity, int tasteType);
+    void clearTastes();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
 // Internal signals (来自大脑内部状态)
 class InternalSignals : public SensoryInput {
 public:

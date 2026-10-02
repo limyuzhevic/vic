@@ -162,7 +162,39 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        
+        // Advanced configuration API
+        .def("validateConfig", &Config::validateConfig,
+             py::arg("errors"),
+             "Validate configuration, returns true if valid, fills errors vector if invalid")
+        .def("compareConfigs", &Config::compareConfigs,
+             py::arg("other"), py::arg("ignoreSource") = true,
+             "Compare two configurations, ignoreSource=true to ignore source differences")
+        .def("diff", &Config::diff,
+             py::arg("other"),
+             "Get string representation of configuration differences")
+        .def("saveTemplate", &Config::saveTemplate,
+             py::arg("name"),
+             "Save configuration as a template")
+        .def("loadTemplate", &Config::loadTemplate,
+             py::arg("name"),
+             "Load configuration from a template")
+        .def("applyTemplate", &Config::applyTemplate,
+             py::arg("templateConfig"),
+             "Apply template configuration to this config")
+        .def("loadBatch", &Config::loadBatch,
+             py::arg("filepaths"),
+             "Load configuration from multiple files")
+        .def("saveBatch", &Config::saveBatch,
+             py::arg("filepaths"),
+             "Save configuration to multiple files")
+        .def("removeKeys", &Config::removeKeys,
+             py::arg("keys"),
+             "Remove multiple configuration keys")
+        .def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -192,6 +224,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);
+
+    py::class_<Smell, SensoryInput>(m, "Smell", R"pbdoc(Smell sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t>(), py::arg("numSamples"))
+        .def("addScent", &Smell::addScent, py::arg("intensity"),
+             "Add a scent with given intensity")
+        .def("clearScents", &Smell::clearScents,
+             "Clear all scents")
+        .def("setData", [](Smell& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"));
+
+    py::class_<Taste, SensoryInput>(m, "Taste", R"pbdoc(Taste sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t>(), py::arg("numTastes"))
+        .def("addTaste", &Taste::addTaste, py::arg("intensity"), py::arg("tasteType"),
+             "Add a taste with given intensity and type")
+        .def("clearTastes", &Taste::clearTastes,
+             "Clear all tastes")
+        .def("setData", [](Taste& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"));
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -398,11 +452,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Enhanced exploration control
+        .def("getRandomMotorCommand", &AgentBrain::getRandomMotorCommand,
+             "Get random motor command for exploration")
+        .def("enableExploration", &AgentBrain::enableCuriosity,
+             py::arg("enable"),
+             "Enable/disable exploration behavior")
+        .def("isExplorationEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if exploration is enabled")
+        .def("setExplorationRate", &AgentBrain::setExplorationRate,
+             py::arg("rate"),
+             "Set exploration rate (0.0-1.0)")
+        .def("getExplorationRate", &AgentBrain::getExplorationRate,
+             "Get current exploration rate")
+        
+        // Enhanced learning rate control
+        .def("adaptiveLearningRate", &AgentBrain::adaptiveLearningRate,
+             py::arg("error"),
+             "Adjust learning rate based on prediction error")
+        .def("scheduleLearningRateChange", &AgentBrain::scheduleLearningRateChange,
+             py::arg("newRate"), py::arg("timestep"),
+             "Schedule a learning rate change for the future")
+        .def("setLearningRate", &AgentBrain::setLearningRate,
+             py::arg("rate"),
+             "Set learning rate directly")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get current learning rate")
+        .def("setWeightDecay", &AgentBrain::setWeightDecay,
+             py::arg("decay"),
+             "Set weight decay factor")
+        .def("getWeightDecay", &AgentBrain::getWeightDecay,
+             "Get current weight decay")
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // createDefaultConfig is now a method on the Config class
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);

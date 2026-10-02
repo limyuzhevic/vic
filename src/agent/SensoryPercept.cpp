@@ -12,6 +12,8 @@ SensoryPercept::SensoryPercept()
     internal_.resize(4, 0.0f);
     proprioception_.resize(6, 0.0f);
     audio_.resize(0, 0.0f);
+    smell_.resize(16, 0.0f);
+    taste_.resize(8, 0.0f);
 }
 
 std::vector<float> SensoryPercept::getAllSignals() const {
@@ -31,6 +33,12 @@ std::vector<float> SensoryPercept::getAllSignals() const {
     
     // Audio
     all.insert(all.end(), audio_.begin(), audio_.end());
+    
+    // Smell
+    all.insert(all.end(), smell_.begin(), smell_.end());
+    
+    // Taste
+    all.insert(all.end(), taste_.begin(), taste_.end());
     
     return all;
 }

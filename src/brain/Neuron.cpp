@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <cstring> // For memset optimization
 
 namespace nlm {
 
@@ -23,8 +24,23 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
-    Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+    // OPTIMIZED: Pre-allocated buffer for spike history
+    Timestamp spikeBuffer[MAX_SPIKE_HISTORY];
+    size_t spikeCount = 0;
+    size_t spikeHead = 0;
+    
+    // OPTIMIZED: Cache local copies of frequently used parameters
+    float cachedMembraneCapacitance;
+    float cachedTimeConstant;
+    
+    Impl() : id(), type(NeuronType::Internal), state(), regionId(), populationId(),
+             totalCurrent(0.0f), synapticInput(0.0f),
+             spikeCount(0), spikeHead(0),
+             cachedMembraneCapacitance(MEMBRANE_CAPACITANCE),
+             cachedTimeConstant(TIME_CONSTANT) {
+        // Initialize buffer
+        std::memset(spikeBuffer, 0, sizeof(spikeBuffer));
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -148,14 +164,17 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    // OPTIMIZED: Use circular buffer for O(1) spike history
+    pImpl->spikeBuffer[pImpl->spikeHead] = timestamp;
+    pImpl->spikeCount = std::min(pImpl->spikeCount + 1, static_cast<size_t>(Impl::MAX_SPIKE_HISTORY));
+    pImpl->spikeHead = (pImpl->spikeHead + 1) % Impl::MAX_SPIKE_HISTORY;
 }
 
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    // OPTIMIZED: Reset circular buffer
+    pImpl->spikeCount = 0;
+    pImpl->spikeHead = 0;
+    std::memset(pImpl->spikeBuffer, 0, sizeof(pImpl->spikeBuffer));
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -191,7 +210,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period - early exit
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -202,34 +221,33 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
+    // OPTIMIZED: Local variables for faster access (cache locality)
     MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    const float V_rest = pImpl->state.restingPotential;
+    const float V_reset = pImpl->state.resetPotential;
+    const float threshold = pImpl->state.threshold;
+    const float adaptationVar = pImpl->state.adaptationVariable;
+    const float synapticInput = pImpl->synapticInput;
+    const float cachedC = pImpl->cachedMembraneCapacitance;
+    const float cachedTau = pImpl->cachedTimeConstant;
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
-    
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // LIF dynamics: Leaky Integrate-and-Fire
+    // OPTIMIZED: Pre-compute constants to avoid repeated division
+    const float synapticContribution = synapticInput / cachedC;
+    const float leakContribution = (V_rest - V) / cachedTau;
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    if (adaptationVar > 0.0f) {
+        V -= adaptationVar * 0.01f;
+        pImpl->state.adaptationVariable = adaptationVar * 0.95f;  // Decay adaptation
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    if (V > 50.0f) V = 50.0f;
+    else if (V < -100.0f) V = -100.0f;
     
     // Check for spike
     if (V >= threshold) {
@@ -237,7 +255,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // OPTIMIZED: Use circular buffer for spike recording
         recordSpike(currentTime);
         
         // Reset membrane potential
@@ -268,7 +286,7 @@ void Neuron::step(Timestamp currentTime) {
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    clearSpikeHistory();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {

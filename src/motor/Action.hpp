@@ -15,6 +15,8 @@ enum class ActionType {
     MoveRight,
     TurnLeft,
     TurnRight,
+    LookLeft,
+    LookRight,
     Look,
     LookUp,
     LookDown,

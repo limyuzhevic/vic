@@ -20,41 +20,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with better distribution
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
+                    distributeMotorNeurons(pop.get());
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+                    distributeSensoryNeurons(pop.get());
                 }
             }
         }
@@ -87,60 +62,16 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
+    // Process each sensory modality using optimized helper methods
+    processVisionInput(percept.getVision());
+    processTouchInput(percept.getTouch());
+    processInternalInput(percept.getInternal());
+    processProprioceptionInput(percept.getProprioception());
+    processSmellInput(percept.getSmell());
+    processTasteInput(percept.getTaste());
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty (difference from previous vision)
-    if (!vision.empty()) {
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
-        }
-        
-        // Normalize
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        
-        // Decay and update
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        
-        // Store for next time
-        previousVision_ = vision;
-    }
+    // Compute novelty level using optimized method
+    computeNoveltyLevel(percept.getVision());
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
@@ -345,6 +276,79 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+void AgentBrain::processSmellInput(const std::vector<float>& smell) {
+    if (sensorySmell_.empty()) return;
+    
+    float totalActivity = 0.0f;
+    for (Neuron* n : sensorySmell_) {
+        // Apply smell-specific input processing
+        float input = smell.empty() ? 0.0f : smell.back(); // Use last scent intensity
+        input *= NEURON_SCALE_FACTOR_SMELL_;
+        
+        // Update neuron state
+        float delta = input - n->getState().membranePotential;
+        n->setState(n->getState().membranePotential + delta * 0.1f, n->getState().restingPotential);
+        
+        totalActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    }
+}
+
+void AgentBrain::processTasteInput(const std::vector<float>& taste) {
+    if (sensoryTaste_.empty()) return;
+    
+    float totalActivity = 0.0f;
+    for (Neuron* n : sensoryTaste_) {
+        // Apply taste-specific input processing
+        float input = taste.empty() ? 0.0f : taste.back(); // Use last taste intensity
+        input *= NEURON_SCALE_FACTOR_TASTE_;
+        
+        // Update neuron state
+        float delta = input - n->getState().membranePotential;
+        n->setState(n->getState().membranePotential + delta * 0.1f, n->getState().restingPotential);
+        
+        totalActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    }
+}
+
+    float delta = input - n->getState().membranePotential;
+        n->setState(n->getState().membranePotential + delta * 0.1f, n->getState().restingPotential);
+        
+        totalActivity += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+    }
+}
+
+// Learning rate control implementations
+
+void AgentBrain::adaptiveLearningRate(float error) {
+    // Adaptive learning rate based on prediction error
+    // Higher error = higher learning rate (but with bounds to prevent instability)
+    float baseLearningRate = 0.01f;
+    float errorMultiplier = std::min(std::abs(error) * 10.0f, 2.0f); // Cap at 2x base rate
+    
+    learningRate_ = baseLearningRate * errorMultiplier;
+    
+    // Apply bounds to maintain stability
+    learningRate_ = std::clamp(learningRate_, 0.001f, 0.5f);
+    
+    // Log learning rate adjustment
+    NLM_LOG_INFO("Adaptive learning rate: " + std::to_string(learningRate_));
+}
+
+void AgentBrain::scheduleLearningRateChange(float newRate, double timestep) {
+    // Schedule a gradual learning rate change
+    float rateChange = newRate - learningRate_;
+    float changePerStep = rateChange / static_cast<float>(targetNetworkUpdateInterval_);
+    
+    // Smooth transition to avoid abrupt changes
+    float smoothnessFactor = std::pow(2.0f, -static_cast<float>(timestep) / 100.0f);
+    float effectiveChange = changePerStep * smoothnessFactor;
+    
+    learningRate_ += effectiveChange;
+    learningRate_ = std::clamp(learningRate_, 0.001f, 0.5f);
+    
+    NLM_LOG_INFO("Scheduled learning rate change: " + std::to_string(learningRate_));
 }
 
 } // namespace nlm

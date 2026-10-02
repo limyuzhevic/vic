@@ -93,6 +93,27 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced configuration features
+    
+    // Batch loading/saving
+    bool loadBatch(const std::vector<std::string>& filepaths);
+    bool saveBatch(const std::vector<std::string>& filepaths) const;
+    
+    // Configuration validation
+    bool validateConfig(std::vector<std::string>& errors) const;
+    
+    // Configuration comparison
+    bool compareConfigs(const Config& other, bool ignoreSource = true) const;
+    std::string diff(const Config& other) const;
+    
+    // Configuration templates
+    bool saveTemplate(const std::string& name);
+    bool loadTemplate(const std::string& name);
+    bool applyTemplate(const Config& templateConfig);
+    
+    // Configuration keys management
+    void removeKeys(const std::vector<std::string>& keys);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +121,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const ConfigValue& value) const;
+    
+    // Comparison helpers
+    static bool valuesEqual(const ConfigValue& a, const ConfigValue& b, bool ignoreSource = true);
+    
+    // Template management
+    static const std::string TEMPLATES_DIR;
+    static constexpr const char* CONFIG_EXTENSION = ".nlmconfig";
 };
 
 } // namespace nlm
