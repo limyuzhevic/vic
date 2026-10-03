@@ -36,22 +36,183 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
+#include <iostream>
+#include <memory>
+#include <iomanip>
+#include <sstream>
+#include "core/Config/Config.hpp"
+#include "core/Logger/Logger.hpp"
+#include "brain/Brain.hpp"
+#include "agent/AgentBrain.hpp"
+#include "world/SimpleWorld.hpp"
+#include "experiments/Phase4Experiment.hpp"
+#include "prediction/NeuralPrediction.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "cognition/NeuralPlanner.hpp"
+
+using namespace nlm;
+
+void printHelp(const std::string& programName) {
+    std::cout << R"(
+╔═══════════════════════════════════════════════════════════════╗
+║                      NLM Phase 4 Demo                             ║
+║                Emerging Cognition Demonstration                   ║
+╠═══════════════════════════════════════════════════════════════════╣
+║                                                                             ║
+║ USAGE:                                                                      ║
+║   " << programName << " [OPTIONS]                                        ║
+║                                                                             ║
+║ DESCRIPTION:                                                                ║
+║   Phase 4 demo demonstrates emerging cognitive abilities in NLM:             ║
+║   • Temporal prediction: Learning sequences of events                        ║
+║   • Working memory: Maintaining information across delays                ║
+║   • Episodic memory: Storing and recalling experiences                     ║
+║   • Concept formation: Discovering patterns without labels                ║
+║   • Neural attention: Selective processing through competition              ║
+║   • Multi-step planning: Using predictions to select actions                ║
+║   • Self-model: Learning body schema and action consequences               ║
+║   • Social learning: Observing and imitating others                       ║
+║   • Continual learning: Adapting to new tasks                             ║
+║                                                                             ║
+║ OPTIONS:                                                                    ║
+║   --help, -h            Show this help message                               ║
+║   --trials N            Number of trials per experiment (default: 50)         ║
+║   --neurons N           Number of neurons (default: 1000)                   ║
+║   --regions R           Number of brain regions (default: 2)                ║
+║   --seed SEED           Random seed (default: 42)                            ║
+║   --verbose, -v         Enable verbose logging                              ║
+║   --quiet, -q           Enable quiet mode                                   ║
+║                                                                             ║
+║ EXAMPLES:                                                                   ║
+║   " << programName << " --help                                      ║
+║   " << programName << " --trials 100 --neurons 2000 --seed 123                ║
+║   " << programName << " --verbose                                      ║
+║                                                                             ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+)" << std::endl;
+}
+
+struct Phase4DemoArgs {
+    size_t trials = 50;
+    size_t neurons = 1000;
+    size_t regions = 2;
+    uint64_t seed = 42;
+    bool verbose = false;
+    bool quiet = false;
+};
+
+Phase4DemoArgs parseCommandLine(int argc, char* argv[]) {
+    Phase4DemoArgs args;
+    
+    if (argc < 1 || !argv) {
+        return args;
+    }
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            exit(0);
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            args.quiet = true;
+        } else if (arg.substr(0, 9) == "--trials") {
+            if (arg.find('=') != std::string::npos) {
+                args.trials = std::stoul(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.trials = std::stoul(argv[++i]);
+            }
+        } else if (arg.substr(0, 9) == "--neurons") {
+            if (arg.find('=') != std::string::npos) {
+                args.neurons = std::stoul(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.neurons = std::stoul(argv[++i]);
+            }
+        } else if (arg.substr(0, 8) == "--regions") {
+            if (arg.find('=') != std::string::npos) {
+                args.regions = std::stoul(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.regions = std::stoul(argv[++i]);
+            }
+        } else if (arg.substr(0, 6) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                args.seed = std::stoull(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                args.seed = std::stoull(argv[++i]);
+            }
+        } else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            std::cerr << "Use --help for usage information.\n";
+            exit(1);
+        }
+    }
+    
+    return args;
+}
+
+void printHeader(const std::string& title) {
+    std::cout << "\n" << std::string(60, '=') << "\n";
+    std::cout << "  " << title << "\n";
+    std::cout << std::string(60, '=') << "\n";
+}
+
+void printResult(const std::string& name, float value, float max = 1.0f) {
+    std::cout << "  " << std::left << std::setw(30) << name << ": ";
+    std::cout << std::fixed << std::setprecision(3) << value;
+    if (max > 0) {
+        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
+    }
+    std::cout << "\n";
+}
+
+void printSection(const std::string& title) {
+    std::cout << "\n--- " << title << " ---\n";
+}
+
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    Phase4DemoArgs args = parseCommandLine(argc, argv);
+    
+    if (args.quiet) {
+        auto logger = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Error);
+        logger->addLogger(consoleLogger);
+        Logger::setGlobal(logger);
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
-    }
+    // Set up logging based on verbosity
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(
+        args.verbose ? LogLevel::Debug : LogLevel::Info
+    );
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Log configuration
+    std::cout << "=== Phase 4 Demo Configuration ===" << std::endl;
+    std::cout << "Trials: " << args.trials << std::endl;
+    std::cout << "Neurons: " << args.neurons << std::endl;
+    std::cout << "Regions: " << args.regions << std::endl;
+    std::cout << "Seed: " << args.seed << std::endl;
+    std::cout << "Verbose: " << (args.verbose ? "Yes" : "No") << std::endl;
+    std::cout << std::endl;
+    
+    // Initialize random seed
+    Random::initialize(args.seed);
     
     // Create configuration
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
+    config->set("neuron_count", args.neurons);
+    config->set("region_count", args.regions);
     config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
+    config->set("random_seed", args.seed);
     config->set("simulation_timestep", 0.001);
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
@@ -70,7 +231,7 @@ int main(int argc, char* argv[]) {
     printSection("1. Temporal Prediction Learning");
     {
         TemporalPredictionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Initial Prediction Error", results.predictionErrorInitial);
         printResult("Final Prediction Error", results.predictionErrorFinal);
@@ -88,7 +249,7 @@ int main(int argc, char* argv[]) {
     printSection("2. Working Memory");
     {
         WorkingMemoryExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Initial Retention", results.workingMemoryRetentionInitial);
         printResult("Final Retention", results.workingMemoryRetentionFinal);
@@ -99,7 +260,7 @@ int main(int argc, char* argv[]) {
     printSection("3. Episodic Memory");
     {
         EpisodicRecallExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Recall Accuracy", results.episodicRecallAccuracy);
         printResult("Episodes Stored", results.episodesStored);
@@ -110,7 +271,7 @@ int main(int argc, char* argv[]) {
     printSection("4. Concept Formation");
     {
         ConceptFormationExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Concepts Formed", results.conceptsFormed);
         printResult("Concept Stability", results.conceptStability);
@@ -125,7 +286,7 @@ int main(int argc, char* argv[]) {
     printSection("5. Neural Attention");
     {
         AttentionExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Attention Selectivity", results.attentionSelectivity);
         printResult("Distraction Resistance", results.distractionResistance);
@@ -139,7 +300,7 @@ int main(int argc, char* argv[]) {
     printSection("6. Multi-Step Planning");
     {
         PlanningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        Phase4Results results = experiment.run(brain.get(), args.trials / 2);
         
         printResult("Planning Accuracy", results.planningAccuracy);
         printResult("Planning Confidence", results.planningConfidence);
@@ -153,7 +314,7 @@ int main(int argc, char* argv[]) {
     printSection("7. Self-Model");
     {
         SelfModelExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Self-Prediction Accuracy", results.selfPredictionAccuracy);
         printResult("Body Awareness", results.bodyAwareness);
@@ -167,7 +328,7 @@ int main(int argc, char* argv[]) {
     printSection("8. Social Learning");
     {
         SocialLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials / 2);
+        Phase4Results results = experiment.run(brain.get(), args.trials / 2);
         
         printResult("Imitation Accuracy", results.imitationAccuracy);
         printResult("Observations from Others", results.observationsFromOthers);
@@ -181,7 +342,7 @@ int main(int argc, char* argv[]) {
     printSection("9. Continual Learning");
     {
         ContinualLearningExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), numTrials);
+        Phase4Results results = experiment.run(brain.get(), args.trials);
         
         printResult("Behavior Improvement", results.behaviorImprovement);
         printResult("Transfer Performance", results.transferPerformance);
