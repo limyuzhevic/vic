@@ -44,6 +44,27 @@ public:
     double getTimestamp() const { return timestamp_; }
     void setTimestamp(double t) { timestamp_ = t; }
     
+    // New utility methods
+    std::vector<float> getNormalizedVision() const;
+    float getVisionMean() const;
+    float getVisionStdDev() const;
+    float getTouchMean() const;
+    float getInternalMean() const;
+    float getProprioceptionMean() const;
+    float getMaxSignal() const;
+    float getMinSignal() const;
+    std::vector<float> getTouchSignalIndices() const;
+    std::vector<float> getHighActivationVision(float threshold) const;
+    
+    // Object methods
+    bool isValid() const;
+    std::string toString() const;
+    SensoryPercept clone() const;
+    
+    // Validation methods
+    bool validate() const;
+    static std::string getValidationError(const SensoryPercept& percept);
+    
 private:
     std::vector<float> vision_;
     size_t visionWidth_;
