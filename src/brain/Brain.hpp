@@ -19,15 +19,17 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class NeuralSemanticMemory;
+class NeuralProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Acetylcholine;
+    class Norepinephrine;
+    class Serotonin;
+class SensoryInput;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -148,12 +150,18 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Semantic memory - knowledge and facts
+    NeuralSemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    NeuralProceduralMemory* getProceduralMemory();
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
+        // ========== COGNITION SYSTEMS ==========
     
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
@@ -170,7 +178,22 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Apply developmental effects on brain systems
+    void applyDevelopmentEffects();
+    
+    // Neural excitability modulation
+    void adjustNeuralExcitability(float factor);
+    
+    // Attention enhancement based on developmental stage
+    void enhanceAttentionBasedOnDevelopment();
+    
+    // Memory consolidation based on developmental age
+    void enhanceMemoryConsolidationBasedOnDevelopment();
+    
+    // Neuromodulation level adjustment based on development
+    void adjustNeuromodulationBasedOnDevelopment();
+    
+// ========== NEUROMODULATION SYSTEMS ==========
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
@@ -184,12 +207,17 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
+    // Phase 2: Add Acetylcholine, Norepinephrine, Serotonin accessors
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
+    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
-    
+
     // Logging
     void logStatus() const;
     

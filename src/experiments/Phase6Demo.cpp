@@ -68,6 +68,10 @@ int main(int argc, char* argv[]) {
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Prediction accuracy: " << (result.predictionAccuracy * 100) << "%" << std::endl;
+    std::cout << "Prediction error: " << result.predictionError << std::endl;
+    std::cout << "Prediction confidence: " << result.predictionConfidence << std::endl;
+    std::cout << "Prediction error count: " << result.predictionErrorCount << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;

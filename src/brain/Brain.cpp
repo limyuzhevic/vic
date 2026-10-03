@@ -71,6 +71,8 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    SimulationStep sleepStartStep;  // When sleep started
+    int sleepStage;  // Current sleep stage (1: Light, 2: Deep, 3: REM)
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -89,6 +91,8 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , sleepStartStep(0)
+        , sleepStage(0)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -586,9 +590,168 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+
+    // ========== STEP 16: SLEEP/REST CYCLE MANAGEMENT ==========
+    // Check for sleep/rest transition
+    if (!pImpl->isResting) {
+        // Check if we should start resting (after some activity)
+        size_t idleSteps = pImpl->currentStep - pImpl->sleepStartStep;
+        if (idleSteps > 500) {  // Rest after 500 steps of activity
+            startSleep();
+        }
+    } else {
+        // We're in sleep/rest state
+        pImpl->sleepStartStep = pImpl->currentStep;
+        
+        // Sleep-stage progression
+        if (pImpl->sleepStage == 1 && pImpl->currentStep - pImpl->sleepStartStep > 200) {
+            transitionToSleepStage(2);  // Progress to deep sleep
+        } else if (pImpl->sleepStage == 2 && pImpl->currentStep - pImpl->sleepStartStep > 400) {
+            transitionToSleepStage(3);  // Progress to REM sleep
+        } else if (pImpl->sleepStage == 3 && pImpl->currentStep - pImpl->sleepStartStep > 600) {
+            // Sleep cycle complete, wake up
+            endSleep();
+        }
+        
+        // Apply sleep effects during rest
+        // Reduced neural activity during sleep
+        adjustNeuralExcitability(0.3f);  // 30% of normal excitability
+        
+        // Enhanced memory consolidation during sleep
+        enhanceMemoryConsolidationDuringSleep();
+        
+        // Sleep-stage specific processing
+        switch (pImpl->sleepStage) {
+            case 1: // Light sleep - general consolidation
+                break;
+            case 2: // Deep sleep - high-level memory processing
+                // Enhanced synaptic downscaling
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        float weight = syn->getWeight();
+                        syn->setWeight(weight * 0.95f);  // Synaptic downscaling
+                    }
+                }
+                break;
+            case 3: // REM sleep - integration and rehearsal
+                // Replay and integration of memories
+                if (pImpl->episodicMemory) {
+                    // Get more episodes for REM replay
+                    auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+                    for (const auto* episode : episodesToReplay) {
+                        pImpl->episodicMemory->replayEpisode(episode);
+                    }
+                }
+                break;
+        }
+    }
+
+    // ========== STEP 17: Development system integration ==========
+    // Development affects sleep requirements and plasticity
+    pImpl->developmentSystem->update(this, pImpl->currentStep);
+    
+    // Sleep effects on development
+    if (pImpl->isResting) {
+        // During sleep, development processes continue
+        float sleepDevelopmentMod = (pImpl->sleepStage == 2) ? 1.2f : 1.0f;
+        pImpl->developmentSystem->applySleepEffects(sleepDevelopmentMod);
+    }
+
+    // ========== STEP 18: Statistics collection ==========
+    // Collect sleep-related statistics
+    if (pImpl->isResting) {
+        pImpl->totalSpikesThisStep = static_cast<size_t>(pImpl->totalSpikesThisStep * 0.3f);  // Reduced during sleep
+    }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
+// ========== SLEEP/REST SYSTEM IMPLEMENTATIONS ==========
+
+bool Brain::isResting() const {
+    return pImpl->isResting;
+}
+
+SimulationStep Brain::getSleepStartStep() const {
+    return pImpl->sleepStartStep;
+}
+
+int Brain::getSleepStage() const {
+    return pImpl->sleepStage;
+}
+
+void Brain::setSleepStage(int stage) {
+    pImpl->sleepStage = stage;
+}
+
+void Brain::enhanceMemoryConsolidationDuringSleep() {
+    if (pImpl->episodicMemory && pImpl->isResting) {
+        // Enhanced consolidation during sleep (2x rate)
+        pImpl->episodicMemory->consolidate(0.5f);
+        NLM_LOG_INFO("Sleep-enhanced memory consolidation (stage " + std::to_string(pImpl->sleepStage) + ")");
+    }
+}
+
+void Brain::startSleep() {
+    pImpl->isResting = true;
+    pImpl->sleepStartStep = pImpl->currentStep;
+    pImpl->sleepStage = 1; // Start with light sleep
+    NLM_LOG_INFO("Brain entered resting state at step " + std::to_string(pImpl->sleepStartStep));
+}
+
+void Brain::endSleep() {
+    pImpl->isResting = false;
+    pImpl->sleepStartStep = 0;
+    pImpl->sleepStage = 0;
+    NLM_LOG_INFO("Brain exited resting state");
+}
+
+void Brain::transitionToSleepStage(int stage) {
+    pImpl->sleepStage = stage;
+    NLM_LOG_INFO("Sleep stage transition to: " + std::string(getSleepStageName(stage)));
+}
+
+const char* Brain::getSleepStageName(int stage) {
+    switch (stage) {
+        case 1: return "Light Sleep (N1)";
+        case 2: return "Deep Sleep (N3)";
+        case 3: return "REM Sleep";
+        default: return "Unknown";
+    }
+}
+
+void Brain::adjustNeuralExcitability(float factor) {
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Scale neuron excitability (affect threshold, resting potential)
+                float currentThreshold = neuron->getThreshold();
+                neuron->setThreshold(currentThreshold * factor);
+                
+                float currentRestingPotential = neuron->getRestingPotential();
+                neuron->setRestingPotential(currentRestingPotential * factor);
+            }
+        }
+    }
+}
+
+void Brain::applyDevelopmentEffects() {
+    // Apply developmental effects on brain systems
+    // This is called from development system
+}
+
+void Brain::enhanceAttentionBasedOnDevelopment() {
+    // Enhance attention based on developmental stage
+    // Implementation to be added
+}
+
+void Brain::enhanceMemoryConsolidationBasedOnDevelopment() {
+    // Memory consolidation based on developmental age
+    // Implementation to be added
+}
+
+void Brain::adjustNeuromodulationBasedOnDevelopment() {
+    // Neuromodulation level adjustment based on development
+    // Implementation to be added
+}
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     

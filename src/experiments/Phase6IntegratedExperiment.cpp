@@ -4,6 +4,7 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../sensory/InternalSignals.hpp"
 #include <chrono>
 #include <cmath>
 
@@ -111,18 +112,46 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
-    // Verify integration
-    result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
-    result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
-    result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
-    result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
+    // Collect prediction metrics
+    if (brain->getPredictionSystem()) {
+        result.predictionIntegrated = true;
+        
+        // Get prediction metrics
+        result.predictionError = brain->getPredictionSystem()->getPredictionError();
+        result.predictionConfidence = brain->getPredictionSystem()->getConfidence();
+        const auto& errorHistory = brain->getPredictionSystem()->getErrorHistory();
+        result.predictionErrorCount = errorHistory.size();
+        
+        // Calculate prediction accuracy (inverse of error)
+        if (errorHistory.empty()) {
+            result.predictionAccuracy = 1.0f; // No error, perfect accuracy
+        } else {
+            float avgError = 0.0f;
+            for (float error : errorHistory) {
+                avgError += error;
+            }
+            avgError /= errorHistory.size();
+            result.predictionAccuracy = std::max(0.0f, 1.0f - avgError);
+        }
+    } else {
+        result.predictionIntegrated = false;
+        result.predictionAccuracy = 0.0f;
+        result.predictionError = 1.0f;
+        result.predictionConfidence = 0.0f;
+        result.predictionErrorCount = 0;
+    }
+    
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Semantic Memory: " + std::string(result.memorySemanticMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Procedural Memory: " + std::string(result.memoryProceduralMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Prediction Accuracy: " + std::to_string(result.predictionAccuracy * 100) + "%");
+    NLM_LOG_INFO("Prediction Error: " + std::to_string(result.predictionError));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
@@ -190,6 +219,20 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    if (brain->getSemanticMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Semantic memory is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Semantic memory is NOT integrated");
+        success = false;
+    }
+    
+    if (brain->getProceduralMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Procedural memory is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] ProceduralMemory is NOT integrated");
+        success = false;
+    }
+    
     // Test 2: Neuromodulation systems exist
     if (brain->getDopamine() != nullptr) {
         NLM_LOG_INFO("[PASS] Dopamine system is integrated");
@@ -208,6 +251,34 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     // Test 3: Prediction system exists
     if (brain->getPredictionSystem() != nullptr) {
         NLM_LOG_INFO("[PASS] Prediction system is integrated");
+        
+        // Test prediction functionality
+        bool predictionWorking = false;
+        if (brain->getPredictionSystem()) {
+            // Get current state and make prediction
+            nlm::InternalSignals state;
+            for (float testSignal : {0.1f, 0.5f, 0.9f}) {
+                state.addSignal(testSignal);
+            }
+            
+            auto predicted = brain->getPredictionSystem()->predictNextState(state);
+            if (predicted) {
+                brain->getPredictionSystem()->updatePredictions(*predicted, state);
+                float error = brain->getPredictionSystem()->getPredictionError();
+                float confidence = brain->getPredictionSystem()->getConfidence();
+                
+                if (confidence > 0.0f) {
+                    predictionWorking = true;
+                    NLM_LOG_INFO("[PASS] Prediction system makes predictions with error: " + 
+                               std::to_string(error) + ", confidence: " + std::to_string(confidence));
+                }
+            }
+        }
+        
+        if (!predictionWorking) {
+            NLM_LOG_ERROR("[FAIL] Prediction system is not functional");
+            success = false;
+        }
     } else {
         NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
         success = false;
@@ -258,15 +329,38 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     // Get memory systems
     auto* wm = brain->getWorkingMemory();
     auto* em = brain->getEpisodicMemory();
+    auto* sm = brain->getSemanticMemory();
+    auto* pm = brain->getProceduralMemory();
     
-    if (!wm || !em) {
+    if (!wm || !em || !sm || !pm) {
         NLM_LOG_ERROR("Memory systems not available");
         return false;
     }
     
-    // Run some steps
+    // Initialize all memory systems
+    wm->initialize(brain.get());
+    em->initialize(brain.get());
+    sm->initialize(brain.get());
+    pm->initialize(brain.get());
+    
+    // Set capacities
+    wm->setCapacity(50);
+    em->setMaxEpisodes(1000);
+    
+    // Run some steps to populate working memory
     for (int i = 0; i < 100; ++i) {
         brain->step(i, i * 0.001);
+        
+        // Store some semantic facts
+        if (sm) {
+            sm->storeFact(std::to_string(i), std::to_string(i * 2), 0.9f);
+        }
+        
+        // Store some procedural skills
+        if (pm) {
+            std::vector<NeuronId> pattern = {static_cast<NeuronId>(i % 100)};  // Simple pattern
+            pm->learnSkill("action_" + std::to_string(i % 10), pattern, 0.8f);
+        }
     }
     
     // Check if working memory has traces
@@ -281,6 +375,30 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
         NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
     } else {
         NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
+    }
+    
+    // Check semantic memory facts
+    if (sm) {
+        int factCount = sm->getFactCount();
+        NLM_LOG_INFO("[PASS] Semantic memory has facts: " + std::to_string(factCount));
+        
+        // Test fact retrieval
+        if (factCount > 0) {
+            bool retrieved = sm->retrieveFact("5", "10");
+            NLM_LOG_INFO("[PASS] Semantic memory can retrieve facts: " + std::string(retrieved ? "YES" : "NO"));
+        }
+    }
+    
+    // Check procedural memory skills
+    if (pm) {
+        int skillCount = pm->getSkillCount();
+        NLM_LOG_INFO("[PASS] Procedural memory has skills: " + std::to_string(skillCount));
+        
+        // Test skill retrieval
+        if (skillCount > 0) {
+            float strength = pm->getProficiency("action_5");
+            NLM_LOG_INFO("[PASS] Procedural memory can retrieve skill strength: " + std::to_string(strength));
+        }
     }
     
     return true;

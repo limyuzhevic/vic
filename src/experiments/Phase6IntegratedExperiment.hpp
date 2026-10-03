@@ -32,11 +32,19 @@ struct Phase6IntegrationResult {
     // System integration status
     bool memoryWorkingMemoryIntegrated;
     bool memoryEpisodicMemoryIntegrated;
+    bool memorySemanticMemoryIntegrated;
+    bool memoryProceduralMemoryIntegrated;
     bool neuromodulationIntegrated;
     bool predictionIntegrated;
     bool developmentIntegrated;
     bool checkpointingWorks;
     bool replayWorks;
+    
+    // Prediction metrics
+    float predictionAccuracy;
+    float predictionError;
+    float predictionConfidence;
+    size_t predictionErrorCount;
     
     // Metrics
     float totalReward;
@@ -55,11 +63,17 @@ struct Phase6IntegrationResult {
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
         , memoryEpisodicMemoryIntegrated(false)
+        , memorySemanticMemoryIntegrated(false)
+        , memoryProceduralMemoryIntegrated(false)
         , neuromodulationIntegrated(false)
         , predictionIntegrated(false)
         , developmentIntegrated(false)
         , checkpointingWorks(false)
         , replayWorks(false)
+        , predictionAccuracy(0.0f)
+        , predictionError(0.0f)
+        , predictionConfidence(0.0f)
+        , predictionErrorCount(0)
         , totalReward(0.0f)
         , avgFiringRate(0.0f)
         , avgSynapticWeight(0.0f)

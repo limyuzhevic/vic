@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../core/Random/Random.hpp"
 #include <functional>
 
 namespace nlm {
@@ -46,7 +47,26 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
-private:
+    // Sleep/rest stage management
+    bool isResting() const;
+    SimulationStep getSleepStartStep() const;
+    int getSleepStage() const;
+    void applySleepEffects(float sleepModulation);
+    
+    // Enhanced memory consolidation during sleep
+    void enhanceMemoryConsolidationDuringSleep();
+    
+    // Sleep effects on neural plasticity
+    void adjustPlasticityForSleep(int sleepStage);
+    
+    // Sleep-enhanced developmental processing
+    void processDuringSleep(Brain* brain);
+    // Internal developmental effects
+    void applyNeuralExcitabilityEffects(Brain* brain, TimestepDuration dt);
+    void applyAttentionEffects(Brain* brain);
+    void applyMemoryConsolidationEffects(Brain* brain);
+    void applyNeuromodulationEffects(Brain* brain);
+    
     struct Impl;
     Impl* pImpl;
     double age_;
