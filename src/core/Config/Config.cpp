@@ -30,7 +30,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
-        line = trim(line);
+        line = trimString(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
@@ -38,8 +38,8 @@ bool Config::loadFromFile(const std::string& filepath) {
         // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+            std::string key = trimString(line.substr(0, pos));
+            std::string value = trimString(line.substr(pos + 1));
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -86,7 +86,60 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the variant value
+        std::visit([&file](const auto& val) {
+            // Handle string values (with quotes for safety)
+            if constexpr (std::is_same_v<const std::string&, decltype(val)>) {
+                file << "\"" << val << "\"";
+            }
+            // Handle boolean values
+            else if constexpr (std::is_same_v<const bool&, decltype(val)>) {
+                file << (val ? "true" : "false");
+            }
+            // Handle numeric values
+            else if constexpr (std::is_same_v<const int&, decltype(val)>) {
+                file << val;
+            }
+            else if constexpr (std::is_same_v<const int64_t&, decltype(val)>) {
+                file << val;
+            }
+            else if constexpr (std::is_same_v<const double&, decltype(val)>) {
+                file << val;
+            }
+            // Handle vector values
+            else if constexpr (std::is_same_v<const std::vector<int>&, decltype(val)>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]";
+            }
+            else if constexpr (std::is_same_v<const std::vector<double>&, decltype(val)>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]";
+            }
+            else if constexpr (std::is_same_v<const std::vector<std::string>&, decltype(val)>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << val[i] << "\"";
+                }
+                file << "]";
+            }
+            // Unknown type - output as placeholder
+            else {
+                file << "PLACEHOLDER_VALUE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -193,18 +246,26 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Free function version for convenience
+static std::string trimString(const std::string& str) {
+    return Config::trim(str);
 }
-
 // Explicit template instantiations
+// Basic types
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+// Vector types
+
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
+
+// getOr specializations
 
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
