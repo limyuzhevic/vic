@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,16 +20,60 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to detect file format by extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
+    if (ext == ".json" || ext == ".jsonl" || ext == ".json5") {
+        return loadFromJSON(filepath);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // For now, implement basic JSON support as a simple extension of the existing parser
+    // This can be enhanced with nlohmann/json or similar library in the future
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON file: " + filepath);
         return false;
     }
     
+    // For now, fall back to simple format to maintain compatibility
+    // TODO: Implement proper JSON parsing with nlohmann/json
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // For now, implement basic YAML support as a simple extension of the existing parser
+    // This can be enhanced with yaml-cpp or similar library in the future
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open YAML file: " + filepath);
+        return false;
+    }
+    
+    // For now, fall back to simple format to maintain compatibility
+    // TODO: Implement proper YAML parsing with yaml-cpp
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    // Original simple key=value parser
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
+        return false;
+    }
+    
+    int lineNum = 0;
     std::string line;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,12 +88,21 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING(std::string("Invalid config key on line ") + std::to_string(lineNum));
+                continue;
+            }
+            
+            // Set the value with file source
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid config format on line ") + std::to_string(lineNum) + ": " + line);
         }
     }
     

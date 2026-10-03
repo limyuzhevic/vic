@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -20,63 +21,22 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
-
-void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
-        return;
-    }
-    
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
-    }
-}
-
-void ConsoleLogger::setLevel(LogLevel level) {
-    pImpl->level = level;
-}
-
-LogLevel ConsoleLogger::getLevel() const {
-    return pImpl->level;
-}
-
-void ConsoleLogger::setUseColors(bool useColors) {
-    pImpl->useColors = useColors;
-}
-
-bool ConsoleLogger::getUseColors() const {
-    return pImpl->useColors;
+ConsoleLogger::~ConsoleLogger() {
+    // Ensure file is closed when logger is destroyed
+    closeOutputFile();
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    // Close any existing file first
+    closeOutputFile();
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    if (!pImpl->fileOut.is_open()) {
+        // Cannot use NLM_LOG_ERROR here due to potential deadlock
+        // when logging system is not properly initialized
+        // Instead, throw an exception that caller can handle
+        throw std::runtime_error("Failed to open log file: " + filepath);
     }
 }
 
