@@ -18,22 +18,13 @@ struct SpikeSystem::Impl {
     Impl() : maxHistorySize(10000) {}
 };
 
-SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
+SpikeSystem::SpikeSystem() : pImpl(std::make_unique<Impl>()) {}
 
 SpikeSystem::~SpikeSystem() = default;
 
-SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept = default;
 
-SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
+SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept = default;
 
 void SpikeSystem::queueSpike(const SpikeEvent& event) {
     pImpl->pendingSpikes.push(event);

@@ -14,22 +14,14 @@ struct NeuralPopulation::Impl {
     Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
 };
 
-NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
+NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) 
+    : pImpl(std::make_unique<Impl>(id, size)) {}
 
 NeuralPopulation::~NeuralPopulation() = default;
 
-NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept = default;
 
-NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
+NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept = default;
 
 PopulationId NeuralPopulation::getId() const {
     return pImpl->id;

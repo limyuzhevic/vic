@@ -143,9 +143,28 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# NLM CLI tools (user-facing command-line utilities)
+add_executable(nlm_cli_tools
+    cli_tools/cli_tools.cpp
+)
+target_link_libraries(nlm_cli_tools PUBLIC nlm_core)
+
+# Create symlinks for individual CLI tools
+add_custom_command(TARGET create_cli_symlinks POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:nlm_cli_tools> $<TARGET_FILE_DIR:nlm_cli_tools>/nlm-config-validate
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:nlm_cli_tools> $<TARGET_FILE_DIR:nlm_cli_tools>/nlm-network-visualize
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:nlm_cli_tools> $<TARGET_FILE_DIR:nlm_cli_tools>/nlm-profile
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:nlm_cli_tools> $<TARGET_FILE_DIR:nlm_cli_tools>/nlm-tune
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:nlm_cli_tools> $<TARGET_FILE_DIR:nlm_cli_tools>/nlm-sim
+    COMMENT "Creating CLI tool symlinks"
+    VERBATIM
+)
+
+add_custom_target(cli_symlinks ALL DEPENDS create_cli_symlinks)
+
+# Install CLI tools
+install(TARGETS nlm_cli_tools
+    RUNTIME DESTINATION bin
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
 )
