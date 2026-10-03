@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "constants.hpp"
 #include <memory>
 #include <vector>
 

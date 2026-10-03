@@ -3,6 +3,8 @@
 #include <cmath>
 #include <algorithm>
 
+#include "../agent/constants.hpp"
+
 namespace nlm {
 
 struct STDP::Impl {
@@ -12,8 +14,8 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    Impl() : ltpWeight(STDP_LTP_WEIGHT_DEFAULT), ltdWeight(STDP_LTD_WEIGHT_DEFAULT), timeConstant(STDP_TIME_CONSTANT_DEFAULT),
+             minWeight(STDP_MIN_WEIGHT), maxWeight(STDP_MAX_WEIGHT) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -79,7 +81,7 @@ void STDP::update(Synapse* synapse,
     }
     
     // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
+    if (std::abs(totalDelta) > MIN_WEIGHT_DELTA_FOR_ELIGIBILITY) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
