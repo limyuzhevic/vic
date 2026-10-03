@@ -183,10 +183,104 @@ enum class FiringState : uint8_t {
 using NeuronHandle = uint64_t;
 using SynapseHandle = uint64_t;
 
-// Invalid ID sentinel
-constexpr NeuronId INVALID_NEURON_ID = NeuronId(UINT64_MAX);
-constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
-constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
-constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
+// Constants for agent brain configuration and behavior
+namespace AgentConstants {
+    // Sensory input scaling factors (vision, touch, internal, proprioception)
+    constexpr float VISION_SCALE = 5.0f;           // Vision intensity to current scaling
+    constexpr float TOUCH_SCALE = 8.0f;           // Collision signal scaling
+    constexpr float INTERNAL_CENTER = 2.0f;       // Internal signal center
+    constexpr float INTERNAL_SCALE = 5.0f;        // Internal signal scaling
+    constexpr float PROPRIOCEPT_CENTER = 2.0f;    // Proprioception signal center
+    constexpr float PROPRIOCEPT_SCALE = 3.0f;     // Proprioception signal scaling
+    constexpr float NOVELTY_NORMALIZATION = 1.0f; // Division factor for novelty calculation
+    
+    // Novelty detection parameters
+    constexpr float NOVELTY_DECAY_FACTOR = 0.99f; // Decay factor for novelty persistence
+    
+    // Motor action selection thresholds
+    constexpr float MOTOR_ACTIVITY_THRESHOLD = 0.5f;      // Minimum activity to consider an action
+    constexpr float CURIOSITY_THRESHOLD = 0.5f;           // Curiosity level for exploration
+    constexpr float EXPLORATION_CHANCE_FACTOR = 0.3f;    // Maximum exploration probability
+    constexpr int MAX_RANDOM_ACTIONS = 7;                 // Number of random action choices (0-6)
+    
+    // Reward modulation parameters
+    constexpr float REWARD_EXPECTATION_DECAY = 0.95f;    // EMA decay factor for expected reward
+    constexpr float REWARD_LEARNING_RATE = 0.05f;        // EMA learning rate for expected reward
+    
+    // Development stage parameters
+    constexpr float DEVELOPMENT_STAGE_1_THRESHOLD = 60.0;   // Age threshold for Initial stage (~1 minute)
+    constexpr float DEVELOPMENT_STAGE_2_THRESHOLD = 300.0;  // Age threshold for CriticalPeriod (~5 minutes)
+    constexpr float DEVELOPMENT_STAGE_3_THRESHOLD = 900.0;  // Age threshold for Maturation (~15 minutes)
+    
+    // Plasticity modifiers for different developmental stages
+    constexpr float PLASTICITY_INITIAL = 1.0f;     // High plasticity in initial stage
+    constexpr float PLASTICITY_CRITICAL = 0.8f;   // Moderate plasticity in critical period
+    constexpr float PLASTICITY_MATURE = 0.5f;     // Lower plasticity in maturation
+    constexpr float PLASTICITY_ADULT = 0.2f;      // Low plasticity in adult stage
+    
+    // Structural plasticity base rates
+    constexpr float SYNAPTOGENESIS_BASE_RATE = 0.0001f;  // Base synaptogenesis rate
+    constexpr float PRUNING_BASE_RATE = 0.00001f;       // Base pruning rate
+    constexpr float PLASTICITY_FOR_PRUNING = 2.0f;       // Plasticity factor for pruning rate calculation
+    
+    // Vision processing parameters (from AgentBrain.cpp)
+    constexpr size_t VISION_INPUT_SIZE = 256;        // Vision input dimensionality (16x16)
+    constexpr size_t TOUCH_INPUT_SIZE = 8;          // Touch input dimensionality
+    constexpr size_t INTERNAL_INPUT_SIZE = 4;       // Internal signals dimensionality
+    constexpr size_t PROPRIOCEPTION_INPUT_SIZE = 6; // Proprioception dimensionality
+    
+    // Motor output configuration (from AgentBrain.cpp)
+    constexpr size_t MOTOR_OUTPUT_SIZE = 6;          // Number of motor actions (forward, backward, left, right, interact, wait)
+    
+    // Development parameters
+    constexpr float DEVELOPMENT_MAX_AGE = 1800.0;   // Maximum developmental age (30 minutes)
+    constexpr double DEVELOPMENT_TIMESTEP = 0.1;   // Development update timestep
+} // namespace AgentConstants
+
+// Integration constants
+namespace IntegrationConstants {
+    // Replay and consolidation intervals (from Brain.cpp)
+    constexpr size_t DEFAULT_REPLAY_INTERVAL = 100;      // Replay every 100 steps
+    constexpr size_t DEFAULT_CONSOLIDATION_INTERVAL = 1000; // Consolidate every 1000 steps
+    
+    // Neural dynamics constants (from Brain.cpp)
+    constexpr float DEFAULT_SIMULATION_TIMESTEP = 0.001; // Default simulation timestep
+    constexpr float DEFAULT_STDP_LTP_WEIGHT = 0.01f;     // STDP LTP weight
+    constexpr float DEFAULT_STDP_LTD_WEIGHT = 0.012f;    // STDP LTD weight
+    constexpr float DEFAULT_STDP_TAU = 20.0f;            // STDP time constant
+    
+    // Structural plasticity constants (from Brain.cpp)
+    constexpr float DEFAULT_SYNAPTOGENESIS_RATE = 0.0001f;  // Default synaptogenesis rate
+    constexpr float DEFAULT_PRUNING_RATE = 0.00001f;        // Default pruning rate
+} // namespace IntegrationConstants
+
+// Random seed and simulation parameters
+namespace RandomConstants {
+    constexpr uint64_t DEFAULT_RANDOM_SEED = 42;    // Default random seed
+    constexpr uint64_t MIN_RANDOM_SEED = 0;        // Minimum random seed
+    constexpr uint64_t MAX_RANDOM_SEED = UINT64_MAX; // Maximum random seed
+} // namespace RandomConstants
+
+// Memory system parameters
+namespace MemoryConstants {
+    constexpr size_t MAX_SPIKE_HISTORY = 100;      // Maximum spike history length per neuron
+    constexpr size_t MAX_SPIKE_EVENTS = 10000;     // Maximum pending spike events
+} // namespace MemoryConstants
+
+// World simulation parameters
+namespace WorldConstants {
+    constexpr float DEFAULT_WORLD_WIDTH = 16.0f;   // Default world width
+    constexpr float DEFAULT_WORLD_HEIGHT = 16.0f; // Default world height
+    constexpr float DEFAULT_VISION_WIDTH = 8.0f;  // Default vision width
+    constexpr float DEFAULT_VISION_HEIGHT = 8.0f; // Default vision height
+    constexpr float DEFAULT_ENERGY_DECAY = 0.95f; // Default energy decay rate
+    constexpr float MAX_ENERGY = 100.0f;          // Maximum agent energy
+} // namespace WorldConstants
+
+// Visualization and logging parameters
+namespace LoggingConstants {
+    constexpr size_t MAX_LOG_ENTRIES = 10000;     // Maximum log entries before rotation
+    constexpr size_t MAX_LOG_MESSAGE_LENGTH = 2048; // Maximum log message length
+} // namespace LoggingConstants
 
 } // namespace nlm

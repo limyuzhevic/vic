@@ -1,3 +1,55 @@
+// NLM (熙然) - Neural Learning Machine
+// Phase 2: Real Neural Computation
+//
+// This phase implements real spiking neural computation with:
+// - Leaky Integrate-and-Fire (LIF) neurons
+// - Event-driven spike propagation with synaptic delays
+// - STDP and Hebbian plasticity
+// - Structural plasticity (synaptogenesis/pruning)
+
+/**
+ * @file Brain.cpp
+ * @brief Main brain implementation for the NLM system
+ * 
+ * This file contains the complete implementation of the Brain class, which serves as the central
+ * coordinator of the neural system. The brain integrates multiple specialized subsystems into
+ * a unified computational architecture that supports:
+ * 
+ * - **Core Neural Computation**: Real spiking dynamics using LIF neurons with event-driven propagation
+ * - **Memory Systems**: Working memory, episodic memory, and associative memory integration
+ * - **Prediction Systems**: Forward models and prediction error signals
+ * - **Cognitive Functions**: Planning, concept formation, and attentional selection
+ * - **Development**: Developmental stages, synaptogenesis, and pruning
+ * - **Neuromodulation**: Dopamine, curiosity, novelty, and prediction error signals
+ * - **Plasticity**: STDP, Hebbian learning, and structural plasticity
+ * - **Checkpointing**: State persistence and replay systems
+ * 
+ * The Brain class implements the central coordination loop that connects all these systems
+ * into a coherent computational architecture. Each step involves:
+ * 
+ * 1. Processing sensory input through neural populations
+ * 2. Running neural dynamics computation
+ * 3. Integrating memory systems
+ * 4. Applying neuromodulatory signals
+ * 5. Producing motor actions
+ * 6. Learning from experience through plasticity
+ * 
+ * Key design principles:
+ * - Integration: All systems work together through shared neural populations
+ * - Modularity: Each subsystem can be enabled/disabled independently
+ * - Scalability: Support for multiple brain regions and inter-region connections
+ * - Persistence: Checkpoint save/load for long-running simulations
+ * 
+ * Performance characteristics:
+ * - Time complexity: O(N_neurons × N_synapses) per simulation step
+ * - Memory usage: O(N_neurons + N_synapses) for neural state
+ * - Parallelization: Event-driven spikes support asynchronous processing
+ * 
+ * @author NLM Research Team
+ * @date Phase 2 Implementation
+ * @version 0.1.0
+ */
+
 #include "Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"

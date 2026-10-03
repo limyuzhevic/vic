@@ -412,9 +412,42 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    // Convenience factory methods
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
+
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience environment factory
+    py::class_<SimpleEnvironment>(m, "SimpleEnvironment", R"pbdoc(
+        Simple environment combining brain, world, and agent for easy simulation
+    )pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SimpleEnvironment::initialize,
+             py::arg("width") = 16.0f, py::arg("height") = 16.0f,
+             py::arg("visionWidth") = 8.0f, py::arg("visionHeight") = 8.0f,
+             "Initialize the environment with specified dimensions")
+        .def("runEpisode", &SimpleEnvironment::runEpisode,
+             py::arg("numSteps"), py::arg("render") = false,
+             "Run a complete simulation episode")
+        .def("reset", &SimpleEnvironment::reset, "Reset environment for new episode")
+        .def("getBrain", &SimpleEnvironment::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the brain object")
+        .def("getWorld", &SimpleEnvironment::getWorld,
+             py::return_value_policy::reference_internal,
+             "Get the world object")
+        .def("getAgent", &SimpleEnvironment::getAgent,
+             py::return_value_policy::reference_internal,
+             "Get the agent brain object");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

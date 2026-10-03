@@ -1,13 +1,16 @@
+// Config.cpp - Improved implementation with hash map for O(1) lookups
+
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, ConfigEntry> entries;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -84,94 +87,93 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
+    for (const auto& [key, entry] : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
     return true;
 }
 
+// Get value with O(1) lookup using hash map
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
+    auto it = pImpl->entries.find(key);
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
     
     try {
-        return std::get<T>(it->value);
+        return std::get<T>(it->second.value);
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
 }
 
+// Get value with default using O(1) lookup
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
+// Set value with O(1) lookup/update
+template<typename T>
+void Config::set(const std::string& key, const T& value, ConfigSource source) {
+    pImpl->entries[key] = ConfigEntry(key, ConfigValue(value), source);
 }
 
+// String specialization for set()
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set<std::string>(key, value, source);
 }
 
+// Int specialization for set()
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set<int>(key, value, source);
 }
 
+// Double specialization for set()
 void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set<double>(key, value, source);
 }
 
+// Bool specialization for set()
 void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    set<bool>(key, value, source);
 }
 
+// Check existence with O(1) lookup
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->entries.find(key) != pImpl->entries.end();
 }
 
+// Remove key with O(1) lookup
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    pImpl->entries.erase(key);
 }
 
+// Get all keys (preserving order for compatibility)
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    for (const auto& pair : pImpl->entries) {
+        keys.push_back(pair.first);
     }
     return keys;
 }
 
+// Clear all entries
 void Config::clear() {
     pImpl->entries.clear();
 }
 
+// Get configuration summary
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
+    for (const auto& pair : pImpl->entries) {
+        const auto& entry = pair.second;
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
@@ -186,6 +188,7 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// String trimming helper
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -193,6 +196,7 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
+// Case-insensitive comparison helper
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
