@@ -13,12 +13,12 @@ using namespace nlm;
 
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
-    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    std::cout << "Testing the integrated artificial brain with consistent configuration..." << std::endl << std::endl;
     
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
     
-    // Create experiment
+    // Create experiment with consistent configuration
     Phase6IntegratedExperiment experiment;
     
     // First, run the quick integration verification
@@ -51,16 +51,18 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with consistent configuration
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
+    
+    // Use ConsistentPhase6Config for better parameter management
+    ConsistentPhase6Config config;
     config.neuronCount = 500;
     config.maxSteps = 2000;
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
     
-    auto result = experiment.run(config);
+    auto result = experiment.run(config.toBrainConfig());
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

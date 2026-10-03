@@ -1,10 +1,6 @@
 #pragma once
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -100,6 +96,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Backward compatibility: simple key=value format parser
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // JSON parsing implementation (simplified)
+    nlohmann::json parseJSON(const std::string& content);
+    void applyJSONConfig(const nlohmann::json& json);
 };
 
 } // namespace nlm
