@@ -5,6 +5,38 @@
 
 namespace nlm {
 
+MotorCommand AgentBrain::decodeFromMotorNeurons();
+
+MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd);
+
+void AgentBrain::setActionSelectionWeights(const std::vector<float>& weights) {
+    actionSelectionWeights_ = weights;
+    NLM_LOG_INFO("Action selection weights updated: " + std::to_string(weights.size()) + " weights");
+}
+
+std::vector<float> AgentBrain::getActionSelectionWeights() const {
+    return actionSelectionWeights_;
+}
+
+void AgentBrain::setSensoryThreshold(float threshold) {
+    sensoryThreshold_ = std::clamp(threshold, 0.0f, 1.0f);
+    NLM_LOG_INFO("Sensory threshold set to: " + std::to_string(sensoryThreshold_));
+}
+
+float AgentBrain::getSensoryThreshold() const {
+    return sensoryThreshold_;
+}
+
+void AgentBrain::setCuriosityDecay(float decayRate) {
+    curiosityDecay_ = std::clamp(decayRate, 0.0f, 1.0f);
+    NLM_LOG_INFO("Curiosity decay set to: " + std::to_string(curiosityDecay_));
+}
+
+float AgentBrain::getCuriosityDecay() const {
+    return curiosityDecay_;
+}
+
+// Add new member variables initialization in constructor
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
@@ -19,7 +51,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , sensoryThreshold_(0.5f)
+    , curiosityDecay_(0.99f)
 {
+    // Initialize action selection weights to equal probabilities for 6 basic actions
+    actionSelectionWeights_ = {1.0f/6, 1.0f/6, 1.0f/6, 1.0f/6, 1.0f/6, 1.0f/6};
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -67,6 +104,10 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize new convenience parameters
+    sensoryThreshold_ = 0.5f;
+    curiosityDecay_ = 0.99f;
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -342,6 +383,13 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Reset new convenience parameters
+    sensoryThreshold_ = 0.5f;
+    curiosityDecay_ = 0.99f;
+    
+    // Reset action selection weights to default
+    actionSelectionWeights_ = {1.0f/6, 1.0f/6, 1.0f/6, 1.0f/6, 1.0f/6, 1.0f/6};
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);

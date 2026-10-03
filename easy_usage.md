@@ -151,6 +151,14 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# Advanced Convenience Methods for Enhanced Control
+agent.setActionSelectionWeights([0.1, 0.2, 0.3, 0.1, 0.2, 0.1])  # Biased action selection
+agent.setSensoryThreshold(0.3)  # Lower threshold for sensory sensitivity
+agent.setCuriosityDecay(0.95)  # Slower curiosity decay for longer exploration
+agent.getActionSelectionWeights()  # Get current action weights
+agent.getSensoryThreshold()  # Get current sensory threshold
+agent.getCuriosityDecay()  # Get current curiosity decay rate
 ```
 
 ---

@@ -344,6 +344,14 @@ agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
 agent.getNeuromodulationLevel()
+
+# Enhanced Convenience Methods for Advanced Control
+agent.getActionSelectionWeights()  # Get current action weights for curiosity exploration
+agent.setActionSelectionWeights([w1, w2, w3, w4, w5, w6])  # Set custom action selection weights
+agent.getSensoryThreshold()  # Get threshold for sensory input processing
+agent.setSensoryThreshold(threshold)  # Set threshold for sensory input
+agent.getCuriosityDecay()  # Get decay rate for curiosity persistence
+agent.setCuriosityDecay(decay_rate)  # Set decay rate for curiosity
 ```
 
 #### SimpleWorld Class

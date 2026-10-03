@@ -4,15 +4,21 @@
 
 namespace nlm {
 
-struct NeuralPopulation::Impl {
     PopulationId id;
     size_t size;
     std::vector<Neuron*> neurons;
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
-    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
-};
+    // Performance: Cached statistics for faster access
+    mutable size_t cachedActiveCount;
+    mutable size_t cachedFiringCount;
+    mutable bool activeCountValid;
+    mutable bool firingCountValid;
+    
+    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal)
+        , cachedActiveCount(0), cachedFiringCount(0)
+        , activeCountValid(false), firingCountValid(false) {}
 
 NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
 

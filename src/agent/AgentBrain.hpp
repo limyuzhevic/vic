@@ -76,6 +76,14 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Convenience methods for enhanced Python API
+    void setActionSelectionWeights(const std::vector<float>& weights);
+    std::vector<float> getActionSelectionWeights() const;
+    void setSensoryThreshold(float threshold);
+    float getSensoryThreshold() const;
+    void setCuriosityDecay(float decayRate);
+    float getCuriosityDecay() const;
+    
     std::shared_ptr<Brain> brain_;
     
     // Motor neuron groups

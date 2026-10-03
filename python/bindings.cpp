@@ -395,10 +395,15 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("getActionSelectionWeights", &AgentBrain::getActionSelectionWeights)
+        .def("setActionSelectionWeights", &AgentBrain::setActionSelectionWeights,
+             py::arg("weights"), "Set action selection weights for curiosity-based exploration")
+        .def("getSensoryThreshold", &AgentBrain::getSensoryThreshold)
+        .def("setSensoryThreshold", &AgentBrain::setSensoryThreshold,
+             py::arg("threshold"), "Set sensory input threshold for novelty detection")
+        .def("getCuriosityDecay", &AgentBrain::getCuriosityDecay)
+        .def("setCuriosityDecay", &AgentBrain::setCuriosityDecay,
+             py::arg("decay_rate"), "Set curiosity decay rate for exploration persistence");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
