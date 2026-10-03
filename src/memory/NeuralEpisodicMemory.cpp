@@ -481,62 +481,151 @@ void NeuralAssociativeMemory::updateAssociation(const std::vector<float>& patter
     }
 }
 
-std::vector<std::vector<float>> NeuralAssociativeMemory::spreadActivation(
-    const std::vector<float>& cuePattern,
-    size_t steps) const {
+void NeuralAssociativeMemory::update(TimestepDuration dt) {
+    // Update associations based on current neural activity patterns
+    if (!brain_) return;
     
-    std::vector<std::vector<float>> activated;
-    std::set<NeuronId> visited;
-    
-    // Find initial pattern neuron
-    NeuronId currentNeuron;
-    for (const auto& pn : patternNeurons_) {
-        if (computeSimilarity(cuePattern, pn.second) > 0.5f) {
-            currentNeuron = pn.first;
-            activated.push_back(pn.second);
-            visited.insert(currentNeuron);
-            break;
+    // Check if plasticity mechanisms are available
+    if (auto* stdp = brain_->getSTDP()) {
+        // Get current neural activity patterns
+        std::vector<float> currentPattern;
+        for (const auto& pn : patternNeurons_) {
+            // Extract activity from pattern neurons (simplified)
+            currentPattern.push_back(0.5f);  // Placeholder - would use actual neural activity
         }
-    }
-    
-    if (currentNeuron == INVALID_NEURON_ID) {
-        return activated;
-    }
-    
-    // Spread through association network
-    for (size_t step = 0; step < steps; ++step) {
-        std::vector<NeuronId> nextNeurons;
         
-        for (const auto& assoc : associations_) {
-            NeuronId otherNeuron = INVALID_NEURON_ID;
-            
-            if (std::get<0>(assoc) == currentNeuron && visited.find(std::get<1>(assoc)) == visited.end()) {
-                otherNeuron = std::get<1>(assoc);
-            } else if (std::get<1>(assoc) == currentNeuron && visited.find(std::get<0>(assoc)) == visited.end()) {
-                otherNeuron = std::get<0>(assoc);
-            }
-            
-            if (otherNeuron != INVALID_NEURON_ID && std::get<2>(assoc) > 0.3f) {
-                nextNeurons.push_back(otherNeuron);
-                visited.insert(otherNeuron);
-                
-                // Find pattern for this neuron
-                for (const auto& pn : patternNeurons_) {
-                    if (pn.first == otherNeuron) {
-                        activated.push_back(pn.second);
-                        break;
-                    }
+        // Strengthen associations using STDP
+        for (size_t i = 0; i < patternNeurons_.size(); ++i) {
+            for (size_t j = i + 1; j < patternNeurons_.size(); ++j) {
+                // Check if these neurons are co-active
+                if (currentPattern[i] > 0.5f && currentPattern[j] > 0.5f) {
+                    // Update association strength using Hebbian-like mechanism
+                    updateAssociation(patternNeurons_[i].second, 
+                                    patternNeurons_[j].second, 
+                                    dt * 0.1f);
                 }
             }
         }
-        
-        if (nextNeurons.empty()) break;
-        
-        // Pick highest associated next neuron
-        currentNeuron = nextNeurons[0];
     }
     
-    return activated;
+    // Apply Hebbian learning if available
+    if (auto* hebbian = brain_->getHebbian()) {
+        // Additional association strengthening based on spike timing
+        // This would integrate with the existing plasticity systems
+    }
+}
+
+std::vector<std::vector<float>> NeuralAssociativeMemory::getCompletedPatterns(
+    const std::vector<float>& queryPattern,
+    size_t maxResults) const {
+    
+    std::vector<std::vector<float>> results;
+    std::vector<std::pair<float, std::vector<float>>> scored;
+    
+    // Find patterns that match or are similar to the query
+    for (const auto& pn : patternNeurons_) {
+        float sim = computeSimilarity(queryPattern, pn.second);
+        
+        if (sim > 0.7f) {  // Threshold for pattern completion
+            scored.emplace_back(sim, pn.second);
+        }
+    }
+    
+    // Sort by similarity (descending)
+    std::sort(scored.begin(), scored.end(),
+        [](const auto& a, const auto& b) { return a.first > b.first; });
+    
+    // Return top results
+    for (size_t i = 0; i < std::min(maxResults, scored.size()); ++i) {
+        results.push_back(scored[i].second);
+    }
+    
+    return results;
+}
+
+std::vector<std::vector<float>> NeuralAssociativeMemory::getRetrievedPatterns(
+    const std::vector<float>& queryPattern,
+    size_t maxResults) const {
+    
+    // Alias for getCompletedPatterns - both retrieve similar patterns
+    return getCompletedPatterns(queryPattern, maxResults);
+}
+
+std::vector<std::vector<float>> NeuralAssociativeMemory::getAssociatedPatterns(
+    const std::vector<float>& queryPattern,
+    size_t maxResults) const {
+    
+    // Enhanced retrieval that includes spreading activation
+    std::vector<std::vector<float>> directResults = getCompletedPatterns(queryPattern, maxResults);
+    std::vector<std::vector<float>> spreadResults = spreadActivation(queryPattern, 1);
+    
+    // Combine results, avoiding duplicates
+    std::vector<std::vector<float>> results;
+    std::set<size_t> seenIndices;
+    
+    // Add direct matches first
+    for (const auto& pattern : directResults) {
+        // Check if pattern already seen
+        bool seen = false;
+        for (size_t i = 0; i < results.size(); ++i) {
+            if (computeSimilarity(pattern, results[i]) > 0.9f) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen) {
+            results.push_back(pattern);
+        }
+    }
+    
+    // Add spread activation results
+    for (const auto& pattern : spreadResults) {
+        bool seen = false;
+        for (size_t i = 0; i < results.size(); ++i) {
+            if (computeSimilarity(pattern, results[i]) > 0.9f) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen && results.size() < maxResults) {
+            results.push_back(pattern);
+        }
+    }
+    
+    return results;
+}
+
+std::vector<std::vector<float>> NeuralAssociativeMemory::getSpreadingActivationPatterns(
+    const std::vector<float>& cuePattern,
+    size_t steps) const {
+    
+    return spreadActivation(cuePattern, steps);
+}
+
+void NeuralAssociativeMemory::updateFromWorkingMemory(
+    const std::vector<NeuronId>& memoryNeurons,
+    const std::vector<float>& activations) {
+    
+    // Create pattern from working memory traces
+    if (memoryNeurons.empty() || activations.empty()) return;
+    
+    std::vector<float> pattern;
+    pattern.reserve(memoryNeurons.size());
+    
+    for (float activation : activations) {
+        pattern.push_back(activation > 0.5f ? activation : 0.0f);
+    }
+    
+    if (pattern.empty()) return;
+    
+    // Associate this pattern with its related patterns
+    for (const auto& existingPN : patternNeurons_) {
+        float sim = computeSimilarity(pattern, existingPN.second);
+        if (sim > 0.8f) {
+            // Strong similarity - create/update association
+            associate(pattern, existingPN.second, 0.5f);
+        }
+    }
 }
 
 void NeuralAssociativeMemory::clear() {

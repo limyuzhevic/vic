@@ -1,6 +1,4 @@
-#include "PredictionSystem.hpp"
-
-namespace nlm {
+#include "../core/Types/Types.hpp"
 
 struct PredictionSystem::Impl {
     float predictionError;
@@ -43,6 +41,32 @@ float PredictionSystem::getPredictionError() const {
 
 float PredictionSystem::getConfidence() const {
     return pImpl->confidence;
+}
+
+void PredictionSystem::setConfidence(float confidence) {
+    pImpl->confidence = std::clamp(confidence, 0.0f, 1.0f);
+}
+
+void PredictionSystem::adaptConfidence(TimestepDuration dt) {
+    // Adapt confidence based on recent prediction error history
+    if (!pImpl->errorHistory.empty()) {
+        // Calculate average error over recent history
+        float sumError = 0.0f;
+        size_t historySize = std::min(pImpl->errorHistory.size(), static_cast<size_t>(100)); // Last 100 errors
+        
+        if (historySize > 0) {
+            for (size_t i = pImpl->errorHistory.size() - historySize; i < pImpl->errorHistory.size(); ++i) {
+                sumError += std::abs(pImpl->errorHistory[i]);
+            }
+            float avgError = sumError / historySize;
+            
+            // Higher error leads to lower confidence
+            float targetConfidence = std::max(0.1f, 1.0f - (avgError * 0.5f));
+            
+            // Smooth adaptation
+            pImpl->confidence += (targetConfidence - pImpl->confidence) * 0.05f;
+        }
+    }
 }
 
 const std::vector<float>& PredictionSystem::getErrorHistory() const {

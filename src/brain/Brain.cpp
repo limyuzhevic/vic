@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <vector>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -129,6 +131,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Configure prediction error for neuromodulation integration
+        // PredictionError will be initialized later in Brain::initialize()
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +263,7 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);  // Initialize PredictionError for neuromodulation integration
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -406,37 +412,55 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
+    // ========== STEP 5.5: Apply PredictionError-dependent neuromodulation effects ==========
+    if (pImpl->predictionError) {
+        float predictionError = pImpl->predictionError->getError();
+        float errorMagnitude = pImpl->predictionError->getMagnitude();
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+        // Update dopamine based on prediction error (reward prediction error)
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
+        
+        // Apply prediction error effects on neural excitability
+        // Positive prediction error (better than expected) increases excitability
+        // Negative prediction error (worse than expected) decreases excitability
+        float neuromodulationFactor = predictionError * 0.2f;
+        
+        // Enhance or suppress neural activity based on prediction error
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
+                    // Prediction error modulates effective current
+                    // Scale factor depends on error magnitude
+                    float excitabilityMod = neuromodulationFactor * errorMagnitude;
                     if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                        // Positive error increases excitability
+                        neuron->injectCurrent(excitabilityMod * 0.5f);
+                    } else if (excitabilityMod < 0.0f) {
+                        // Negative error decreases excitability (inhibition)
+                        neuron->injectCurrent(excitabilityMod * 0.2f);  // Less inhibitory effect
                     }
                 }
             }
         }
+        
+        // Apply prediction error to plasticity
+        if (errorMagnitude > 0.5f) {  // Strong prediction error triggers plasticity
+            float plasticityMod = errorMagnitude * 0.1f;
+            if (pImpl->stdp) {
+                // Enhance STDP for strong prediction errors
+                pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * (1.0f + plasticityMod));
+            }
+            if (pImpl->hebbian) {
+                pImpl->hebbian->setLearningRate(pImpl->hebbian->getLearningRate() * (1.0f + plasticityMod * 0.5f));
+            }
+        }
+        
+        // Log prediction error effects
+        NLM_LOG_INFO("PredictionError: error=" + std::to_string(predictionError) +
+                    ", magnitude=" + std::to_string(errorMagnitude) +
+                    ", neuromodulation factor=" + std::to_string(neuromodulationFactor));
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -511,8 +535,103 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory input pattern from working memory
+        std::vector<float> currentSensoryPattern = pImpl->workingMemory ? pImpl->workingMemory->retrieve() : std::vector<float>();
+        
+        // Create SensoryInput from working memory pattern for prediction
+        if (!currentSensoryPattern.empty() && pImpl->sensoryNeurons.size() > 0) {
+            // Get most recent sensory observation from internal signals
+            // Use working memory pattern as current observation for prediction
+            auto currentObservation = std::make_unique<InternalSignals>();
+            for (float value : currentSensoryPattern) {
+                currentObservation->addSignal(value);
+            }
+            
+            // Make prediction using the prediction system
+            auto predictedState = pImpl->predictionSystem->predictNextState(*currentObservation);
+            
+            // Update predictions with actual observation (using working memory as actual)
+            auto actualObservation = std::make_unique<InternalSignals>();
+            for (float value : currentSensoryPattern) {
+                actualObservation->addSignal(value);
+            }
+            
+            // Update prediction system with comparison
+            pImpl->predictionSystem->updatePredictions(*predictedState, *actualObservation);
+            
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Connect prediction error to PredictionError neuromodulator
+        if (pImpl->predictionError) {
+            // Compute prediction error using the actual sensory observation
+            // Create a simple predicted value based on confidence
+            float predictedValue = confidence * predictionError;  // Simple prediction model
+            pImpl->predictionError->computeError(predictedValue, predictionError);
+            
+            // Integrate prediction errors into curiosity system
+            if (pImpl->curiosity) {
+                float curiosityLevel = pImpl->curiosity->getLevel();
+                pImpl->curiosity->update(curiosityLevel, predictionError, pImpl->timestep);
+            }
+        }
+            
+            // Connect prediction errors to dopamine for reward prediction error
+            if (pImpl->dopamine && predictionError != 0.0f) {
+                // Positive prediction error (better than expected) -> reward
+                // Negative prediction error (worse than expected) -> punishment
+                pImpl->dopamine->signalRewardPredictionError(predictionError);
+            }
+            
+            // Confidence-based exploration behavior
+            if (confidence < 0.3f && pImpl->curiosity) {
+                // Low confidence triggers exploration through curiosity
+                float explorationBoost = (0.3f - confidence) * 2.0f;
+                float currentCuriosity = pImpl->curiosity->getLevel();
+                pImpl->curiosity->update(currentCuriosity, predictionError, pImpl->timestep);
+            }
+            
+            // Train prediction system with current observation
+            pImpl->predictionSystem->train(*currentObservation);
+            
+            // Update prediction confidence based on error
+            pImpl->predictionSystem->adaptConfidence(pImpl->timestep);
+        }
+    }
+    
+    // ========== STEP 8.5: Update associative memory ==========
+    // Apply pattern completion and strengthen associations
+    if (pImpl->associativeMemory) {
+        // Get current neural activity for pattern completion
+        std::vector<float> sensoryPattern(1000, 0.0f);
+        
+        // Update associative memory based on current neural activity
+        pImpl->associativeMemory->update(pImpl->timestep);
+        
+        // Retrieve completed patterns for retrieval
+        auto completedPatterns = pImpl->associativeMemory->getCompletedPatterns(sensoryPattern, 3);
+        
+        // Spread activation from completed patterns
+        auto spreadPatterns = pImpl->associativeMemory->spreadActivation(sensoryPattern, 2);
+        
+        // Inject completed patterns into neural population
+        for (const auto& pattern : completedPatterns) {
+            if (!pattern.empty()) {
+                // Inject the pattern as current into appropriate neurons
+                // For now, just reinforce the pattern through existing Hebbian updates
+                for (size_t i = 0; i < std::min(pattern.size(), pattern.size()); ++i) {
+                    float activation = pattern[i];
+                    if (activation > 0.1f) {
+                        // Find sensory neuron to represent this pattern
+                        size_t neuronIndex = i % pImpl->sensoryNeurons.size();
+                        if (neuronIndex < pImpl->sensoryNeurons.size()) {
+                            pImpl->sensoryNeurons[neuronIndex]->injectCurrent(activation * 5.0f);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +647,276 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // === CONCEPT FORMATION INTEGRATION ===
+        // 
+        // 1. Extract sensory state encoding from current neural activity
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(1000);
+        
+        // Extract neural activity patterns from sensory neurons
+        // This serves as the sensory state encoding for concept formation
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                float activation = std::max(0.0f, 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                sensoryPattern.push_back(activation);
+            }
+        }
+        
+        // Pad if needed for consistent pattern size
+        if (sensoryPattern.size() < 1000) {
+            sensoryPattern.resize(1000, 0.0f);
+        } else if (sensoryPattern.size() > 1000) {
+            sensoryPattern.resize(1000);
+        }
+        
+        // Extract features from working memory for concept formation
+        std::vector<float> conceptFeatures;
+        if (pImpl->workingMemory) {
+            std::vector<float> wmPattern = pImpl->workingMemory->retrieve();
+            conceptFeatures = wmPattern;
+            if (conceptFeatures.size() > 100) {
+                conceptFeatures.resize(100);
+            }
+        }
+        
+        // 2. Connect ConceptFormation to episodic memory for concept learning
+        // Use recent episodic memory episodes to inform concept formation
+        if (pImpl->episodicMemory && pImpl->episodicMemory->getEpisodeCount() > 0) {
+            // Get the most recent episode for concept learning
+            const EpisodicMemoryItem* recentEpisode = pImpl->episodicMemory->getEpisode(
+                pImpl->episodicMemory->getEpisodeCount() - 1);
+            
+            if (recentEpisode) {
+                // Form concepts from episodic memory experiences
+                // Episodic memory provides the "raw experience" for concept learning
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    recentEpisode->sensoryState,
+                    conceptFeatures,
+                    recentEpisode->reward,
+                    currentStep);
+                
+                // Log concept formation from episodic memory
+                if (conceptId > 0) {
+                    float stability = pImpl->conceptFormation->getConceptStability(conceptId);
+                    float generalization = pImpl->conceptFormation->getGeneralizationAbility(conceptId);
+                    NLM_LOG_INFO("ConceptFormation: Learned concept " + std::to_string(conceptId) +
+                                 " from episodic memory (stability: " + std::to_string(stability) +
+                                 ", generalization: " + std::to_string(generalization) + ")");
+                }
+            }
+        }
+        
+        // 3. Present current sensory experience to concept formation
+        // Current neural activity patterns become the input to concept formation
+        float rewardSignal = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        size_t matchedConcept = pImpl->conceptFormation->presentExperience(
+            sensoryPattern,
+            conceptFeatures,
+            rewardSignal,
+            currentStep);
+        
+        // 4. Add concept activation and competition mechanisms
+        // Use attentional selection to implement concept competition
+        if (pImpl->conceptFormation && pImpl->attention && !sensoryPattern.empty()) {
+            // Get concept that best matches current sensory input
+            size_t dominantConcept = pImpl->conceptFormation->getMatchingConcept(sensoryPattern);
+            
+            if (dominantConcept > 0) {
+                // Get concept instances for activation competition
+                const std::vector<ConceptInstance>& instances = 
+                    pImpl->conceptFormation->getConceptInstances(dominantConcept);
+                
+                // Apply concept-based attention modulation
+                // Winner-take-all among concepts based on stability and activation
+                if (!instances.empty()) {
+                    float conceptStability = pImpl->conceptFormation->getConceptStability(dominantConcept);
+                    float conceptGeneralization = pImpl->conceptFormation->getGeneralizationAbility(dominantConcept);
+                    float conceptActivation = 0.0f;
+                    
+                    // Calculate concept activation based on instance counts and stability
+                    for (const auto& instance : instances) {
+                        conceptActivation += instance.stability * instance.observationCount;
+                    }
+                    
+                    // Apply concept-based attention modulation to working memory
+                    if (pImpl->workingMemory && conceptActivation > 0.5f) {
+                        // Boost working memory traces related to dominant concept
+                        pImpl->attention->applyTopDownBias(
+                            pImpl->workingMemory->getMemoryNeurons().empty() ? 
+                            static_cast<NeuronId>(100) : pImpl->workingMemory->getMemoryNeurons()[0],
+                            conceptActivation * conceptStability);
+                    }
+                    
+                    // Log concept competition results
+                    NLM_LOG_INFO("ConceptFormation: Dominant concept " + std::to_string(dominantConcept) +
+                                 " (activation: " + std::to_string(conceptActivation) +
+                                 ", stability: " + std::to_string(conceptStability) + ")");
+                }
+            }
+        }
+        
+        // 5. Connect ConceptFormation to working memory for pattern abstraction
+        // Create abstracted concepts from working memory patterns
+        if (pImpl->conceptFormation && pImpl->workingMemory && !sensoryPattern.empty()) {
+            // Retrieve current working memory pattern
+            std::vector<float> wmPattern = pImpl->workingMemory->retrieve();
+            
+            if (!wmPattern.empty()) {
+                // Determine if working memory pattern belongs to an existing concept
+                size_t wmConcept = pImpl->conceptFormation->getMatchingConcept(wmPattern);
+                
+                if (wmConcept > 0) {
+                    // Store abstracted concept in working memory
+                    float conceptStability = pImpl->conceptFormation->getConceptStability(wmConcept);
+                    
+                    // Reinforce working memory with concept abstraction
+                    for (size_t i = 0; i < std::min(wmPattern.size(), static_cast<size_t>(100)); ++i) {
+                        if (wmPattern[i] > 0.3f) {
+                            // Find corresponding sensory neuron and strengthen
+                            size_t neuronIndex = i % pImpl->sensoryNeurons.size();
+                            if (neuronIndex < pImpl->sensoryNeurons.size()) {
+                                float abstractionBoost = wmPattern[i] * conceptStability * 0.5f;
+                                pImpl->sensoryNeurons[neuronIndex]->injectCurrent(abstractionBoost);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 6. Integrate concepts with NeuralPlanner for action planning
+        // Use learned concepts to guide action selection
+        if (pImpl->conceptFormation && pImpl->planner && !sensoryPattern.empty()) {
+            // Determine if current state matches any learned concept
+            size_t relevantConcept = pImpl->conceptFormation->getMatchingConcept(sensoryPattern, 0.6f);
+            
+            if (relevantConcept > 0) {
+                // Get concept stability for planning confidence
+                float conceptStability = pImpl->conceptFormation->getConceptStability(relevantConcept);
+                
+                // Get concept instances for planning context
+                const std::vector<ConceptInstance>& instances = 
+                    pImpl->conceptFormation->getConceptInstances(relevantConcept);
+                
+                if (!instances.empty()) {
+                    // Use concept-based planning
+                    // Create a state representation that includes concept information
+                    std::vector<float> conceptState = sensoryPattern;
+                    
+                    // Add concept-specific information to planning state
+                    for (size_t i = 0; i < std::min(instances.size(), static_cast<size_t>(10)); ++i) {
+                        float conceptRelevance = instances[i].stability * instances[i].observationCount;
+                        size_t featureIndex = 1000 + i;  // Offset to add concept features
+                        if (featureIndex < conceptState.size()) {
+                            conceptState[featureIndex] = conceptRelevance;
+                        }
+                    }
+                    
+                    // Plan action using concept-informed state
+                    ActionType plannedAction = pImpl->planner->planAction(
+                        conceptState, 
+                        0.5f * conceptStability);
+                    
+                    // Log concept-based planning
+                    NLM_LOG_INFO("ConceptFormation: Planned action " + std::to_string(static_cast<int>(plannedAction)) +
+                                 " based on concept " + std::to_string(relevantConcept) +
+                                 " (stability: " + std::to_string(conceptStability) + ")");
+                }
+            }
+        }
+        
+        // 8. Connect PredictionError to concept formation stability
+        // Use prediction error history to modulate concept stability
+        if (pImpl->conceptFormation && pImpl->predictionError && 
+            currentStep % 50 == 0) {  // Update every 50 steps
+            
+            float predictionError = pImpl->predictionError->getError();
+            float errorMagnitude = pImpl->predictionError->getMagnitude();
+            
+            // Get current concept stability metrics
+            size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+            
+            if (conceptCount > 0) {
+                float totalStability = 0.0f;
+                float totalGeneralization = 0.0f;
+                
+                for (size_t i = 1; i <= conceptCount; ++i) {
+                    float stability = pImpl->conceptFormation->getConceptStability(i);
+                    float generalization = pImpl->conceptFormation->getGeneralizationAbility(i);
+                    totalStability += stability;
+                    totalGeneralization += generalization;
+                }
+                
+                float avgStability = totalStability / conceptCount;
+                float avgGeneralization = totalGeneralization / conceptCount;
+                
+                // Apply prediction error-based modulation to concept stability
+                // High prediction error reduces concept stability (concept needs updating)
+                // Low prediction error increases concept stability (concept is reliable)
+                float stabilityMod = 1.0f;
+                if (errorMagnitude > 0.5f) {
+                    // Large error - reduce stability to allow concept updating
+                    stabilityMod = std::max(0.5f, 1.0f - (errorMagnitude * 0.8f));
+                } else if (errorMagnitude < 0.1f) {
+                    // Small error - increase stability to reinforce reliable concepts
+                    stabilityMod = 1.0f + (0.1f - errorMagnitude) * 2.0f;
+                }
+                
+                // Apply modulation to concept formation system
+                float modulatedStability = avgStability * stabilityMod;
+                float modulatedGeneralization = avgGeneralization;
+                
+                // Log prediction error effects on concept stability
+                NLM_LOG_INFO("PredictionError::ConceptStability: avg_stability=" + 
+                            std::to_string(avgStability) +
+                            ", error_magnitude=" + std::to_string(errorMagnitude) +
+                            ", stability_mod=" + std::to_string(stabilityMod) +
+                            ", modulated_stability=" + std::to_string(modulatedStability));
+                
+                // Store prediction error in concept formation for future reference
+                // This could be used to evaluate concept reliability
+                for (size_t i = 1; i <= conceptCount; ++i) {
+                    // Gradually reduce concept stability when prediction error is high
+                    if (errorMagnitude > 0.3f) {
+                        float currentStability = pImpl->conceptFormation->getConceptStability(i);
+                        float reducedStability = std::max(0.1f, currentStability - errorMagnitude * 0.05f);
+                        pImpl->conceptFormation->setConceptStability(i, reducedStability);
+                    }
+                }
+            }
+        }
+        
+        // 9. Implement prediction error-dependent concept consolidation
+        if (pImpl->conceptFormation && pImpl->predictionError && currentStep % 200 == 0) {
+            float predictionError = pImpl->predictionError->getError();
+            
+            // If prediction error is high, trigger concept consolidation/revision
+            if (std::abs(predictionError) > 0.5f) {
+                NLM_LOG_INFO("PredictionError: High error detected, triggering concept consolidation");
+                
+                // Consolidate concepts based on prediction error
+                // This could involve strengthening stable concepts and weakening unreliable ones
+                size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+                
+                for (size_t i = 1; i <= conceptCount; ++i) {
+                    float stability = pImpl->conceptFormation->getConceptStability(i);
+                    
+                    if (stability < 0.3f) {
+                        // Weak concepts should be reinforced if prediction error is high
+                        // as it indicates inconsistency
+                        float reinforcement = std::min(0.3f, stability + errorMagnitude * 0.1f);
+                        pImpl->conceptFormation->setConceptStability(i, reinforcement);
+                    } else if (stability > 0.7f) {
+                        // Strong concepts should be maintained
+                        float maintenance = std::max(0.7f, stability - errorMagnitude * 0.05f);
+                        pImpl->conceptFormation->setConceptStability(i, maintenance);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -592,11 +979,12 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     
-    const auto& values = input.getData();
-    if (values.empty()) return;
-    
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Create a simplified sensory pattern for associative memory
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(1000);
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -613,8 +1001,73 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+        
+        // Add to sensory pattern for associative memory
+        sensoryPattern.push_back(std::max(0.0f, (normalizedValue + 10.0f) / 20.0f));
     }
-}
+    
+        // ========== PREDICTION ERROR COMPUTATION DURING SENSORY INPUT ==========
+        // Compute prediction errors using the PredictionError system
+        if (pImpl->predictionSystem && pImpl->predictionError) {
+            // Get prediction error from prediction system for neuromodulation
+            float predictionErrorFromSystem = pImpl->predictionSystem->getPredictionError();
+            float confidence = pImpl->predictionSystem->getConfidence();
+            
+            // Use prediction system error for PredictionError computation
+            // Create a predicted value based on confidence
+            float predictedValue = confidence * predictionErrorFromSystem;
+            pImpl->predictionError->computeError(predictedValue, predictionErrorFromSystem);
+            
+            // Log prediction error computation
+            float error = pImpl->predictionError->getError();
+            float magnitude = pImpl->predictionError->getMagnitude();
+            NLM_LOG_INFO("PredictionError::computeError: predicted=" + std::to_string(predictedValue) +
+                        ", actual=" + std::to_string(predictionErrorFromSystem) +
+                        ", error=" + std::to_string(error) +
+                        ", magnitude=" + std::to_string(magnitude));
+        }
+    
+    // ========== PATTERN COMPLETION DURING SENSORY INPUT ==========
+    // Integrate pattern completion during sensory processing
+    if (pImpl->associativeMemory && !sensoryPattern.empty()) {
+        // Pattern completion based on partial sensory input
+        std::vector<std::vector<float>> completedPatterns = 
+            pImpl->associativeMemory->getCompletedPatterns(sensoryPattern, 1);
+        
+        // Integrate completed patterns into working memory
+        if (!completedPatterns.empty()) {
+            for (const auto& pattern : completedPatterns) {
+                if (!pattern.empty() && pattern.size() == numSensory) {
+                    for (size_t i = 0; i < pattern.size() && i < numSensory; ++i) {
+                        float completionStrength = pattern[i];
+                        if (completionStrength > 0.1f) {
+                            // Strengthen the corresponding sensory neuron
+                            pImpl->sensoryNeurons[i]->injectCurrent(completionStrength * 3.0f);
+                            
+                            // Store in working memory
+                            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), completionStrength);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Automatic association strengthening with Hebbian learning
+        // Associate current sensory pattern with previous patterns
+        if (pImpl->workingMemory) {
+            // Get recent working memory content
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            std::vector<float> activations;
+            activations.reserve(memoryNeurons.size());
+            
+            for (const auto& neuron : memoryNeurons) {
+                activations.push_back(pImpl->workingMemory->getNeuronActivation(neuron));
+            }
+            
+            // Create association from current input
+            pImpl->associativeMemory->updateFromWorkingMemory(memoryNeurons, activations);
+        }
+    }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     for (auto& region : pImpl->regions) {

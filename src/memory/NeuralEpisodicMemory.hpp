@@ -184,6 +184,17 @@ public:
                           const std::vector<float>& patternB,
                           float delta);
 
+    // Update associations based on current neural activity
+    void update(TimestepDuration dt);
+
+    // Get completed patterns for retrieval
+    std::vector<std::vector<float>> getCompletedPatterns(const std::vector<float>& queryPattern,
+                                                         size_t maxResults = 5) const;
+
+    // Get patterns from working memory for association
+    void updateFromWorkingMemory(const std::vector<NeuronId>& memoryNeurons,
+                                const std::vector<float>& activations);
+
     // Spread activation from cue pattern
     // Returns patterns that become activated through association chains
     std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern,

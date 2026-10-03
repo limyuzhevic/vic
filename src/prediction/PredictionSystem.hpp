@@ -27,12 +27,18 @@ public:
     // Get prediction confidence
     float getConfidence() const;
     
+    // Set prediction confidence
+    void setConfidence(float confidence);
+    
     // Get prediction history
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Adapt confidence based on recent error history
+    void adaptConfidence(TimestepDuration dt);
     
 private:
     struct Impl;
