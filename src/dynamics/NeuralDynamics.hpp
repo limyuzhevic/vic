@@ -46,6 +46,18 @@ public:
     // Parameters
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
+    void setMembraneResistance(float R);
+    float getMembraneResistance() const;
+    void setMembraneCapacitance(float C);
+    float getMembraneCapacitance() const;
+    void setRestingPotential(float V_rest);
+    float getRestingPotential() const;
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    void setResetPotential(float V_reset);
+    float getResetPotential() const;
+    void setAdaptationTimeConstant(float tau_adapt);
+    float getAdaptationTimeConstant() const;
     
 private:
     struct Impl;
@@ -62,9 +74,15 @@ public:
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
     bool shouldFire(const Neuron* neuron) const override { return false; }
     void reset() override {}
+    
+    // HH parameters
+    void setMembraneConductance(float g_Na, float g_K, float g_L);
+    void setReversalPotentials(float E_Na, float E_K, float E_L);
+    void setCapacitance(float C_m);
+    void setRestingPotential(float V_rest);
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
+// FitzHugh-Nagumo dynamics (simplified excitation model)
 // TODO PHASE 2: Implement FHN dynamics
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
@@ -74,6 +92,11 @@ public:
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
     bool shouldFire(const Neuron* neuron) const override { return false; }
     void reset() override {}
+    
+    // FHN parameters
+    void setFHNParameters(float a, float b, float c);
+    void setRestingPotential(float V_rest);
+    void setThreshold(float threshold);
 };
 
 } // namespace nlm

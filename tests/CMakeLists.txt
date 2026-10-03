@@ -19,6 +19,10 @@ add_executable(nlm_test
 target_link_libraries(nlm_test PRIVATE nlm_core)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
+# Property-Based Testing Framework
+add_subdirectory(property_tests)
+
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+add_test(NAME nlm_property_tests COMMAND nlm_property_tests)
