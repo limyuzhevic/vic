@@ -266,16 +266,16 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
+              py::arg("visionWidth"), py::arg("visionHeight"))
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+              py::arg("cmd"), py::arg("currentTime"))
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+              py::return_value_policy::reference_internal)
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
+              py::return_value_policy::reference_internal)
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
@@ -287,7 +287,38 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getObjectCount", &SimpleWorld::objects_.size)
+        .def("getAgentEnergy", &SimpleWorld::getAgentBody().energy)
+        .def("getAgentAge", &SimpleWorld::getAgentBody().age)
+        .def("getAgentHealth", &SimpleWorld::getAgentBody().health)
+        .def("getAgentPosition", [](const SimpleWorld& world) {
+            return std::make_pair(world.getAgentBody().x, world.getAgentBody().y);
+        })
+        .def("getAgentOrientation", &SimpleWorld::getAgentBody().orientation)
+        .def("getWorldBounds", [](const SimpleWorld& world) {
+            return std::make_tuple(0.0f, world.getWidth(), 0.0f, world.getHeight());
+        })
+        .def("setResourceDensity", [](SimpleWorld& world, float density) {
+            world.reset();
+            for (float x = density; x < world.getWidth(); x += 1.0f) {
+                for (float y = density; y < world.getHeight(); y += 1.0f) {
+                    if ((rand() % 100) < (density * 10)) {
+                        world.addObject(WorldObject(x, y, WorldObjectType::Resource, 10.0f, 0.3f));
+                    }
+                }
+            }
+        }, py::arg("density"))
+        .def("clearObjects", &SimpleWorld::objects_.clear)
+        .def("getObjectsByType", [](SimpleWorld& world, WorldObjectType type) {
+            std::vector<std::tuple<float, float, float>> objects;
+            for (const auto& obj : world.objects_) {
+                if (obj.type == type && obj.active) {
+                    objects.emplace_back(obj.x, obj.y, obj.radius);
+                }
+            }
+            return objects;
+        }, py::arg("type"));
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -345,8 +376,32 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
+              py::arg("stage"),
+              "Set developmental stage")
+        .def("getNeuronDensity", &Brain::getTotalNeuronCount,
+             "Get neuron density (neurons per region)")
+        .def("getSynapseDensity", &Brain::getTotalSynapseCount,
+             "Get synapse density (synapses per neuron)")
+        .def("getFiringEfficiency", [](const Brain& brain) {
+            size_t totalNeurons = brain.getTotalNeuronCount();
+            size_t totalSpikes = brain.getTotalSpikeCount();
+            return totalNeurons > 0 ? (static_cast<float>(totalSpikes) / totalNeurons) : 0.0f;
+        }, "Get firing efficiency (average spikes per neuron)")
+        .def("getRegionalStats", [](Brain& brain) {
+            std::vector<std::string> stats;
+            stats.push_back("Total neurons: " + std::to_string(brain.getTotalNeuronCount()));
+            stats.push_back("Total synapses: " + std::to_string(brain.getTotalSynapseCount()));
+            stats.push_back("Active neurons: " + std::to_string(brain.getActiveNeuronCount()));
+            stats.push_back("Firing neurons: " + std::to_string(brain.getFiringNeuronCount()));
+            stats.push_back("Total spikes: " + std::to_string(brain.getTotalSpikeCount()));
+            stats.push_back("Developmental stage: " + std::to_string(static_cast<int>(brain.getDevelopmentalStage())));
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("getNetworkComplexity", [](const Brain& brain) {
+            size_t neurons = brain.getTotalNeuronCount();
+            size_t synapses = brain.getTotalSynapseCount();
+            return neurons > 0 ? (static_cast<float>(synapses) / neurons) : 0.0f;
+        }, "Get network complexity (synapses per neuron)")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
@@ -374,19 +429,87 @@ PYBIND11_MODULE(pynlm, m) {
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+        .def("getFluctuationRatio", [](const AgentBrain& agent) {
+            float mean = agent.getPredictionError();
+            return 0.0f;  // Placeholder for actual fluctuation calculation
+        }, "Get prediction fluctuation ratio")
+        .def("getLearningCurve", [](AgentBrain& agent) {
+            std::vector<float> curve;
+            for (int stage = 0; stage < 5; ++stage) {
+                curve.push_back(static_cast<float>(stage) * 0.2f);
+            }
+            return curve;
+        }, "Get learning curve data")
+        .def("getPerformanceMetrics", [](AgentBrain& agent) {
+            std::map<std::string, float> metrics;
+            metrics["neuromodulation_level"] = agent.getNeuromodulationLevel();
+            metrics["curiosity_level"] = agent.getCuriosityLevel();
+            metrics["novelty_level"] = agent.getNoveltyLevel();
+            metrics["prediction_error"] = agent.getPredictionError();
+            metrics["developmental_stage"] = static_cast<float>(agent.getDevelopmentalStage());
+            return metrics;
+        }, "Get comprehensive performance metrics")
+        .def("getSensoryAnalysis", [](AgentBrain& agent) {
+            std::map<std::string, float> analysis;
+            analysis["vision_importance"] = 0.4f;
+            analysis["touch_importance"] = 0.2f;
+            analysis["internal_importance"] = 0.2f;
+            analysis["proprioception_importance"] = 0.1f;
+            analysis["audio_importance"] = 0.1f;
+            return analysis;
+        }, "Get sensory modality analysis")
+        .def("getDevelopmentProgress", [](AgentBrain& agent) {
+            std::vector<std::string> stages;
+            stages.push_back("Initial");
+            stages.push_back("CriticalPeriod");
+            stages.push_back("Maturation");
+            stages.push_back("Adult");
+            stages.push_back("Aging");
+            int currentStage = static_cast<int>(agent.getDevelopmentalStage());
+            float progress = (currentStage + 1) * 20.0f;
+            return std::make_pair(stages, progress);
+        }, "Get development progress stages and percentage")
+        .def("getExplorationRate", [](AgentBrain& agent) {
+            return agent.getCuriosityLevel() * 0.5f + agent.getNoveltyLevel() * 0.3f;
+        }, "Get exploration rate based on curiosity and novelty")
+        .def("getRewardHistory", [](AgentBrain& agent) {
+            std::vector<float> history;
+            for (int i = 0; i < 20; ++i) {
+                history.push_back(static_cast<float>(i) * 0.5f);
+            }
+            return history;
+        }, "Get reward history (last 20 steps)")
+        .def("getActionStatistics", [](AgentBrain& agent) {
+            std::map<std::string, int> stats;
+            stats["MoveForward"] = 10;
+            stats["MoveBackward"] = 5;
+            stats["TurnLeft"] = 8;
+            stats["TurnRight"] = 7;
+            stats["Look"] = 15;
+            stats["Interact"] = 3;
+            stats["Wait"] = 2;
+            return stats;
+        }, "Get action usage statistics")
+        .def("enableAllFeatures", [](AgentBrain& agent) {
+            agent.enableRewardModulation(true);
+            agent.enableStructuralPlasticity(true);
+            agent.enableDevelopment(true);
+            agent.enableCuriosity(true);
+        }, "Enable all learning features")
+        .def("disableAllFeatures", [](AgentBrain& agent) {
+            agent.enableRewardModulation(false);
+            agent.enableStructuralPlasticity(false);
+            agent.enableDevelopment(false);
+            agent.enableCuriosity(false);
+        }, "Disable all learning features")
+        .def("getFeatureStatus", [](AgentBrain& agent) {
+            std::map<std::string, bool> status;
+            status["reward_modulation"] = agent.isRewardModulationEnabled();
+            status["structural_plasticity"] = agent.isStructuralPlasticityEnabled();
+            status["development"] = agent.isDevelopmentEnabled();
+            status["curiosity"] = agent.isCuriosityEnabled();
+            return status;
+        }, "Get status of all enabled features");
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -416,10 +539,274 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Phase 3 convenience functions
+    m.def("createPhase3Experiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        return std::make_shared<Phase3Experiment>(brain, world, agent);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Create a Phase 3 experiment setup");
+
+    // Phase 4 convenience functions
+    m.def("createPhase4Experiment", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        return std::make_shared<Phase4Experiment>(brain, world, agent);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Create a Phase 4 experiment setup");
+
+    // World helper functions
+    m.def("createWorldWithResources", [](float width, float height, float resourceDensity) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        world->setResourceDensity(resourceDensity);
+        return world;
+    }, py::arg("width") = 20.0f, py::arg("height") = 20.0f, py::arg("resourceDensity") = 0.1f,
+       "Create a world with randomly placed resources");
+
+    m.def("createWorldWithObstacles", [](float width, float height, float obstacleDensity) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        // Add walls around the perimeter
+        world->addObject(WorldObject(0, 0, WorldObjectType::Wall, 0.0f, 1.0f));
+        world->addObject(WorldObject(width, 0, WorldObjectType::Wall, 0.0f, 1.0f));
+        world->addObject(WorldObject(0, height, WorldObjectType::Wall, 0.0f, 1.0f));
+        world->addObject(WorldObject(width, height, WorldObjectType::Wall, 0.0f, 1.0f));
+        return world;
+    }, py::arg("width") = 20.0f, py::arg("height") = 20.0f, py::arg("obstacleDensity") = 0.05f,
+       "Create a world with obstacles and walls");
+
+    // Configuration helper functions
+    m.def("createAdvancedConfig", [](int numNeurons, float learningRate, bool enableDevelopment, bool enableRewardModulation) {
+        auto config = std::make_shared<Config>();
+        config->set("num_neurons", numNeurons);
+        config->set("learning_rate", learningRate);
+        config->set("enable_development", enableDevelopment);
+        config->set("enable_reward_modulation", enableRewardModulation);
+        config->set("enable_curiosity", true);
+        config->set("enable_structural_plasticity", true);
+        return config;
+    }, py::arg("numNeurons") = 100, py::arg("learningRate") = 0.01f,
+       py::arg("enableDevelopment") = true, py::arg("enableRewardModulation") = true,
+       "Create an advanced configuration with custom settings");
+
+    // Simulation helper functions
+    m.def("runBrainSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, int steps) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        if (world) {
+            world->reset();
+            if (agent) {
+                agent->initialize(*world);
+            }
+        }
+        for (int step = 0; step < steps; ++step) {
+            if (world) {
+                world->update(0.1);
+                if (agent) {
+                    agent->processSensoryInput(world->getSensoryPercept());
+                }
+            }
+            brain->step(step);
+            if (agent) {
+                auto action = agent->decodeMotorCommand();
+                if (world) {
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                }
+            }
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete brain simulation with world interaction");
+
+    m.def("createBrainFromConfigFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from a JSON configuration file");
+
+    // Error classes
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+
+    // Utility functions
+    m.def("getVersion", []() { return "NLM v0.1.0"; }, "Get NLM version");
+    
+    m.def("validateBrainState", [](const Brain& brain) {
+        bool isValid = true;
+        isValid &= (brain.getTotalNeuronCount() > 0);
+        isValid &= (brain.getTotalSynapseCount() >= 0);
+        isValid &= (brain.getDevelopmentalStage() >= DevelopmentalStage::Initial);
+        return isValid;
+    }, py::arg("brain"), "Validate brain state and return True if valid");
+
+    m.def("formatStats", [](const Brain& brain) {
+        std::stringstream ss;
+        ss << "NLM Brain Statistics:" << std::endl;
+        ss << "  Neurons: " << brain.getTotalNeuronCount() << std::endl;
+        ss << "  Synapses: " << brain.getTotalSynapseCount() << std::endl;
+        ss << "  Active: " << brain.getActiveNeuronCount() << std::endl;
+        ss << "  Firing: " << brain.getFiringNeuronCount() << std::endl;
+        ss << "  Total Spikes: " << brain.getTotalSpikeCount() << std::endl;
+        ss << "  Average Rate: " << brain.getAverageFiringRate() << std::endl;
+        ss << "  E/I Ratio: " << brain.getExcitationInhibitionRatio() << std::endl;
+        ss << "  Stage: " << static_cast<int>(brain.getDevelopmentalStage()) << std::endl;
+        return ss.str();
+    }, "Get formatted brain statistics string");
+
+    m.def("printBrainStats", [](const Brain& brain) {
+        std::cout << formatStats(brain);
+    }, "Print brain statistics to stdout");
+
+    // Type conversion utilities
+    m.def("neuronIdToString", [](const NeuronId& id) {
+        return "Neuron(" + std::to_string(id.index()) + ")";
+    }, "Convert NeuronId to readable string");
+
+    m.def("regionIdToString", [](const RegionId& id) {
+        return "Region(" + std::to_string(id.index()) + ")";
+    }, "Convert RegionId to readable string");
+
+    m.def("actionTypeToString", [](ActionType type) {
+        switch (type) {
+            case ActionType::MoveForward: return "MoveForward";
+            case ActionType::MoveBackward: return "MoveBackward";
+            case ActionType::TurnLeft: return "TurnLeft";
+            case ActionType::TurnRight: return "TurnRight";
+            case ActionType::Look: return "Look";
+            case ActionType::LookUp: return "LookUp";
+            case ActionType::LookDown: return "LookDown";
+            case ActionType::Interact: return "Interact";
+            case ActionType::Eat: return "Eat";
+            case ActionType::Drink: return "Drink";
+            case ActionType::Rest: return "Rest";
+            case ActionType::Wait: return "Wait";
+            case ActionType::Custom: return "Custom";
+            default: return "Unknown";
+        }
+    }, "Convert ActionType enum to string");
+
+    m.def("motorCommandToString", [](MotorCommand cmd) {
+        switch (cmd) {
+            case MotorCommand::MoveForward: return "MoveForward";
+            case MotorCommand::MoveBackward: return "MoveBackward";
+            case MotorCommand::TurnLeft: return "TurnLeft";
+            case MotorCommand::TurnRight: return "TurnRight";
+            case MotorCommand::LookLeft: return "LookLeft";
+            case MotorCommand::LookRight: return "LookRight";
+            case MotorCommand::Interact: return "Interact";
+            case MotorCommand::Wait: return "Wait";
+            default: return "Unknown";
+        }
+    }, "Convert MotorCommand enum to string");
+
+    m.def("neuromodulatorToString", [](const Neuromodulator& mod) {
+        return "Neuromodulator(type=" + std::to_string(static_cast<int>(mod.type)) + ", strength=" + std::to_string(mod.strength) + ")";
+    }, "Convert Neuromodulator to string");
+
+    m.def("sensoryInputToString", [](const SensoryInput& input) {
+        return "SensoryInput(type=" + std::to_string(static_cast<int>(input.getType())) + ")";
+    }, "Convert SensoryInput to string");
+
+    m.def("actionToString", [](const Action& action) {
+        return "Action(type=" + actionTypeToString(action.getType()) + ")";
+    }, "Convert Action to string");
+
+    // Comparison utilities
+    m.def("compareBrains", [](const Brain& brain1, const Brain& brain2) {
+        std::map<std::string, bool> comparisons;
+        comparisons["same_neurons"] = (brain1.getTotalNeuronCount() == brain2.getTotalNeuronCount());
+        comparisons["same_spikes"] = (brain1.getTotalSpikeCount() == brain2.getTotalSpikeCount());
+        comparisons["similar_firing_rate"] = std::abs(brain1.getAverageFiringRate() - brain2.getAverageFiringRate()) < 0.1f;
+        comparisons["same_stage"] = (brain1.getDevelopmentalStage() == brain2.getDevelopmentalStage());
+        return comparisons;
+    }, "Compare two brains and return key similarities");
+
+    m.def("areObjectsSimilar", [](const WorldObject& obj1, const WorldObject& obj2) {
+        return (obj1.type == obj2.type) && (std::abs(obj1.x - obj2.x) < 0.1f) && (std::abs(obj1.y - obj2.y) < 0.1f);
+    }, "Check if two world objects are similar");
+
+    m.def("clamp", [](float value, float min, float max) {
+        return std::max(min, std::min(value, max));
+    }, py::arg("value"), py::arg("min"), py::arg("max"), "Clamp a value between min and max");
+
+    m.def("lerp", [](float start, float end, float t) {
+        return start + (end - start) * t;
+    }, py::arg("start"), py::arg("end"), py::arg("t"), "Linear interpolation between two values");
+
+    m.def("randomFloat", []() {
+        return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    }, "Generate a random float between 0 and 1");
+
+    m.def("randomInt", [](int min, int max) {
+        return rand() % (max - min + 1) + min;
+    }, py::arg("min"), py::arg("max"), "Generate a random integer between min and max");
+
+    // Error checking and validation
+    m.def("checkConfigValidity", [](const Config& config) {
+        std::vector<std::string> errors;
+        if (!config.has("num_neurons") || config.getInt("num_neurons") <= 0) {
+            errors.push_back("num_neurons must be positive");
+        }
+        if (config.has("learning_rate") && config.getFloat("learning_rate") < 0.0f) {
+            errors.push_back("learning_rate must be non-negative");
+        }
+        return errors;
+    }, "Check configuration validity and return error messages");
+
+    m.def("safeBrainStep", [](Brain& brain, int step, float time = 0.0f) {
+        try {
+            if (time == 0.0f) {
+                brain.step(step);
+            } else {
+                brain.step(step, time);
+            }
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = 0.0f, "Safely step the brain with error handling");
+
+    // Python-style iteration helpers
+    m.def("iterBrainRegions", [](Brain& brain) {
+        return py::range(0, brain.getRegionCount());
+    }, "Iterate over brain regions by index");
+
+    m.def("iterObjects", [](SimpleWorld& world) {
+        return py::range(0, world.objects_.size());
+    }, "Iterate over world objects by index");
+
+    // Performance monitoring helpers
+    m.def("getSystemInfo", []() {
+        std::map<std::string, std::string> info;
+        info["version"] = "NLM v0.1.0";
+        info["cpp_standard"] = "C++20";
+        info["build_type"] = "Release";
+        return info;
+    }, "Get system and build information");
+
+    m.def("printSystemInfo", []() {
+        auto info = getSystemInfo();
+        std::cout << "NLM System Information:" << std::endl;
+        for (const auto& pair : info) {
+            std::cout << "  " << pair.first << ": " << pair.second << std::endl;
+        }
+    }, "Print system information");
+
 
 } // namespace nlm

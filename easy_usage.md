@@ -290,8 +290,17 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. Read `advanced_usage.md` for advanced techniques and optimizations
+2. Read `HOW_TO_USE.md` for more details
+3. Read `docs/ARCHITECTURE.md` to understand how it all works
+4. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+For advanced users, check out the comprehensive documentation in `advanced_usage.md` covering:
+- Deep configuration customization
+- Multi-agent simulation
+- Performance optimization techniques
+- Developmental psychology simulation
+- Advanced debugging and troubleshooting
+- Custom extensions and integrations
