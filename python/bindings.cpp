@@ -12,9 +12,28 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/Vision.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/neuromodulation/Acetylcholine.hpp"
+#include "../src/neuromodulation/Norepinephrine.hpp"
+#include "../src/neuromodulation/Serotonin.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/BCM.hpp"
+#include "../src/plasticity/AntiHebbian.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -289,69 +308,197 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Neural prediction system for future state prediction)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &PredictionSystem::initialize, py::arg("brain"),
+             "Initialize prediction system with brain reference")
+        .def("predictNextState", &PredictionSystem::predictNextState, py::arg("currentState"),
+             "Predict next sensory state based on current neural activity")
+        .def("updatePredictions", &PredictionSystem::updatePredictions, py::arg("predicted"), py::arg("actual"),
+             "Update predictions based on actual observation")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error value")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence level")
+        .def("getNeuralConfidence", &PredictionSystem::getNeuralConfidence,
+             "Get neural prediction confidence based on activity patterns")
+        .def("train", &PredictionSystem::train, py::arg("observation"),
+             "Train prediction model with observation")
+        .def("update", &PredictionSystem::update, py::arg("currentTime"),
+             "Update prediction system with current time")
+        .def("reset", &PredictionSystem::reset,
+             "Reset prediction system to initial state")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction history");
+
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Dopamine::getLevel, "Get dopamine level")
+        .def("setLevel", &Dopamine::setLevel, py::arg("level"), "Set dopamine level")
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor,
+             "Get dopamine-modulated plasticity factor")
+        .def("update", &Dopamine::update, py::arg("dt"), "Update dopamine state")
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"), "Signal reward reception")
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError,
+             py::arg("error"), "Signal reward prediction error")
+        .def("getBaseline", &Dopamine::getBaseline,
+             "Get dopamine baseline level")
+        .def("setBaseline", &Dopamine::setBaseline, py::arg("baseline"),
+             "Set dopamine baseline level")
+        .def("getPeak", &Dopamine::getPeak,
+             "Get dopamine peak level")
+        .def("setPeak", &Dopamine::setPeak, py::arg("peak"), "Set dopamine peak level");
+
+    py::class_<Acetylcholine, Neuromodulator>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator for attention and memory)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Acetylcholine::getLevel, "Get acetylcholine level")
+        .def("setLevel", &Acetylcholine::setLevel, py::arg("level"), "Set acetylcholine level")
+        .def("getPlasticityFactor", &Acetylcholine::getPlasticityFactor,
+             "Get acetylcholine-modulated plasticity factor")
+        .def("update", &Acetylcholine::update, py::arg("dt"), "Update acetylcholine state")
+        .def("signalAttention", &Acetylcholine::signalAttention, py::arg("strength"),
+             "Signal attentional focus strength");
+
+    py::class_<Norepinephrine, Neuromodulator>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Norepinephrine::getLevel, "Get norepinephrine level")
+        .def("setLevel", &Norepinephrine::setLevel, py::arg("level"), "Set norepinephrine level")
+        .def("getPlasticityFactor", &Norepinephrine::getPlasticityFactor,
+             "Get norepinephrine-modulated plasticity factor")
+        .def("update", &Norepinephrine::update, py::arg("dt"), "Update norepinephrine state")
+        .def("signalAlertness", &Norepinephrine::signalAlertness, py::arg("arousalLevel"),
+             "Signal arousal/attention level");
+
+    py::class_<Serotonin, Neuromodulator>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator for mood and impulsivity)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Serotonin::getLevel, "Get serotonin level")
+        .def("setLevel", &Serotonin::setLevel, py::arg("level"), "Set serotonin level")
+        .def("getPlasticityFactor", &Serotonin::getPlasticityFactor,
+             "Get serotonin-modulated plasticity factor")
+        .def("update", &Serotonin::update, py::arg("dt"), "Update serotonin state")
+        .def("signalMood", &Serotonin::signalMood, py::arg("moodLevel"),
+             "Signal mood/affect level");
+
+    py::class_<Curiosity, Neuromodulator>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator for exploration behavior)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Curiosity::getLevel, "Get curiosity level")
+        .def("setLevel", &Curiosity::setLevel, py::arg("level"), "Set curiosity level")
+        .def("getPlasticityFactor", &Curiosity::getPlasticityFactor,
+             "Get curiosity-modulated plasticity factor")
+        .def("update", &Curiosity::update, py::arg("dt"), "Update curiosity state")
+        .def("signalExploration", &Curiosity::signalExploration,
+             "Signal exploratory behavior");
+
+    py::class_<Novelty, Neuromodulator>(m, "Novelty", R"pbdoc(Novelty neuromodulator for detecting new stimuli)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Novelty::getLevel, "Get novelty level")
+        .def("setLevel", &Novelty::setLevel, py::arg("level"), "Set novelty level")
+        .def("getPlasticityFactor", &Novelty::getPlasticityFactor,
+             "Get novelty-modulated plasticity factor")
+        .def("update", &Novelty::update, py::arg("dt"), "Update novelty state")
+        .def("signalNewStimulus", &Novelty::signalNewStimulus, py::arg("stimulusIntensity"),
+             "Signal detection of novel stimulus");
+
+    py::class_<PredictionError, Neuromodulator>(m, "PredictionError", R"pbdoc(Prediction error neuromodulator for learning from surprises)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &PredictionError::getLevel, "Get prediction error level")
+        .def("setLevel", &PredictionError::setLevel, py::arg("level"), "Set prediction error level")
+        .def("getPlasticityFactor", &PredictionError::getPlasticityFactor,
+             "Get prediction error-modulated plasticity factor")
+        .def("update", &PredictionError::update, py::arg("dt"), "Update prediction error state")
+        .def("signalError", &PredictionError::signalError, py::arg("errorMagnitude"),
+             "Signal prediction error");
+
+    py::class_<Reward, Neuromodulator>(m, "Reward", R"pbdoc(Reward neuromodulator for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Reward::getLevel, "Get reward level")
+        .def("setLevel", &Reward::setLevel, py::arg("level"), "Set reward level")
+        .def("getPlasticityFactor", &Reward::getPlasticityFactor,
+             "Get reward-modulated plasticity factor")
+        .def("update", &Reward::update, py::arg("dt"), "Update reward state")
+        .def("signalOutcome", &Reward::signalOutcome, py::arg("outcomeValue"),
+             "Signal environmental outcome");
+
+    py::class_<Hebbian, PlasticityRule>(m, "Hebbian", R"pbdoc(Hebbian plasticity rule: 'neurons that fire together, wire together')pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update,
+             py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on pre/post synaptic activity")
+        .def("applyWeightChange", &Hebbian::applyWeightChange,
+             py::arg("synapse"), py::arg("delta"), "Apply weight change to synapse")
+        .def("getName", &Hebbian::getName, "Get plasticity rule name")
+        .def("setLearningRate", &Hebbian::setLearningRate, py::arg("rate"), "Set learning rate")
+        .def("getLearningRate", &Hebbian::getLearningRate, "Get current learning rate")
+        .def("getWeight", &Hebbian::getWeight, "Get current synaptic weight")
+        .def("setWeight", &Hebbian::setWeight, py::arg("weight"), "Set synaptic weight");
+
+    py::class_<BCM, PlasticityRule>(m, "BCM", R"pbdoc(Bienenstock-Cooper-Munro (BCM) plasticity rule for supervised learning)pbdoc")
+        .def(py::init<>())
+        .def("update", &BCM::update,
+             py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights using BCM rule")
+        .def("applyWeightChange", &BCM::applyWeightChange,
+             py::arg("synapse"), py::arg("delta"), "Apply weight change to synapse")
+        .def("getName", &BCM::getName, "Get plasticity rule name")
+        .def("setLearningRate", &BCM::setLearningRate, py::arg("rate"), "Set learning rate")
+        .def("getLearningRate", &BCM::getLearningRate, "Get current learning rate")
+        .def("setThreshold", &BCM::setThreshold, py::arg("threshold"), "Set BCM threshold")
+        .def("getThreshold", &BCM::getThreshold, "Get current BCM threshold");
+
+    py::class_<AntiHebbian, PlasticityRule>(m, "AntiHebbian", R"pbdoc(Anti-Hebbian plasticity rule: 'neurons that fire together, unwire together')pbdoc")
+        .def(py::init<>())
+        .def("update", &AntiHebbian::update,
+             py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights using anti-Hebbian rule")
+        .def("applyWeightChange", &AntiHebbian::applyWeightChange,
+             py::arg("synapse"), py::arg("delta"), "Apply weight change to synapse")
+        .def("getName", &AntiHebbian::getName, "Get plasticity rule name")
+        .def("setLearningRate", &AntiHebbian::setLearningRate, py::arg("rate"), "Set learning rate")
+        .def("getLearningRate", &AntiHebbian::getLearningRate, "Get current learning rate");
+
+    m.def("createDopamine", []() -> std::shared_ptr<Dopamine> {
+        return std::make_shared<Dopamine>();
+    }, "Create a new dopamine neuromodulator");
+
+    m.def("createAcetylcholine", []() -> std::shared_ptr<Acetylcholine> {
+        return std::make_shared<Acetylcholine>();
+    }, "Create a new acetylcholine neuromodulator");
+
+    m.def("createNorepinephrine", []() -> std::shared_ptr<Norepinephrine> {
+        return std::make_shared<Norepinephrine>();
+    }, "Create a new norepinephrine neuromodulator");
+
+    m.def("createSerotonin", []() -> std::shared_ptr<Serotonin> {
+        return std::make_shared<Serotonin>();
+    }, "Create a new serotonin neuromodulator");
+
+    m.def("createCuriosity", []() -> std::shared_ptr<Curiosity> {
+        return std::make_shared<Curiosity>();
+    }, "Create a new curiosity neuromodulator");
+
+    m.def("createNovelty", []() -> std::shared_ptr<Novelty> {
+        return std::make_shared<Novelty>();
+    }, "Create a new novelty neuromodulator");
+
+    m.def("createPredictionError", []() -> std::shared_ptr<PredictionError> {
+        return std::make_shared<PredictionError>();
+    }, "Create a new prediction error neuromodulator");
+
+    m.def("createReward", []() -> std::shared_ptr<Reward> {
+        return std::make_shared<Reward>();
+    }, "Create a new reward neuromodulator");
+
+    m.def("createHebbian", []() -> std::shared_ptr<Hebbian> {
+        return std::make_shared<Hebbian>();
+    }, "Create a new Hebbian plasticity rule");
+
+    m.def("createBCM", []() -> std::shared_ptr<BCM> {
+        return std::make_shared<BCM>();
+    }, "Create a new BCM plasticity rule");
+
+    m.def("createAntiHebbian", []() -> std::shared_ptr<AntiHebbian> {
+        return std::make_shared<AntiHebbian>();
+    }, "Create a new anti-Hebbian plasticity rule");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

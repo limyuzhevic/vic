@@ -1,21 +1,29 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 namespace nlm {
 
+// Forward declarations
+class Brain;
+class NeuralRegion;
+
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// Uses neural activity patterns to predict future observations
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
-    // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // Initialize prediction system with brain reference
+    void initialize(Brain* brain);
+    
+    // Make prediction for next timestep based on current neural state
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -31,8 +39,17 @@ public:
     const std::vector<float>& getErrorHistory() const;
     void clearHistory();
     
-    // Train prediction model
+    // Train prediction model with observation
     void train(const SensoryInput& observation);
+    
+    // Update prediction system with current neural activity
+    void update(Timestamp currentTime);
+    
+    // Get neural prediction confidence based on activity patterns
+    float getNeuralConfidence() const;
+    
+    // Reset prediction system
+    void reset();
     
 private:
     struct Impl;

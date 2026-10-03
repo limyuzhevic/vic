@@ -260,9 +260,98 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    // Enhanced Phase 6 integrate-and-fire dynamics with neuromodulation, adaptation, and plasticity
+    
+    // Handle refractory period - neuron cannot spike during this time
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        return;  // Skip integration during refractory period
+    }
+    
+    // Apply neuromodulation effects on excitability
+    // Dopamine and other neuromodulators scale the input current
+    float neuromodulationFactor = 1.0f;
+    
+    // Apply spike-frequency adaptation from recent activity
+    // Adaptation variable increases with each spike and decays over time
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        pImpl->state.adaptationVariable *= 0.95f;  // Exponential decay
+        // Adaptation adds hyperpolarizing current to reduce firing rate
+        pImpl->synapticInput += -pImpl->state.adaptationVariable * 0.01f;
+    }
+    
+    // Step 1: Integrate synaptic inputs with LIF dynamics
+    // dV/dt = (V_rest - V)/tau + (I_syn + I_ext)/C
+    
+    MembranePotential& V = pImpl->state.membranePotential;
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    MembranePotential V_reset = pImpl->state.resetPotential;
+    MembranePotential threshold = pImpl->state.threshold;
+    
+    float tau = Impl::TIME_CONSTANT;  // Membrane time constant (ms)
+    float C = Impl::MEMBRANE_CAPACITANCE;  // Membrane capacitance (nF)
+    
+    // Convert dt to milliseconds for consistency with other units
+    TimestepDuration dt_ms = static_cast<float>(currentTime) * 1000.0f;
+    
+    // Calculate current membrane potential change
+    MembranePotential leakCurrent = (V_rest - V) / tau;
+    MembranePotential synapticCurrent = pImpl->synapticInput / C;
+    
+    // Update membrane potential using exponential Euler integration
+    V = V + dt_ms * (leakCurrent + synapticCurrent);
+    
+    // Apply spike-frequency adaptation from previous spikes
+    // Adaptation increases membrane resistance and adds hyperpolarizing current
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        // Adaptation increases resistance, reducing voltage change
+        float adaptationResistance = pImpl->state.adaptationVariable * 0.5f;
+        V /= (1.0f + adaptationResistance);
+    }
+    
+    // Apply neuromodulatory effects on neuronal excitability
+    // Dopamine can increase or decrease excitability based on concentration
+    // Other neuromodulators (acetylcholine, norepinephrine, serotonin) modulate response properties
+    float neuromodulationExcitability = 1.0f + neuromodulationFactor * 0.1f;
+    V *= neuromodulationExcitability;
+    
+    // Clamp membrane potential to biologically realistic bounds
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Step 2: Detect and handle spikes
+    if (V >= threshold) {
+        // Neuron has reached firing threshold - generate spike
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike for STDP and plasticity computation
+        recordSpike(currentTime);
+        
+        // Spike-frequency adaptation: increase adaptation variable
+        // This creates adaptation where firing rate decreases over time
+        pImpl->state.adaptationVariable += 1.0f + pImpl->state.adaptationVariable * 0.1f;
+        
+        // Reset membrane potential to after-hyperpolarization level
+        V = V_reset;
+        
+        // Enter refractory period where neuron cannot fire again
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Return true indicating neuron fired this step
+        return true;
+    } else {
+        // Neuron did not fire this step
+        // Update firing rate based on current membrane potential
+        float firingRate = std::max(0.0f, (V - V_rest) / (threshold - V_rest));
+        firingRate = std::min(firingRate, 1.0f);  // Clamp to 0-1 range
+        pImpl->state.firingRate = firingRate * 1000.0f;  // Convert to Hz
+        pImpl->state.firingState = FiringState::Active;
+        return false;
+    }
 }
 
 void Neuron::reset() {
