@@ -165,11 +165,20 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("No neurons found in region 1");
+        return;
+    }
+    
+    // Validate brain has spike system for proper stepping
+    if (!brain->getSpikeSystem()) {
+        NLM_LOG_ERROR("Brain missing spike system - cannot run connectivity test");
         return;
     }
     
@@ -178,13 +187,25 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    size_t neuronsToInject = std::min(size_t(10), neurons.size());
+    for (size_t i = 0; i < neuronsToInject; ++i) {
+        if (neurons[i]) {
+            neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        }
     }
     
-    // Run a few steps
+    // Run a few steps with error checking
+    bool stepsCompleted = true;
     for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+        if (!brain->step(step, step * 0.001)) {
+            NLM_LOG_ERROR("Brain step failed at step " + std::to_string(step));
+            stepsCompleted = false;
+            break;
+        }
+    }
+    
+    if (!stepsCompleted) {
+        NLM_LOG_WARNING("Connectivity test stopped early due to errors");
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -195,9 +216,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
-            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
-                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            if (neurons[i]) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()));
+            }
         }
     }
 }
@@ -213,9 +236,17 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        auto& synapses = region->getSynapses();
+        if (synapses.empty()) {
+            NLM_LOG_WARNING("No synapses found in region 1, cannot enable plasticity");
+        } else {
+            for (auto& syn : synapses) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
+            NLM_LOG_INFO("Enabled plasticity on " + std::to_string(synapses.size()) + " synapses");
         }
+    } else {
+        NLM_LOG_ERROR("Region 1 not found, cannot enable plasticity");
     }
     
     // Apply repeated input pattern to stimulate learning
@@ -250,24 +281,39 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Region 1 not found for STDP verification");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+        NLM_LOG_INFO("  Not enough synapses for STDP test (found " + 
+                    std::to_string(synapses.size()) + ", need at least 5)");
         return;
     }
-    
+
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
     // Record initial weights
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
+    beforeWeights.reserve(5);
+    bool plasticityEnabled = false;
+    
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
                     " before: " + std::to_string(beforeWeights[i]));
+        if (synapses[i]->getPlasticityFlags().stdp) {
+            plasticityEnabled = true;
+        }
+    }
+    
+    if (!plasticityEnabled) {
+        NLM_LOG_ERROR("Failed to enable STDP plasticity on synapses");
+        return;
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -356,11 +402,11 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (log warning if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Could not load configuration from " + configFile + "; using defaults.");
     }
     
     // Override with command line args

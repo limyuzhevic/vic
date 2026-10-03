@@ -115,9 +115,61 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Validate key before setting
+    if (key.empty()) {
+        throw std::invalid_argument("Configuration key cannot be empty");
+    }
     
+    // Basic validation based on key name
+    std::string lowerKey = toLower(key);
+    
+    if (lowerKey == "neuron_count") {
+        if (std::holds_alternative<int>(value)) {
+            int neuronCount = std::get<int>(value);
+            if (neuronCount <= 0) {
+                throw std::invalid_argument("neuron_count must be positive (> 0)");
+            }
+        } else if (std::holds_alternative<int64_t>(value)) {
+            int64_t neuronCount = std::get<int64_t>(value);
+            if (neuronCount <= 0) {
+                throw std::invalid_argument("neuron_count must be positive (> 0)");
+            }
+        } else {
+            throw std::invalid_argument("neuron_count must be a numeric value");
+        }
+    }
+    
+    if (lowerKey == "simulation_timestep") {
+        if (std::holds_alternative<double>(value)) {
+            double timestep = std::get<double>(value);
+            if (timestep <= 0.0) {
+                throw std::invalid_argument("simulation_timestep must be positive (> 0)");
+            }
+        } else {
+            throw std::invalid_argument("simulation_timestep must be a numeric value");
+        }
+    }
+    
+    if (lowerKey == "connection_probability") {
+        if (std::holds_alternative<double>(value)) {
+            double prob = std::get<double>(value);
+            if (prob < 0.0 || prob > 1.0) {
+                throw std::invalid_argument("connection_probability must be between 0.0 and 1.0");
+            }
+        } else {
+            throw std::invalid_argument("connection_probability must be a numeric value between 0.0 and 1.0");
+        }
+    }
+    
+    // Check for duplicate keys (prevent overriding with same source)
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });n
+    if (it != pImpl->entries.end() && it->source == source) {
+        // Same source overriding - this is generally okay, but log it
+        // Could add logging here if needed
+    }
+    
+    // Set the value
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
