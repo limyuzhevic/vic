@@ -141,7 +141,20 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 
 # Testing
 enable_testing()
-add_subdirectory(tests)
+
+# Add test executables
+add_executable(test_basic_connectivity src/tests/basic_connectivity_test.cpp)
+target_link_libraries(test_basic_connectivity nlm_core)
+
+add_executable(test_plasticity src/tests/plasticity_test.cpp)
+target_link_libraries(test_plasticity nlm_core)
+
+add_executable(test_stdp src/tests/stdp_test.cpp)
+target_link_libraries(test_stdp nlm_core)
+
+add_test(NAME basic_connectivity_test COMMAND test_basic_connectivity)
+add_test(NAME plasticity_test COMMAND test_plasticity)
+add_test(NAME stdp_test COMMAND test_stdp)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
