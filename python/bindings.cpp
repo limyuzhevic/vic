@@ -142,6 +142,73 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Advanced Experiment Configuration and Result structures
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", R"pbdoc(Phase 6 integration test results)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readwrite("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readwrite("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readwrite("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readwrite("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readwrite("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readwrite("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readwrite("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readwrite("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readwrite("dopamineLevel", &Phase6IntegrationResult::dopamineLevel)
+        .def_readwrite("startTime", &Phase6IntegrationResult::startTime)
+        .def_readwrite("endTime", &Phase6IntegrationResult::endTime)
+        .def_readwrite("totalWallClockTime", &Phase6IntegrationResult::totalWallClockTime);
+
+    // Advanced Experiment Configuration
+    py::class_<AdvancedExperiment::AdvancedConfig>(m, "AdvancedConfig", R"pbdoc(Advanced experiment configuration)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("maxSteps", &AdvancedExperiment::AdvancedConfig::maxSteps)
+        .def_readwrite("neuronCount", &AdvancedExperiment::AdvancedConfig::neuronCount)
+        .def_readwrite("regionCount", &AdvancedExperiment::AdvancedConfig::regionCount)
+        .def_readwrite("connectionProbability", &AdvancedExperiment::AdvancedConfig::connectionProbability)
+        .def_readwrite("enableCheckpointing", &AdvancedExperiment::AdvancedConfig::enableCheckpointing)
+        .def_readwrite("enableReplay", &AdvancedExperiment::AdvancedConfig::enableReplay)
+        .def_readwrite("enableDevelopment", &AdvancedExperiment::AdvancedConfig::enableDevelopment)
+        .def_readwrite("enableAdvancedLearning", &AdvancedExperiment::AdvancedConfig::enableAdvancedLearning)
+        .def_readwrite("enableMultiTaskLearning", &AdvancedExperiment::AdvancedConfig::enableMultiTaskLearning)
+        .def_readwrite("enableMetaLearning", &AdvancedExperiment::AdvancedConfig::enableMetaLearning)
+        .def_readwrite("learningRate", &AdvancedExperiment::AdvancedConfig::learningRate)
+        .def_readwrite("explorationRate", &AdvancedExperiment::AdvancedConfig::explorationRate)
+        .def_readwrite("noveltyThreshold", &AdvancedExperiment::AdvancedConfig::noveltyThreshold)
+        .def_readwrite("checkpointPath", &AdvancedExperiment::AdvancedConfig::checkpointPath)
+        .def_readwrite("usePolicyGradient", &AdvancedExperiment::AdvancedConfig::usePolicyGradient)
+        .def_readwrite("useReinforcementLearning", &AdvancedExperiment::AdvancedConfig::useReinforcementLearning)
+        .def_readwrite("useCurriculumLearning", &AdvancedExperiment::AdvancedConfig::useCurriculumLearning)
+        .def_readwrite("useTransferLearning", &AdvancedExperiment::AdvancedConfig::useTransferLearning)
+        .def_readwrite("rewardDecay", &AdvancedExperiment::AdvancedConfig::rewardDecay)
+        .def_readwrite("curiosityExploration", &AdvancedExperiment::AdvancedConfig::curiosityExploration)
+        .def_readwrite("enablePerformanceMonitoring", &AdvancedExperiment::AdvancedConfig::enablePerformanceMonitoring)
+        .def_readwrite("enableDetailedLogging", &AdvancedExperiment::AdvancedConfig::enableDetailedLogging)
+        .def_readwrite("logInterval", &AdvancedExperiment::AdvancedConfig::logInterval);
+
+    // Advanced Experiment Results
+    py::class_<AdvancedExperiment::AdvancedResult>(m, "AdvancedResult", R"pbdoc(Advanced experiment comprehensive results)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("totalReward", &AdvancedExperiment::AdvancedResult::totalReward)
+        .def_readwrite("avgFiringRate", &AdvancedExperiment::AdvancedResult::avgFiringRate)
+        .def_readwrite("policyGradientScore", &AdvancedExperiment::AdvancedResult::policyGradientScore)
+        .def_readwrite("reinforcementLearningReturn", &AdvancedExperiment::AdvancedResult::reinforcementLearningReturn)
+        .def_readwrite("curriculumLearningProgress", &AdvancedExperiment::AdvancedResult::curriculumLearningProgress)
+        .def_readwrite("dopamineLevel", &AdvancedExperiment::AdvancedResult::dopamineLevel)
+        .def_readwrite("curiosityLevel", &AdvancedExperiment::AdvancedResult::curiosityLevel)
+        .def_readwrite("workingMemoryEfficiency", &AdvancedExperiment::AdvancedResult::workingMemoryEfficiency)
+        .def_readwrite("episodicMemoryAccuracy", &AdvancedExperiment::AdvancedResult::episodicMemoryAccuracy)
+        .def_readwrite("simulationSpeed", &AdvancedExperiment::AdvancedResult::simulationSpeed)
+        .def_readwrite("wallClockTime", &AdvancedExperiment::AdvancedResult::wallClockTime)
+        .def_readwrite("systemStable", &AdvancedExperiment::AdvancedResult::systemStable)
+        .def_readwrite("learningCurveProgress", &AdvancedExperiment::AdvancedResult::learningCurveProgress)
+        .def_readwrite("generalizationAccuracy", &AdvancedExperiment::AdvancedResult::generalizationAccuracy);
+
+    // Advanced Experiment class
+    py::class_<AdvancedExperiment>(m, "AdvancedExperiment", R"pbdoc(Advanced experiment with sophisticated learning protocols)pbdoc")
+        .def(py::init<>())
+        .def("run", &AdvancedExperiment::run, py::arg("config"), R"pbdoc(Run advanced experiment with learning protocols)pbdoc");
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),

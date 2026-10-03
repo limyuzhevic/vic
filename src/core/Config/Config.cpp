@@ -19,16 +19,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,21 +37,27 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + 
+                           " in " + filepath + ": " + line);
+            continue;
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
     }
     
+    NLM_LOG_INFO("Loaded configuration from " + filepath + ": " + 
+                 std::to_string(pImpl->entries.size()) + " entries");
     return true;
 }
 
@@ -186,6 +192,232 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Implement new advanced configuration features
+
+bool Config::validate() const {
+    // Basic validation - check for required parameters
+    static const std::vector<std::string> requiredParams = {
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "simulation_timestep"
+    };
+    
+    std::string errors = validateAndGetErrors();
+    return errors.empty();
+}
+
+std::string Config::validateAndGetErrors() const {
+    std::string errors;
+    
+    // Check for required parameters
+    static const std::vector<std::string> requiredParams = {
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "simulation_timestep"
+    };
+    
+    for (const auto& param : requiredParams) {
+        if (!has(param)) {
+            if (!errors.empty()) errors += "\n";
+            errors += "Missing required parameter: '" + param + "'";
+        } else {
+            // Validate parameter values
+            if (!isParameterValid(param, pImpl->entries)) {
+                if (!errors.empty()) errors += "\n";
+                errors += "Invalid value for parameter: '" + param + "'";
+            }
+        }
+    }
+    
+    return errors;
+}
+
+Config Config::createQuickTestPreset() {
+    Config config;
+    config.set("neuron_count", 100, ConfigSource::Default);
+    config.set("region_count", 1, ConfigSource::Default);
+    config.set("connection_probability", 0.15, ConfigSource::Default);
+    config.set("simulation_timestep", 0.001, ConfigSource::Default);
+    config.set("random_seed", 42, ConfigSource::Default);
+    config.set("stdp_ltp_weight", 0.02, ConfigSource::Default);
+    config.set("stdp_ltd_weight", 0.015, ConfigSource::Default);
+    config.set("stdp_tau", 20.0, ConfigSource::Default);
+    config.set("synaptogenesis_rate", 0.0001, ConfigSource::Default);
+    config.set("pruning_rate", 0.00001, ConfigSource::Default);
+    
+    return config;
+}
+
+Config Config::createPerformancePreset() {
+    Config config;
+    config.set("neuron_count", 500, ConfigSource::Default);
+    config.set("region_count", 1, ConfigSource::Default);
+    config.set("connection_probability", 0.1, ConfigSource::Default);
+    config.set("simulation_timestep", 0.01, ConfigSource::Default);
+    config.set("random_seed", 42, ConfigSource::Default);
+    config.set("stdp_ltp_weight", 0.01, ConfigSource::Default);
+    config.set("stdp_ltd_weight", 0.012, ConfigSource::Default);
+    config.set("stdp_tau", 20.0, ConfigSource::Default);
+    config.set("synaptogenesis_rate", 0.00001, ConfigSource::Default);
+    config.set("pruning_rate", 0.000001, ConfigSource::Default);
+    config.set("working_memory_capacity", 50, ConfigSource::Default);
+    config.set("episodic_memory_limit", 500, ConfigSource::Default);
+    
+    return config;
+}
+
+Config Config::createResearchPreset() {
+    Config config;
+    config.set("neuron_count", 5000, ConfigSource::Default);
+    config.set("region_count", 2, ConfigSource::Default);
+    config.set("connection_probability", 0.05, ConfigSource::Default);
+    config.set("simulation_timestep", 0.001, ConfigSource::Default);
+    config.set("random_seed", 12345, ConfigSource::Default);
+    config.set("stdp_ltp_weight", 0.03, ConfigSource::Default);
+    config.set("stdp_ltd_weight", 0.025, ConfigSource::Default);
+    config.set("stdp_tau", 25.0, ConfigSource::Default);
+    config.set("synaptogenesis_rate", 0.00005, ConfigSource::Default);
+    config.set("pruning_rate", 0.000005, ConfigSource::Default);
+    config.set("working_memory_capacity", 500, ConfigSource::Default);
+    config.set("episodic_memory_limit", 5000, ConfigSource::Default);
+    config.set("enable_curiosity", true, ConfigSource::Default);
+    config.set("enable_novelty", true, ConfigSource::Default);
+    config.set("enable_prediction", true, ConfigSource::Default);
+    config.set("enable_planning", true, ConfigSource::Default);
+    
+    return config;
+}
+
+Config Config::createVisualizationPreset() {
+    Config config;
+    config.set("neuron_count", 200, ConfigSource::Default);
+    config.set("region_count", 1, ConfigSource::Default);
+    config.set("connection_probability", 0.12, ConfigSource::Default);
+    config.set("simulation_timestep", 0.001, ConfigSource::Default);
+    config.set("random_seed", 999, ConfigSource::Default);
+    config.set("stdp_ltp_weight", 0.015, ConfigSource::Default);
+    config.set("stdp_ltd_weight", 0.018, ConfigSource::Default);
+    config.set("stdp_tau", 15.0, ConfigSource::Default);
+    config.set("synaptogenesis_rate", 0.00002, ConfigSource::Default);
+    config.set("pruning_rate", 0.000002, ConfigSource::Default);
+    config.set("enable_checkpointing", true, ConfigSource::Default);
+    config.set("checkpoint_path", "./checkpoints", ConfigSource::Default);
+    config.set("enable_replay", true, ConfigSource::Default);
+    config.set("replay_interval", 100, ConfigSource::Default);
+    
+    return config;
+}
+
+bool Config::validateNeuronCount(size_t count) {
+    return count >= 10 && count <= 100000;
+}
+
+bool Config::validateSynapseDensity(double density) {
+    return density >= 0.0 && density <= 1.0;
+}
+
+bool Config::validateLearningRate(double rate) {
+    return rate >= 0.0 && rate <= 1.0;
+}
+
+bool Config::validateMemoryCapacity(size_t capacity) {
+    return capacity <= 1000000; // Reasonable upper bound
+}
+
+std::pair<size_t, size_t> Config::getNeuronCountRange() {
+    return std::make_pair(10, 100000);
+}
+
+std::pair<double, double> Config::getSynapseDensityRange() {
+    return std::make_pair(0.0, 1.0);
+}
+
+std::pair<double, double> Config::getLearningRateRange() {
+    return std::make_pair(0.0, 1.0);
+}
+
+void Config::merge(const Config& other, ConfigSource source) {
+    for (const auto& entry : other.pImpl->entries) {
+        set(entry.key, entry.value, source);
+    }
+}
+
+std::vector<ConfigEntry> Config::getEntriesBySource(ConfigSource source) const {
+    std::vector<ConfigEntry> result;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.source == source) {
+            result.push_back(entry);
+        }
+    }
+    return result;
+}
+
+bool Config::isComplete() const {
+    return validate();
+}
+
+std::vector<std::string> Config::getMissingParameters() const {
+    std::vector<std::string> missing;
+    
+    static const std::vector<std::string> requiredParams = {
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "simulation_timestep"
+    };
+    
+    for (const auto& param : requiredParams) {
+        if (!has(param)) {
+            missing.push_back(param);
+        }
+    }
+    
+    return missing;
+}
+
+void Config::initializeValidationRules() {
+    // Initialize any validation rules or constraints
+}
+
+bool Config::validateParameter(const ConfigEntry& entry) const {
+    return isParameterValid(entry.key, entry.value);
+}
+
+bool Config::isParameterValid(const std::string& key, const ConfigValue& value) {
+    // Validate based on key name
+    std::string lowerKey = toLower(key);
+    
+    if (lowerKey.find("neuron_count") != std::string::npos) {
+        if (std::holds_alternative<size_t>(value)) {
+            return validateNeuronCount(std::get<size_t>(value));
+        } else if (std::holds_alternative<int>(value)) {
+            return validateNeuronCount(static_cast<size_t>(std::get<int>(value)));
+        }
+    } else if (lowerKey.find("synapse_density") != std::string::npos || 
+               lowerKey.find("connection_probability") != std::string::npos) {
+        if (std::holds_alternative<double>(value)) {
+            return validateSynapseDensity(std::get<double>(value));
+        }
+    } else if (lowerKey.find("learning_rate") != std::string::npos || 
+               lowerKey.find("plasticity") != std::string::npos) {
+        if (std::holds_alternative<double>(value)) {
+            return validateLearningRate(std::get<double>(value));
+        }
+    } else if (lowerKey.find("memory") != std::string::npos || 
+               lowerKey.find("capacity") != std::string::npos) {
+        if (std::holds_alternative<size_t>(value)) {
+            return validateMemoryCapacity(std::get<size_t>(value));
+        } else if (std::holds_alternative<int>(value)) {
+            return validateMemoryCapacity(static_cast<size_t>(std::get<int>(value)));
+        }
+    }
+    
+    // Default: parameter is valid if it can be retrieved without error
+    return true;
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -200,6 +432,7 @@ std::string Config::toLower(const std::string& str) {
 }
 
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

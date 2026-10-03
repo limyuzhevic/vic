@@ -93,6 +93,41 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // === ADVANCED CONFIGURATION FEATURES ===
+    
+    // Validation functions
+    bool validate() const;
+    std::string validateAndGetErrors() const;
+    
+    // Preset configurations for common use cases
+    static Config createQuickTestConfig();
+    static Config createPerformanceConfig();
+    static Config createResearchConfig();
+    static Config createVisualizationConfig();
+    
+    // Validate specific parameter ranges
+    static bool validateNeuronCount(size_t count);
+    static bool validateSynapseDensity(double density);
+    static bool validateLearningRate(double rate);
+    static bool validateMemoryCapacity(size_t capacity);
+    
+    // Get parameter ranges for validation
+    static std::pair<size_t, size_t> getNeuronCountRange();
+    static std::pair<double, double> getSynapseDensityRange();
+    static std::pair<double, double> getLearningRateRange();
+    
+    // Merge configuration from multiple sources
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Get configuration by source
+    std::vector<ConfigEntry> getEntriesBySource(ConfigSource source) const;
+    
+    // Check if configuration is complete (has all required parameters)
+    bool isComplete() const;
+    
+    // Get missing required parameters
+    std::vector<std::string> getMissingParameters() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +135,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // Validation helper methods
+    void initializeValidationRules();
+    bool validateParameter(const ConfigEntry& entry) const;
+    static bool isParameterValid(const std::string& key, const ConfigValue& value);
+    
+    // Preset configuration implementations
+    static Config createQuickTestPreset();
+    static Config createPerformancePreset();
+    static Config createResearchPreset();
+    static Config createVisualizationPreset();
+    };
 
 } // namespace nlm
