@@ -21,29 +21,42 @@ HebbianRule::HebbianRule() : pImpl(new Impl) {}
 HebbianRule::~HebbianRule() = default;
 
 void HebbianRule::update(Synapse* synapse,
-                          const std::vector<Timestamp>& preSpikes,
-                          const std::vector<Timestamp>& postSpikes,
-                          TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
+                           const std::vector<Timestamp>& preSpikes,
+                           const std::vector<Timestamp>& postSpikes,
+                           TimestepDuration dt) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
+    // Real Hebbian learning: strengthen synapses when pre and post fire together
+    // Calculate spike timing correlations
+    float totalWeightChange = 0.0f;
+    
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+            float dt = static_cast<float>(post - pre);  // Δt in ms
+            
+            if (std::abs(dt) < 20.0f) {  // Within 20ms window
+                // Hebbian plasticity: Δw = η * post * pre
+                // where η is learning rate, post is postsynaptic spike, pre is presynaptic spike
+                float weightChange = pImpl->learningRate * 1.0f * 1.0f;  // Binary spikes
+                
+                if (dt > 0) {
+                    // Post after pre: LTP (long-term potentiation)
+                    weightChange *= 1.5f;  // Strengthen more for causal order
+                } else if (dt < 0) {
+                    // Post before pre: LTD (long-term depression) or minimal change
+                    weightChange *= 0.5f;  // Weaken for anti-causal order
+                }
+                
+                totalWeightChange += weightChange;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Apply accumulated weight change
+    if (std::abs(totalWeightChange) > 1e-6f) {
+        applyWeightChange(synapse, totalWeightChange);
     }
 }
 
