@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include "Profiling/ProfilingSystem.hpp"
 
 namespace nlm {
 
@@ -64,7 +65,7 @@ private:
     std::string levelToColor(LogLevel level) const;
 };
 
-// Main Logger class
+// Main Logger class with profiling integration
 class Logger {
 public:
     Logger();
@@ -103,7 +104,30 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Profiling integration
+    void setProfilingEnabled(bool enabled);
+    bool isProfilingEnabled() const;
+    std::string generateProfilingReport() const;
+    bool saveProfilingReports(const std::string& directory) const;
+    
+    // Performance timing utilities
+    static double timeFunction(const std::string& name, std::function<void()> func);
+    
+    // Metrics collection
+    void recordMetric(const std::string& name, double value,
+                     const std::map<std::string, std::string>& labels = {});
+    
+    // Debug and performance assertions
+    bool assert(bool condition, const std::string& message = "Assertion failed") const;
+    bool assertPerformance(const std::string& testName, double maxTimeSeconds,
+                          std::function<void()> testFunc) const;
+    
+    // Debug mode control
+    void setDebugMode(bool enabled);
+    bool isDebugMode() const;
+    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -115,6 +139,18 @@ private:
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Performance timing macros
+#define NLM_TIME_FUNCTION(name, func) nlm::Logger::timeFunction(name, func)
+#define NLM_PROFILE_SCOPE(name) nlm::Profiling::ScopedTimer timer_##__LINE__(name)
+
+// Performance assertion macros
+#define NLM_ASSERT_PERFORMANCE(testName, maxTime, func) \
+    nlm::Logger::getGlobal().assertPerformance(testName, maxTime, func)
+
+// Debug mode macros
+#define NLM_DEBUG_ENABLED() nlm::Logger::getGlobal().isDebugMode()
+#define NLM_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
 
 // Stream-style logging helper
 class LogStream {

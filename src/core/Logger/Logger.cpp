@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <algorithm>
 
 namespace nlm {
 
@@ -12,6 +13,7 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    bool profilingEnabled = false;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -51,6 +53,14 @@ void ConsoleLogger::log(const LogEntry& entry) {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+    }
+    
+    // Send to profiler if enabled
+    if (pImpl->profilingEnabled) {
+        Profiler& profiler = ProfilingSystem::getInstance().getProfiler();
+        profiler.start("log_output");
+        NLM_LOG_DEBUG("Logged: " + entry.message);
+        profiler.stop("log_output");
     }
 }
 
@@ -106,6 +116,8 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    bool profilingEnabled = false;
+    bool debugMode = false;
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -144,6 +156,11 @@ void Logger::log(LogLevel level, const std::string& message,
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
+    
+    // Send to metrics collector
+    ProfilingSystem::getInstance().getMetricsCollector().record(
+        "log_" + std::to_string(static_cast<int>(level)), 1.0
+    );
 }
 
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
@@ -184,6 +201,92 @@ Logger& Logger::getGlobal() {
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // This is a placeholder for advanced global logger management
     // In practice, we just use getGlobal() which is already static
+}
+
+void Logger::setProfilingEnabled(bool enabled) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->profilingEnabled = enabled;
+    
+    for (auto& logger : pImpl->loggers) {
+        auto consoleLogger = std::dynamic_pointer_cast<ConsoleLogger>(logger);
+        if (consoleLogger) {
+            consoleLogger->pImpl->profilingEnabled = enabled;
+        }
+    }
+}
+
+bool Logger::isProfilingEnabled() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->profilingEnabled;
+}
+
+std::string Logger::generateProfilingReport() const {
+    return ProfilingSystem::getInstance().generateReport();
+}
+
+bool Logger::saveProfilingReports(const std::string& directory) const {
+    return ProfilingSystem::getInstance().saveReports(directory);
+}
+
+double Logger::timeFunction(const std::string& name, std::function<void()> func) {
+    auto start = std::chrono::high_resolution_clock::now();
+    func();
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    double duration = std::chrono::duration<double>(end - start).count();
+    
+    // Record in profiler
+    Profiler& profiler = ProfilingSystem::getInstance().getProfiler();
+    profiler.start(name);
+    func();
+    profiler.stop(name);
+    
+    return duration;
+}
+
+void Logger::recordMetric(const std::string& name, double value,
+                         const std::map<std::string, std::string>& labels) {
+    ProfilingSystem::getInstance().getMetricsCollector().record(name, value, labels);
+}
+
+bool Logger::assert(bool condition, const std::string& message) const {
+    if (!condition) {
+        error("ASSERTION FAILED: " + message);
+    }
+    return condition;
+}
+
+bool Logger::assertPerformance(const std::string& testName, double maxTimeSeconds,
+                              std::function<void()> testFunc) const {
+    auto start = std::chrono::high_resolution_clock::now();
+    testFunc();
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    double elapsed = std::chrono::duration<double>(end - start).count();
+    
+    if (elapsed > maxTimeSeconds) {
+        error("Performance assertion failed: '" + testName + "' took " + 
+              std::to_string(elapsed) + "s (max: " + std::to_string(maxTimeSeconds) + "s)");
+        return false;
+    }
+    
+    return true;
+}
+
+void Logger::setDebugMode(bool enabled) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->debugMode = enabled;
+}
+
+bool Logger::isDebugMode() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->debugMode;
+}
+
+void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
+    if (pImpl->debugMode) {
+        log(LogLevel::Debug, message, file, line, function);
+    }
 }
 
 // LogStream implementation

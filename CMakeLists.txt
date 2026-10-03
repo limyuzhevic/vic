@@ -92,6 +92,28 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# CLI Framework
+add_library(nlm_cli STATIC
+    src/core/CLI/CLIFramework.cpp
+    src/core/Config/ConfigEnhanced.cpp
+)
+target_include_directories(nlm_cli PUBLIC src/core/CLI src/core/Config)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Profiling System
+add_library(nlm_profiling STATIC
+    src/core/Profiling/ProfilingSystem.cpp
+)
+target_include_directories(nlm_profiling PUBLIC src/core/Profiling)
+target_link_libraries(nlm_profiling PUBLIC nlm_core nlm_cli)
+
+# Performance Benchmarking
+add_library(nlm_performance STATIC
+    src/core/Performance/PerformanceBenchmark.cpp
+)
+target_include_directories(nlm_performance PUBLIC src/core/Performance)
+target_link_libraries(nlm_performance PUBLIC nlm_core nlm_cli nlm_profiling)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -138,6 +160,18 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# CLI Demo executable
+add_executable(nlm_cli_demo
+    src/demo/CLIDemo.cpp
+)
+target_link_libraries(nlm_cli_demo PUBLIC nlm_core nlm_cli nlm_profiling)
+
+# Phase 6 Demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
