@@ -1,0 +1,968 @@
+// Performance Monitoring and Profiling for NLM
+// 
+// This module provides comprehensive performance monitoring and profiling capabilities
+// for the NLM (Neural Learning Machine) framework. It includes:
+// 
+// 1. Performance metrics collection and tracking
+// 2. Profiling capabilities for detailed analysis
+// 3. Resource usage monitoring
+// 4. Performance benchmarking
+// 5. Performance alerts and thresholds
+// 6. Performance reporting and visualization
+// 7. Integration with existing logging system
+// 
+// Key features:
+// - Real-time performance monitoring
+// - Detailed profiling of neural operations
+// - Resource usage tracking (memory, CPU)
+// - Performance bottleneck detection
+// - Configurable performance thresholds
+// - Performance reports and statistics
+// - Integration with error handling system
+//
+
+#pragma once
+
+#include <string>
+#include <vector>
+#include <map>
+#include <chrono>
+#include <memory>
+#include <atomic>
+#include <mutex>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
+#include <functional>
+#include <thread>
+#include <unordered_map>
+
+using namespace std::chrono;
+
+namespace nlm {
+
+// Performance measurement types
+enum class MeasurementType {
+    Time,               // Duration of operations
+    Memory,            // Memory allocation/deallocation
+    CPU,               // CPU usage
+    I_O,               // I/O operations
+    Network,           // Network activity
+    Custom            // Custom metrics
+};
+
+// Performance threshold levels
+enum class ThresholdLevel {
+    Info,              // Informational threshold
+    Warning,           // Warning threshold
+    Critical,          // Critical threshold
+    Fatal              // Fatal threshold
+};
+
+// Performance alert structure
+struct PerformanceAlert {
+    std::string name;
+    ThresholdLevel level;
+    std::string message;
+    double currentValue;
+    double thresholdValue;
+    MeasurementType measurementType;
+    std::chrono::system_clock::time_point timestamp;
+    std::map<std::string, std::string> context;
+    
+    PerformanceAlert() : level(ThresholdLevel::Info), currentValue(0.0), thresholdValue(0.0) {}
+    
+    PerformanceAlert(const std::string& n, ThresholdLevel l, const std::string& msg,
+                     double current, double threshold, MeasurementType type = MeasurementType::Custom)
+        : name(n), level(l), message(msg), currentValue(current), 
+          thresholdValue(threshold), measurementType(type), 
+          timestamp(std::chrono::system_clock::now()) {}
+};
+
+// Performance measurement data
+struct PerformanceMeasurement {
+    std::string operation;
+    MeasurementType type;
+    double value;
+    std::chrono::system_clock::time_point timestamp;
+    std::map<std::string, std::string> metadata;
+    size_t threadId;
+    
+    PerformanceMeasurement() : type(MeasurementType::Custom), value(0.0), threadId(0) {}
+    
+    PerformanceMeasurement(const std::string& op, MeasurementType t, double val)
+        : operation(op), type(t), value(val), 
+          timestamp(std::chrono::system_clock::now()), threadId(0) {}
+};
+
+// Performance counter for tracking metrics
+class PerformanceCounter {
+public:
+    PerformanceCounter() : value(0), maxValue(0), minValue(0), total(0), count(0) {}
+    
+    void increment(double amount = 1.0) {
+        std::lock_guard<std::mutex> lock(mutex);
+        value += amount;
+        total += amount;
+        if (value > maxValue) maxValue = value;
+        if (count == 0 || value < minValue) minValue = value;
+        count++;
+    }
+    
+    void decrement(double amount = 1.0) {
+        std::lock_guard<std::mutex> lock(mutex);
+        value -= amount;
+        if (value < minValue) minValue = value;
+    }
+    
+    double getValue() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return value;
+    }
+    
+    double getAverage() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return count > 0 ? total / count : 0.0;
+    }
+    
+    double getMax() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return maxValue;
+    }
+    
+    double getMin() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return minValue;
+    }
+    
+    size_t getCount() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return count;
+    }
+    
+    void reset() {
+        std::lock_guard<std::mutex> lock(mutex);
+        value = 0.0;
+        maxValue = 0.0;
+        minValue = 0.0;
+        total = 0.0;
+        count = 0;
+    }
+    
+    std::string getStatistics() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::stringstream ss;
+        ss << "Value: " << value << ", "
+           << "Average: " << getAverage() << ", "
+           << "Min: " << minValue << ", "
+           << "Max: " << maxValue << ", "
+           << "Count: " << count;
+        return ss.str();
+    }
+    
+private:
+    mutable std::mutex mutex;
+    double value;
+    double maxValue;
+    double minValue;
+    double total;
+    size_t count;
+};
+
+// Performance profiler for detailed timing analysis
+class PerformanceProfiler {
+public:
+    struct ProfileData {
+        std::string operation;
+        std::chrono::duration<double> duration;
+        std::map<std::string, std::string> metadata;
+        size_t threadId;
+        std::chrono::system_clock::time_point timestamp;
+    };
+    
+    PerformanceProfiler(size_t maxProfiles = 10000) : maxProfiles(maxProfiles) {}
+    
+    void startProfile(const std::string& operation) {
+        std::lock_guard<std::mutex> lock(mutex);
+        profileStack.push_back({operation, std::chrono::steady_clock::now(), {}, getCurrentThreadId()});
+    }
+    
+    void endProfile(const std::string& operation) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!profileStack.empty()) {
+            auto startTime = profileStack.back().startTime;
+            auto endTime = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(endTime - startTime);
+            
+            ProfileData profile;
+            profile.operation = operation;
+            profile.duration = duration;
+            profile.metadata = profileStack.back().metadata;
+            profile.threadId = profileStack.back().threadId;
+            profile.timestamp = std::chrono::system_clock::now();
+            
+            profiles.push_back(profile);
+            
+            if (profiles.size() > maxProfiles) {
+                profiles.erase(profiles.begin());
+            }
+            
+            profileStack.pop_back();
+        }
+    }
+    
+    void addProfileMetadata(const std::string& key, const std::string& value) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!profileStack.empty()) {
+            profileStack.back().metadata[key] = value;
+        }
+    }
+    
+    std::vector<ProfileData> getProfiles(const std::string& operation = "") const {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (operation.empty()) {
+            return std::vector<ProfileData>(profiles.begin(), profiles.end());
+        }
+        
+        std::vector<ProfileData> result;
+        for (const auto& profile : profiles) {
+            if (profile.operation == operation) {
+                result.push_back(profile);
+            }
+        }
+        return result;
+    }
+    
+    double getAverageDuration(const std::string& operation) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto profiles = getProfiles(operation);
+        if (profiles.empty()) return 0.0;
+        
+        double total = 0.0;
+        for (const auto& profile : profiles) {
+            total += profile.duration.count();
+        }
+        return total / profiles.size();
+    }
+    
+    double getMaxDuration(const std::string& operation) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto profiles = getProfiles(operation);
+        if (profiles.empty()) return 0.0;
+        
+        double maxDuration = 0.0;
+        for (const auto& profile : profiles) {
+            if (profile.duration.count() > maxDuration) {
+                maxDuration = profile.duration.count();
+            }
+        }
+        return maxDuration;
+    }
+    
+    std::string getProfileReport(const std::string& operation = "") const {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::stringstream ss;
+        
+        auto targetProfiles = operation.empty() ? profiles : getProfiles(operation);
+        
+        if (targetProfiles.empty()) {
+            ss << "No profiles found";
+            return ss.str();
+        }
+        
+        ss << "Performance Profile Report" << std::endl;
+        ss << "=====================" << std::endl;
+        ss << "Total profiles: " << targetProfiles.size() << std::endl;
+        ss << std::endl;
+        
+        std::map<std::string, std::vector<ProfileData>> operationGroups;
+        for (const auto& profile : targetProfiles) {
+            operationGroups[profile.operation].push_back(profile);
+        }
+        
+        for (const auto& pair : operationGroups) {
+            const auto& operationProfiles = pair.second;
+            double totalDuration = 0.0;
+            double minDuration = std::numeric_limits<double>::max();
+            double maxDuration = 0.0;
+            
+            for (const auto& profile : operationProfiles) {
+                totalDuration += profile.duration.count();
+                if (profile.duration.count() < minDuration) {
+                    minDuration = profile.duration.count();
+                }
+                if (profile.duration.count() > maxDuration) {
+                    maxDuration = profile.duration.count();
+                }
+            }
+            
+            double avgDuration = totalDuration / operationProfiles.size();
+            
+            ss << "Operation: " << pair.first << std::endl;
+            ss << "  Count: " << operationProfiles.size() << std::endl;
+            ss << "  Total: " << totalDuration << "s" << std::endl;
+            ss << "  Average: " << avgDuration << "s" << std::endl;
+            ss << "  Min: " << minDuration << "s" << std::endl;
+            ss << "  Max: " << maxDuration << "s" << std::endl;
+            ss << std::endl;
+        }
+        
+        return ss.str();
+    }
+    
+    void clear() {
+        std::lock_guard<std::mutex> lock(mutex);
+        profiles.clear();
+        profileStack.clear();
+    }
+    
+private:
+    struct ProfileStackEntry {
+        std::string operation;
+        std::chrono::steady_clock::time_point startTime;
+        std::map<std::string, std::string> metadata;
+        size_t threadId;
+    };
+    
+    size_t getCurrentThreadId() {
+        std::stringstream ss;
+        ss << std::this_thread::get_id();
+        return std::stoi(ss.str());
+    }
+    
+    mutable std::mutex mutex;
+    std::vector<ProfileData> profiles;
+    std::vector<ProfileStackEntry> profileStack;
+    size_t maxProfiles;
+};
+
+// Resource usage monitor for system-level performance tracking
+class ResourceUsageMonitor {
+public:
+    struct ResourceStats {
+        double cpuUsage;        // CPU usage percentage
+        double memoryUsage;    // Memory usage in MB
+        double memoryAvailable; // Available memory in MB
+        size_t activeThreads;  // Number of active threads
+        double diskUsage;      // Disk usage percentage
+        std::chrono::system_clock::time_point timestamp;
+        
+        ResourceStats() : cpuUsage(0.0), memoryUsage(0.0), memoryAvailable(0.0),
+                         activeThreads(0), diskUsage(0.0) {}
+    };
+    
+    ResourceUsageMonitor() : updateInterval(1000) {} // 1 second default
+    
+    void setUpdateInterval(std::chrono::milliseconds interval) {
+        updateInterval = interval;
+    }
+    
+    ResourceStats getCurrentStats() const {
+        ResourceStats stats;
+        stats.timestamp = std::chrono::system_clock::now();
+        
+        // Get thread count
+        stats.activeThreads = getThreadCount();
+        
+        // Note: In a real implementation, this would query system resources
+        // For demonstration, we'll return placeholder values
+        stats.cpuUsage = getCpuUsage();
+        stats.memoryUsage = getMemoryUsage();
+        stats.memoryAvailable = getAvailableMemory();
+        stats.diskUsage = getDiskUsage();
+        
+        return stats;
+    }
+    
+    std::string getResourceReport() const {
+        std::stringstream ss;
+        ss << "Resource Usage Report" << std::endl;
+        ss << "===================" << std::endl;
+        
+        auto stats = getCurrentStats();
+        
+        ss << "CPU Usage: " << stats.cpuUsage << "%" << std::endl;
+        ss << "Memory Usage: " << stats.memoryUsage << " MB" << std::endl;
+        ss << "Available Memory: " << stats.memoryAvailable << " MB" << std::endl;
+        ss << "Active Threads: " << stats.activeThreads << std::endl;
+        ss << "Disk Usage: " << stats.diskUsage << "%" << std::endl;
+        ss << "Last Updated: " << timestampToString(stats.timestamp) << std::endl;
+        
+        return ss.str();
+    }
+    
+    std::string timestampToString(const std::chrono::system_clock::time_point& timestamp) const {
+        auto time = std::chrono::system_clock::to_time_t(timestamp);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        return ss.str();
+    }
+    
+protected:
+    virtual double getCpuUsage() const { return 0.0; } // Override in derived classes
+    virtual double getMemoryUsage() const { return 0.0; } // Override in derived classes
+    virtual double getAvailableMemory() const { return 0.0; } // Override in derived classes
+    virtual double getDiskUsage() const { return 0.0; } // Override in derived classes
+    virtual size_t getThreadCount() const { return 0; } // Override in derived classes
+    
+    std::chrono::milliseconds updateInterval;
+};
+
+// Performance monitoring system with thresholds and alerts
+class PerformanceMonitor {
+public:
+    PerformanceMonitor() : enabled(true), alertEnabled(true) {}
+    
+    void setEnabled(bool enabled) {
+        std::lock_guard<std::mutex> lock(mutex);
+        this->enabled = enabled;
+    }
+    
+    void setAlertEnabled(bool enabled) {
+        std::lock_guard<std::mutex> lock(mutex);
+        alertEnabled = enabled;
+    }
+    
+    void addCounter(const std::string& name, MeasurementType type = MeasurementType::Custom) {
+        std::lock_guard<std::mutex> lock(mutex);
+        counters[name] = PerformanceCounter();
+        counterTypes[name] = type;
+    }
+    
+    void incrementCounter(const std::string& name, double amount = 1.0) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (counters.find(name) != counters.end()) {
+            counters[name].increment(amount);
+            checkThresholds(name, counters[name].getValue());
+        }
+    }
+    
+    void setCounter(const std::string& name, double value) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (counters.find(name) != counters.end()) {
+            // Reset and set new value
+            counters[name].reset();
+            counters[name].increment(value);
+            checkThresholds(name, value);
+        }
+    }
+    
+    double getCounterValue(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (counters.find(name) != counters.end()) {
+            return counters.at(name).getValue();
+        }
+        return 0.0;
+    }
+    
+    void startProfiling(const std::string& operation) {
+        std::lock_guard<std::mutex> lock(mutex);
+        profiler.startProfile(operation);
+    }
+    
+    void endProfiling(const std::string& operation) {
+        std::lock_guard<std::mutex> lock(mutex);
+        profiler.endProfile(operation);
+    }
+    
+    void addProfileMetadata(const std::string& key, const std::string& value) {
+        std::lock_guard<std::mutex> lock(mutex);
+        profiler.addProfileMetadata(key, value);
+    }
+    
+    void addThreshold(const std::string& name, ThresholdLevel level, 
+                     double thresholdValue, MeasurementType type = MeasurementType::Custom) {
+        std::lock_guard<std::mutex> lock(mutex);
+        thresholds.push_back({name, level, "Performance threshold exceeded", 
+                            0.0, thresholdValue, type, std::chrono::system_clock::now(), {}});
+    }
+    
+    void setResourceMonitor(std::shared_ptr<ResourceUsageMonitor> monitor) {
+        std::lock_guard<std::mutex> lock(mutex);
+        resourceMonitor = monitor;
+    }
+    
+    std::string getPerformanceReport() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::stringstream ss;
+        
+        ss << "Performance Monitoring Report" << std::endl;
+        ss << "===========================" << std::endl;
+        ss << std::endl;
+        
+        // Report on counters
+        ss << "Counters:" << std::endl;
+        for (const auto& pair : counters) {
+            ss << "  " << pair.first << ": " << pair.second.getStatistics() << std::endl;
+        }
+        
+        ss << std::endl;
+        
+        // Report on profiling
+        ss << "Profiling Summary:" << std::endl;
+        ss << profiler.getProfileReport() << std::endl;
+        
+        ss << std::endl;
+        
+        // Report on resource usage
+        if (resourceMonitor) {
+            ss << "Resource Usage:" << std::endl;
+            ss << resourceMonitor->getResourceReport() << std::endl;
+        }
+        
+        return ss.str();
+    }
+    
+    std::vector<PerformanceAlert> getActiveAlerts() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return activeAlerts;
+    }
+    
+    std::string getAlertReport() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::stringstream ss;
+        
+        if (activeAlerts.empty()) {
+            ss << "No active performance alerts." << std::endl;
+            return ss.str();
+        }
+        
+        ss << "Active Performance Alerts:" << std::endl;
+        ss << "===========================" << std::endl;
+        
+        for (const auto& alert : activeAlerts) {
+            ss << "Alert: " << alert.name << std::endl;
+            ss << "  Level: " << thresholdLevelToString(alert.level) << std::endl;
+            ss << "  Message: " << alert.message << std::endl;
+            ss << "  Current Value: " << alert.currentValue << std::endl;
+            ss << "  Threshold: " << alert.thresholdValue << std::endl;
+            ss << "  Timestamp: " << timestampToString(alert.timestamp) << std::endl;
+            ss << std::endl;
+        }
+        
+        return ss.str();
+    }
+    
+    void clearAlerts() {
+        std::lock_guard<std::mutex> lock(mutex);
+        activeAlerts.clear();
+    }
+    
+    void reset() {
+        std::lock_guard<std::mutex> lock(mutex);
+        for (auto& pair : counters) {
+            pair.second.reset();
+        }
+        profiler.clear();
+        activeAlerts.clear();
+    }
+    
+protected:
+    void checkThresholds(const std::string& name, double currentValue) {
+        if (!alertEnabled || !enabled) return;
+        
+        for (const auto& threshold : thresholds) {
+            if (threshold.name == name && currentValue >= threshold.thresholdValue) {
+                PerformanceAlert alert;
+                alert.name = threshold.name;
+                alert.level = threshold.level;
+                alert.message = threshold.message;
+                alert.currentValue = currentValue;
+                alert.thresholdValue = threshold.thresholdValue;
+                alert.measurementType = threshold.measurementType;
+                alert.timestamp = std::chrono::system_clock::now();
+                alert.context["counter_name"] = name;
+                
+                // Check if we already have a similar alert
+                bool alertExists = false;
+                for (const auto& existingAlert : activeAlerts) {
+                    if (existingAlert.name == alert.name && 
+                        existingAlert.level == alert.level &&
+                        std::abs(existingAlert.currentValue - alert.currentValue) < 0.01) {
+                        alertExists = true;
+                        break;
+                    }
+                }
+                
+                if (!alertExists) {
+                    activeAlerts.push_back(alert);
+                    NLM_LOG_WARNING(std::string("Performance threshold exceeded: ") + alert.message);
+                    NLM_LOG_WARNING(std::string("  " + name + ": ") + std::to_string(currentValue) + 
+                                 " >= " + std::to_string(threshold.thresholdValue));
+                }
+            }
+        }
+    }
+    
+    std::string thresholdLevelToString(ThresholdLevel level) const {
+        switch (level) {
+            case ThresholdLevel::Info: return "INFO";
+            case ThresholdLevel::Warning: return "WARNING";
+            case ThresholdLevel::Critical: return "CRITICAL";
+            case ThresholdLevel::Fatal: return "FATAL";
+            default: return "UNKNOWN";
+        }
+    }
+    
+    std::string timestampToString(const std::chrono::system_clock::time_point& timestamp) const {
+        auto time = std::chrono::system_clock::to_time_t(timestamp);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+        return ss.str();
+    }
+    
+    mutable std::mutex mutex;
+    bool enabled;
+    bool alertEnabled;
+    std::map<std::string, PerformanceCounter> counters;
+    std::map<std::string, MeasurementType> counterTypes;
+    PerformanceProfiler profiler;
+    std::vector<PerformanceAlert> thresholds;
+    std::vector<PerformanceAlert> activeAlerts;
+    std::shared_ptr<ResourceUsageMonitor> resourceMonitor;
+};
+
+// NLM Performance Monitor - integrated with existing NLM logging
+class NLMPerformanceMonitor {
+public:
+    NLMPerformanceMonitor() {
+        // Initialize with default counters
+        addDefaultCounters();
+    }
+    
+    void initialize() {
+        NLM_LOG_INFO("NLM Performance Monitor initialized");
+    }
+    
+    void incrementCounter(const std::string& name, double amount = 1.0) {
+        monitor.incrementCounter(name, amount);
+    }
+    
+    void setCounter(const std::string& name, double value) {
+        monitor.setCounter(name, value);
+    }
+    
+    double getCounterValue(const std::string& name) const {
+        return monitor.getCounterValue(name);
+    }
+    
+    void startProfiling(const std::string& operation) {
+        monitor.startProfiling(operation);
+    }
+    
+    void endProfiling(const std::string& operation) {
+        monitor.endProfiling(operation);
+    }
+    
+    void addProfileMetadata(const std::string& key, const std::string& value) {
+        monitor.addProfileMetadata(key, value);
+    }
+    
+    void addThreshold(const std::string& name, ThresholdLevel level,
+                     double thresholdValue, MeasurementType type = MeasurementType::Custom) {
+        monitor.addThreshold(name, level, thresholdValue, type);
+    }
+    
+    std::string getPerformanceReport() const {
+        return monitor.getPerformanceReport();
+    }
+    
+    std::string getAlertReport() const {
+        return monitor.getAlertReport();
+    }
+    
+    void clearAlerts() {
+        monitor.clearAlerts();
+    }
+    
+    void reset() {
+        monitor.reset();
+    }
+    
+    // Convenience methods for common performance operations
+    void recordBrainStep(size_t steps = 1) {
+        incrementCounter("brain_steps", static_cast<double>(steps));
+    }
+    
+    void recordNeuronFiring(size_t neurons = 1) {
+        incrementCounter("neuron_firings", static_cast<double>(neurons));
+    }
+    
+    void recordSynapseCreation(size_t synapses = 1) {
+        incrementCounter("synapse_creations", static_cast<double>(synapses));
+    }
+    
+    void recordMemoryAllocation(size_t bytes = 0) {
+        incrementCounter("memory_allocations", static_cast<double>(bytes));
+    }
+    
+    void recordSimulationTime(double seconds) {
+        setCounter("simulation_time", seconds);
+    }
+    
+    void recordPeakMemoryUsage(double mb) {
+        setCounter("peak_memory_usage", mb);
+    }
+    
+    void startBrainStep() {
+        startProfiling("brain_step");
+    }
+    
+    void endBrainStep() {
+        endProfiling("brain_step");
+    }
+    
+    void startExperiment(const std::string& experimentName) {
+        startProfiling(experimentName);
+    }
+    
+    void endExperiment(const std::string& experimentName) {
+        endProfiling(experimentName);
+    }
+    
+protected:
+    void addDefaultCounters() {
+        monitor.addCounter("brain_steps", MeasurementType::Time);
+        monitor.addCounter("neuron_firings", MeasurementType::Count);
+        monitor.addCounter("synapse_creations", MeasurementType::Count);
+        monitor.addCounter("memory_allocations", MeasurementType::Memory);
+        monitor.addCounter("simulation_time", MeasurementType::Time);
+        monitor.addCounter("peak_memory_usage", MeasurementType::Memory);
+        
+        // Add common thresholds
+        monitor.addThreshold("neuron_firings", ThresholdLevel::Warning, 1000.0);
+        monitor.addThreshold("simulation_time", ThresholdLevel::Warning, 10.0);
+        monitor.addThreshold("peak_memory_usage", ThresholdLevel::Warning, 512.0);
+    }
+    
+    PerformanceMonitor monitor;
+};
+
+// Global performance monitor instance
+class GlobalPerformanceMonitor {
+public:
+    static GlobalPerformanceMonitor& getInstance() {
+        static GlobalPerformanceMonitor instance;
+        return instance;
+    }
+    
+    void initialize() {
+        if (!initialized) {
+            performanceMonitor = std::make_shared<NLMPerformanceMonitor>();
+            performanceMonitor->initialize();
+            initialized = true;
+            NLM_LOG_INFO("Global Performance Monitor initialized");
+        }
+    }
+    
+    void shutdown() {
+        if (initialized) {
+            NLM_LOG_INFO("Global Performance Monitor shutdown complete");
+            performanceMonitor.reset();
+            initialized = false;
+        }
+    }
+    
+    static void incrementCounter(const std::string& name, double amount = 1.0) {
+        getInstance().internalIncrementCounter(name, amount);
+    }
+    
+    static void setCounter(const std::string& name, double value) {
+        getInstance().internalSetCounter(name, value);
+    }
+    
+    static double getCounterValue(const std::string& name) {
+        return getInstance().internalGetCounterValue(name);
+    }
+    
+    static void startProfiling(const std::string& operation) {
+        getInstance().internalStartProfiling(operation);
+    }
+    
+    static void endProfiling(const std::string& operation) {
+        getInstance().internalEndProfiling(operation);
+    }
+    
+    static std::string getPerformanceReport() {
+        return getInstance().internalGetPerformanceReport();
+    }
+    
+    static std::string getAlertReport() {
+        return getInstance().internalGetAlertReport();
+    }
+    
+    static void clearAlerts() {
+        getInstance().internalClearAlerts();
+    }
+    
+    // Convenience methods for NLM-specific operations
+    static void recordBrainStep(size_t steps = 1) {
+        incrementCounter("brain_steps", static_cast<double>(steps));
+    }
+    
+    static void recordNeuronFiring(size_t neurons = 1) {
+        incrementCounter("neuron_firings", static_cast<double>(neurons));
+    }
+    
+    static void recordSynapseCreation(size_t synapses = 1) {
+        incrementCounter("synapse_creations", static_cast<double>(synapses));
+    }
+    
+    static void recordSimulationTime(double seconds) {
+        setCounter("simulation_time", seconds);
+    }
+    
+    static void startBrainStep() {
+        startProfiling("brain_step");
+    }
+    
+    static void endBrainStep() {
+        endProfiling("brain_step");
+    }
+    
+    static void startExperiment(const std::string& experimentName) {
+        startProfiling(experimentName);
+    }
+    
+    static void endExperiment(const std::string& experimentName) {
+        endProfiling(experimentName);
+    }
+    
+private:
+    GlobalPerformanceMonitor() = default;
+    ~GlobalPerformanceMonitor() = default;
+    
+    void internalIncrementCounter(const std::string& name, double amount) {
+        if (performanceMonitor) {
+            performanceMonitor->incrementCounter(name, amount);
+        }
+    }
+    
+    void internalSetCounter(const std::string& name, double value) {
+        if (performanceMonitor) {
+            performanceMonitor->setCounter(name, value);
+        }
+    }
+    
+    double internalGetCounterValue(const std::string& name) {
+        if (performanceMonitor) {
+            return performanceMonitor->getCounterValue(name);
+        }
+        return 0.0;
+    }
+    
+    void internalStartProfiling(const std::string& operation) {
+        if (performanceMonitor) {
+            performanceMonitor->startProfiling(operation);
+        }
+    }
+    
+    void internalEndProfiling(const std::string& operation) {
+        if (performanceMonitor) {
+            performanceMonitor->endProfiling(operation);
+        }
+    }
+    
+    std::string internalGetPerformanceReport() {
+        if (performanceMonitor) {
+            return performanceMonitor->getPerformanceReport();
+        }
+        return "Performance monitor not initialized";
+    }
+    
+    std::string internalGetAlertReport() {
+        if (performanceMonitor) {
+            return performanceMonitor->getAlertReport();
+        }
+        return "Performance monitor not initialized";
+    }
+    
+    void internalClearAlerts() {
+        if (performanceMonitor) {
+            performanceMonitor->clearAlerts();
+        }
+    }
+    
+    bool initialized = false;
+    std::shared_ptr<NLMPerformanceMonitor> performanceMonitor;
+};
+
+// Convenience functions for performance monitoring
+namespace performance {
+    
+    inline void initialize() {
+        GlobalPerformanceMonitor::getInstance().initialize();
+    }
+    
+    inline void shutdown() {
+        GlobalPerformanceMonitor::getInstance().shutdown();
+    }
+    
+    inline void incrementCounter(const std::string& name, double amount = 1.0) {
+        GlobalPerformanceMonitor::incrementCounter(name, amount);
+    }
+    
+    inline void setCounter(const std::string& name, double value) {
+        GlobalPerformanceMonitor::setCounter(name, value);
+    }
+    
+    inline double getCounterValue(const std::string& name) {
+        return GlobalPerformanceMonitor::getCounterValue(name);
+    }
+    
+    inline void startProfiling(const std::string& operation) {
+        GlobalPerformanceMonitor::startProfiling(operation);
+    }
+    
+    inline void endProfiling(const std::string& operation) {
+        GlobalPerformanceMonitor::endProfiling(operation);
+    }
+    
+    inline std::string getPerformanceReport() {
+        return GlobalPerformanceMonitor::getPerformanceReport();
+    }
+    
+    inline std::string getAlertReport() {
+        return GlobalPerformanceMonitor::getAlertReport();
+    }
+    
+    inline void clearAlerts() {
+        GlobalPerformanceMonitor::clearAlerts();
+    }
+    
+    // Convenience methods for NLM operations
+    inline void recordBrainStep(size_t steps = 1) {
+        GlobalPerformanceMonitor::recordBrainStep(steps);
+    }
+    
+    inline void recordNeuronFiring(size_t neurons = 1) {
+        GlobalPerformanceMonitor::recordNeuronFiring(neurons);
+    }
+    
+    inline void recordSynapseCreation(size_t synapses = 1) {
+        GlobalPerformanceMonitor::recordSynapseCreation(synapses);
+    }
+    
+    inline void recordSimulationTime(double seconds) {
+        GlobalPerformanceMonitor::recordSimulationTime(seconds);
+    }
+    
+    inline void startBrainStep() {
+        GlobalPerformanceMonitor::startBrainStep();
+    }
+    
+    inline void endBrainStep() {
+        GlobalPerformanceMonitor::endBrainStep();
+    }
+    
+    inline void startExperiment(const std::string& experimentName) {
+        GlobalPerformanceMonitor::startExperiment(experimentName);
+    }
+    
+    inline void endExperiment(const std::string& experimentName) {
+        GlobalPerformanceMonitor::endExperiment(experimentName);
+    }
+    
+} // namespace performance
+
+} // namespace nlm
