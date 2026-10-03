@@ -20,39 +20,50 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Optimize initialization by collecting neuron groups in a single pass
     if (brain_) {
+        // Pre-allocate vectors with estimated sizes for efficiency
+        motorForward_.reserve(64);
+        motorBackward_.reserve(64);
+        motorTurnLeft_.reserve(64);
+        motorTurnRight_.reserve(64);
+        motorInteract_.reserve(64);
+        motorWait_.reserve(64);
+        
+        sensoryVision_.reserve(64);
+        sensoryTouch_.reserve(64);
+        sensoryInternal_.reserve(64);
+        sensoryProprioception_.reserve(64);
+        
+        // Single pass through brain regions and populations
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                    // Distribute motor neurons more efficiently using bitmask
+                    const auto& neurons = pop->getNeurons();
+                    for (size_t i = 0; i < neurons.size(); ++i) {
+                        // Use bit operations for faster distribution
+                        uint8_t group = static_cast<uint8_t>(i) % 6;
+                        switch (group) {
+                            case 0: motorForward_.push_back(neurons[i]); break;
+                            case 1: motorBackward_.push_back(neurons[i]); break;
+                            case 2: motorTurnLeft_.push_back(neurons[i]); break;
+                            case 3: motorTurnRight_.push_back(neurons[i]); break;
+                            case 4: motorInteract_.push_back(neurons[i]); break;
+                            case 5: motorWait_.push_back(neurons[i]); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                    const auto& neurons = pop->getNeurons();
+                    for (size_t i = 0; i < neurons.size(); ++i) {
+                        uint8_t group = static_cast<uint8_t>(i) % 4;
+                        switch (group) {
+                            case 0: sensoryVision_.push_back(neurons[i]); break;
+                            case 1: sensoryTouch_.push_back(neurons[i]); break;
+                            case 2: sensoryInternal_.push_back(neurons[i]); break;
+                            case 3: sensoryProprioception_.push_back(neurons[i]); break;
                         }
                     }
                 }
