@@ -139,8 +139,21 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Tests (Phase 2 test framework)
+add_executable(nlm_tests
+    tests/TestMain.cpp
+)
+target_link_libraries(nlm_tests PUBLIC nlm_core)
+
+# Phase 5: Performance benchmarks (if needed)
+# add_executable(nlm_benchmark
+#     src/benchmark.cpp
+# )
+# target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
 # Testing
 enable_testing()
+add_test(NAME NLM_Tests COMMAND nlm_tests)
 add_subdirectory(tests)
 
 # Install targets (future)
