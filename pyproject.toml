@@ -54,4 +54,4 @@ NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
