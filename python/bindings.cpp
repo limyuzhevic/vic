@@ -142,24 +142,36 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(
+        Configuration class for NLM system.
+        
+        The Config class manages key-value pairs for configuring neural simulation parameters.
+        Supports int, double, string, bool, and vector types. Values can be loaded from
+        files, command line arguments, or set at runtime.
+        
+        Examples:
+            >>> config = pynlm.createDefaultConfig()
+            >>> config.set("brain.neuron_count", 1000)
+            >>> brain = pynlm.createBrain(config)
+            >>> brain.initialize()
+        )pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             R"pbdoc(Load configuration from a JSON file. Returns True on success.)pbdoc")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            R"pbdoc(Load configuration from command line arguments. Returns True on success.)pbdoc")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             R"pbdoc(Save configuration to a JSON file. Returns True on success.)pbdoc")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+             R"pbdoc(Check if a configuration key exists.)pbdoc")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             R"pbdoc(Get all configuration keys.)pbdoc")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+             R"pbdoc(Clear all configuration entries.)pbdoc")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             R"pbdoc(Get a summary string of the configuration for debugging.)pbdoc")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
